@@ -69,7 +69,7 @@ target_compile_definitions(fcremote PRIVATE
 )
 
 if(MSVC)
-  target_compile_options(fcremote PRIVATE /MP /W3 /MT /GS-)
+  target_compile_options(fcremote PRIVATE /MP /W3 /MT /GS- /Oi-)
   set_source_files_properties(
     "${SAL_PLUGINS}/filecomp/fcremote/messages_fcremote.cpp"
     "${SAL_PLUGINS}/filecomp/fcremote/rtc_stubs_fcremote.cpp"
