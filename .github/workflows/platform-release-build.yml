@@ -1,0 +1,76 @@
+# SPDX-FileCopyrightText: 2026 Elias Bachaalany
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+name: Platform Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag or commit to build
+        required: true
+        default: v1.0.27
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }} Release
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            cmake_arch: x64
+          - arch: x86
+            cmake_arch: Win32
+          - arch: ARM64
+            cmake_arch: ARM64
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout requested ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Register MSVC problem matcher
+        uses: ammaraskar/msvc-problem-matcher@master
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -A ${{ matrix.cmake_arch }}
+          -DSAL_UNDER_CI=ON
+          -DSAL_BUILD_DEMOPLUG=OFF
+
+      - name: Build Release
+        run: cmake --build build --config Release -j
+
+      - name: Populate runtime
+        run: cmake --build build --config Release --target populate -j
+
+      - name: Verify runtime layout
+        run: |
+          $runtime = "build/out/sally/Release_${{ matrix.arch }}"
+          if (!(Test-Path -LiteralPath "$runtime/sally.exe")) {
+            throw "Missing $runtime/sally.exe"
+          }
+          if (!(Test-Path -LiteralPath "$runtime/lang/english.slg")) {
+            throw "Missing $runtime/lang/english.slg"
+          }
+          if (!(Test-Path -LiteralPath "$runtime/plugins/plugins.ver")) {
+            throw "Missing $runtime/plugins/plugins.ver"
+          }
+
+      - name: Upload populated runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sally-${{ inputs.ref }}-${{ matrix.arch }}-raw
+          path: build/out/sally/Release_${{ matrix.arch }}/
+          if-no-files-found: error
+          retention-days: 7
