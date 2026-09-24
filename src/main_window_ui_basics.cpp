@@ -2687,18 +2687,13 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
 */
         case 8:
         {
-            // Read the exact UTF-16 hot text directly from the directory-line owner.
-            std::wstring hotTextW;
-            panel->DirectoryLine->GetHotTextW(hotTextW);
-            CopyTextToClipboardW(hotTextW.c_str());
+            CopyTextToClipboardW(HotText.c_str());
             panel->DirectoryLine->FlashText(TRUE);
         }
         break;
         case 9:
         {
-            std::wstring hotTextW;
-            panel->StatusLine->GetHotTextW(hotTextW);
-            CopyTextToClipboardW(hotTextW.c_str());
+            CopyTextToClipboardW(HotText.c_str());
             panel->StatusLine->FlashText(TRUE);
         }
         break;

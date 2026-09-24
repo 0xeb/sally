@@ -37,7 +37,7 @@
 // absent in a fresh clone before configure. A plain header it can always read.
 #define VERSINFO_SALAMANDER_MAJOR 1
 #define VERSINFO_SALAMANDER_MINORA 0
-#define VERSINFO_SALAMANDER_MINORB 27
+#define VERSINFO_SALAMANDER_MINORB 28
 
 // Sally versions are three dotted parts (1.0.25). Open Salamander used "hundredths",
 // concatenating MINORB with no separator - 2,5,1 read as "2.51" - and suppressing a zero
