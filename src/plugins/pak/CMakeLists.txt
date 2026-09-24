@@ -21,7 +21,7 @@ sal_add_plugin(NAME pak
 
 # pak lang file is in spl/lang/ instead of lang/
 set_source_files_properties("${SAL_PLUGINS}/pak/spl/lang/lang.rc" PROPERTIES
-  COMPILE_DEFINITIONS "_LANG;WINVER=0x0601"
+  COMPILE_DEFINITIONS "_LANG;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
 )
 add_library(plugin_pak_lang SHARED "${SAL_PLUGINS}/pak/spl/lang/lang.rc")
 target_include_directories(plugin_pak_lang PRIVATE
