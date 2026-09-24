@@ -35,7 +35,7 @@ function(sal_add_plugin_lang)
 
   # RC files need defines set via source properties
   set_source_files_properties("${LANG_RC}" PROPERTIES
-    COMPILE_DEFINITIONS "_LANG;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+    COMPILE_DEFINITIONS "_LANG;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
   )
 
   add_library(${TARGET_NAME} SHARED "${LANG_RC}")

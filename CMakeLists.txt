@@ -151,7 +151,7 @@ endif()
 
 # Resource file settings
 set_source_files_properties(${sally_RC} PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
 )
 
 # bzip2 C sources need BZ_NO_STDIO
@@ -197,7 +197,7 @@ set_target_properties(sally PROPERTIES
 
 # RC files need defines set via source properties, not target_compile_definitions
 set_source_files_properties("${SAL_SRC}/lang/lang.rc" PROPERTIES
-  COMPILE_DEFINITIONS "_LANG;_LANG_SALLY;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+  COMPILE_DEFINITIONS "_LANG;_LANG_SALLY;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
 )
 
 add_library(sal_lang_english SHARED "${SAL_SRC}/lang/lang.rc")
@@ -454,7 +454,7 @@ target_compile_definitions(salext PRIVATE
 )
 
 set_source_files_properties("${SAL_SRC}/shellext/shellext.rc" PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
+  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
 )
 
 if(MSVC)

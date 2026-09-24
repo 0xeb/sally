@@ -66,6 +66,16 @@ jobs:
           if (!(Test-Path -LiteralPath "$runtime/plugins/plugins.ver")) {
             throw "Missing $runtime/plugins/plugins.ver"
           }
+          $expectedSuffix = "(${{ matrix.arch }})"
+          $versionedFiles = @("$runtime/sally.exe") +
+            @(Get-ChildItem -LiteralPath $runtime -Recurse -Filter english.slg -File |
+              Select-Object -ExpandProperty FullName)
+          foreach ($file in $versionedFiles) {
+            $fileVersion = (Get-Item -LiteralPath $file).VersionInfo.FileVersion
+            if (!$fileVersion.EndsWith($expectedSuffix, [StringComparison]::Ordinal)) {
+              throw "$file reports '$fileVersion'; expected architecture suffix '$expectedSuffix'"
+            }
+          }
 
       - name: Upload populated runtime
         uses: actions/upload-artifact@v4

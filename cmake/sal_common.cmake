@@ -32,6 +32,14 @@ else()
   set(SAL_PLATFORM "x86")
 endif()
 
+# Resource Compiler does not define the MSVC architecture macros consistently.
+set(SAL_RC_PLATFORM_DEFINES)
+if(SAL_PLATFORM STREQUAL "ARM64")
+  list(APPEND SAL_RC_PLATFORM_DEFINES _WIN64 _M_ARM64)
+elseif(SAL_PLATFORM STREQUAL "x64")
+  list(APPEND SAL_RC_PLATFORM_DEFINES _WIN64)
+endif()
+
 # Output directory base
 if(NOT DEFINED SAL_OUTPUT_DIR)
   if(DEFINED ENV{OPENSAL_BUILD_DIR} AND NOT "$ENV{OPENSAL_BUILD_DIR}" STREQUAL "")
