@@ -1391,10 +1391,10 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
     {
         if (dragFiles && !SalShExtRegistered)
         {
-            TRACE_E("Drag&drop from archives is not possible, shell extension utils\\salextx86.dll or utils\\salextx64.dll is missing!");
+            TRACE_E("Drag&drop from archives is not possible because the native shell extension is missing!");
         }
         if (action == saCopyToClipboard && !SalShExtRegistered)
-            TRACE_E("Copy&paste from archives is not possible, shell extension utils\\salextx86.dll or utils\\salextx64.dll is missing!");
+            TRACE_E("Copy&paste from archives is not possible because the native shell extension is missing!");
         // we do not support other archive operations yet
         return;
     }
@@ -1405,7 +1405,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
              !panel->GetPluginFS()->IsServiceSupported(FS_SERVICE_COPYFROMFS))) // FS umi "copy from FS"
     {
         if (!SalShExtRegistered)
-            TRACE_E("Drag&drop from file-systems is not possible, shell extension utils\\salextx86.dll or utils\\salextx64.dll is missing!");
+            TRACE_E("Drag&drop from file-systems is not possible because the native shell extension is missing!");
         if (!panel->GetPluginFS()->NotEmpty())
             TRACE_E("Unexpected situation in ShellAction(): panel->GetPluginFS() is empty!");
         return;
@@ -1580,7 +1580,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                                             TRACE_E("Shared memory is too small!");
                                                         ReleaseMutex(SalShExtSharedMemMutex);
 
-                                                        if (!sharedMemOK) // if it's not possible to establish communication with salextx86.dll or salextx64.dll, it makes no sense to leave data-object on clipboard
+                                                        if (!sharedMemOK) // if shell-extension communication is unavailable, it makes no sense to leave the data object on the clipboard
                                                         {
                                                             gClipboard->Clear();
                                                             OurDataOnClipboard = FALSE; // theoretically unnecessary (should be set in Release() of fakeDataObject - a few lines below)

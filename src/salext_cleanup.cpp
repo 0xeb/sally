@@ -43,7 +43,9 @@ bool IsStaleSalextRegistration(const wchar_t* currentSalextPath, const wchar_t* 
 
     // Only ever act on our own shell-extension DLL by exact basename — never a arbitrary CLSID.
     const wchar_t* base = BaseName(registeredPath);
-    if (_wcsicmp(base, L"salextx64.dll") != 0 && _wcsicmp(base, L"salextx86.dll") != 0)
+    if (_wcsicmp(base, L"salextx64.dll") != 0 &&
+        _wcsicmp(base, L"salextx86.dll") != 0 &&
+        _wcsicmp(base, L"salextARM64.dll") != 0)
         return false;
 
     // The current install's own registration is not stale.

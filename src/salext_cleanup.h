@@ -10,13 +10,13 @@
 //
 // Every past Sally/Salamander version registered its shell extension under a sibling CLSID in
 // the family {c78b61XX-f3ea-11d2-94a1-00e0292a01e3}, each pointing at its own per-install
-// utils\salextx64.dll (or salextx86.dll). After an upgrade those old DLLs stay loaded/locked
+// utils\salextx64.dll, salextx86.dll, or salextARM64.dll. After an upgrade those old DLLs stay loaded/locked
 // by Explorer, so the previous install folder cannot be deleted. CleanupStaleShellExtensions()
 // (sally_entry_lifecycle.cpp) walks the CLSID family and uses this predicate to decide which
 // registered DLL paths are stale and safe to reclaim.
 //
-// Returns true when 'registeredPath' names a Sally shell-extension DLL (basename salextx64.dll
-// or salextx86.dll, case-insensitive), is non-empty, and differs (case-insensitively) from the
+// Returns true when 'registeredPath' names a Sally shell-extension DLL (basename salextx64.dll,
+// salextx86.dll, or salextARM64.dll, case-insensitive), is non-empty, and differs (case-insensitively) from the
 // current install's DLL path. The caller additionally confirms the file still exists on disk
 // before scheduling it for deletion on reboot. Pure / no I/O, so it is headless-testable.
 bool IsStaleSalextRegistration(const wchar_t* currentSalextPath, const wchar_t* registeredPath);

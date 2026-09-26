@@ -4147,9 +4147,10 @@ FIND_NEW_SLG_FILE:
     // the ANSI-boundary policy already established at ChangePathToArchive
     // (files_window_actions.cpp) - if neither succeeds, skip registering that DLL rather than
     // risk registering (or reporting missing) the wrong file.
-    std::wstring shellExtX86PathW, shellExtX64PathW;
+    std::wstring shellExtX86PathW, shellExtX64PathW, shellExtARM64PathW;
     BOOL haveX86PathW = BuildModuleRelativePathW(HInstance, L"utils\\salextx86.dll", shellExtX86PathW);
     BOOL haveX64PathW = BuildModuleRelativePathW(HInstance, L"utils\\salextx64.dll", shellExtX64PathW);
+    BOOL haveARM64PathW = BuildModuleRelativePathW(HInstance, L"utils\\salextARM64.dll", shellExtARM64PathW);
     auto resolveShellExtPath = [](const std::wstring& wide, std::wstring& outPath) -> BOOL
     {
         // SECRegisterToRegistry takes const wchar_t* directly - the ANSI
@@ -4172,12 +4173,19 @@ FIND_NEW_SLG_FILE:
         outPath = *verified;
         return TRUE;
     };
-    std::wstring shellExtX86Path, shellExtX64Path;
+    std::wstring shellExtX86Path, shellExtX64Path, shellExtARM64Path;
     BOOL haveX86Path = haveX86PathW && resolveShellExtPath(shellExtX86PathW, shellExtX86Path);
     BOOL haveX64Path = haveX64PathW && resolveShellExtPath(shellExtX64PathW, shellExtX64Path);
-    if (haveX86Path || haveX64Path)
+    BOOL haveARM64Path = haveARM64PathW && resolveShellExtPath(shellExtARM64PathW, shellExtARM64Path);
+    if (haveX86Path || haveX64Path || haveARM64Path)
     {
-#ifdef _WIN64
+#if defined(_M_ARM64)
+        if (haveARM64Path && FileExistsW(shellExtARM64Path.c_str()))
+            SalShExtRegistered = SECRegisterToRegistry(shellExtARM64Path.c_str(), FALSE, 0);
+        else
+            SalShExtRegistered = FALSE;
+        const std::wstring& cleanupPathW = shellExtARM64PathW;
+#elif defined(_WIN64)
         BOOL x86Present = haveX86Path && FileExistsW(shellExtX86Path.c_str());
         BOOL x86Registered = FALSE;
         if (x86Present)
@@ -4202,7 +4210,7 @@ FIND_NEW_SLG_FILE:
                 SalShExtRegistered = FALSE;
         }
         const std::wstring& cleanupPathW = Windows64Bit ? shellExtX64PathW : shellExtX86PathW;
-#endif // _WIN64
+#endif
 
         // #82: reclaim previous installs' salext DLLs still locked by Explorer so their folders
         // become deletable (schedules delete-on-reboot; best-effort, needs admin).

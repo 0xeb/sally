@@ -23,11 +23,13 @@ HANDLE LogFile = NULL;
 HANDLE LogFileMutex = NULL;
 wchar_t* ModuleName = NULL;
 
-#ifdef _WIN64
+#ifdef _M_ARM64
+const char* ShExtName = "salextARM64.dll";
+#elif defined(_WIN64)
 const char* ShExtName = "salextx64.dll";
-#else  // _WIN64
+#else
 const char* ShExtName = "salextx86.dll";
-#endif // _WIN64
+#endif
 
 static wchar_t* GetModuleFileNameOwned(HMODULE module)
 {

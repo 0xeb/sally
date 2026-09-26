@@ -10,11 +10,13 @@
 #define FILE_VER "1.50\0"
 #define FILE_COPYRIGHT "Copyright \xA9 2003-2023 Open Salamander Authors; \xA9 2025-2026 Elias Bachaalany\0"
 
-#ifdef _WIN64
+#ifdef _M_ARM64
+#define FILE_DESCR "Shell Extension (ARM64) for Sally " FILE_SALVER "\0"
+#elif defined(_WIN64)
 #define FILE_DESCR "Shell Extension (x64) for Sally " FILE_SALVER "\0"
-#else // _WIN64
+#else
 #define FILE_DESCR "Shell Extension (x86) for Sally " FILE_SALVER "\0"
-#endif // _WIN64
+#endif
 
 1 VERSIONINFO
  FILEVERSION 1,4,9,VERSINFO_BUILDNUMBER
@@ -30,22 +32,27 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "Comments", "This DLL is registered as a shell extension in the Windows registry. It provides support for Drag & Drop and Cut / Copy & Paste from archives and plugin file-systems to Windows Explorer. It can be locked by Windows, so it may not be possible to delete it directly. If you have uninstalled Sally, you should restart Windows to remove this DLL (this DLL will be removed on next start of Windows). If you want to uninstall this DLL manually, open Command Prompt (run cmd.exe or command.com), run ""regsvr32 /u "
-#ifdef _WIN64
+#ifdef _M_ARM64
+            "salextARM64"
+#elif defined(_WIN64)
             "salextx64"
-#else // _WIN64
+#else
             "salextx86"
-#endif // _WIN64
+#endif
             ".dll"", restart Windows, and try to delete this DLL again (it should not be registered as the shell extension, so it should be possible to delete it).\0"
             VALUE "CompanyName", "Sally\0"
             VALUE "FileDescription", FILE_DESCR
             VALUE "FileVersion", FILE_VER
-#ifdef _WIN64
+#ifdef _M_ARM64
+            VALUE "InternalName", "salextARM64\0"
+            VALUE "OriginalFilename", "salextARM64.dll\0"
+#elif defined(_WIN64)
             VALUE "InternalName", "salextx64\0"
             VALUE "OriginalFilename", "salextx64.dll\0"
-#else // _WIN64
+#else
             VALUE "InternalName", "salextx86\0"
             VALUE "OriginalFilename", "salextx86.dll\0"
-#endif // _WIN64
+#endif
             VALUE "LegalCopyright", FILE_COPYRIGHT
             VALUE "ProductVersion", VERSINFO_SALAMANDER_VERSION "\0"
             VALUE "ProductName", "Sally\0"
