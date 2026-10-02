@@ -233,10 +233,9 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
         // same table at icncache.cpp - so both folds move in this one commit, and the array
         // is rebuilt in memory by ReadAssociations() on every start, which is why no
         // migration or re-sort is needed. NOT towlower(): see the note on FoldCharW itself.
-        // ⚠ The *(DWORD*)dstExt = 0 below is load-bearing - CompareDWORDS reads past
+        // ⚠ The key must come from MakeDwordCompareKey - CompareDWORDS reads past
         // lengthBytes in DWORD steps, so the two-wide-NUL pad keeps that read defined.
-        lowerExtension = sally::text::Fold(f->Ext);
-        lowerExtension.append(2, L'\0'); // CompareDWORDS reads through DWORD alignment.
+        lowerExtension = MakeDwordCompareKey(sally::text::Fold(f->Ext));
 
         // _wcsicmp: a DWORD spans four narrow characters but only TWO
         // wide ones, so *(DWORD*)lowerExtension == *(DWORD*)"exe" could never match once
@@ -295,7 +294,7 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                 if (isDir) // it's a directory
                 {
                     int icon;
-                    fileName.assign(f->Name, f->NameLen);
+                    fileName = MakeDwordCompareKey(f->Name, f->NameLen); // #115: padded lookup key
 
                     if (!IconCache->GetIndex(fileName.c_str(), icon, NULL, NULL) ||                     // the icon-thread isn't loading it
                         IconCache->At(icon).GetFlag() != 1 && IconCache->At(icon).GetFlag() != 2 ||     // neither new nor old icon is loaded
@@ -323,7 +322,7 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                         if (exceptions || Associations[index].GetIndex(iconSize) < 0) // dynamic icon (from the file) or a loaded static icon
                         {                                                             // icon in the file
                             int icon;
-                            fileName.assign(f->Name, f->NameLen);
+                            fileName = MakeDwordCompareKey(f->Name, f->NameLen); // #115: padded lookup key
                             if (!IconCache->GetIndex(fileName.c_str(), icon, NULL, NULL) ||                 // the icon-thread isn't loading it
                                 IconCache->At(icon).GetFlag() != 1 && IconCache->At(icon).GetFlag() != 2 || // neither new nor old icon is loaded
                                 !IconCache->GetIcon(IconCache->At(icon).GetIndex(),
@@ -1419,7 +1418,7 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             if (Is(ptDisk) && !isDir)
             {
                 int icon;
-                const std::wstring fileName(f->Name, f->NameLen);
+                const std::wstring fileName = MakeDwordCompareKey(f->Name, f->NameLen); // #115: padded lookup key
 
                 if (IconCache->GetIndex(fileName.c_str(), icon, NULL, NULL))
                 {

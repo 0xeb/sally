@@ -14,6 +14,7 @@
 #include "mainwnd.h"
 #include "plugins.h"
 #include "geticon.h"
+#include "dword_compare_key.h"
 #include "logo.h"
 
 // should be a multiple of IL_ITEMS_IN_ROW value
@@ -40,33 +41,7 @@ CIconCache::~CIconCache()
     Destroy();
 }
 
-// Raw DWORD-wise comparator over the packed sort keys. It is NOT
-// lexicographic (it compares four bytes at a time as a little-endian DWORD) -- it is a
-// consistent arbitrary total order, which is all the sort and the binary search need,
-// provided both use it. The keys (CIconData::NameAndData, CAssociationData::
-// ExtensionAndData) are wchar_t* and DWORD-aligned with zero padding, so the parameters
-// are void* and 'lengthBytes' is a BYTE span -- the old name said DWORDs but the code
-// always used it as a byte offset, and every caller now derives it from wcslen().
-inline int CompareDWORDS(const void* p1, const void* p2, int lengthBytes)
-{
-    const char* s1 = (const char*)p1;
-    const char* s2 = (const char*)p2;
-    const char* end = s1 + lengthBytes;
-    while (s1 <= end)
-    {
-        //    if ((res = *(DWORD *)s1 - *(DWORD *)s2) != 0) return res;  // this doesn't work (try 0x8 and 0x0 in 4-bit numbers)
-        if (*(DWORD*)s1 > *(DWORD*)s2)
-            return 1;
-        else
-        {
-            if (*(DWORD*)s1 < *(DWORD*)s2)
-                return -1;
-        }
-        s1 += sizeof(DWORD);
-        s2 += sizeof(DWORD);
-    }
-    return 0;
-}
+// CompareDWORDS lives in dword_compare_key.h beside the lookup-key builder its callers need.
 
 void CIconCache::SortArray(int left, int right, CPluginDataInterfaceEncapsulation* dataIface)
 {

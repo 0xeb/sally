@@ -11,6 +11,7 @@
 #include "fileswnd.h"
 #include "zip.h"
 #include "pack.h"
+#include "pack_listing_date.h"
 #include "common/ExternalToolRunner.h"
 #include "common/IFileSystem.h"
 #include "common/PackerCommandLinePolicy.h"
@@ -359,36 +360,14 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
     }
     else
     {
-        // otherwise read all three parts of the date
-        int i;
-        for (i = 1; i < 4; i++)
-        {
-            WORD tmpnum = 0;
-            // read a number
-            while (*tmpbuf >= '0' && *tmpbuf <= '9')
-            {
-                tmpnum = tmpnum * 10 + (*tmpbuf - '0');
-                tmpbuf++;
-            }
-            // and assign it to the correct variable
-            if (configTable->DateYIdx == i)
-                t.wYear = tmpnum;
-            else if (configTable->DateMIdx == i)
-                t.wMonth = tmpnum;
-            else
-                t.wDay = tmpnum;
-            tmpbuf++;
-        }
+        // otherwise read all three parts of the date (an ISO year-first date overrides the table order)
+        const PackListingDate date = ParsePackListingDate(tmpbuf, configTable->DateYIdx, configTable->DateMIdx);
+        t.wYear = date.Year;
+        t.wMonth = date.Month;
+        t.wDay = date.Day;
     }
 
     t.wDayOfWeek = 0; // ignored
-    if (t.wYear < 100)
-    {
-        if (t.wYear >= 80)
-            t.wYear += 1900;
-        else
-            t.wYear += 2000;
-    }
 
     // ted cas
     idx = configTable->TimeIdx;

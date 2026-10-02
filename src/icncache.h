@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "dword_compare_key.h" // lookup keys for CIconCache/CAssociations::GetIndex
+
 //
 // ****************************************************************************
 // CIconData

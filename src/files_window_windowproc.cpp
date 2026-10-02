@@ -709,15 +709,9 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (file != NULL && !isDir &&                                   // it's a file
                 (!Is(ptPluginFS) || GetPluginIconsType() != pitFromPlugin)) // it's not an icon from plug-in
             {
-                std::wstring key = sally::text::Fold(file->Ext); // extension in lowercase
-                // CompareDWORDS (icncache.cpp), which CAssociations::GetIndex and
-                // CIconCache::GetIndex both use, walks in DWORD steps with
-                // `s1 <= end` - it reads a full DWORD AT the end offset, i.e. up
-                // to 4 bytes past the length. c_str() guarantees only one wide
-                // NUL, so an even-length key left that read straddling the end of
-                // the buffer. Same two-wide-NUL pad the paint path documents as
-                // load-bearing (files_window_paint.cpp).
-                key.append(2, L'\0');
+                // Lookup keys come from MakeDwordCompareKey: CompareDWORDS reads a whole
+                // DWORD at the end offset (dword_compare_key.h).
+                std::wstring key = MakeDwordCompareKey(sally::text::Fold(file->Ext)); // extension in lowercase
                 int index;
                 CIconSizeEnum iconSize = IconCache->GetIconSize();
                 if (Associations.GetIndex(key.c_str(), index) &&     // extension has an icon (association)
@@ -727,8 +721,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int icon;
                     CIconList* srcIconList;
                     int srcIconListIndex;
-                    key.assign(file->Name, file->NameLen);
-                    key.append(2, L'\0'); // same CompareDWORDS pad as above
+                    key = MakeDwordCompareKey(file->Name, file->NameLen);
                     if (IconCache->GetIndex(key.c_str(), icon, NULL, NULL) &&                         // icon-thread is loading it
                         (IconCache->At(icon).GetFlag() == 1 || IconCache->At(icon).GetFlag() == 2) && // icon is loaded new or old
                         IconCache->GetIcon(IconCache->At(icon).GetIndex(),

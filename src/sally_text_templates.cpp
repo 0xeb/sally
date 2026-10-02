@@ -946,7 +946,7 @@ void WINAPI InternalGetType()
         {
             if (TransferFileData->Ext[0] != 0)
             {
-                const std::wstring foldedExtension = sally::text::Fold(TransferFileData->Ext);
+                const std::wstring foldedExtension = MakeDwordCompareKey(sally::text::Fold(TransferFileData->Ext)); // padded lookup key
                 if (!Associations.GetIndex(foldedExtension.c_str(), TransferAssocIndex))
                     TransferAssocIndex = -1; // not found
             }
