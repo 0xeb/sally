@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "plugin_window_text.h"
+#include "renamer_history_combo.h"
 
 #include <vector>
 
@@ -428,11 +429,10 @@ void HistoryComboBox(CTransferInfo& ti, int id, std::string& text,
         }
     }
 
-    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    std::vector<std::wstring> items;
     for (int index = 0; index < historySize && history[index] != NULL; ++index)
-        SendMessageW(combo, CB_ADDSTRING, 0,
-                     reinterpret_cast<LPARAM>(RenamerTextToWide(history[index]).c_str()));
-    RenamerEditLine(ti, id, text);
+        items.push_back(RenamerTextToWide(history[index]));
+    RefillRenamerHistoryCombo(combo, items, RenamerTextToWide(text.c_str()));
 }
 
 void TransferCombo(CTransferInfo& ti, int id, int* comboContent, int& value)

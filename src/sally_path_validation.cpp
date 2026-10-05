@@ -9,6 +9,7 @@
 #include "fileswnd.h"
 #include "mainwnd.h"
 #include "pack.h"
+#include "path_target_walk.h"
 #include "codetbl.h"
 #include "dialogs.h"
 #include "common/widepath.h"
@@ -544,117 +545,72 @@ PARSE_AGAIN_W:
     }
 
 FIND_AGAIN_W:
-    wchar_t* buffer = path.data();
-    wchar_t* end = buffer + path.length();
-    wchar_t* afterRoot = buffer + root.length();
-    if (afterRoot > buffer && *(afterRoot - 1) == L'\\')
+    size_t afterRoot = root.length();
+    if (afterRoot > 0 && path[afterRoot - 1] == L'\\')
         ;
-    else if (*afterRoot == L'\\')
+    else if (afterRoot < path.length() && path[afterRoot] == L'\\')
         afterRoot++;
+    size_t walkEnd = path.length();
     wchar_t lastChar = 0;
     BOOL hasMask = FALSE;
-    if (end > afterRoot)
+    if (walkEnd > afterRoot)
     {
-        wchar_t* end2 = end;
-        while (*--end2 != L'\\')
-        {
-            if (*end2 == L'*' || *end2 == L'?')
-                hasMask = TRUE;
-        }
+        const size_t lastSlash = path.rfind(L'\\', walkEnd - 1);
+        hasMask = path.find_first_of(L"*?", lastSlash + 1) != std::wstring::npos;
         if (hasMask)
         {
-            CutSpacesFromBothSidesW(end2 + 1);
-            end = end2;
-            lastChar = *end;
-            *end = 0;
-            path.resize((size_t)(end - buffer));
-            buffer = path.data();
-            end = buffer + path.length();
-            afterRoot = buffer + root.length();
+            // spaces around a mask only cause trouble (e.g. "*.* " + "a" = "a. ")
+            CutSpacesFromBothSidesW(path.data() + lastSlash + 1);
+            path.resize(wcslen(path.c_str()));
+            walkEnd = lastSlash; // the mask is never probed
+            lastChar = L'\\';
         }
     }
 
     HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-    isDir = TRUE;
-    std::wstring text;
-    while (end > afterRoot)
-    {
-        if (*(end - 1) != L'\\')
-        {
-            DWORD attrs = gFileSystem->GetFileAttributes(path.c_str());
-            if (attrs != 0xFFFFFFFF)
-            {
-                if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
-                {
-                    if (lastChar != 0 || backslashAtEnd || mustBePath)
-                    {
-                        if (PackerFormatConfig.PackIsArchive(path.c_str()))
-                        {
-                            type = PATH_TYPE_ARCHIVE;
-                            isDir = FALSE;
-                            break;
-                        }
-                        text = LoadStrW(IDS_NOTARCHIVEPATH);
-                        if (error != NULL)
-                            *error = SPP_NOTARCHIVEFILE;
-                        break;
-                    }
-                    isDir = FALSE;
-                    while (*--end != L'\\')
-                        ;
-                    lastChar = *end;
-                    break;
-                }
-                break;
-            }
-            else
-            {
-                DWORD err = GetLastError();
-                if (err != ERROR_FILE_NOT_FOUND && err != ERROR_INVALID_NAME &&
-                    err != ERROR_PATH_NOT_FOUND && err != ERROR_BAD_PATHNAME &&
-                    err != ERROR_DIRECTORY)
-                {
-                    text = GetErrorTextOwned(err).c_str();
-                    if (error != NULL)
-                        *error = SPP_WINDOWSPATHERROR;
-                    break;
-                }
-            }
-        }
-        *end = lastChar;
-        while (*--end != L'\\')
-            ;
-        lastChar = *end;
-        *end = 0;
-        path.resize((size_t)(end - buffer));
-        buffer = path.data();
-        end = buffer + path.length();
-        afterRoot = buffer + root.length();
-    }
-    // Capture the boundary between the existing-path prefix and the
-    // non-existent leaf/mask before the buffer-trick resize below grows
-    // path back to its original length. Use `end - buffer` rather than
-    // `path.length()`: the new-dir/mask loop path always resizes path to
-    // match `end`, so the two agree; but the existing-file break at
-    // lines 1264-1268 walks `end` back to the previous '\\' WITHOUT
-    // resizing path, leaving path.length() at the full original length.
-    // Taking path.length() there would lose the boundary the same way the
-    // pre-fix code did and secondPart would point at the terminator.
-    const size_t boundaryOff = (size_t)(end - buffer);
-    if (end <= buffer + path.length())
-        *end = lastChar;
-    path.resize(wcslen(buffer));
+    const PathTargetWalk walk = WalkPathTarget(
+        path, afterRoot, walkEnd, lastChar, backslashAtEnd != FALSE, mustBePath != FALSE,
+        [](const std::wstring& prefix, unsigned long& errorCode) {
+            const DWORD attrs = gFileSystem->GetFileAttributes(prefix.c_str());
+            if (attrs != INVALID_FILE_ATTRIBUTES)
+                return (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0 ? PathPrefixState::Directory : PathPrefixState::File;
+            const DWORD err = GetLastError();
+            if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME || err == ERROR_PATH_NOT_FOUND ||
+                err == ERROR_BAD_PATHNAME || err == ERROR_DIRECTORY)
+                return PathPrefixState::Missing;
+            errorCode = err;
+            return PathPrefixState::Failed;
+        },
+        [](const std::wstring& prefix) { return PackerFormatConfig.PackIsArchive(prefix.c_str()) != 0; });
     SetCursor(oldCur);
+
+    if (walk.kind == PathTargetKind::Archive) // a path into an existing archive
+    {
+        secondPart = path.data() + walk.boundary;
+        type = PATH_TYPE_ARCHIVE;
+        isDir = FALSE;
+        return TRUE;
+    }
+
+    std::wstring text;
+    if (walk.kind == PathTargetKind::NotArchive)
+    {
+        text = LoadStrW(IDS_NOTARCHIVEPATH);
+        if (error != NULL)
+            *error = SPP_NOTARCHIVEFILE;
+    }
+    else if (walk.kind == PathTargetKind::Failed)
+    {
+        text = GetErrorTextOwned(walk.errorCode);
+        if (error != NULL)
+            *error = SPP_WINDOWSPATHERROR;
+    }
+    isDir = walk.isDir ? TRUE : FALSE;
 
     if (text.empty())
     {
-        buffer = path.data();
-        // Restore end to the boundary captured above, not to the new
-        // terminator. Without this, secondPart would be returned empty for
-        // copy/move targets with a non-existent leaf or mask, and
-        // SalSplitWindowsPathW would treat the whole input as an existing
-        // directory.
-        end = buffer + boundaryOff;
+        wchar_t* buffer = path.data();
+        wchar_t* end = buffer + walk.boundary; // the existing prefix ends here; the rest is new or a mask
         if (*end == L'\\')
             end++;
         if (isDir && *end != 0 && !hasMask && wcschr(end, L'\\') == NULL)
