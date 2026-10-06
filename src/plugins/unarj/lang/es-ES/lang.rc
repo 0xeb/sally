@@ -1,0 +1,116 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for unarj. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unarj/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unarj.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 6, 15, 202, 110
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Siguiente volumen del archivo"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Por favor, inserve el disco con el siguiente volumen del archivo o localice el fichero apropiado en el disco.\n\nPulse Aceptar cuando esté preparado.",IDC_STATIC_1,12,9,181,32
+    LTEXT           "Volumen previo:",IDC_STATIC_2,12,48,60,8
+    EDITTEXT        IDC_PREVVOL,73,48,117,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "Volumen &siguiente:",IDC_STATIC_3,12,62,67,8
+    EDITTEXT        IDC_FILENAME,12,72,163,12
+    PUSHBUTTON      "...",IDC_BROWSE,178,72,13,12
+    DEFPUSHBUTTON   "Aceptar",IDOK,44,91,50,14
+    PUSHBUTTON      "Cancelar",IDCANCEL,107,91,50,14
+END
+
+IDD_ERROR DIALOGEX 15, 34, 352, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Error"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Nombre:",IDC_STATIC_1,6,10,32,8
+    LTEXT           "",IDS_FILENAME,41,10,304,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Error:",IDC_STATIC_2,6,23,32,8,NOT WS_GROUP
+    LTEXT           "El fichero no puede ser extraido porque continúa a partir de un volumen anterior. Para extraer este fichero debe empezar con el volumen donde comience el fichero.",IDC_STATIC_3,41,23,304,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&No mostrar este mensaje en lo sucesivo.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,41,44,148,12
+    DEFPUSHBUTTON   "Correto",IDOK,121,63,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,181,63,50,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 225, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuración de UnARJ"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "volumen anterior cuando se desempaqueta.",IDC_STATIC_1,23,22,154,8
+    CONTROL         "&Saltar automáticamente ficheros que continúan desde el",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,10,202,12
+    LTEXT           "no pueda ser listado.",IDC_STATIC_2,23,44,111,8
+    CONTROL         "&No mostrar aviso cuando todo el contenido del archivo",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,195,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,213,1
+    DEFPUSHBUTTON   "Aceptar",IDOK,60,66,50,14
+    PUSHBUTTON      "Cancelar",IDCANCEL,115,66,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 107
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ - Aviso"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "No todos los ficheros del archivo multivolumen pueden listarse (y verse en el panel) porque algunos de los volúmenes del archivo no pudieron encontrarse.",IDC_STATIC_1,11,10,194,24
+    LTEXT           "Para listar el contenido total del archivo copie todos los volúmenes del archivo en el mismo directorio.",IDC_STATIC_2,11,41,192,16
+    CONTROL         "&No mostrar este mensaje en lo sucesivo",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,66,157,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,83,203,1
+    DEFPUSHBUTTON   "Aceptar",IDOK,153,89,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnARJ"
+  IDS_PLUGIN_DESCRIPTION, "Hojear y extraer archivos ARJ."
+  IDS_ABOUT, "Acerca del Plugin"
+  IDS_LOWMEM, "Memoria insuficiente."
+  IDS_ARCEOF, "Final de archivo inesperado."
+  IDS_BADDATA, "El archivo está corrupto."
+  IDS_BADARC, "Fichero de formato desconocido o no es un archivo ARJ válido."
+  IDS_ERROPENARC, "Imposible abrir el fichero del archivo."
+  IDS_UNKNOWN, "Ocurrió un error desconocido."
+  IDS_ERRACCESSARC, "Imposible acceder al fichero del archivo."
+  IDS_ARJARCHIVES, "Archivos ARJ (*.A*)"
+  IDS_ALLFILES, "Todos los ficheros (*.*)"
+  IDS_BROWSEARCHIVETITLE, "Seleccione el fichero del archivo"
+  IDS_CRC, "Error en datos comprimidos. El CRC no concuerda."
+  IDS_LIST, "Imposible añadir entrada de archivo a la lista de ficheros."
+  IDS_EXTRPROGTITLE, "Desempaquetando archivo ARJ - %s"
+  IDS_PREPAREDATA, "preparando datos y creando directorios..."
+  IDS_EXTRACTFILES, "desempaquetando..."
+  IDS_EXTRACTING, "desempaquetando: "
+  IDS_UNABLEGETFIELPOS, "Imposible conseguir puntero de ficihero: "
+  IDS_UNABLEWRITE, "Imposible grabar en el fichero:"
+  IDS_UNABLESEEK, "Imposible disponer puntero de fichero: "
+  IDS_TOOLONGNAME, "La operación no puede terminar por nombre de ruta demasiado largo."
+  IDS_TOOLONGMASK, "La operación no puede terminar por plantilla demasiado larga."
+  IDS_VERSION, "Versión desconocida de fichero comprimido."
+  IDS_TYPE, "Tipo desconocido de fichero comprimido."
+  IDS_METHOD,  "El fichero está comprimido con un método no admitido por el plugin UnARJ."
+  IDS_ENCRYPT, "Lo siento pero no se admiten ficheros encriptados."
+  IDS_BADVOL, "Volumen incorrecto o estructura de archivo desconocida."
+  IDS_EXPIRE, "Lo siento pero el plugin ha expirado. Compruebe nuestra página web para una versión más reciente."
+  IDS_NOTFOUND, "Fichero no encontrado."
+  IDS_ERROR, "Error"
+}

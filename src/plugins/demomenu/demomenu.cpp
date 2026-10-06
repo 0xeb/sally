@@ -21,11 +21,11 @@ CPluginInterface PluginInterface;
 CPluginInterfaceForMenuExt InterfaceForMenuExt;
 
 // Global data
-const wchar_t* PluginNameEN = L"DemoMenu";    // Non-translated plugin name, used before loading the language module + for debugging
+const wchar_t* PluginNameEN = L"DemoMenu";    // Non-translated plugin name, used before the translated resources are needed + for debugging
 const wchar_t* PluginNameShort = L"DEMOMENU"; // Plugin name (short, without spaces)
 
 HINSTANCE DLLInstance = NULL; // Handle to SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // Handle to SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // Handle to the module with language-dependent resources (this DLL)
 
 // Salamander general interface - available from Salamander launch until the plugin shuts down
 CSalamanderGeneralAbstract* SalamanderGeneral = NULL;
@@ -117,10 +117,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // Load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), PluginNameEN);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // Acquire Salamander's general interface
     SalamanderGeneral = salamander->GetSalamanderGeneral();

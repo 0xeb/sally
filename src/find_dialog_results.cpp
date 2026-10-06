@@ -11,6 +11,7 @@
 
 #include "menu.h"
 #include "find_dialog_theme_ids.h"
+#include "find_dialog_skin_style.h"
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
 #include "common/PathDisplayUtils.h" // MakeCompactPathBuffer
@@ -352,7 +353,7 @@ static bool BrowseFindResultsFileNameW(HWND owner, BOOL save, std::wstring& file
     if (!sally::find::TryFindResultsFormatFromPathOrFilter(fileName, ofn.nFilterIndex, &format))
     {
         if (gPrompter != NULL)
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FIND_RESULTS_UNSUPPORTED));
+            gPrompter->ShowError(owner, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FIND_RESULTS_UNSUPPORTED));
         return false;
     }
 
@@ -427,6 +428,7 @@ static void SetFindWindowStyle(HWND hwnd, LONG_PTR style)
     if (hwnd == NULL || !IsWindow(hwnd))
         return;
 
+    style = MergeFindSkinStyle(style, GetWindowLongPtr(hwnd, GWL_STYLE));
     if (GetWindowLongPtr(hwnd, GWL_STYLE) == style)
         return;
 
@@ -2789,7 +2791,7 @@ void CFindDialog::Validate(CTransferInfo& ti)
         int errorPos;
         if (!mask.PrepareMasks(errorPos, Data.NamedText.c_str()))
         {
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(hNamesWnd); // ensure the CB_SETEDITSEL message works correctly
             SendMessage(hNamesWnd, CB_SETEDITSEL, 0, MAKELPARAM(errorPos, errorPos + 1));
             ti.ErrorOn(IDC_FIND_NAMED);
@@ -2802,7 +2804,7 @@ void CFindDialog::Validate(CTransferInfo& ti)
             BuildSerchForData();
             if (SearchForData.Count == 0)
             {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FF_EMPTYSTRING));
+                gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FF_EMPTYSTRING));
                 ti.ErrorOn(IDC_FIND_LOOKIN);
             }
         }
@@ -3024,7 +3026,7 @@ void CFindDialog::StartSearch(WORD command)
             {
                 const std::wstring msg = FormatStrW(
                     LoadStrW(IDS_INVALIDREGEXP), Data.GrepText.c_str(), error.c_str());
-                gPrompter->ShowError(LoadStrW(IDS_ERRORFINDINGFILE), msg.c_str());
+                gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORFINDINGFILE), msg.c_str());
                 if (GrepData.Refine != 0)
                     FoundFilesListView->DestroyDataForRefine();
             };
@@ -3092,7 +3094,7 @@ void CFindDialog::StartSearch(WORD command)
                     {
                         const std::wstring msg =
                             FormatStrW(LoadStrW(IDS_FIND_HEX_INVALID), Data.GrepText.c_str());
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORFINDINGFILE), msg.c_str());
+                        gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORFINDINGFILE), msg.c_str());
                     }
                     if (GrepData.Refine != 0)
                         FoundFilesListView->DestroyDataForRefine();
@@ -3469,7 +3471,7 @@ void CFindDialog::OnSaveResults()
     {
         std::wstring msg = FormatStrW(LoadStrW(IDS_FIND_RESULTS_SAVE_ERROR), error.c_str());
         if (gPrompter != NULL)
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), msg.c_str());
         else
             MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
     }
@@ -3492,7 +3494,7 @@ void CFindDialog::OnLoadResults()
     {
         std::wstring msg = FormatStrW(LoadStrW(IDS_FIND_RESULTS_LOAD_ERROR), error.c_str());
         if (gPrompter != NULL)
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), msg.c_str());
         else
             MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
         return;
@@ -3501,13 +3503,13 @@ void CFindDialog::OnLoadResults()
     if (records.empty())
     {
         if (gPrompter != NULL)
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_FIND_RESULTS_LOAD_EMPTY));
+            gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_FIND_RESULTS_LOAD_EMPTY));
         return;
     }
 
     PromptResult replaceResult = {};
     if (gPrompter != NULL)
-        replaceResult = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), LoadStrW(IDS_FIND_RESULTS_LOAD_MODE));
+        replaceResult = gPrompter->AskYesNoCancel(HWindow, LoadStrW(IDS_QUESTION), LoadStrW(IDS_FIND_RESULTS_LOAD_MODE));
     else
     {
         int msgResult = MessageBoxW(HWindow, LoadStrW(IDS_FIND_RESULTS_LOAD_MODE), LoadStrW(IDS_QUESTION),
@@ -3555,7 +3557,7 @@ void CFindDialog::OnLoadResults()
                 // it ran unconditionally - dereferencing gPrompter exactly in the
                 // out-of-memory case the guard exists for.
                 const std::wstring error = sally::legacy_search::DecodeEngineAcp(LOW_MEMORY);
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), error.c_str());
+                gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), error.c_str());
             }
             return;
         }
@@ -3571,7 +3573,7 @@ void CFindDialog::OnLoadResults()
     {
         std::wstring msg = FormatStrW(LoadStrW(IDS_FIND_RESULTS_LOAD_REPORT),
                                       (unsigned)records.size(), (unsigned)skippedRows);
-        gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
+        gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), msg.c_str());
     }
 }
 
@@ -3588,7 +3590,7 @@ void CFindDialog::OnFocusFile()
         Sleep(200); // give Salamander time-if we switched from the main window the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
+            gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -3655,7 +3657,7 @@ void CFindDialog::OnViewFile(BOOL alternate)
                     // the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
+            gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -3680,7 +3682,7 @@ void CFindDialog::OnEditFile()
                     // the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
+            gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -3703,7 +3705,7 @@ void CFindDialog::OnViewFileWith()
                     // the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
+            gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -3723,7 +3725,7 @@ void CFindDialog::OnViewFileWith()
                         // the menu's message queue might still be running
             if (SalamanderBusy)
             {
-                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
+                gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
                 return;
             }
         }
@@ -3749,7 +3751,7 @@ void CFindDialog::OnEditFileWith()
                     // the menu's message queue might still be running
         if (SalamanderBusy)
         {
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
+            gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }
@@ -3768,7 +3770,7 @@ void CFindDialog::OnEditFileWith()
                         // the menu's message queue might still be running
             if (SalamanderBusy)
             {
-                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
+                gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
                 return;
             }
         }
@@ -4021,7 +4023,7 @@ BOOL CFindDialog::DoYouWantToStopSearching()
     if (Configuration.CnfrmStopFind)
     {
         bool dontShow = !Configuration.CnfrmStopFind;
-        ret = gPrompter->AskYesNoWithCheckbox(LoadStrW(IDS_WANTTOSTOPTITLE), LoadStrW(IDS_WANTTOSTOP),
+        ret = gPrompter->AskYesNoWithCheckbox(HWindow, LoadStrW(IDS_WANTTOSTOPTITLE), LoadStrW(IDS_WANTTOSTOP),
                                               LoadStrW(IDS_DONTSHOWAGAINSS), &dontShow).type;
         Configuration.CnfrmStopFind = !dontShow;
     }
@@ -4622,7 +4624,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (ProcessingEscape && Configuration.CnfrmCloseFind)
                 {
                     bool dontShow = !Configuration.CnfrmCloseFind;
-                    PromptResult res = gPrompter->AskYesNoWithCheckbox(LoadStrW(IDS_WANTTOSTOPTITLE), LoadStrW(IDS_WANTTOCLOSEFIND),
+                    PromptResult res = gPrompter->AskYesNoWithCheckbox(HWindow, LoadStrW(IDS_WANTTOSTOPTITLE), LoadStrW(IDS_WANTTOCLOSEFIND),
                                                                        LoadStrW(IDS_DONTSHOWAGAINCF), &dontShow);
                     Configuration.CnfrmCloseFind = !dontShow;
                     if (res.type != PromptResult::kYes)

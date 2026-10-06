@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for tar. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/tar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\tar.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "Prehliada a extrahuje Unix archívy."
+ IDS_ABOUT, "O plugine"
+ IDS_TARERR_TITLE, "Chyba TAR pluginu"
+ IDS_TARERR_UNKNOWN, "Nerozpoznaný alebo nepodporovaný formát archívu."
+ IDS_TARERR_HEADER, "Neplatné dáta TAR hlavičky - poškodený archív."
+ IDS_TARERR_CHECKSUM, "Neplatný súbor alebo kontrolný súčet hlavičky - poškodený archív."
+ IDS_TARERR_FDATA, "Interná chyba: poškodená štruktúra dát súboru."
+ IDS_TARERR_BADSIG, "Neznáma značka bloku - preskakujem."
+ IDS_TARERR_NOTFOUND, "Požadovaný súbor nebol v archíve nájdený."
+ IDS_TARERR_MEMORY, "Chyba alokácie pamäti."
+ IDS_UNPACKPROGRESS_TITLE, "Extrahovať"
+ IDS_UNPACKPROGRESS_TEXT, "Extrahujem "
+ IDS_SKIPPROGRESS_TEXT, "Preskakujem "
+ IDS_GZERR_TITLE, "GZip Chyba"
+ IDS_GZERR_BADMETHOD, "Použitá neznáma komprimačná metóda, nie je možné extrahovať."
+ IDS_GZERR_ENCRYPTED, "Tento súbor je šifrovaný. V GZip archívoch nie je šifrovanie podporované."
+ IDS_GZERR_MULTIPART, "Tento súbor je časťou viaczväzkového archívu. Viaczväzkové GZip archívy nie sú podporované."
+ IDS_GZERR_BADFLAGS, "Zistená neznáma značka v GZip hlavičke, nie je možné extrahovať."
+ IDS_GZERR_FOPEN, "Chyba otvárania archívu: "
+ IDS_ERR_FREAD, "Chyba načítania archívu: "
+ IDS_TARERR_FWRITE, "Chyba zápisu archívu: "
+ IDS_TARERR_WRSIZE, "Funkcia zápis súboru odmietla zapísať všetky požadované dáta."
+ IDS_GZERR_BADBLOCKTYPE, "Zistený neplatný blok v GZip streame, nie je možné extrahovať."
+ IDS_ERR_INTERNAL, "Interná chyba v plugine TAR, nahláste ju prosím na https://github.com/0xeb/sally/issues."
+ IDS_ERR_MEMORY, "Chyba alokácie pamäti."
+ IDS_GZERR_CRC, "CRC chyba."
+ IDS_ERR_CORRUPT, "Neočakávané dáta v komprimovanom streame, poškodený archív."
+ IDS_ERR_EOF, "Neočakávaný koniec súboru."
+ IDS_GZERR_SEEK, "Chyba hľadania v archíve: "
+ IDS_RPM_VIEWTITLE, "RPM Prehliadač"
+ IDS_ERR_RPMTITLE, "RPM Chyba"
+ IDS_RPMERR_TMPNAME, "Chyba vytvárania názvu dočasného súboru."
+ IDS_RPMERR_TMPFILE, "Chyba vytvárania dočasného súboru."
+ IDS_ERR_NORPM, "Súbor nebol rozpoznaný ako RPM archív."
+ IDS_ERR_BADRPMVERSION, "Verzia RPM vyžadovaná týmto archívom nie je podporovaná."
+ IDS_ERR_BADSIGNATURE, "Zistený neznámy podpis RPM archívu."
+ IDS_CPIOERR_BADSIG, "Záznam súboru má neplatný podpis."
+ IDS_CPIOERR_HEADER, "Neplatný záznam hlavičky súboru."
+ IDS_CPIOERR_FORMAT, "Neznámy formát cpio hlavičky."
+ IDS_LZH_NOT_IMPLEMENTED, "LZH archívy nie sú podporované."
+}

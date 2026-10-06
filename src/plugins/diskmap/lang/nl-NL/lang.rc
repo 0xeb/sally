@@ -1,0 +1,120 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for diskmap. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/diskmap/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#define SALAMANDER
+#include "..\..\DiskMap\Resources\DiskMap.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDC_ZAREVAKDISKMAP MENU 
+BEGIN
+    POPUP "&Bestand"
+    BEGIN
+        MENUITEM "Bestand &openen",                       IDM_FILE_OPEN
+        MENUITEM "&Selectie in paneel\tF",        IDM_FILE_FOCUSINSALAMANDER
+        MENUITEM SEPARATOR
+        MENUITEM "S&toppen\tEsc",                      IDM_FILE_ABORT
+        MENUITEM "Ve&rnieuwen\tCtrl+R",            IDM_FILE_REFRESH
+        MENUITEM SEPARATOR
+        MENUITEM "&Afsluiten\tAlt+F4",                      IDM_FILE_EXIT
+    END
+    POPUP "Beel&d"
+    BEGIN
+        MENUITEM "&Inzoomen\t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "&Uitzooment\t -",                IDM_VIEW_ZOOMOUT
+        MENUITEM "Un&zoom\t Shift+Backspace",   IDM_VIEW_GOTOROOT
+        MENUITEM SEPARATOR
+        MENUITEM "&Log venster...\tCtrl+L",              IDM_VIEW_LOG
+    END
+
+    POPUP "&Opties"
+    BEGIN
+	MENUITEM "&Markeer mappen",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
+	MENUITEM "&Toon tooltip\tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+        POPUP "Tooltip pad &formaat"
+        BEGIN
+            MENUITEM "&Bestandsnaam",            IDM_PATHFORMAT_FILENAME
+            MENUITEM "&Relatief",            IDM_PATHFORMAT_RELATIVEVIEW
+//            MENUITEM "&Relative to Root",  IDM_PATHFORMAT_RELATIVEROOT
+            MENUITEM "&Absoluut",            IDM_PATHFORMAT_ABSOLUTE
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "Bevestig sluiten met &Esc",       IDM_OPTIONS_CONSFIRMCLOSE, CHECKED
+    END
+    POPUP "&Help"
+    BEGIN
+//        POPUP "&Debug"
+//        BEGIN
+//            MENUITEM "&Export Directory Structure...", IDM_DEBUG_EXPORTDIR
+//        END
+//        MENUITEM SEPARATOR
+        MENUITEM "&Over...",                  IDM_HELP_ABOUT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME,            "SchijfMap"
+    IDS_PLUGIN_DESCRIPTION,     "Illustreert een plattegrond van bestanden op uw schijf."
+    IDS_PLUGIN_ABOUT,           "Over Sally SchijfMap Plugin"
+    IDS_PLUGIN_MENU,            "&SchijfMap weergeven"
+    IDS_CLOSE_CONFIRMATION,     "Wilt u SchijfMap afsluiten?"
+    IDS_CLOSE_CONFIRMATION_CHECKBOX, "Toon dit bericht niet meer en sluit SchijfMap af zonder bevestiging"
+
+    IDS_DISKMAP_TITLE,               "SchijfMap"
+    IDS_DISKMAP_TITLEPREFIX,         "SchijfMap - "
+
+    IDS_DISKMAP_LOAD_TITLE,          "Bestanden zoeken..."
+    IDS_DISKMAP_LOAD_FOOTER,         "...druk op de ESC toets om te stoppen"
+    IDS_DISKMAP_LOAD_HSIZE,          "Grootte:"
+    IDS_DISKMAP_LOAD_HFILE,          "Bestanden:"
+    IDS_DISKMAP_LOAD_HDIRS,          "Mappen:"
+
+    IDS_DISKMAP_ABORT_TITLE,         "Zoeken geannuleerd..."
+    IDS_DISKMAP_ABORT_FOOTER,        "...druk op Ctrl+R om beeld te vernieuwen"
+
+    IDS_DISKMAP_LOG_TITLE,           "Log"
+    IDS_DISKMAP_LOG_HTYPE,           "Type"
+    IDS_DISKMAP_LOG_HTEXT,           "Tekst"
+    IDS_DISKMAP_LOG_HFILE,           "Bestand of map"
+    IDS_DISKMAP_LOG_LINFO,           "Informatie"
+    IDS_DISKMAP_LOG_LWARN,           "Waarschuwing"
+    IDS_DISKMAP_LOG_LERROR,          "Fout"
+
+    IDS_DISKMAP_SHELL_FOCUS,         "&Selectie in paneel"
+    IDS_DISKMAP_SHELL_ZOOMIN,        "&Inzoomen"
+    IDS_DISKMAP_SHELL_ZOOMOUT,       "&Uitzoomen"
+    IDS_DISKMAP_SHELL_DIROPEN,       "&Openen in paneel"
+    IDS_DISKMAP_SHELL_DIRCHANGE,     "Verander &Map"
+
+    IDS_DISKMAP_TTIP_TIMECREATE,     "Aangemaakt:"
+    IDS_DISKMAP_TTIP_TIMEMODIFY,     "Gewijzigd:"
+    IDS_DISKMAP_TTIP_TIMEACCESS,     "Laatst geopend:"
+    IDS_DISKMAP_TTIP_SIZEDATA,       "Grootte:"
+    IDS_DISKMAP_TTIP_SIZEREAL,       "Ware grootte:"
+    IDS_DISKMAP_TTIP_SIZEDISK,       "Grootte op schijf:"
+    IDS_DISKMAP_TTIP_COUNTFILE,      "Bestanden:"
+    IDS_DISKMAP_TTIP_COUNTDIRS,      "Mappen:"
+
+    IDS_DISKMAP_FORMAT_BYTE0,        "bytes"
+    IDS_DISKMAP_FORMAT_BYTE1,        "byte"
+    IDS_DISKMAP_FORMAT_BYTEN,        "bytes"
+
+    IDS_DISKMAP_EMPTY_TITLE,         "Niets om weer te geven..."
+    IDS_DISKMAP_EMPTY_FOOTER,        "...deze map bevat geen bestanden om in kaart te brengen"
+END

@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for pak. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 194, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "优化 PAK 压缩包"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "有效数据大小:",IDC_STATIC_1,8,9,57,8
+    LTEXT           "",IDC_VALIDSIZE,67,9,115,8
+    LTEXT           "总文件大小:",IDC_STATIC_2,8,20,48,8
+    LTEXT           "",IDC_TOTALSIZE,67,20,115,8
+    LTEXT           "浪费空间:",IDC_STATIC_3,8,31,40,8
+    LTEXT           "",IDC_WASTEDSPACE,67,31,115,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,178,1
+    DEFPUSHBUTTON   "优化",IDOK,41,53,50,14
+    PUSHBUTTON      "取消",IDCANCEL,101,53,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "不能打开文件: %s"
+ IDS_PAK_ERRINIT, "不能初始化 paklib 界面。已经打开一个文件。"
+ IDS_PAK_ERROPEN2, "不能打开文件。已经打开一个文件。"
+ IDS_PAK_ERRGETFILESIZE, "得不到文件大小: %s"
+ IDS_PAK_INVLAIDDATA, "无效数据格式。"
+ IDS_PAK_LOWMEMORY, "内存不足。"
+ IDS_PAK_CENTRDIR, "当前 PAK 中央目录"
+ IDS_PAK_ERRSETFILEPTR, "无法设置文件指针: %s"
+ IDS_PAK_ERRREADFILE, "无法从文件读取: %s"
+ IDS_PAK_ERRGETFILEPTR, "无法获得文件指针: %s"
+ IDS_PAK_ERRWRITEFILE, "无法写到文件: %s"
+ IDS_PAK_TOOLONGNAME, "由于文件名太长不能添加文件。"
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "浏览并解压 Quake PAK 压缩包。"
+ IDS_ABOUT, "关于插件"
+ IDS_LOWMEM, "内存不足。"
+ IDS_ERRLIST, "无法添加文件到列表。"
+ IDS_ERRLOADPAKLIB, "无法加载 paklib.dll 或获得程序地址: "
+ IDS_EXTRPROGTITLE, "正在解压 PAK 压缩包 - %s"
+ IDS_PREPAREDATA, "正在准备数据..."
+ IDS_EXTRACTFILES, "正在解压缩..."
+ IDS_EXTRACTING, "正在解压缩: "
+ IDS_TOOLONGNAME, "由于路径名太长，不能完成操作。"
+ IDS_UNABLESEEK, "无法设置文件指针: "
+ IDS_UNABLEGETFIELPOS, "无法获得文件指针: "
+ IDS_UNABLEWRITE, "无法写到文件:"
+ IDS_ERROPEN, "无法打开文件: "
+ IDS_TOOLONGMASK, "由于掩码太长，无法完成操作。"
+ IDS_DELPROGTITLE, "正在从 PAK 压缩包删除 - %s"
+ IDS_DELFILES, "正在删除..."
+ IDS_DELETING, "正在删除: "
+ IDS_CANCELING, "正在取消操作，请等待..."
+ IDS_ADDPROGTITLE, "正在压缩到 PAK 压缩包 - %s"
+ IDS_TOOLARGE, "不能添加文件: 文件太大。"
+ IDS_ADDFILES, "正在压缩..."
+ IDS_TOOLONGNAME2, "由于名称太长，不能添加文件。"
+ IDS_PACKING, "正在压缩: "
+ IDS_UNABLEREAD, "无法从文件读取: "
+ IDS_ERRCONNECT, "无法连接插件到 Sally."
+ IDS_OPTIMIZING, "正在优化，请稍等..."
+ IDS_OPTPROGTITLE, "正在优化 PAK 压缩包 - %s"
+ IDS_NEEDOPT, "未成功删除文件。你可能需要从 PAK 插件菜单运行 PAK 优化，以防止浪费磁盘空间。"
+ IDS_MENUOPTIMIZE, "优化 PAK(&O)"
+ IDS_EXPIRE, "抱歉，插件已经过期。请访问我们的网站获得更新版本。"
+}

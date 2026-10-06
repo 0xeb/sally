@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for pak. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 234, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Optimisation d'une archive PAK"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Taille des données valides:",IDC_STATIC_1,8,9,92,8
+    LTEXT           "",IDC_VALIDSIZE,102,9,120,8
+    LTEXT           "Taille totale du fichier:",IDC_STATIC_2,8,20,77,8
+    LTEXT           "",IDC_TOTALSIZE,102,20,120,8
+    LTEXT           "Espace perdu:",IDC_STATIC_3,8,31,51,8
+    LTEXT           "",IDC_WASTEDSPACE,102,31,120,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,218,1
+    DEFPUSHBUTTON   "Optimiser",IDOK,62,53,50,14
+    PUSHBUTTON      "Annuler",IDCANCEL,122,53,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "Impossible d'ouvrir le fichier: %s"
+ IDS_PAK_ERRINIT, "Impossible de lancer l'interface paklib. Un fichier est déjà ouvert."
+ IDS_PAK_ERROPEN2, "Impossible d'ouvrir le fichier. Un fichier est déjà ouvert."
+ IDS_PAK_ERRGETFILESIZE, "Impossible d'obtenir la taille du fichier: %s"
+ IDS_PAK_INVLAIDDATA, "Format de donnée invalide."
+ IDS_PAK_LOWMEMORY, "Mémoire insuffisante."
+ IDS_PAK_CENTRDIR, "répertoire central PAK actuel"
+ IDS_PAK_ERRSETFILEPTR, "Impossible de définir un pointeur de fichier: %s"
+ IDS_PAK_ERRREADFILE, "Lecture impossible à partir du fichier: %s"
+ IDS_PAK_ERRGETFILEPTR, "Impossible d'obtenir un pointeur de fichier: %s"
+ IDS_PAK_ERRWRITEFILE, "Ecriture impossible à partir du fichier: %s"
+ IDS_PAK_TOOLONGNAME, "Ajout du fichier impossible, car son nom est trop long."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Parcourt et extrait les archives Quake PAK."
+ IDS_ABOUT, "A propos du module"
+ IDS_LOWMEM, "Mémoire insuffisante."
+ IDS_ERRLIST, "Impossible d'ajouter le fichier à la liste."
+ IDS_ERRLOADPAKLIB, "Impossible de charger paklib.dll ou d'obtenir l'adresse de la procédure: "
+ IDS_EXTRPROGTITLE, "Décompression de l'archive PAK - %s"
+ IDS_PREPAREDATA, "préparation des données..."
+ IDS_EXTRACTFILES, "décompression en cours..."
+ IDS_EXTRACTING, "décompression: "
+ IDS_TOOLONGNAME, "Impossible de terminer l'opération car le nom du chemin est trop long."
+ IDS_UNABLESEEK, "Impossible de définir le pointeur de fichier: "
+ IDS_UNABLEGETFIELPOS, "Impossible d'obtenir le pointeur de fichier: "
+ IDS_UNABLEWRITE, "Impossible d'écrire dans le fichier:"
+ IDS_ERROPEN, "Impossible d'ouvrir le fichier: "
+ IDS_TOOLONGMASK, "Impossible de terminer l'opération car le masque est trop long."
+ IDS_DELPROGTITLE, "Suppression de l'archive PAK - %s"
+ IDS_DELFILES, "suppression en cours..."
+ IDS_DELETING, "suppression: "
+ IDS_CANCELING, "annulation de l'opération en cours, veuillez patienter..."
+ IDS_ADDPROGTITLE, "Compression en archive PAK - %s"
+ IDS_TOOLARGE, "Impossible d'ajouter le fichier, car il est trop gros."
+ IDS_ADDFILES, "compression en cours..."
+ IDS_TOOLONGNAME2, "Impossible d'ajouter le fichier, car son nom est trop long."
+ IDS_PACKING, "compression: "
+ IDS_UNABLEREAD, "Lecture impossible à partir du fichier: "
+ IDS_ERRCONNECT, "Impossible connecter le module à Sally."
+ IDS_OPTIMIZING, "optimisation en cours, veuillez patienter..."
+ IDS_OPTPROGTITLE, "Optimisation de l'archive PAK - %s"
+ IDS_NEEDOPT, "La suppression de fichiers a échoué. Vous devriez lancer l'optimisation du PAK à partir du menu du Module PAK pour éviter la perte d'espace disque."
+ IDS_MENUOPTIMIZE, "&Optimisation du PAK"
+ IDS_EXPIRE, "Désolé, la validité du module a expiré. Veuillez consulter notre site Web pour une obtenir une version plus récente."
+}

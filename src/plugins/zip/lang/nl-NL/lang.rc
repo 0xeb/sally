@@ -1,0 +1,660 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for zip. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\zip.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_EXPACKOPTIONS DIALOGEX 41, 41, 328, 201
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Uitgebreide inpak-opties"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archief:",IDC_STATIC_1,17,9,28,8
+    CONTROL         "",IDC_ARCHIVE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,48,9,272,8
+    LTEXT           "",IDC_STATIC_2,8,24,311,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Maken van &multi-delig archiefbestand",IDC_MULTIVOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,31,138,12
+    LTEXT           "&Volumegrootte:",IDC_STATIC_3,171,33,54,8,NOT WS_GROUP
+    COMBOBOX        IDC_VOLSIZE,226,31,61,110,CBS_DROPDOWN | WS_DISABLED | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_UNITS,292,31,27,34,CBS_DROPDOWNLIST | WS_DISABLED | WS_TABSTOP
+    CONTROL         "Sequentiële &bestandsnamen",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,17,45,107,12
+    LTEXT           "",IDC_STATIC_4,8,63,311,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Maken van &zelf-uitpakkend archiefbestand",IDC_SELFEXTR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,70,154,12
+    PUSHBUTTON      "&Geavanceerd...",IDC_ADVANCED,254,70,65,14,WS_DISABLED
+    LTEXT           "",IDC_STATIC_5,8,90,311,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Bestanden &coderen",IDC_ENCRYPT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,97,77,12
+    LTEXT           "&Wachtwoord:",IDC_STATIC_6,28,113,47,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD1,105,111,85,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    LTEXT           "Bevestig w&achtwoord:",IDC_STATIC_7,28,129,76,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD2,105,127,85,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    GROUPBOX        " Coderingmethode ",IDC_STATIC_8,205,97,114,50
+    CONTROL         "ZI&P 2.0 verenigbaar (zwak)",IDC_ENC_ZIP20,"Button",BS_AUTORADIOBUTTON | WS_DISABLED | WS_GROUP,210,108,103,12
+    CONTROL         "&128-bit AES",IDC_ENC_AES128,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,210,120,52,12
+    CONTROL         "&256-bit AES",IDC_ENC_AES256,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,210,132,52,12
+    LTEXT           "",IDC_STATIC_9,8,154,311,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Dit scherm niet meer weergeven (u kunt dit wijzigen in het configuratiescherm)",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,161,280,12
+    DEFPUSHBUTTON   "OK",IDOK,34,180,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,92,180,50,14
+    PUSHBUTTON      "C&onfigureren...",IDC_CONFIG,150,180,65,14
+    PUSHBUTTON      "Help",IDHELP,223,180,50,14
+END
+
+IDD_CONFIG DIALOGEX 50, 37, 407, 277
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP Configuratie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Uitpakken",IDC_STATIC_1,7,6,35,8
+    LTEXT           "",IDC_STATIC_2,44,10,357,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Automatisch uitbreiden van een multi-delig archiefbestand welke is opgeslagen op de vaste schijf",IDC_AUTOEXPANDMV,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,17,338,12
+    LTEXT           "Inpakken",IDC_STATIC_3,7,35,34,8
+    LTEXT           "",IDC_STATIC_4,43,39,358,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Gebruik bij &wijzigingen aan het archiefbestand een tijdelijk kopie-achiefbestand (aanbevolen, crash-bestendig)",IDC_BACKUP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,46,383,12
+    CONTROL         "Geen &lege mappen opslaan in ZIP-archief",IDC_NOEMPTYDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,58,152,12
+    CONTROL         "Wi&jzig de archieftijd naar de nieuwste bestandstijd bij wijzigingen aan het archiefbestand",IDC_SETFILETIME,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,70,312,12
+    CONTROL         "Gebruik WinZip verenigbare bestandsnamen voor multi-delige archiefbestanden (behalve voor zelf-",IDC_WINZIPNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,82,345,12
+    LTEXT           "uitpakkende archiefbestanden, welke altijd gebruik maken van de Sally naamconventie)",IDC_STATIC_5,26,94,341,8
+    LTEXT           "Compressie &niveau (0 - 9, 9 beste compressie, langste tijd):",IDC_STATIC_6,14,107,202,8
+    EDITTEXT        IDC_LEVEL,217,105,16,12
+    LTEXT           "Standaardtaal van de &zelf-extractor:",IDC_STATIC_7,14,120,123,8
+    COMBOBOX        IDC_LANGUAGE,138,118,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Bevestigingen",IDC_STATIC_8,7,136,49,8
+    LTEXT           "",IDC_STATIC_9,58,140,343,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Bij verandering van de SFX taal",IDC_STATIC_10,14,148,259,49
+    CONTROL         "Altij&d navragen voordat er tekst veranderd wordt",IDC_ASK,"Button",BS_AUTORADIOBUTTON | WS_GROUP,20,158,176,12
+    CONTROL         "Tekst automatisch &vervangen met hun standaardwaarden",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,20,170,206,12
+    CONTROL         "Ni&et opnieuw vragen en laat tekst onveranderd",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,20,182,170,12
+    CONTROL         "Geef uitgebreide &opties weer alvorens het archiveren",IDC_SHOWEXOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,200,190,12
+    LTEXT           "Paneel instellingen",IDC_STATIC_11,7,217,64,8
+    LTEXT           "",IDC_STATIC_12,73,221,328,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Toon kolom ""&Inpakken"" bij het bekijken van archiefbestand",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,228,211,12
+    LTEXT           "",IDC_STATIC_13,6,247,395,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,62,256,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,121,256,50,14
+    PUSHBUTTON      "&Standaardwaarden instellen",IDC_DEFAULT,180,256,105,14
+    PUSHBUTTON      "Help",IDHELP,294,256,50,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 294, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Voer ZIP wachtwoord in"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK,21,10,18,20
+    LTEXT           "Dit bestand is gecodeerd. Voert u alstublieft het juiste wachtwoord in voor het decoderen.",IDC_STATIC_1,57,10,226,16
+    LTEXT           "Bestand:",IDC_STATIC_2,57,31,32,8
+    CONTROL         "",IDC_FILE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,92,31,192,8
+    LTEXT           "&Wachtwoord:",IDC_STATIC_3,57,44,47,8
+    EDITTEXT        IDC_PASSWORD,105,42,178,12,ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,26,63,50,14,WS_GROUP
+    PUSHBUTTON      "&Overslaan",IDC_SKIP,85,63,50,14
+    PUSHBUTTON      "Alles o&verslaan",IDC_SKIPALL,144,63,65,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,218,63,50,14
+END
+
+IDD_LOWFREESPACE DIALOGEX 13, 54, 355, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Lage vrije schijfruimte"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Waarschuwing: De vrije ruimte op de schijf is kleiner dan de volumegrootte die u hebt opgegeven.",IDC_TEXT,9,9,334,8
+    RTEXT           "Pad:",IDC_STATIC_1,4,26,54,8
+    LTEXT           "",IDC_PATH,63,26,284,8
+    RTEXT           "Vrije ruimte:",IDC_STATIC_2,4,39,54,8
+    LTEXT           "",IDC_FREESPACE,63,39,284,8
+    RTEXT           "Volumegrootte:",IDC_STATIC_3,4,52,54,8
+    LTEXT           "",IDC_VOLUMESIZE,63,52,284,8
+    DEFPUSHBUTTON   "&Negeren",IDC_IGNORE,46,73,50,14
+    PUSHBUTTON      "&Alles negeren",IDC_ALL,105,73,60,14
+    PUSHBUTTON      "&Opnieuw proberen",IDC_RETRY,174,73,75,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,258,73,50,14
+END
+
+IDD_CHANGEDISK DIALOGEX 24, 40, 199, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Verander schijf"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,173,24
+    LTEXT           "Druk op OK wanneer u klaar bent.",IDC_STATIC_1,13,39,173,8
+    DEFPUSHBUTTON   "OK",IDOK,44,57,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,104,57,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 6, 15, 362, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Bevestig het overschijven van bestand"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Bestand overschrijven:",IDC_STATIC_1,4,14,78,8
+    LTEXT           "",IDC_FILE,87,14,269,8
+    LTEXT           "",IDC_FILEATTR,87,24,269,8
+    LTEXT           "Bestand bestaat al op de schijf. Overschrijven?",IDC_STATIC_2,87,39,174,8
+    DEFPUSHBUTTON   "&Ja",IDC_YES,55,56,50,14
+    PUSHBUTTON      "&Alles",IDC_ALL,114,56,50,14
+    PUSHBUTTON      "&Opnieuw proberen",IDC_RETRY,173,56,75,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,257,56,50,14
+END
+
+IDD_CHANGEDISK2 DIALOGEX 24, 40, 226, 116
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Het bestand maakt deel uit van een multi-delig archiefbestand of is corrupt.",IDC_STATIC_1,13,8,204,16
+    LTEXT           "Wanneer u van mening bent dat het gaat om een multi-delig achiefbestand, voeg dan alstublieft het laatste deel in van het achiefbestand toe of zoek het bestand op de vaste schijf. Druk op OK wanneer u klaar bent.",IDC_STATIC_2,13,31,204,32
+    LTEXT           "&Laatste deel van het archiefbestand:",IDC_STATIC_3,13,69,125,8
+    EDITTEXT        IDC_FILENAME,13,79,184,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,201,79,13,12
+    DEFPUSHBUTTON   "OK",IDOK,58,97,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,118,97,50,14
+END
+
+IDD_CHANGEDISK3 DIALOGEX 24, 40, 210, 132
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Verander schijf"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,184,16
+    LTEXT           "Druk op OK wanneer u klaar bent.",IDC_STATIC_1,13,31,184,8
+    CONTROL         "Bestanden worden &sequentieel genoemd",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,43,150,12
+    CONTROL         "Schijf nummers in &uitbreiding",IDC_WINZIP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,55,112,12
+    CONTROL         "Zonder navraag &alle volumes voortzetten",IDC_PROCEEDALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,67,149,12
+    LTEXT           "&Bestandsnaam:",IDC_STATIC_2,13,84,60,8
+    EDITTEXT        IDC_FILENAME,13,94,168,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,185,94,13,12
+    DEFPUSHBUTTON   "OK",IDOK,49,112,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,111,112,50,14
+END
+
+IDD_ADVANCEDSE DIALOGEX 37, 14, 370, 303
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Instellingen van de Zelfuitpakker"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_STATIC_1,0,0,370,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Pad voor het uitpakken van bestanden",IDC_STATIC_2,7,7,357,89,WS_GROUP
+    LTEXT           "&Uitpakken naar:",IDC_STATIC_3,20,19,56,8,NOT WS_GROUP
+    EDITTEXT        IDC_TARGETDIR,20,29,314,12,ES_AUTOHSCROLL | ES_NOHIDESEL
+    PUSHBUTTON      ">",IDC_SPECDIR,337,29,12,12
+    LTEXT           "Opmerking: U kunt een relatief pad, die zal worden gecombineerd met de huidige directory als de zelfuitpakker wordt uitgevoerd, of het volledige pad opgeven. Laat het veld leeg voor het uitpakken naar de huidige directory.",IDC_STATIC_4,20,47,265,24,NOT WS_GROUP
+    CONTROL         "Laat toe dat de &gebruiker het pad kan veranderen",IDC_ALLOWUSER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,77,181,12
+    LTEXT           "&Commando uitvoeren of document openen:",IDC_STATIC_5,20,113,149,8,NOT WS_GROUP
+    EDITTEXT        IDC_EXECUTE,20,123,329,12,ES_AUTOHSCROLL
+    CONTROL         "&Verwijder uitgepakte bestanden",IDC_REMOVE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,139,119,12
+    PUSHBUTTON      "&Wachten op...",IDC_WAITFOR,289,138,60,14
+    GROUPBOX        "Gebruikersinterface",IDC_STATIC_6,7,163,357,53,WS_GROUP
+    PUSHBUTTON      "T&eksten...",IDC_TEXTS,20,177,50,14
+    LTEXT           "&Taal:",IDC_STATIC_7,20,198,20,8,NOT WS_GROUP
+    COMBOBOX        IDC_LANGUAGE,44,196,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Pictogram:",IDC_STATIC_8,197,198,38,8,NOT WS_GROUP
+    LTEXT           "",IDC_EXEICON,238,194,19,18,NOT WS_GROUP
+    PUSHBUTTON      "Verander &pictogram...",IDC_CHANGEICON,265,196,84,14
+    GROUPBOX        "Bevestigingen en andere opties",IDC_STATIC_9,7,221,357,57
+    CONTROL         "Start e&xtractie automatisch",IDC_AUTO,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,20,234,103,12
+    CONTROL         "Ve&rberg extractie dialoogvenster",IDC_HIDEMAINDLG,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,246,121,12
+    CONTROL         "&Automatisch aanmaken van bestemmings-directory",IDC_AUTODIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,258,184,12
+    CONTROL         "Toon voortgang &dialoogvenster",IDC_SUMDLG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,210,234,116,12
+    CONTROL         "Automatisch &overschrijven van bestanden",IDC_OVEWRITE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,210,246,152,12
+    CONTROL         "&Beheerdersbevoegdheden vereist ",IDC_REQSADMIN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,210,258,127,12
+    DEFPUSHBUTTON   "OK",IDOK,99,283,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,160,283,50,14
+    PUSHBUTTON      "Help",IDHELP,221,283,50,14
+    GROUPBOX        "Na extractie is voltooid",IDC_STATIC_10,7,101,357,57,WS_GROUP
+END
+
+IDD_OVERWRITE2 DIALOGEX 6, 15, 362, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Bevestig het overschijven van bestand"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Bestand overschrijven:",IDC_STATIC_1,4,14,78,8
+    LTEXT           "",IDC_FILE,87,14,269,8
+    LTEXT           "",IDC_FILEATTR,87,24,269,8
+    LTEXT           "Bestand bestaat al op de schijf. Overschrijven?",IDC_STATIC_2,87,39,174,8
+    DEFPUSHBUTTON   "&Ja",IDC_YES,95,56,50,14
+    PUSHBUTTON      "&Nee",IDC_NO_,156,56,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,217,56,50,14
+END
+
+IDD_RENAMEFAVSET DIALOGEX 100, 37, 194, 99
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Instellingen nieuwe favorieten"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Naam:",IDC_STATIC_1,14,8,60,8
+    EDITTEXT        IDC_NAME,14,18,164,12,ES_AUTOHSCROLL
+    LTEXT           "Opmerking: Voor het defineren van sneltoetsen van deze favorieten typt u een ampersand (&&) voor het (letter)teken van deze sneltoest.",IDC_STATIC_2,14,41,161,24
+    LTEXT           "",IDC_STATIC_3,7,74,180,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,39,80,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,99,80,50,14
+END
+
+IDD_CREATESFX DIALOGEX 6, 15, 254, 113
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Creëer zelfuitpakkend achiefbestand"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Creëer een zelfuitpakkend achiefbestand van dit archiefbestand:",IDC_SOURCE,16,11,219,8
+    EDITTEXT        IDC_ARCHIVE,16,21,222,12,ES_AUTOHSCROLL
+    LTEXT           "&Bestandsnaam van het nieuwe zelfuitpakkend archiefbestand:",IDC_TARGET,16,39,210,8
+    EDITTEXT        IDC_NEWARCHIVE,16,49,222,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Geavanceerd...",IDC_ADVANCED,178,68,60,14
+    LTEXT           "",IDC_STATIC_1,7,87,240,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,43,94,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,102,94,50,14
+    PUSHBUTTON      "Help",IDHELP,161,94,50,14
+END
+
+IDD_COMMENT DIALOGEX 9, 34, 340, 180
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "ZIP archief aantekening"
+MENU IDM_COMMENTMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_COMMENT,0,0,340,180,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+END
+
+IDD_SFXTEXTS DIALOGEX 94, 18, 260, 352
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zelf-Extractor teksten"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Berichten dialoogvenster ",IDC_STATIC_1,8,5,245,158
+    LTEXT           "Dit berichten dialoogvenster wordt getoond voor het hoofd-dialoogvenster en voordat het uitpakken begint.",IDC_STATIC_2,20,18,221,16,NOT WS_GROUP
+    LTEXT           "Laat de velden 'Titel' en 'Bericht' leeg als u niet wilt dat er berichten worden weergeven.",IDC_STATIC_3,20,38,221,16,NOT WS_GROUP
+    LTEXT           "&Knoppen:",IDC_STATIC_4,20,61,35,8
+    COMBOBOX        IDC_MBOXBUTTONS,56,59,140,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Type:",IDC_STATIC_5,20,77,22,8,NOT WS_GROUP
+    COMBOBOX        IDC_MBOXICON,56,75,140,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Tite&l:",IDC_STATIC_6,20,92,145,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTITLE,20,102,221,12,ES_AUTOHSCROLL
+    LTEXT           "&Bericht:",IDC_STATIC_7,20,117,34,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTEXT,20,127,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    GROUPBOX        "Hoofd-dialoogvenster",IDC_STATIC_8,8,169,245,158
+    LTEXT           "Tit&el van het dialoogvenster:",IDC_STATIC_9,20,179,98,8
+    EDITTEXT        IDC_TITLE,20,189,221,12,ES_AUTOHSCROLL
+    LTEXT           "Tek&st welke weergegeven wordt in het dialoogvenster:",IDC_STATIC_10,20,205,186,8,NOT WS_GROUP
+    EDITTEXT        IDC_TEXT,20,215,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Tekst in de knop '&Uitpakken':",IDC_STATIC_11,20,247,99,8,NOT WS_GROUP
+    EDITTEXT        IDC_BUTTONTEXT,20,257,68,12,ES_AUTOHSCROLL
+    LTEXT           "&Naam verkoper:",IDS_VENDOR,20,272,174,8
+    EDITTEXT        IDE_VENDOR,20,282,184,12,ES_AUTOHSCROLL
+    LTEXT           "&Internet adres:",IDS_WWW,20,297,174,8
+    EDITTEXT        IDE_WWW,20,307,108,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,24,333,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,78,333,50,14
+    PUSHBUTTON      "&Reset",IDC_RESET,132,333,50,14
+    PUSHBUTTON      "Help",IDHELP,186,333,50,14
+END
+
+IDD_MANFAVS DIALOGEX 59, 61, 240, 123
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Beheren van favorieten"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Favorieten:",IDC_STATIC_1,9,4,60,8
+    LISTBOX         IDC_FAVORITIES,9,14,142,100,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Hernoemen",IDC_RENAME,161,13,70,14,WS_GROUP
+    PUSHBUTTON      "&Verwijderen",IDC_REMOVE,161,32,70,14
+    PUSHBUTTON      "&Alles verwijderen",IDC_REMOVEALL,161,51,70,14
+    DEFPUSHBUTTON   "Sluiten",IDOK,161,100,70,14
+END
+
+IDD_WAITFOR DIALOGEX 15, 24, 232, 155
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Wachten op"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Deze optie geeft u de mogelijkheid te wachten op een ander proces dan hetgeen door uzelf is gedefineerd onder het veld 'Commando'. Nadien het gehele proces is voltooid zal de zelfuitpakker de tijdelijke bestanden verwijderen en zichzelf afronden.",IDC_STATIC_1,12,9,205,40
+    LTEXT           "",IDC_STATIC_2,12,57,205,32
+    LTEXT           "&Bestandsnaam van het uitvoerbaar bestand:",IDC_STATIC_3,12,97,151,8
+    EDITTEXT        IDC_FILENAME,12,107,205,12,ES_AUTOHSCROLL
+    LTEXT           "",IDC_STATIC_4,3,129,225,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,31,136,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,91,136,50,14
+    PUSHBUTTON      "Help",IDHELP,151,136,50,14
+END
+
+IDD_CHANGELANG DIALOGEX 6, 15, 248, 114
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Verander Zelf-Extractor teksten"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "U hebt de zelf-extractor taal verandert, wilt u de aangepaste teksten die u hebt verandert in het dialoogvenster 'Zelf-Extractor teksten' laten wijzigigen naar hun standaardwaarden die corresponderen met de taal die u geselecteerd hebt?",IDC_STATIC_1,11,8,227,32
+    DEFPUSHBUTTON   "Ja",IDOK,40,48,50,14
+    PUSHBUTTON      "Nee",IDCANCEL,99,48,50,14
+    PUSHBUTTON      "Help",IDHELP,158,48,50,14
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,3,70,242,1
+    CONTROL         "&Altijd navragen voordat er tekst veranderd wordt",IDC_ASK,"Button",BS_AUTORADIOBUTTON,11,74,176,12
+    CONTROL         "Tekst automatisch &vervangen met hun standaardwaarden",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,11,86,206,12
+    CONTROL         "Niet opnieuw vragen en laat tekst &onveranderd",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,11,98,170,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SFXMENU MENU 
+BEGIN
+    POPUP "&Bestand"
+    BEGIN
+        MENUITEM "&Instellingen exporteren...\tCtrl+E", CM_SFX_EXPORT
+        MENUITEM "I&nstellingen importeren...\tCtrl+I", CM_SFX_IMPORT
+    END
+    POPUP "&Tonen"
+    BEGIN
+        MENUITEM "&Voorvertoning SFX-dialoogvenster...\tCtrl+V", CM_SFX_PREVIEW
+    END
+    POPUP "&Opties"
+    BEGIN
+        MENUITEM "Alles &resetten\tCtrl+Shift+R",    CM_SFX_RESETALL
+        MENUITEM "Reset &waarden\tCtrl+R",       CM_SFX_RESETVALUES
+        MENUITEM "Reset &teksten\tCtrl+T",        CM_SFX_RESETTEXTS
+        MENUITEM SEPARATOR
+        MENUITEM "T&oevoegen aan favorieten...\tCtrl+A", CM_SFX_ADD
+        MENUITEM "&Favorieten\tCtrl+F",          CM_SFX_FAVORITIES
+        MENUITEM SEPARATOR
+        MENUITEM "&Laatst gebruikt\tCtrl+L",          CM_SFX_LASTUSED
+    END
+END
+
+IDM_FAVMANMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Hernoemen",                     CM_FAVRENAME
+        MENUITEM "&Verwijderen",                     CM_FAVDELETE
+        MENUITEM SEPARATOR
+        MENUITEM "&Alles verwijderen",                 CM_FAVREMOVEALL
+    END
+END
+
+IDM_COMMENTMENU MENU 
+BEGIN
+    POPUP "&Bestand"
+    BEGIN
+        MENUITEM "&Opslaan",                       CM_SAVE
+        MENUITEM SEPARATOR
+        MENUITEM "&Sluiten\tAlt+F4",              CM_CLOSE
+    END
+END
+
+IDM_SPECDIR MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Tijdelijke directory",        CM_TEMP
+        MENUITEM "&Programma bestanden",              CM_PROGFILES
+        MENUITEM "&Windows directory",          CM_WINDIR
+        MENUITEM "&Systeem directory",           CM_SYSDIR
+        MENUITEM SEPARATOR
+        MENUITEM "&Omgevingsvariabelen",       CM_ENVVAR
+        MENUITEM "&Register items",             CM_REGENTRY
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_ABOUTPLUGINTITLE, "Over deze plugin"
+  IDS_PLUGIN_DESCRIPTION, "Creër, blader, en pak ZIP-archiefbstanden uit."
+  IDS_ERROPEN, "Kan het bestand niet openen."
+  IDS_ERRFORMAT, "Onjuist data formaat."
+  IDS_ERREOCENTRDIR, "Kan het einde van de centrale directoryhandtekening niet vinden. Mogelijkerwijs een corrupt/beschadigd bestand."
+  IDS_LOWMEM, "Onvoldoende geheugen."
+  IDS_ERRADDFILE, "Kan het bestand niet toevoegen aan de lijst."
+  IDS_ERRADDFILE_TOOLONG, "Kan één of meerdere bestanden niet toevoegen aan de lijst. Het totale pad is te lang.\nSommige directories of bestanden kunnen ontbreken in het achiefbestand."
+  IDS_ERRADDDIR, "Kan de directory niet toevoegen aan de lijst."
+  IDS_ERRADDDIR_TOOLONG, "Één of meerdere directories kunnen niet toegevoegd worden aan de lijst. Het totale pad is te lang.\nEnkele directories of bestanden kunnen ontbreken in het achiefbestand."
+  IDS_PLUGINNAME, "ZIP"
+  IDS_TOOBIG, "Bestanden groter dan 4GB worden niet ondersteund."
+  IDS_ERRACCESS, "Geen toegang tot het bestand."
+  IDS_ERRREAD, "Kan het bestand niet lezen."
+  IDS_EOF, "Onverwacht einde van bestand."
+  IDS_NODISPLAY, "Foutmelding is reeds weergegeven. Deze tekst mag niet op het scherm verschijnen."
+  IDS_ERRCREATE, "Kan het bestand niet openen noch creëren."
+  IDS_MULDISK, "Sorry, meerdere schijf archieven worden niet ondersteund in deze versie van ZIP-plugin."
+  IDS_TOOLONGNAME, "Het bestand heeft een te lange padnaam en kan daardoor niet verwerkt worden."
+  IDS_TOOLONGNAME2, "Het bestand heeft een te lange padnaam en kan daardoor niet weergegeven worden in het dialoogvenster."
+  IDS_PREPAREDATA, "voorbereiden van data..."
+  IDS_EXTRPROGTITLE, "Uitpakken vanuit ZIP-archief - %s"
+  IDS_ERRTEMPDIR, "Kan geen tijdelijke directory aanmaken in de bestemmings-directory."
+  IDS_EXTRACTING, "uitpakken: "
+  IDS_TOOLONGNAME3, "Vanwege een te lange padnaam kan het bestand niet uitgepakt worden."
+  IDS_ERRCOMPDATA, "Fout in gecomprimeerde data."
+  IDS_BADMETHOD, "Bestand is gecomprimeerd gebruikmakende van een methode welke niet wordt ondersteund door deze versie van ZIP plugin."
+  IDS_ERRCRC, "Fout in gecomprimeerde data. CRC komt niet overeen."
+  IDS_ERRWRITE, "Kan niet naar het bestand schrijven."
+  IDS_TOOLONGMASK, "Masker is te lang."
+  IDS_EXTRACTFILES, "uitpakken..."
+  IDS_BADPACKLEVEL, "Verkeerde compressie niveau."
+  IDS_BLOCKVANISHED, "Onverwachte fout opgetreden tijdens de compressie: block verdwenen."
+  IDS_DELPROGTITLE, "Verwijderen van ZIP-archief items - %s"
+  IDS_DELETEFILES, "verwijderen..."
+  IDS_DELETING, "Verwijderen: "
+  IDS_CANCELING, "voortgang wordt onderbroken, een moment geduld alstublieft..."
+  IDS_ERRTEMP, "Kan geen tijdelijk back-up bestand creëren."
+  IDS_READONLY, "Dit archiefbestand is alleen-lezen. Diese Archivdatei ist schreibgeschützt. Gelieve eerst het kenmerk alleen-lezen opklaren."
+  IDS_USERBREAK, "Afgebroken door gebruiker. Deze tekst mag niet op het scherm verschijnen."
+  IDS_REMOVEFILES, "verwijderen van overbodige bestanden uit het archiefbestand..."
+  IDS_ADDFILES, "inpakken..."
+  IDS_ADDING, "Inpakken: "
+  IDS_BACKUPING, "backing-up achiefbestand..."
+  IDS_SKIP, "Sla het bestand over. Deze tekst mag niet op het scherm verschijnen."
+  IDS_ERRACCESDIR, "Geen toegang tot de directory."
+  IDS_REMOVING, "verwijderen: "
+  IDS_ERRRESTORE, "Kan het originele archiefbestand niet vervangen door tijdelijk werkbestand. Het archiefbestand is onveranderd gebleven."
+  IDS_AUTO, "automatisch"
+  IDS_BADLEVEL, "Compressie niveau moet in het bereik van 0 tot 9."
+  IDS_ERROR, "Fout"
+  IDS_BADVOLSIZE, "Onjuiste waarde van de volumegrootte. De vermelding kan alleen cijfers bevatten en één decimaal scheidingsteken.\n\nVolumegrootte moet groter of gelijk zijn aan 1KB en kleiner dan 4 GB."
+  IDS_PWDDONTMATCH, "Het ingevoerde wachtwoord komt niet overeen."
+  IDS_PWDTOOSHORT, "Wachtwoord zou tenminste één karakter lang moeten zijn."
+  IDS_BADPWD, "Het wachtwoord is onjuist. Probeert u het nogmaals alstublieft. Wachtwoorden zijn hoofdletter gevoelig. Verzeker u ervan dat de CapsLock-toets is uitgeschakeld."
+  IDS_BADPWDTITLE, "Onjuist wachtwoord"
+  IDS_ADDPROGTITLE, "Inpakken van ZIP-archief - %s"
+  IDS_ERRRECOVER, "Poging om het zip-archief te herstellen is mislukt. Bestandgegevens zijn mogelijkerwijs beschadigd."
+  IDS_ECRYPTSTORED, "Codering kan niet worden uitgevoerd gebruikmakende van de methode opslaan (niveau 0)."
+  IDS_ECRYPTSFX, "AES-codering wordt niet ondersteund door zelfuitpakkende archiefbestanden."
+  IDS_ERRCREATEDIR, "Kan geen directory creëren."
+  IDS_CANTMULTIVOL, "Archiefbestand van dezelfde bestandsnaam bestaat al.\nHet multi-delig archiefbestand kan alleen worden gecreëerd als een nieuw archiefbestand."
+  IDS_FILEEXIST, "Het opgegeven bestand bestaat al, wilt u het overschrijven?"
+  IDS_CHDISKTEXT, "Inpakken van volume nummer %d is voltooid.\nGelieve plaatst u een andere schijf voor de inbruikname voor volume nummer %d."
+  IDS_BYTES, "bytes"
+  IDS_TOOLOWSPACE, "Er is niet genoeg ruimte op de schijf. Schijf kan daardoor niet worden gebruikt voor het inpakken."
+  IDS_LOWSPACE, "Waarschuwing: De vrije ruimte op de schijf is kleiner dan de volumegrootte die u hebt opgegeven."
+  IDS_LOWSPACE2, "Waarschuwing: Niet genoeg vrije ruimte op de schijf."
+  IDS_MULTISTORED, "Multi-delige archiefbestanden kunnen niet gecreëerd worden gebruikmakende van de methode opslaan (niveau 0)."
+  IDS_CHDISKTEXT2, "Gelieve plaatst u de schijf met het volume nummer %d of zoekt u het bestand op de schijf."
+  IDS_ZIPARCHIVES, "ZIP archiefbestanden (*.zip; *.z*; *.pk3; *.jar)"
+  IDS_BROWSEARCHIVETITLE, "Selecteer archiefbestand"
+  IDS_ZIPARCHIVESEXTS, "*.zip;*.z*;*.pk3;*.jar"
+  IDS_ERRMULTIVOL, "Gewenste bewerking wordt niet ondersteund voor multi-delige archiefbestanden. Het multi-delig archiefbestand kan worden opgenomen en alleen worden uitgepakt.\n\nOpmerking: Als dit geen multi-delig archiefbestand is, zullen de bestandsgegevens onbekende opmaak hebben of zijn beschadigd."
+  IDS_MISSLHSIG, "Onjuist data formaat. Lokale bestandskop handtekening ontbreekt."
+  IDS_ERRGETDISKFREESP, "Kan geen vrije schijfruimte detecteren."
+  IDS_MISSCHSIG, "Onjuist data formaat. Centraal bestandkop handtekening ontbreekt."
+  IDS_WRITINGEXE, "schrijven van een zelfuitpakkend uitvoerbaar bestand..."
+  IDS_TOOLONGZIPNAME, "Onmogelijk om verder te gaan. Het ZIP bestand heeft een te lange pad naam."
+  IDS_ERRGETMODULENAME, "Kan module-naam niet verkrijgen."
+  IDS_DEFAULTTEXT, "Dit zal het archiefbestand uitpakken."
+  IDS_CREAETARCH, "Creër nieuw archiefbestand"
+  IDS_ADDTOARCHIVE, "Toevoegen van bestanden aan archiefbestand"
+  IDS_DEFSFXTITLE, "Zelfuitpakkend ZIP archief"
+  IDS_ERRBADTITLE, "De titel in het hoofd-dialoogvenster kan niet leeg zijn. Geeft u ten minste één karakter op."
+  IDS_ERRBADMBOXTITLE, "De titel in het bericht-dialoogvenster kan niet leeg zijn. Geeft u ten minste één karakter op."
+  IDS_ERRLAODSHELLDLL, "Kan shell32.dll niet laden. "
+  IDS_ERRGETPROCADDRESS, "Onmogelijk om het procedure-adres van de DLL-module te identificeren. "
+  IDS_ERRADDICON, "Kan geen pictogram toevoegen aan het uitvoerbaar bestand van de Zelf-Extractor."
+  IDS_ERRLOADICON, "Kan het pictogram niet uit een bestand laden. "
+  IDS_ERRLOADLIB, "Kan de module, welke het pictogram bevat, niet laden. Deze module is geen geldig Win32-toepassing. "
+  IDS_ERRLOADLIB2, "Kan de module, welke het pictogram bevat, niet laden. "
+  IDS_ERRLOADSFXICON, "Kan het pictogram niet laden voor de zelf-extractor."
+  IDS_EXPIRE, "Sorry, de plugin is verlopen. Gelieve onze website te raadplegen voor een nieuwere versie."
+  IDS_UNDERCOSTRUCT, "Onder constructie."
+  IDS_NOSFXINSTALLED, "Kan geen Zelf-Extractor bestanden vinden.\n\nAls u zelfuitpakkende archiefbestanden wilt creëren, gelieve de ZIP plugin opnieuw installeren."
+  IDS_UNABLEREADSFXDIR, "Kan niet lezen vanuit de zelf-extractor directory: "
+  IDS_UNABLEREADALLSFX, "Geen van de zelf-extractor bestanden kunnen worden geladen."
+  IDS_UNABLEREADSFX, "Kan het zelf-extractor bestand '%s' niet laden.\n\nDrukt u op OK om verder te gaan of Annuleren om af te breken."
+  IDS_UNABLEREADSFX2, "Kan een standaard zelf-extractor bestand niet laden: %s"
+  IDS_CORRUPTSFX, "Zelf-extractor bestand is corrupt."
+  IDS_CORRUPTSFX2, "Zelf-extractor bestand '%s' is corrupt.\n\nDrukt u op OK om verder te gaan of Annuleren om af te breken."
+  IDS_ERRLOADMENU, "Kan het menu niet laden."
+  IDS_ERRLOADACCELS, "Kan de versnellers tabel niet laden."
+  IDS_NODEFSFX, "Het standaard zelf-extractor bestand is niet laden."
+  IDS_ERRLOADCONFIG, "Kan het configuratiebestand niet laden - onvoldoende geheugen."
+  IDS_EMPTY, "Leeg"
+  IDS_RENAMEFAVSET, "Instellingen van favorieten hernoemen."
+  IDS_USEDNAME, "Deze naam is al in gebruik."
+  IDS_NOLANGFILE, "Kan de favorieten instellingen niet laden: de vereiste zelf-extractor taal is niet geïnstalleerd (%s)."
+  IDS_SETTINGSFILE, "Configuratiebestanden (*.set)"
+  IDS_DEFEXTRBUTTON, "&uitpakken"
+  IDS_EXPORTOVEWRITE, "Bestand bestaat reeds. Overschrijven?"
+  IDS_ERRGETTEMP, "Kan geen tijdelijk-bestand creëren."
+  IDS_SFXABOUTBTN1, "&Over >>"
+  IDS_SFXABOUTBTN2, "<< &Over"
+  IDS_MENUCREATESFX, "&Zelfuitpakkend uitvoerbaar bestand creëren (.exe)..."
+  IDS_MENUTEST, "&Testen van archiefbestand"
+  IDS_MENUREPAIR, "&Repareren van beschadigd archiefbestand"
+  IDS_CONTINUE, "Laatste bewerking is niet succesvol voltooid. Verder gaan met het volgende bestand?"
+  IDS_NOARCHIVETYPED, "Ontbrekend archiefbestandsnaam."
+  IDS_NOEXETYPED, "Er ontbreekt een bestandsnaam van het zelfuitpakkende archiefbestand waardoor deze niet kan worden aangemaakt."
+  IDS_SFXPROGTITLE, "Creër een zelfuitpakkend ZIP archiefbestand - %s"
+  IDS_COPYDATA, "kopiëren van archiefdata..."
+  IDS_EMPTYARCHIVE, "Het archiefbestand is leeg."
+  IDS_BADMETHODSFX, "Het archiefbestand bevat gecomprimeerde bestanden met methoden welke niet ondersteund worden door Zelf-Extractor.\n\nGelieve deze opnieuw te comprimeren gebruikmakende van de ZIP plugin."
+  IDS_TESTPROGTITLE, "Testen van ZIP archiefbestanden - %s"
+  IDS_TESTFILES, "testen van bestanden..."
+  IDS_TESTING, "testen: "
+  IDS_TESTOK, "Archiefbestand '%s' is OK."
+  IDS_TESTKO, "Sommige bestanden in het archiefbestand '%s' zijn beschadigd of gecodeerd met een onbekend wachtwoord."
+  IDS_MENUCOMMENT, "Archiefbestand &opmerking..."
+  IDS_COMMENTMODIFIED, "De opmerking van het bestand is veranderd.\n\nWilt u de wijzigingen opslaan?"
+  IDS_COMMENTDLGTITLE, "ZIP archief opmerking - %s"
+  IDS_ERRREADCOMMENT, "Er is een fout opgetreden bij het lezen van het ZIP archief opmerking; het bestand is ofwel corrupt of van onbekende indeling.\n\nDrukt u op OK om deze achief opmerking over te slaan en ga verder met het lezen van het archiefbestand."
+  IDS_COMMENTMV, "Mult-delige archief opmerkingen kunnen bekeken worden, maar niet worden opgeslagen."
+  IDS_RECOVERARCHIVETITLE, "Repareren van ZIP archiefbestand"
+  IDS_SOURCEHEADING, "&Repareren van archiefbestand:"
+  IDS_TARGETHEADING, "&Sla het gerepareerde archiefbestand op als:"
+  IDS_REPAIRPROGTITLE, "Reparatie van het ZIP archiefbestand - %s"
+  IDS_SAVING, "opslaan: "
+  IDS_REPAIRING, "repareren archiefbestand..."
+  IDS_ERROPENICO, "Kan het pictogram niet uit een bestand openen."
+  IDS_BADBUTTONTEXT, "De titel in het hoofd-dialoogvenster kan niet leeg zijn. Geeft u ten minste één karakter op."
+  IDS_BADTEMP, "$(Temp) kan en mag door geen enkel karakter worden gevolgd. Gelieve alleen $(Temp) ingeven als u wilt uitpakken naar een tijdelijke directory."
+  IDS_MISBAR, "Missende afsluitbalk in de $() sequence."
+  IDS_BADVAR, "Onbekende $() variabel."
+  IDS_MBOK, "OK"
+  IDS_MBOKCANCEL, "OK + Annuleren"
+  IDS_MBYESNO, "Ja + Nee"
+  IDS_MBAGREEDISAGREE, "Ik ga akkoord + Ik ga niet akkoord"
+  IDS_MBNOICON, "Eenvoudig"
+  IDS_MBEXCLAMATION, "Waarschuwing"
+  IDS_MBINFORMATION, "Informatie"
+  IDS_MBQUESTION, "Vraag"
+  IDS_LONGMESSAGE, "Lang bericht"
+  IDS_BADKEY, "Verkeerde sleutel naam."
+  IDS_MANAGE, "&Beheren..."
+  IDS_REMOVEWARNTITLE, "Verwijder instellingen van favorieten"
+  IDS_REMOVEWARN, "Bent u zeker dat u deze instellingen wilt verwijderen '%s' ?\n\nDeze actie kan niet ongedaan worden gemaakt."
+  IDS_REMOVEALLWARN, "Bent u zeker dat u alle opgeslagen instellingen wilt verwijderen?\n\nDeze actie kan niet ongedaan worden gemaakt."
+  IDS_MISSINGVERSION, "Kan het instellings-bestand niet laden: mist een versienummer."
+  IDS_BADVERSION, "Kan het instellings-bestand niet laden: versie wordt niet ondersteund."
+  IDS_BADTEMP2, "Kan het instellings-bestand niet laden, slechte waarde van 'bestemmings-directory': $(Temp) kan en mag door geen enkel karakter worden gevolgd."
+  IDS_MISBAR2, "Kan het instellings-bestand niet laden, slechte waarde van 'bestemmings-directory': missende afsluitbalk in de $() sequence."
+  IDS_BADVAR2, "Kan het instellings-bestand niet laden, slechte waarde van 'bestemmings-directory': onbekende $() variabel."
+  IDS_BADKEY2, "Kan het instellings-bestand niet laden, slechte waarde van 'bestemmings-directory': verkeerde sleutel naam."
+  IDS_CHDISKTEXT3, "Gelieve plaatst u een schijf met volume nummer %d."
+  IDS_NONTEXT, "Geeft u ten minste één karakter op."
+  IDS_BADSFXVER, "Niet-ondersteunde versie van SFX-bestand (%s). Gelieve, download de nieuwste ZIP plugin met een passende SFX versie."
+  IDS_BADSFXVER2, "Niet-ondersteunde versie van SFX-bestand. Gelieve, download de nieuwste ZIP plugin met een passende SFX versie."
+  IDS_TOOBIG2, "Kan de actie niet succesvol voltooien omdat het ZIP-bestand is gelimiteerd tot aan 4GB qua bestandsgrootte.\n\nOm meer dan 4GB data in een ZIP-bestand dient u gebruik te maken van functionaliteit multi-delige archiefbestanden. U kunt 65536 volumes creëren van elk 4GB in grootte."
+  IDS_FILENOTFOUND, "Bestand niet gevonden."
+  IDS_ALLFILES, "Alle bestanden (*.*)"
+  IDS_NOTFOUND, "Bestand niet gevonden."
+  IDS_BADMSGBOXTYPE, """Ik ga akkoord + Ik ga niet akkoord"" knoppen kunnen alleen gebruikt worden in combinatie met ""Lang bericht"" berichten vensters."
+  IDS_LOTFILES, "U bent bezig met het creëren van een ZIP-bestand welke meer dan 65535 items bevat. Dergelijk archiefbestanden zijn niet compatibel met originele ZIP-indelingen en sommige extractors zijn niet in staat deze uit te pakken.\n\nWilt u doorgaan?"
+  IDS_LOTFILESSFX, "Kan geen zelfuitpakkend ZIP-achiefbestand creëren welke meer dan 65535 items bevat."
+  IDS_BADAES, "Bestand is gecodeerd met een onbekende AES versie."
+  IDS_PWDTOOLONG, "Wachtwoord is te lang.\nDe macimale wachtwoordlengte voor AES codering is 128 karakters."
+  IDS_AESERROR, "AES fout."
+  IDS_MACERROR, "Authenticatie-code komt niet overeen. Het bestand is beschadigd of het wachtwoord is onjuist."
+  IDS_ERRZIP64, "Gewenste bewerking wordt niet ondersteund voor zip64 archiefbestanden. De zip64 archiefbestanden kunnen alleen worden opgenomen en uitgepakt."
+  IDS_ONLYFULLVERSION, " (alleen in de volledige versie beschikbaar)"
+  IDS_ERRBZIP2 "Er is een fout opgetreden in BZIP2 stream. Het archiefbestand is mogelijkerwijs beschadigd."
+  IDS_UNSUP_CD_ENCRYPTION "De index van dit archiefbestand, welke de lijst van bestanden bevat, is gecodeerd ofwel gecomprimeerd.\nDit wordt niet ondersteund."
+  IDS_LISTINFO_PAKEDSIZE      "Ingepakte grootte"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Ingepakte grootte van bestand"
+  IDS_SIZE_KB, "KB"
+  IDS_SIZE_MB, "MB"
+  IDS_MODIFICATION_NOT_SUPPORTED, "Het ZIP bestand gebruikt gegevens in een formaat dat modificatie door de huidige versie van de ZIP plugin niet ondersteund"
+  IDS_WAITFOR_INFO, "Dit is alleen noodzakelijk als de originele installatie een ander uitvoerbaar bestand uitvoert, terwijl de originale installatie reeds is voltooid.\nDit is van toepassing op sommige versies van Install Shield."
+}
+
+STRINGTABLE
+{
+  IDS_SFX_COMMENT_HEAD1, ";Zelf-Extractor Instellingen\r\n\r\n;Dit is een bestand met instellingen voor Zelf-Extractor.\r\n;\r\n;Bestandsformaat syntax:\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD2, ";Regels die beginnen met een ';' karakter worden behandeld als commentaar en worden\r\n;genegeerd bij het verwerken van het instellingen-bestand.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD3, ";Alle variabelen zijn optioneel, behalve versie. Als de variabel niet \r\n;gevonden wordt in het instellings-bestand, wordt de standaardwaarde gebruikt.\r\n;Standaardwaarden voor taal afhankelijke variabelen (dlg_text, dlg_title,\r\n;button_text) zijn afkomstig uit het SFX pakket.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD4, ";Alle String-waarden, met inbegrip van null strings, dient te worden ingesloten in\r\n;dubbele aanhalingstekens. Voor het invoeren van dubbele aanhalingstekens in een string gebruik twee\r\n;daaropvolgende dubbele aanhalingstekens.\r\n;\r\n;Nummers kunnen niet worden ingesloten in dubbele aanhalingstekens.\r\n\r\n"
+  IDS_SFX_COMMENT_VERSION, "\r\n;versie van het instelling-bestand, de huidige versie is 2\r\n;dit is de enige verplichte variabel\r\n\r\n"
+  IDS_SFX_COMMENT_TARGDIR1, "\r\n;bestemmings-directory specificatie, het kan een absoluut pad zijn\r\n; ofwel een ralatief pad; een relatief pad is in relatie met de huidige directory\r\n;als een SFX uitvoerbaar bestand wordt uitgevoerd\r\n"
+  IDS_SFX_COMMENT_TARGDIR2, ";u kunt ook voorgedefineerde variabelen gebruiken in het begin (!)\r\n;van de 'target_dir' string:\r\n;\r\n"
+  IDS_SFX_COMMENT_TARGDIR3, ";  $(Temp)      tijdelijke directory, mag alleen zelf bestaan\r\n;               in het 'target_dir' veld niet gevolgd worden door welk pad\r\n;               deel ook\r\n"
+  IDS_SFX_COMMENT_TARGDIR4, ";  $(ProgFiles) gebruikers 'Programma bestanden'\r\n;  $(WinDir)    Windows bestanden\r\n;  $(SysDir)    Systeem bestanden\r\n"
+  IDS_SFX_COMMENT_TARGDIR5, ";  $[variable]  waarde van een omgevingsvariabele beschreven door\r\n;               'variable'\r\n;  $<regkey>    waarde van de registersleutel beschreven door 'regkey'\r\n;  bijv. SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ProgramFilesDir\r\n\r\n"
+  IDS_SFX_COMMENT_ALLOWCHANGE, "\r\n;bepaalt of de gebruiker de bestemming voor het uitpakken van directory kan veranderen\r\n;stel de waarde op 1 als u het wilt toestaan\r\n\r\n"
+  IDS_SFX_COMMENT_REMOVE1, "\r\n;bepaalt of de uitgepakte bestanden na extractie wilt verwijderen uit de tijdelijke directory\r\n;als een programma aangegeven door een 'command' variabel is voltooid\r\n"
+  IDS_SFX_COMMENT_REMOVE2, ";zet deze waarde naar 1 als u wilt dat de tijdelijke bestanden worden verwijderd\r\n;gebruik maken van deze variabel is alleen zinvol als 'target_dir' is ingesteld op\r\n;""$(Temp)"", anders wordt de waarde genegeerd\r\n\r\n"
+  IDS_SFX_COMMENT_AUTO, "\r\n;bepaalt of de extractie automatisch wordt uitgevoerd\r\n;bij een zelfuitpakkend archiefbestand\r\n;zet deze waarde naar 1 als u wilt dat deze extractie automatisch geschied\r\n\r\n"
+  IDS_SFX_COMMENT_SUMMARY, "\r\n;bepaalt of een berichten dialoogvenster wordt weergegeven (voortgang)\r\n;bij het succesvol uitpakken van bestanden\r\n;zet deze waarde naar 1 als u wilt dat deze berichten weergegeven worden\r\n\r\n"
+  IDS_SFX_COMMENT_HIDE, "\r\n;bepaalt of het hoofd-dialoogvenster van de Zelf-Extractor wordt weergegeven\r\n;zet deze waarde naar 1 als u niet wilt dat deze weergegeven wordt\r\n;gebruik maken van deze variabel is alleen zinvol als 'autostart' ingesteld staat op 1,\r\n;anders wordt deze waarde genegeerd\r\n\r\n"
+  IDS_SFX_COMMENT_OVERWRITE, "\r\n;bepaalt automatisch of alle bestanden worden overschreven in de bestemmings-\r\n;directory\r\n;zet deze waarde naar 1 als u wilt dat al deze automatisch worden\r\n;overschreven\r\n\r\n"
+  IDS_SFX_COMMENT_AUTODIR, "\r\n;bepaalt of een nieuwe directory automatisch gecreëerd dient te worden zonder navraag bij de\r\n;gebruiker\r\n;zet deze waarde naar 1 als u wilt dat deze automatisch worden\r\n;gecreëerd\r\n\r\n"
+  IDS_SFX_COMMENT_COMMAND, "\r\n;programma, HTTP link of het document dat uitgevoerd/geopend wordt als de bestanden\r\n;succesvol zijn uitgepakt, het pad is verwant aan de\r\n;uitgepakte bestemmings-directory, als u een programma hebt gedefineerd kunt u ook\r\n;zijn argumenten opgeven\r\n\r\n"
+  IDS_SFX_COMMENT_PACKAGE, "\r\n;SFX pakket wordt gebruikt bij het creëren van zelfuitpakkende archiefbestanden\r\n;het relatieve pad is verwant aan de directory van zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_MBUT, "\r\n;knoppen in het optionele berichten dialoogvenster\r\n;kunnen één van de volgende zijn: ""ok"", ""ok_cancel"", ""yes_no"",\r\n;""agree_disagree""\r\n\r\n"
+  IDS_SFX_COMMENT_MICO, "\r\n;type van het optionele berichten dialoogvenster\r\n;kunnen één van de volgende zijn: ""simple"", ""exclamation"", ""information"",\r\n;""question"", ""long_message""\r\n\r\n"
+  IDS_SFX_COMMENT_MBOX, "\r\n;tekst en titel van de optionele berichten dialoogvenster, welke wordt weergegeven voordat\r\n;het uitpakken begint\r\n;als u niet wilt dat er berichten dialoogvensters worden weergegeven laat u beide velden\r\n;leeg ("""")\r\n\r\n"
+  IDS_SFX_COMMENT_TEXT, "\r\n;tekst welke wordt weergegeven in het hoofd-dialoogvenster van de zelf-extractor\r\n\r\n"
+  IDS_SFX_COMMENT_TITLE, "\r\n;titel van het hoofd-dialoogvenster van de zelf-extractor\r\n\r\n"
+  IDS_SFX_COMMENT_BUTTON, "\r\n;tekst in de uitpak-knop van het hoofd-dialoogvenster van de zelf-extractor\r\n\r\n"
+  IDS_SFX_COMMENT_VENDOR, "\r\n;naam van de verkoper in de linker-onderhoek van het hoofd-dialoogvenster van de zelf-extractor\r\n\r\n"
+  IDS_SFX_COMMENT_WWW, "\r\n;WWW-adres in de rechter-onderhoek van het hoofd-dialoogvenster van de zelf-extractor\r\n\r\n"
+  IDS_SFX_COMMENT_ICOFILE, "\r\n;bestanden welke pictogrammen bevatten, kunnen zowel ICO-bestanden zijn als PE-\r\n;uitvoerbaar bestanden (zoals win32 EXEs of DLLs) bevatten het pictogram\r\n;het relatieve pad is verwant aan de directory van zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_ICOINDEX, "\r\n;positieve waarden in de index van een pictogram vanuit een uitvoerbaar bestand betekent\r\n;gedefineerd uit het 'icon_file' variabel\r\n;een negatieve waarden betekent een hulpbron ID van een pictogram\r\n;voor ICO-bestanden is de waarde altijd 0 en zijn waarde wordt genegeerd\r\n\r\n"
+  IDS_SFX_COMMENT_WAITFOR1, "\r\n;deze optie geeft u de mogelijkheid te wachten op een ander proces dan hetgeen\r\n;door uzelf is gedefineerd onder het veld 'Commando'. Nadien het gehele proces is voltooid\r\n;zal de zelfuitpakker de tijdelijke bestanden verwijderen en zichzelf afronden.\r\n"
+  IDS_SFX_COMMENT_WAITFOR2, ";dit is alleen noodzakelijk als de originele installatie een ander uitvoerbaar bestand\r\n;uitvoert, terwijl de originale installatie\r\n;reeds is voltooid\r\n"
+  IDS_SFX_COMMENT_WAITFOR3, ";dit is van toepassing op sommige versies van Install Shield.\r\n;deze optie wordt genegeerd tenzij 'remove_temp' is ingesteld op de waarde 1.\r\n\r\n"
+  IDS_SFX_COMMENT_REQUIRESADMIN, "\r\n;vereist beheerdersbevoegdheden om te draaien op Windows Vista of later\r\n\r\n"
+}

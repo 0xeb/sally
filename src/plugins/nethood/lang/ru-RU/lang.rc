@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for nethood. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/nethood/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\nethood.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 22, 38, 300, 127
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Отображать &административные общие ресурсы",IDC_SYSSHARES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,7,181,10
+    CONTROL         "О&тображать административные общие ресурсы как скрытые объекты",IDC_HIDESYSSHARES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,22,258,10
+    CONTROL         "Отображать ярлыки &сетевого окружения как папки верхнего уровня",IDC_NETSHORTCUTS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,37,254,10
+    CONTROL         "Отображать сетевые &компьютеры  как папки верхнего уровня",IDC_SHOWWORKGRP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,52,232,10
+    CONTROL         "Отображать &диски, подключенные посредством удаленного рабочего стола",IDC_SHOWTSC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,67,281,10
+    CONTROL         "&Просматривать сеть при запуске Sally",IDC_PRELOAD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,82,190,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,99,287,1
+    DEFPUSHBUTTON   "ОК",IDOK,70,106,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,125,106,50,14
+    PUSHBUTTON      "Справка",IDHELP,180,106,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_COLUMN_COMMENTS     "Комментарий"
+    IDS_INFOLINE_SELECTION_PLURAL "{!}<%d> выделены{й|1|х} объект{1:|1|а|4|ов}"
+    IDS_MENUITEM            "Сеть"
+    IDS_REFRESHING          "Просмотр сети…"
+    IDS_NETWORK_UNAVAILABLE "Сеть недоступна."
+    IDS_ABOUT               "О модуле"
+    IDS_TSCLIENT            "%1 на %2"
+    IDS_TSFOLDER            "Локальный компьютер"
+    IDS_TSHOST              "Хост"
+    IDS_TSFOLDERCOMMENT     "Диски на %s"
+END
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME         "Сеть"
+    IDS_DESCRIPTION         "Предоставляет сетевой доступ."
+END

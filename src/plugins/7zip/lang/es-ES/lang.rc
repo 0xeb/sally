@@ -1,0 +1,197 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for 7zip. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/7zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\7zip.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 23, 38, 220, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuración de 7-Zip"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ajustes de panel",IDC_STATIC_1,5,6,58,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,65,10,152,1
+    CONTROL         "Ver diálogo con &opciones ampliadas antes de comprimir",IDC_CFG_SHOWEXTENDEDOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,19,199,10
+    CONTROL         "Ver &información ampliada al listar el archivo",IDC_CFG_EXTENDEDLISTINFO,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,31,158,10
+    CONTROL         "Comprimido",IDC_CFG_LISTINFOPACKEDSIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,43,53,10
+    CONTROL         "Método",IDC_CFG_LISTINFOMETHOD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,55,38,10
+    LTEXT           "Parámetros de compresión por omisión",IDC_STATIC_3,5,70,133,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,140,74,77,1
+    LTEXT           "&Nivel de compresión:",IDC_STATIC_5,10,85,73,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,93,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Método de compresión:",IDC_STATIC_6,10,103,82,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,93,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Tamaño de &diccionario:",IDC_STATIC_7,10,121,81,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,93,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Tamaño de &palabra:",IDC_STATIC_8,10,139,81,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,93,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Crear archivo &sólido",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,155,79,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,3,175,214,1
+    DEFPUSHBUTTON   "Aceptar",IDOK,53,181,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,108,181,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,163,181,50,14
+END
+
+IDD_NEWARCHIVE DIALOGEX 27, 37, 286, 224
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Crear nuevo archivo"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archivo:",IDC_STATIC_1,16,7,30,8
+    LTEXT           "",IDC_NA_ARCHIVE,47,7,230,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,8,21,270,1
+    CONTROL         "&Encriptar ficheros",IDC_NA_ENCRYPTFILES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,28,71,10
+    LTEXT           "&Contraseña:",IDC_NA_PASSWORD_TXT,103,29,62,8
+    EDITTEXT        IDC_NA_PASSWORD,180,27,78,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Confirmar cont&raseña:",IDC_NA_CONFIRMPASSWORD_TXT,103,46,76,8
+    EDITTEXT        IDC_NA_CONFIRMPASSWORD,180,44,78,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Parámetros de compresión",IDC_STATIC_3,8,67,92,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,102,71,176,1
+    LTEXT           "&Nivel de compresión:",IDC_STATIC_5,16,85,73,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,105,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Método de compresión:",IDC_STATIC_6,16,103,82,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,105,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Tamaño de &diccionario:",IDC_STATIC_7,16,121,81,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,105,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Tamnaño de &palabra:",IDC_STATIC_8,16,139,75,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,105,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Crear archivo &sólido",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,159,79,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,8,181,270,1
+    CONTROL         "No &ver más este diálogo (puede cambiar esto después en diálogo config)",IDC_NA_NOTAGAIN,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,187,257,12
+    PUSHBUTTON      "C&onfigurar...",IDC_SHOW_CONFIG,10,204,60,14,WS_GROUP
+    DEFPUSHBUTTON   "Aceptar",IDOK,116,204,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,171,204,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,226,204,50,14
+END
+
+IDD_ENTERPASSWORD DIALOGEX 6, 15, 267, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Escriba contraseña 7-Zip"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,16,12,20,20
+    LTEXT           "Fichero encriptado. Escriba la contraseña para desencriptarlo.",IDC_STATIC_1,48,12,210,8
+/*    LTEXT           "File:",IDC_STATIC_2,48,26,17,8
+    LTEXT           "",IDC_FILE,65,26,175,8 */
+    LTEXT           "Contraseña:",IDC_STATIC_3,48,40,42,8
+    EDITTEXT        IDC_PASSWORD,91,38,165,12,ES_PASSWORD | ES_AUTOHSCROLL
+/*
+ // preparation for skip and skip all
+    DEFPUSHBUTTON   "OK",IDOK,12,63,50,14
+    PUSHBUTTON      "Skip",IDC_SKIP,72,63,50,14
+    PUSHBUTTON      "Skip all",IDC_SKIPALL,132,63,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,192,63,50,14
+*/    
+    DEFPUSHBUTTON   "Aceptar",IDOK,142,63,50,14
+    PUSHBUTTON      "Cancelar",IDCANCEL,202,63,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME,             "7-Zip"
+  IDS_ABOUT,                  "Acerca del Plugin"
+  IDS_PLUGIN_DESCRIPTION,     "Crear, hojear y extraer archivos 7-Zip."
+  IDS_INSUFFICIENT_MEMORY,    "Memoria insuficiente."
+  IDS_CANT_LOAD_LIBRARY,      "Imposible cargar biblioteca 7za.dll."
+  IDS_CANT_GET_CRATEOBJECT,   "Imposible conseguir método CreateObject."
+  IDS_CANT_GET_CLASS_OBJECT,  "Imposible conseguir objeto de clase."
+  IDS_CANT_OPEN_ARCHIVE,      "Imposible abrir el archivo '%s'."
+  IDS_CANT_OPEN_ARCHIVE_PWD,  "Imposible abrir el archivo '%s'.\nPuede haber sido escrita una contraseña equivocada."
+  IDS_ERROR,                  "Error interno."
+  IDS_PACKING_ARCHIVE,        "Comprimiendo archivo 7-Zip"
+  IDS_UNPACKING_ARCHIVE,      "Descomprimiendo archivo 7-Zip"
+  IDS_UPDATING_ARCHIVE,       "Actualizando archivo 7-Zip"
+  IDS_TESTING_ARCHIVE,        "Comprobando archivo 7-Zip"
+  IDS_TESTING_ARCHIVE_NAME    "Comprobando el archivo '%s'..."
+  IDS_READING_DIRTREE,        "Leyendo árbol de directorios..."
+  IDS_CANT_CREATE_ARCHIVE,    "Imposible crear archivo."
+  IDS_TESTARCHIVE,            "Archivo de prueba"
+  IDS_TESTARCHIVECORRUPTED,   "El archivo '%s' está corrupto."
+  IDS_TESTARCHIVEOK,          "El archivo '%s' es Aceptar."
+  IDS_INCORRECTPASSWORD,      "Contraseña incorrecta"
+  IDS_INCORRECTPASSWORDBODY,  "La contraseña es incorrecta. Vuelva a escribirla. Las letras de la contraseña deben\nteclearse respetando mayúsculas. Asegúrese de que BloqMayús no está activado por error."
+  IDS_PASSWORDSNOTMATCH,      "Las contraseñas introducidas no coinciden."
+  IDS_EMPTYPASSWORD,          "La contraseña debe tener al menos un caracter."
+  IDS_UPDATE_NOT_SUPPORTED,   "Operaciones de actualización no admitidas para este archivo."
+  IDS_CANT_MOVE_TMPARCHIVE,   "Imposible trasladar archivo temporal '%s'."
+  IDS_CANT_DELETE_TMPARCHIVE, "Imposible borrar archivo temporal '%s'."
+  IDS_7Z_UPDATE_ERROR,        "Sucedió un error al actualizar el archivo.\n\nEsto no es un fallo del plugin 7zip de Sally. El problema es en 7za.dll;\nNO nos envíe informe de fallos, conocemos el problema."
+  IDS_7Z_SOLID_DELETE_UNSUP,  "No se admite borrar ficheros de archivos sólidos."
+  IDS_CANT_UPDATE_ARCHIVE,    "Imposible actualizar archivo '%s'."
+  IDS_CANT_CREATE_TMPFILE,    "Imposible crear fichero temporal."
+//  IDS_CANT_CREATEMUTEX,       "Cannot create mutex."
+  IDS_ARCHIVE_CHANGED,        "El fichero de archivo '%s' ha cambiado. El archivo será reabierto en el panel."
+  IDS_DELETE_ERROR,           "Error de borrado"
+  IDS_ADD_FILES_TO_ARCHIVE,   "Añadir ficheros al archivo"
+  IDS_CREATE_NEW_ARCHIVE,     "Crear nuevo archivo"
+  IDS_REMOVING_FILES,         "Eliminando ficheros..."
+  IDS_READING_ARCHIVEITEMS,   "Leyendo elementos del archivo..."
+  IDS_UNPACKING,              "Descomprimiendo..."
+  IDS_PACKING,                "Comprimiendo..."
+  IDS_REMOVING,               "Eliminando..."
+  IDS_UPDATING,               "Actualizando..."
+  IDS_CANCELING_OPERATION,    "Cancelando operación, espere por favor..."
+  IDS_UNSUPPORTED_METHOD,     "Método no admitido."
+  IDS_CRC_FAILED,             "Fallo de CRC."
+  IDS_UNKNOWN_ERROR,          "Error desconocido."
+  IDS_DATA_ERROR,             "Error de datos al descomprimir el fichero '%s'."
+  IDS_DATA_ERROR_PWD,         "Error de datos al descomprimir el fichero '%s'.\nPuede haberse escrito una contraseña incorrecta."
+  IDS_BTN_DELETE,             "&Borrar"
+  IDS_BTN_DELETE_ALL,         "B&orrar todo"
+  IDS_BTN_KEEP,               "&Mantener"
+  IDS_BTN_KEEP_ALL,           "M&antener todo"
+  IDS_ERROR_PROCESSING_FILE,  "Error al procesar el fichero '%s'.\n\n¿Desea borrar o mantener este fichero?"
+  IDS_ERROR_PROCESSING_FILE_PWD, "Error al procesar el fichero '%s'.\nPuede haberse escrito una contraseña incorrecta.\n\n¿Desea borrar o mantener este fichero?"
+  IDS_OVERWRITE_FILE,         "Reemplazar fichero";
+  IDS_READONLY_ARCHIVE,       "El archivo es de sólo lectura. Borre primero el atributo de sólo lectura."
+  IDS_CANT_REMOVE_DIRECTORY,  "Imposible eliminar el directorio '%s'"
+  IDS_CANT_READ_ARCHIVE       "Error al leer desde el fichero de archivo."
+  IDS_CANT_READ               "Error al leer fichero de entrada."
+  IDS_CANT_WRITE              "{!}Imposible escribir %d byte{|1|s}."
+  IDS_BTN_RETRY               "Reintentar"
+  IDS_BTN_ABORT               "Interrumpir"
+  IDS_STORE,                  "Guardar"
+  IDS_FASTEST,                "El más rápido"
+  IDS_FAST,                   "Rápido"
+  IDS_NORMAL,                 "Normal"
+  IDS_MAXIMUM,                "Máximo"
+  IDS_ULTRA,                  "Ultra"
+  IDS_METHOD_LZMA,            "LZMA"
+  IDS_METHOD_LZMA2,           "LZMA2"
+  IDS_METHOD_PPMD,            "PPMd"
+  IDS_PACK_UPDATE_ERROR,      "Ocurrió un error al comprimir/actualizar el archivo."
+  IDS_UNPACK_ERROR,           "Ocurrió un error al descomprimir el archivo."
+  IDS_TEST_ERROR,             "Ocurrió un error al comprobar el archivo."
+  IDS_UNSUPPORTED_ARCHIVE,    "Tipo de archivo no admitido o desconocido.\nEl fichero archivo puede haberse dañado mucho."
+  IDS_7Z_FATAL_ERROR          "El archivo no ha sido creado debido a un error fatal."
+  IDS_7Z_UPDATE_UNKNOWN_ERROR "El archivo no fue actualizado debido al error desconocido %x."
+  IDS_7Z_CREATE_UNKNOWN_ERROR "El archivo no fue creado debido al error desconocido %x."
+//  IDS_7Z_SOLID_UPDATE_UNSUP   "Updating files in solid archives is not supported."
+  IDS_LISTINFO_PAKEDSIZE      "Comprimido"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Tamaño comprimido del fichero"
+  IDS_LISTINFO_METHOD         "Método"
+  IDS_LISTINFO_METHOD_DESC    "Método de compresión"
+  IDS_ARCLOCK_ERROR           "Error de bloqueo de ficheros"
+  IDS_ERRADDFILE_TOOLONG,     "No se pueden añadir 1 o más ficheros a la lista. La ruta total es muy larga.\nAlgunos directorios o ficheros pueden faltar en la lista del archivo."
+  IDS_ERRADDDIR_TOOLONG,      "No se pueden añadir 1 o más directorios a la lista. La ruta total es muy larga.\nAlgunos directorios o ficheros pueden faltar en la lista del archivo."
+  IDS_NAMEISTOOLONG,          "El nombre ""%s"" con ruta completa es muy largo.\n\nRuta: %s"
+}

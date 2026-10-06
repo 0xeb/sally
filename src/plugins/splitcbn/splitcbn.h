@@ -55,7 +55,7 @@ extern BOOL configCombineToOther;
 extern BOOL configSplitToSubdir;
 
 extern HINSTANCE DLLInstance; // handle to SPL - language-independent resources
-extern HINSTANCE HLanguage;   // handle to SLG - language-dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 std::wstring LangStr(int resID);
 void CenterWindow(HWND hWnd);
 std::wstring GetInfo(CQuadWord& size);

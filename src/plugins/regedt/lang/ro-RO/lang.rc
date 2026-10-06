@@ -1,0 +1,325 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for regedt. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/regedt/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\regedt.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CREATEKEY DIALOGEX 10, 24, 227, 75
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Creeaza cheie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Nume cheie:",IDS_TEXT,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "&Trimite calea direct la plugin",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    DEFPUSHBUTTON   "OK",IDOK,58,53,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,118,53,50,14
+END
+
+IDD_RENAME DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,58,43,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,118,43,50,14
+END
+
+IDD_COPY DIALOGEX 10, 24, 227, 76
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    COMBOBOX        IDE_NAME,10,20,208,106,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_TABSTOP
+    CONTROL         "&Trimite calea direct la plugin",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,35,189,12
+    DEFPUSHBUTTON   "OK",IDOK,58,54,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,118,54,50,14
+END
+
+IDD_NEWVALUE DIALOGEX 14, 22, 227, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Valoare Noua"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Valoare Nume:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "&Trimite calea direct la plugin",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    LTEXT           "T&ip Valoare:",IDC_STATIC_2,10,53,56,8
+    COMBOBOX        IDC_TYPE,10,63,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,58,87,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,118,87,50,14
+END
+
+IDD_EDITVAL DIALOGEX 14, 22, 227, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Editeaza Valoarea"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_DATA,10,79,208,12,ES_AUTOHSCROLL
+    LTEXT           "Baza:",IDS_BASE,124,69,60,8
+    CONTROL         "&Hexadecimal",IDR_HEX,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,78,81,12
+    CONTROL         "De&cimal",IDR_DEC,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,90,73,12
+    DEFPUSHBUTTON   "OK",IDOK,58,112,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,118,112,50,14
+    LTEXT           "Valoare Nume:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "&Tip Valoare:",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Valoare &Data:",IDC_STATIC_3,10,69,60,8
+END
+
+IDD_RAWEDITVAL DIALOGEX 14, 22, 227, 145
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Valoare editare Raw"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Valoare Nume:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "&Tip Valoare:",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Porneste Editorul",IDB_EDIT,10,69,75,14
+    LTEXT           "Cand ai terminat editarea si ai salvat modificarile in editorul extern, apasa OK ca sa salvezi modificarile in registri sau alege Anuleaza pentru a iesi fara salvare.",IDS_MESSAGE,10,89,206,24,NOT WS_VISIBLE
+    DEFPUSHBUTTON   "OK",IDOK,58,123,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,118,123,50,14
+END
+
+IDD_SEARCH DIALOGEX 9, 20, 333, 240
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Cautare Registri in Windows"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Cau&ta expresia:",IDC_STATIC_1,6,10,54,8
+    COMBOBOX        IDC_PATTERN,61,8,192,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Gaseste Acum",IDOK,258,7,60,14,WS_GROUP
+    LTEXT           "&Uita-te in:",IDC_STATIC_2,6,27,41,8
+    COMBOBOX        IDC_LOOKIN,61,25,192,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Help",IDHELP,258,24,60,14,WS_GROUP
+    CONTROL         "Arata &Optiunile",IDC_OPTIONS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,255,42,63,12
+    CONTROL         "Include su&bcheile",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,42,86,12
+    LTEXT           "Uita-te la:",IDS_LOOKAT,6,60,41,8
+    CONTROL         "&Chei",IDC_KEYS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,58,55,12
+    CONTROL         "&Valori",IDC_VALUES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,58,55,12
+    CONTROL         "&Data",IDC_DATA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,217,58,55,12
+    LTEXT           "Optiuni:",IDS_OPTIONS,6,76,41,8
+    CONTROL         "HE&X-mode",IDC_HEX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,74,60,12
+    CONTROL         "&Sensibil la litere (mari sau mici)",IDC_CASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,74,118,12
+    CONTROL         "Cuvintele i&ntregi",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,87,67,12
+    CONTROL         "Expresie &regulata",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,87,75,12
+    LTEXT           "&Mai nou sau egal cu:",IDS_NEWER,61,105,76,8
+    EDITTEXT        IDC_MINTIME,139,103,80,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.yyyy",IDS_FORMAT1,225,105,81,8
+    LTEXT           "M&ai vechi sau egal cu:",IDS_OLDER,61,121,76,8
+    EDITTEXT        IDC_MAXTIME,139,119,80,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.yyyy",IDS_FORMAT2,225,121,81,8
+    LTEXT           "Obiecte gas&ite:",IDC_FOUND_FILES,6,132,109,8
+    CONTROL         "",IDC_RESULTS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,6,142,309,57
+END
+
+IDD_CONFIG DIALOGEX 86, 38, 290, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configurare Editor Registri"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Setari editor extern. Editorul extern este folosit pentru editare valori registri raw.",IDC_STATIC_1,10,10,271,8
+    LTEXT           "&Comanda:",IDC_STATIC_2,20,27,50,8
+    EDITTEXT        IDE_COMMAND,74,25,189,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_BROWSE,267,25,13,12
+    LTEXT           "&Argumente:",IDC_STATIC_3,20,43,50,8
+    EDITTEXT        IDE_ARGUMENTS,74,41,189,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_ARGHELP,267,41,13,12
+    LTEXT           "Director &Initial:",IDC_STATIC_4,20,59,53,8
+    EDITTEXT        IDE_INITDIR,74,57,189,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_INITDIRHELP,267,57,13,12
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,10,79,270,1
+    DEFPUSHBUTTON   "OK",IDOK,176,84,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,230,84,50,14
+END
+
+IDD_EXPORT DIALOGEX 14, 22, 227, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Export"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Cale &export:",IDC_STATIC_1,10,10,83,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    LTEXT           "&In fisierul:",IDC_STATIC_2,10,39,56,8
+    EDITTEXT        IDE_FILE,10,49,191,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDB_BROWSE,205,49,13,12
+    DEFPUSHBUTTON   "OK",IDOK,58,72,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,118,72,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Editor Registri"
+  IDS_DESCRIPTION, "Rasfoieste, vizualizeaza si modifica Registri Windows."
+  IDS_ABOUT, "Despre Plugin"
+  IDS_REGEDTERR, "Editor Registri - Eroare"
+  IDS_LOWMEM, "Memorie insuficienta."
+  IDS_DRIVEMENUTEXT, "\tRegistri Windows"
+  IDS_DEFAULTVALUE, "(Implicit)"
+  IDS_TYPE, "Tip/Date"
+  IDS_DATA, "Data/Timp"
+  IDS_SIZE, "Marime"
+  IDS_KEY, "CHEIE"
+  IDS_EMPTY, "Sir gol nu este permis aici."
+  IDS_ERROR, "Eroare"
+  IDS_NEWKEYINROOT, "Crearea de chei noi in radacina registrilor nu este posibila."
+  IDS_LONGNAME, "Nu pot termina operatia, nume cale prea lung."
+  IDS_NEWKEY, "Nu pot crea cheie noua: "
+  IDS_KEYEXISTS, "Cheia exista deja."
+  IDS_DELVAL, "Eroare Stergere Valoare Registri"
+  IDS_DELKEY, "Eroare Stergere Cheie Registri"
+  IDS_CONFIRNNONEMPTYDELETE, "Cheia ""%s"" nu este goala.\nDoriti sa o stergeti?"
+  IDS_QUESTION, "Intrebare"
+  IDS_DELKEYINROOT, "Stergerea cheilor in radacina registrilor nu este posibila."
+  IDS_MENUNEWKEY, "C&heie Noua..."
+  IDS_MENUNEWVAL, "&Valoare Noua..."
+  //IDS_MENUOPEN, "&Open\tEnter"
+  IDS_EDIT, "&Editare..."
+  IDS_RAWEDIT, "Editare Ra&w..."
+  //IDS_MENUDELETE, "&Delete\tF8"
+  //IDS_MENURENAME, "&Rename\tF2"
+  IDS_NEWVAL, "Nu pot crea valoare noua: "
+  IDS_REPLACEVAL, "Valoarea ""%s"" exista deja.\nDoriti s-o inlocuiti?"
+  IDS_INVALIDHEXVALUE, "Valoare hexazecimala invalida."
+  IDS_INVALIDDECVALUE, "Valoare zecimala invalida."
+  IDS_QUERYVAL, "Nu pot apela valoarea: "
+  IDS_SETVAL, "Nu pot seta valoarea: "
+  IDS_BADPATH, "Nume Cale Invalida. "
+  IDS_NOTREGEDTPATH, "Cai catre alte fisiere sistem nu sunt suportate aici."
+  IDS_OPENKEY, "Nu pot deschide cheia din registri ""%ls"". "
+  IDS_OPENKEY2, "Nu pot deschide cheia registri ""%ls\\%ls"". "
+  IDS_ENUMKEY, "Una sau mai multe subchei sau valori nu pot fi listate - %s\nContinuare listarea?"
+  IDS_EXPORT, "&Export..."
+  IDS_SEARCH, "&Cautare..."
+  IDS_QUICKRENAMEKEY, "Redenumeste cheia ""%s"" in"
+  IDS_QUICKRENAMEVAL, "Redenumeste valoarea ""%s"" in"
+  IDS_QUICKRENAME, "Redenumire rapida"
+  IDS_COPY, "Copie"
+  IDS_MOVE, "Muta"
+  IDS_COPYORMOVE1, "%s valoare ""%s"" in"
+  IDS_COPYORMOVE2, "%s cheie ""%s"" to"
+  IDS_COPYORMOVE3, "{!}%s %d valori{} in"
+  IDS_COPYORMOVE4, "{!}%s %d chei{} in"
+  IDS_COPYORMOVE5, "{!}%s %d valoare{|1|s} si %d cheie{|1|s} in"
+  IDS_MOVERENAME, "Muta/Redenumeste"
+  IDS_SAMETARGET, "Aceasta operatie nu are sens. Toate fisierele si directoarele selectate au acelasi nume tinta (se vor suprascrie unul pe altul)."
+  IDS_ACCESS, "Nu pot accesa cheia registri ""%ls\\%ls"". "
+  IDS_CANTCOPYTOITSELF, "Nu pot copia cheia sau valoarea peste ea insasi."
+  IDS_CANTMOVETOITSELF, "Nu pot muta cheia sau valoarea peste ea insasi."
+  IDS_CREATE, "Nu pot crea cheie registri. "
+  IDS_OPEN, "Nu pot deschide o cheie registri. "
+  IDS_ACCESS2, "Nu pot accesa o cheie registri. "
+  IDS_DELETE, "Nu pot sterge o cheie registri. "
+  IDS_COPYKEY, "Eroare Copiere Cheie Registri"
+  IDS_MOVEKEY, "Eroare Mutare Cheie Registri"
+  IDS_SETVAL2, "Nu pot seta o valoare din cheia registri. "
+  IDS_REMOVESOURCE, "Nu pot scoate(sterge) cheia registri originala. "
+  IDS_COPYVALUE, "Eroare la Copiere Valoare Cheie Registri"
+  IDS_MOVEVALUE, "Eroare la Mutarea Valoare Cheie Registri"
+  IDS_REMOVESOURCE2, "Nu pot scoate(sterge) valoarea din cheia sursa. "
+  IDS_CANTCOPYTOITSELF2, "Nume:\t%ls\n\nEroare:\tNu pot copia cheia peste ea insasi."
+  IDS_CANTMOVETOITSELF2, "Nume:\t%ls\n\nEroare:\tNu pot muta cheia peste ea insasi."
+  IDS_COPYCLASSNAME, "Numele clasei cheii nu poate fi copiat in cheia tinta.\nDoriti sa continui?"
+  IDS_WARNING, "Atentie"
+  IDS_CANNOTRENAME, "Nu pot redenumi cheia. Numele specificat al cheii este deja utilizat."
+  IDS_RENAMEKEY, "Eroare Redenumire Cheie Registri"
+  IDS_RENAMEVAL, "Eroare Redenumire Cheie Registri"
+  IDS_SAMECASEKEY, "Nu pot redenumi cheia. Numele original si nou difera numai prin felul mare sau mic al literelor."
+  IDS_SAMECASEVAL, "Nu pot redenumi valoarea. Numele original si nou difera numai prin felul mare sau mic al  literelor."
+  IDS_SYNTAX, "Sintaxa nume cheie este incorecta."
+  IDS_CREATETARGET, "Cheia tinta ""%ls\\%ls"" nu exista. Doriti sa o creati?"
+  IDS_COPYPROGRESS, "Copii intrarile in registri, te rog asteapta (apasa ESC sa anulezi)..."
+  IDS_MOVEPROGRESS, "Mut intrarile in registri, te rog asteapta (apasa ESC sa anulezi)..."
+  IDS_DELETEPROGRESS, "Sterg intrarile in registri, te rog asteapta (apasa ESC sa anulezi)..."
+  IDS_CANCEL, "Vrei sa anulezi aceasta operatie?"
+  IDS_COPYTOTROOT, "Copierea cheilor in radacina registrilor nu este posibila."
+  //IDS_WINDOWSREGISTRY, "Windows Registry"
+  IDS_STOP, "Sto&p"
+  IDS_START, "&Gaseste Acum"
+  IDS_FOUNDITEMS1, "Obiecte gas&ite:"
+  IDS_FOUNDITEMS2, "Obiecte gas&ite (%d):"
+  IDS_NOFILESFOUND, "Nu am Gasit Fisiere"
+  IDS_STOPPED, "Cautare Oprita"
+  IDS_NAME_COLUMN, "Nume"
+  IDS_TYPE_COLUMN, "Tip"
+  IDS_DATA_COLUMN, "Data"
+  IDS_PATH_COLUMN, "Cale"
+  IDS_SIZE_COLUMN, "Marime"
+  IDS_DATE_COLUMN, "Data"
+  IDS_TIME_COLUMN, "Timp"
+  IDS_FIND, "Ca&uta in Windows Registry..."
+  IDS_SEARCHERROR, "Eroare de Cautare in Registrii Windows"
+  IDS_BADHEXSTRING, "Sirul nu este valid de tip hexadecimal."
+  IDS_REGEXPERR, "Eroare clasa expresie regulata: %s"
+  IDS_SEARCHING, "Cautare: %s\\"
+  IDS_SUBSTRINGHELP, "Introdu sirul, numar zecimal sau numar hexazecimal cu prefix 0x. Sirul gol cauta in toate intrarile."
+  IDS_HEXHELP, "Introdu modelul hexazecimal in format: 1a 2b ""foo"" 3c. Foloseste "" pentru unicode si ' pentru siruri de modele ASCII."
+  IDS_REGEXPHELP, "Introdu expresie normala. Pentru detalii la expresiile normale vezi documentatia Sally."
+  IDS_LONGDATA, "Nu pot termina operatiunea din cauza datelor prea lungi."
+  IDS_BADTIMEFORMAT, "Format data/timp invalid. Va rugam introduceti data in format dd.mm.yyyy sau data si timpul in format hh:mm:ss dd.mm.yyyy."
+  IDS_CREATETEMP, "Nu pot crea fisier temporar. "
+  IDS_WRITETEMP, "Nu pot scrie in fisierul trmporar. "
+  IDS_EXP_FULLNAME, "Nume Intreg"
+  IDS_EXP_DRIVE, "Drive"
+  IDS_EXP_PATH, "Cale"
+  IDS_EXP_NAME, "Nume"
+  IDS_EXP_NAMEPART, "Parte Nume"
+  IDS_EXP_EXTPART, "Parte Extensie"
+  IDS_EXP_FULLPATH, "Cale Intreaga"
+  IDS_EXP_WINDIR, "Director Windows"
+  IDS_EXP_SYSDIR, "Director Sistem"
+  IDS_EXP_BROWSE, "Rasfoieste..."
+  IDS_EXP_SALDIR, "Directorul Sally"
+  IDS_EXP_DOSFULLNAME, "Nume Intreg DOS"
+  IDS_EXP_DOSDRIVE, "Drive DOS"
+  IDS_EXP_DOSPATH, "Cale DOS"
+  IDS_EXP_DOSNAME, "Nume DOS"
+  IDS_EXP_DOSNAMEPART, "Parte Nume DOS"
+  IDS_EXP_DOSEXTPART, "Parte Extensie DOS"
+  IDS_EXP_DOSFULLPATH, "Cale Intreaga DOS"
+  IDS_EXP_DOSWINDIR, "Directorul Windows in DOS"
+  IDS_EXP_DOSSYSDIR, "Directorul Sistem in DOS"
+  IDS_EXP_ENVVAR, "Mediu Variabil"
+  IDS_EXEFILES, "Executabile (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tToate Fisierele (*.*)\t*.*\t\t"
+  IDS_OPENTEMP, "Nu pot deschide fisierul trmporar. "
+  IDS_SIZEOFTEMP, "Nu pot obtine marimea fisierului temporar. "
+  IDS_READTEMP, "Nu pot citi din fisierul trmporar. "
+  IDS_PROCESS, "Nu pot porni editorul extern. Verifica configurarea in Registri Editor pentru setarile editorului extern.\n"
+  IDS_NOTDWORD, "Numarul este prea mare ca sa fie stocat ca DWORD."
+  IDS_REGFILES, "Fisiere de Inregistrare (*.reg)\t*.reg\tToate Fisierele (*.*)\t*.*\t\t"
+  IDS_FILENAMEISDIR, "Numele tinta al fisierului este folosit deja pentru un director."
+  IDS_OVERWRITE, "Fisierul tinta exista deja. Doriti sa inlocuiti fisierul existent?"
+  IDS_OVERWRITETITLE, "Confirma Suprascriere Fisier"
+  IDS_REPLACEERROR, "Nu pot inlocui fisierul existent."
+  IDS_PROCESS2, "Nu pot porni %s."
+  IDS_BADEXPORT, "A fost o eroare in timpul exportului de date din registri."
+  IDS_EXPORTING, "Export date registri, va rugam asteptati..."
+  IDS_SELECTED1, "{!}%d valoare selectata{|1|s}"
+  IDS_SELECTED2, "{!}%d cheie selectata{|1|s}"
+  IDS_SELECTED3, "{!}%d valoare selectata{|1|s} si %d cheie selectata{|1|s}"
+  IDS_SELECTEDSIZE, "{!}<%d> byte{s|0||1|s} in "
+  IDS_CANNOTRENAMEDEFVAL, "Nu pot redenumi valoarea implicita. Valoarea nu este definita."
+  IDS_COPYNAME, "Copie Nume ca Text"
+  IDS_COPYFULLNAME, "Copie Nume Intreg ca Text"
+  IDS_COPYPATH, "Copiaza Calea Intreaga ca Text"
+  IDS_BUSY, "Sally este ocupat. Comanda necesara nu poate fi indeplinita, incearca mai tarziu."
+}

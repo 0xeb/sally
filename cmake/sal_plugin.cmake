@@ -8,64 +8,33 @@ if(NOT DEFINED SAL_ROOT)
   include("${CMAKE_CURRENT_LIST_DIR}/sal_common.cmake")
 endif()
 
-# sal_add_plugin_lang(NAME <plugin_name>
-#   [SOURCE_DIR <plugin_root>]
-# )
-#   Adds the English language file (.slg) for a plugin
-#   Looks for lang/lang.rc in the plugin directory
-function(sal_add_plugin_lang)
-  cmake_parse_arguments(PARSE_ARGV 0 LANG "" "NAME;SOURCE_DIR" "")
+# sal_add_plugin_languages(TARGET <plugin_target> LANG_DIR <dir>)
+#   Compiles the plugin's built-in languages into the plugin DLL: <dir>/languages.rc includes
+#   English (<dir>/lang.rc) and every translation (<dir>/<tag>/lang.rc), each under its own
+#   LANGUAGE.
+function(sal_add_plugin_languages)
+  cmake_parse_arguments(PARSE_ARGV 0 LANG "" "TARGET;LANG_DIR" "")
 
-  if(NOT LANG_NAME)
-    message(FATAL_ERROR "sal_add_plugin_lang: NAME is required")
+  if(NOT LANG_TARGET OR NOT LANG_LANG_DIR)
+    message(FATAL_ERROR "sal_add_plugin_languages: TARGET and LANG_DIR are required")
+  endif()
+  if(NOT EXISTS "${LANG_LANG_DIR}/languages.rc")
+    return()  # No language resources for this plugin
   endif()
 
-  if(LANG_SOURCE_DIR)
-    get_filename_component(PLUGIN_DIR "${LANG_SOURCE_DIR}" ABSOLUTE)
-  else()
-    set(PLUGIN_DIR "${SAL_PLUGINS}/${LANG_NAME}")
-  endif()
-  set(LANG_RC "${PLUGIN_DIR}/lang/lang.rc")
-
-  if(NOT EXISTS "${LANG_RC}")
-    return()  # No language file for this plugin
-  endif()
-
-  set(TARGET_NAME "plugin_${LANG_NAME}_lang")
-
+  set(LANG_RC "${LANG_LANG_DIR}/languages.rc")
   # RC files need defines set via source properties
-  set_source_files_properties("${LANG_RC}" PROPERTIES
+  set_source_files_properties(${LANG_RC} PROPERTIES
     COMPILE_DEFINITIONS "_LANG;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
   )
-
-  add_library(${TARGET_NAME} SHARED "${LANG_RC}")
-
-  target_include_directories(${TARGET_NAME} PRIVATE
-    "${PLUGIN_DIR}"
-    "${PLUGIN_DIR}/lang"
+  target_sources(${LANG_TARGET} PRIVATE ${LANG_RC})
+  get_filename_component(LANG_PARENT "${LANG_LANG_DIR}" DIRECTORY)
+  target_include_directories(${LANG_TARGET} PRIVATE
+    "${LANG_PARENT}"
+    "${LANG_LANG_DIR}"
     "${SAL_SRC}"
     "${SAL_SHARED}"
   )
-
-  if(MSVC)
-    target_link_options(${TARGET_NAME} PRIVATE
-      /NOENTRY
-      /NOIMPLIB
-      $<${SAL_IS_RELEASE}:/LTCG:OFF>  # No code to optimize in resource-only DLL
-    )
-  endif()
-
-  set_target_properties(${TARGET_NAME} PROPERTIES
-    OUTPUT_NAME english
-    SUFFIX .slg
-    PREFIX ""
-    RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/plugins/${LANG_NAME}/lang"
-    LIBRARY_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/plugins/${LANG_NAME}/lang"
-    ARCHIVE_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/plugins/${LANG_NAME}/lang"
-  )
-
-  # Add to global list of plugin language targets
-  set_property(GLOBAL APPEND PROPERTY SAL_PLUGIN_LANGS_LIST ${TARGET_NAME})
 endfunction()
 
 # sal_add_plugin(NAME <plugin_name>
@@ -79,7 +48,7 @@ endfunction()
 #   [PCH <precomp_header>]  # Precompiled header (default: precomp.h)
 #   [NO_SHARED]  # Don't include shared plugin sources
 #   [NO_PCH]     # Disable precompiled headers
-#   [NO_LANG]    # Don't auto-generate language target (for custom lang paths)
+#   [NO_LANG]    # Don't add lang/ languages (for custom lang paths)
 # )
 function(sal_add_plugin)
   cmake_parse_arguments(PARSE_ARGV 0 PLUGIN
@@ -197,9 +166,9 @@ function(sal_add_plugin)
   # Add to global list of plugins
   set_property(GLOBAL APPEND PROPERTY SAL_PLUGINS_LIST ${TARGET_NAME})
 
-  # Build language file if it exists (unless NO_LANG is specified)
+  # Built-in languages (unless NO_LANG is specified)
   if(NOT PLUGIN_NO_LANG)
-    sal_add_plugin_lang(NAME ${PLUGIN_NAME} SOURCE_DIR "${PLUGIN_DIR}")
+    sal_add_plugin_languages(TARGET ${TARGET_NAME} LANG_DIR "${PLUGIN_DIR}/lang")
   endif()
 
   message(STATUS "Added plugin: ${PLUGIN_NAME}")

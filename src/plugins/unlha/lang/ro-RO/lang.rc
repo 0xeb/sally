@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for unlha. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Rasfoieste si extrage arhivele LHA."
+ IDS_ABOUT, "Despre Plugin"
+ IDS_FILECORRUPT, "Fisier invalid LZH sau format fisier necunoscut."
+ IDS_CHECKSUMERROR, "Eroare checksum cap fisier.\nArhiva e corupta - nu toate fisierele pot fi listate."
+ IDS_LOWMEM, "Am ramas fara memorie."
+ IDS_WRITEERROR, "Eroare de scriere"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "Eroare la deschiderea arhivei."
+ IDS_LIST, "Nu pot aduga intrare arhiva la lista de fisiere."
+ IDS_SYMLINK, "Arhiva contine unul sau mai multe link-uri simbolice UNIX, care nu sunt aratate."
+ IDS_UNPACKERROR, "Nu pot dezarhiva fisierul."
+ IDS_CRCERROR, "Eroare in data comprimata. CRC nu se potriveste."
+ IDS_READERROR, "Eroare in citirea arhivei."
+ IDS_EXTRPROGTITLE, "Dezarhivarea Arhivei LHA - %s"
+ IDS_PREPAREDATA, "pregatesc datele si creez directoarele..."
+ IDS_UNPACKING, "dezarhivez: "
+ IDS_EXTRACTFILES, "dezarhivez..."
+ IDS_TOOLONGNAME, "Nu pot termina operatiunea pentru ca nume cale e prea lung."
+ IDS_TOOLONGMASK, "Nu pot termina operatiunea pentru ca masca e prea lunga."
+ IDS_METHOD, "Metoda de compresie necunoscuta. Fisierul nu poate fi dezarhivat."
+ IDS_METHOD2, "metoda necunoscuta sarit peste..."
+}

@@ -1,0 +1,122 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for uniso. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uniso/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uniso.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 240, 83
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnISO - Konfigurácia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Odstrániť atribút Len na čítanie pri kopírovaní z archívu",IDC_CFG_READONLY,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,11,198,10
+    CONTROL         "Zobraziť &sekcie ako adresár (povolí prístup ku všetkým sekciám)",IDC_CFG_SESSIONASDIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,23,226,10
+    CONTROL         "Zobraziť &boot image disku ako súbor",IDC_CFG_BOOTIMAGEASFILE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,35,134,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,2,58,236,1
+    DEFPUSHBUTTON   "OK",IDOK,128,64,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,183,64,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "Nie je možné otvoriť súbor."
+    IDS_UNKNOW_ERROR            "Neznáma chyba."
+    IDS_UNPACKING_ARCHIVE       "Extrahovanie ISO archívu"
+    IDS_ERROR_UNPACKING         "Chyba extrahovania archívu."
+    IDS_CANT_HANDLE_FILE        "Nie je možné pracovať s týmto súborom."
+    IDS_INSUFFICIENT_MEMORY     "Nedostatok pamäti."
+    IDS_ERR_TOO_LONG_NAME       "Nie je možné dokončiť operáciu kvôli príliš dlhému názvu."
+    IDS_ABOUT                   "O plugine"
+    IDS_PLUGIN_DESCRIPTION      "Prehliada a extrahuje CD/DVD ISO obrazy."
+    IDS_CANT_CREATE_TEMP        "Nie je možné vytvoriť dočasný adresár."
+    IDS_CANT_DELETE_TEMP_FILE   "Nie je možné vymazať dočasný súbor."
+    IDS_UNKNOWN_FILE_FORMAT     "Neznámy formát súboru alebo neplatný ISO obraz.\n\nAk ste si istý, že je to platný ISO obraz, založte prosím issue na https://github.com/0xeb/sally/issues a pomôžete nám s podporou tohto formátu."
+    IDS_CANT_OPEN_FILE          "Nie je možné otvoriť súbor '%s'."
+    IDS_ERR_TMP                 "Vytváranie dočasného súboru zlyhalo."
+    IDS_CANT_SET_ATTRS          "Nie je možné nastaviť atribúty súboru."
+    IDS_CANT_CREATE_DIR         "Nie je možné vytvoriť adresár '%s'."
+    IDS_YES                     "Áno"
+    IDS_NO                      "Nie"
+    IDS_ERROR                   "Chyba"
+    IDS_WARNING                 "Upozornenie"
+    IDS_ERROR_OPENING_MULTISESSION  "Pri načítaní viacsekciového obrazu vznikla neznáma chyba.\n\nZobrazujem len správne načítané sekcie."
+    IDS_UNKNOWN_TRACK_TYPE      "Neznámy typ stopy."
+    IDS_READERROR               "Chyba čítania"
+    IDS_WRITEERROR              "Chyba zápisu"
+    IDS_CCD_BAD_FORMAT          "Neplatný formát .CCD súboru.\n\nZobraziť aj nekompletný obraz."
+    IDS_CCD_MISSING             "Chýba .CCD súbor.\n\nZobraziť aj nekompletný obraz."
+    IDS_ERROR_READING_SECTOR    "Nie je možné načítať sektor #%08X."
+    IDS_ERROR_LISTING_IMAGE     "Chyba načítania štruktúry adresára v sektore #%08X.\n\nNekompletný obsah ISO obrazu."
+    IDS_INTERNAL_PLUGIN_ERROR   "Interná chyba pluginu."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Neznáma alokačná stratégia (%d).\n\nZaložte prosím issue na https://github.com/0xeb/sally/issues a pomôžete nám opraviť tento problém."
+    IDS_UDF_INVALID_TAG_ID      "Neplatný UDF Tag ID."
+    IDS_UDF_ERROR_READING_VAT   "Chyba načítania virtuálnej alokačnej tabuľky v sektore #%08X."
+    IDS_UDF_MISSING_VAT         "Chýba virtuálna alokačná tabuľka."
+    IDS_UDF_BAD_ROOT_ICB        "Neplatný koreň ICB.\n\nNie je možné načítať štruktúru adresára."
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "Nie je možné extrahovať súbor ""%s"".\n\nNezhoda medzi veľkosťou súboru a ICB bloky."
+    IDS_CANT_OPEN_TRACK         "Nie je možné otvoriť stopu #%d."
+    IDS_BOOT_OR_MBR             "Tento súbor sa zdá byť disketa alebo pevný disk alebo obraz oddielu pevného disku.\nSkúste premenovať súbor na .ima a spustite UnFAT plugin."
+    IDS_UNSUPPORTED_APFS        "Tento diskový obraz obsahuje súborový systém APFS.\nTento súborový systém zatiaľ nie je podporovaný."
+
+    IDS_ERR_HFS_READ            "Nie je možné načítať hlavičku oddielu. Súbor je malý."
+    IDS_ERR_HFS_INVALID_PARTITION "Poškodená štruktúra manažéra oddielov."
+    IDS_ERR_HFS_UNRECOGNIZED    "Tento obraz disku neobsahuje HFS Plus oddiel."
+    IDS_ERR_HFS_ORIGINAL_HFS    "Tento obraz disku obsahuje HFS ale nie HFS Plus systém súborov.\nHFS nie je podporované."
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "Nie je možné nájsť blok #%08X.\nSúbor %s nebude extrahovaný."
+    IDS_ERR_HFS_SEEK            "Nie je možné nájsť blok #%08X."
+    IDS_ERR_HFS_BTREE_NODETYPE  "Nepodporovaný BTree root node typ v súbore katalógu."
+    IDS_ERR_HFS_BTREE_FRAGMENTED "Súbor katalógu je rozdelený na viac ako 8 častí, ktoré nie sú podporované."
+    IDS_ERR_HFS_FILE_FRAGMENTED "Súbor '%s' je rozdelený na viac ako 8 častí, ktoré nie sú podporované.\nSúbor nebude extrahovaný."
+
+    IDS_ERR_TOO_LONG_PATH       "Tento obraz disku obsahuje príliš dlhú cestu, ktorú Sally nevie spracovať."
+
+    IDS_ERR_DMG_READ_HDR        "Nie je možné načítať hlavičku zväzku. Súbor je malý."
+    IDS_ERR_DMG_ENCRYPTED       "Tento zväzok je zašifrovaný.\nZašifrované zväzky nie sú podporované."
+    IDS_ERR_DMG_NO_FOOTER       "Tento súbor sa nezdá byť DMG zväzok alebo je nekompletný.\nNeobsahuje platný DMG footer."
+    IDS_ERR_DMG_PLIST           "Tento súbor sa nezdá byť platný DMG zväzok nebo je nekompletný.\nNeobsahuje platný Property List."
+    IDS_ERR_DMG_BLOCK_UNDEFINED "Tento zväzok neobsahuje dátový blok HFS Plus oddielov začínajúci na %I64u.\nTento blok je potrebný na správne zaobchádzanie so zväzkom."
+
+    IDS_ERR_BF_READ             "Nie je možné čítať dáta z obrazu disku na pozícii %I64u."
+    IDS_ERR_BF_SEEK             "Nie je možné prechádzať v obraze disku na pozícii %I64u."
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "Interná chyba: Nepodporovaná metóda hľadania."
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "Tento obraz disku obsahuje blok skomprimovaný neznámou metódou.\nTaké obrazy diskov nie sú podporované."
+    IDS_ERR_BF_ZLIB             "Extrahovanie ZLIB-komprimovaného bloku zlyhalo. Tento obraz disku je poškodený."
+    IDS_ERR_BF_BZIP2            "Extrahovanie SZIP2-komprimovaného bloku zlyhalo. Tento obraz disku je poškodený."
+
+    IDS_ERR_ISZ_NO_HEADER       "Tento súbor sa nezdá byť komprimovaný ISZ obraz alebo je nekompletný.\nNeobsahuje platnú ISZ hlavičku."
+    IDS_ERR_ISZ_READ_HDR        "Nie je možné čítať hlavičku komprimovaného obrazu. Súbor je malý."
+    IDS_ERR_ISZ_SEGMENTED       "Tento obraz je rozdelený.\nRozdelené obrazy nie sú podporované."
+    IDS_ERR_ISZ_ENCRYPTED       "Tento obraz je zašifrovaný.\nZašifrované obrazy nie sú podporované."
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "Nie je možné extrahovať audio stopy."
+
+    IDS_CANCELING_OPERATION     "Rušenie operácie, čakajte prosím..."
+
+    IDS_INFO_LABEL              "Informácie o obraze\n\n"
+    IDS_INFO_LABEL_LABEL        "Informácie o obraze ""%s""\n\n"
+    IDS_INFO_CNT_SESSIONS       "Počet sekcií: %d"
+    IDS_INFO_SESSION_NUM        "\nSekcia %d\n"
+    IDS_INFO_CNT_TRACKS         "  Počet stôp: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  Stopa: %d, %s, Veľkosť: %d KBajtov\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  Stopa: %d, %s, Veľkosť: %d KBajtov - ""%s""\n"
+}

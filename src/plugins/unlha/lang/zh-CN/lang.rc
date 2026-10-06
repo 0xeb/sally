@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for unlha. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "浏览并解压 LHA 压缩包。"
+ IDS_ABOUT, "关于插件"
+ IDS_FILECORRUPT, "无效 LZH 文件或未知文件格式。"
+ IDS_CHECKSUMERROR, "头部校验和错误。\n压缩包已损坏 - 不能列出所有文件。"
+ IDS_LOWMEM, "内存溢出。"
+ IDS_WRITEERROR, "写入错误"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "打开压缩包错误。"
+ IDS_LIST, "不能添加压缩包项到文件列表。"
+ IDS_SYMLINK, "压缩包包含一个或多个 UNIX 符号链接，将不被显示。"
+ IDS_UNPACKERROR, "不能解压文件。"
+ IDS_CRCERROR, "压缩数据中有错误。CRC 不匹配。"
+ IDS_READERROR, "读取压缩包错误。"
+ IDS_EXTRPROGTITLE, "正在解压 LHA 压缩包 - %s"
+ IDS_PREPAREDATA, "正在准备数据并创建目录..."
+ IDS_UNPACKING, "正在解压: "
+ IDS_EXTRACTFILES, "正在解压..."
+ IDS_TOOLONGNAME, "由于路径名太长无法完成操作。"
+ IDS_TOOLONGMASK, "由于掩码太长无法完成操作。"
+ IDS_METHOD, "未知压缩方式。文件不能被解压。"
+ IDS_METHOD2, "未知方式被跳过..."
+}

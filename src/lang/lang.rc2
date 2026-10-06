@@ -10,7 +10,6 @@
 // Add manually edited resources here...
 
 #include "..\\versinfo.rh2"
-#include "..\\plugins\\shared\\versinfo.rc2"
 
 #include "texts.rc2"   // non-Microsoft Visual C++ edited resources
 

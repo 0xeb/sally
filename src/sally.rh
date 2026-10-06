@@ -14,7 +14,7 @@
 #define IDS_MSGBOX_HINT                 2484
 #define IDS_MSGBOX_URL                  2485
 
-#define IDD_SPLASH                      2490
+#define IDD_SPLASH                      2489 // not 2490: that is IDD_CHANGECODING, a language dialog
 #define IDC_SPLASH_OPENSAL              2491
 #define IDC_SPLASH_VERSION              2492
 #define IDC_SPLASH_COPYRIGHT            2493

@@ -13,7 +13,7 @@
 //for plugin registration... not translatable?
 #define DISKMAP_WIDEN_IMPL(value) L##value
 #define DISKMAP_WIDEN(value) DISKMAP_WIDEN_IMPL(value)
-#define PLUGIN_NAME_EN L"DiskMap" //non-translated plugin name, used before loading the language module + for debug purposes
+#define PLUGIN_NAME_EN L"DiskMap" //non-translated plugin name, used before the translated resources are needed + for debug purposes
 #define PLUGIN_FILE L"DISKMAP"    //registry key
 
 int SalamanderVersion;
@@ -37,7 +37,7 @@ std::wstring LangStr(int resID);
 const wchar_t szPluginWebsite[] = L"https://sally-filemanager.app/"; // original domain not running: http://salamander.diskmap.net
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 HACCEL hAccelTable = NULL;
 
@@ -238,24 +238,15 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (SalamanderVersion < SALSDK_COMPATIBLE_WITH_VER)
     { // reject older versions
         // wide: PLUGIN_NAME_EN is a fixed "DiskMap" narrow macro consumed at
-        // several other call sites (LoadLanguageModule, SetThreadNameInVCAndTrace, ...) -
+        // several other call sites (SetThreadNameInVCAndTrace, ...) -
         // inlined the known wide literal here rather than widening the shared macro.
         MessageBoxW(salamander->GetParentWindow(), REQUIRE_COMPATIBLE_SAL_VERSION, L"DiskMap", MB_OK | MB_ICONERROR);
         return NULL;
     }
 #endif // OPENSAL_VERSION
 
-    //TODO: let the language module (.slg) load
-    // wide: PLUGIN_NAME_EN is a fixed "DiskMap" narrow macro consumed at
-    // several other call sites (SalamanderPluginEntry's own version check, DllMain-adjacent
-    // trace naming) - inlined the known wide literal here rather than widening the shared macro,
-    // matching the file's existing precedent.
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), PLUGIN_NAME_EN);
-    if (HLanguage == NULL)
-    {
-        //MessageBox(salamander->GetParentWindow(), "SLG not found...", PLUGIN_NAME_EN, MB_OK | MB_ICONERROR);
-        return NULL;
-    }
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // obtain the general Salamander interface
     SalamanderGeneral = salamander->GetSalamanderGeneral();

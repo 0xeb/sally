@@ -336,6 +336,7 @@ CWaitForDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 BOOL CWaitForDialog::OnInit(WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE3("CWaitForDialog::OnInit(0x%IX, 0x%IX)", wParam, lParam);
+    SetDlgItemTextW(Dlg, IDC_STATIC_2, LoadStrW(IDS_WAITFOR_INFO).c_str());
     SetDlgItemTextW(Dlg, IDC_FILENAME, WaitFor.c_str());
     SendDlgItemMessage(Dlg, IDC_FILENAME, EM_SETLIMITTEXT, 0, 0);
 

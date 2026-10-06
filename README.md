@@ -5,7 +5,7 @@
 [![Stars](https://img.shields.io/github/stars/0xeb/sally?style=social)](https://github.com/0xeb/sally)
 [![License: GPL v2](https://img.shields.io/badge/License-GPLv2-blue.svg)](LICENSE)
 
-Sally is a fast, keyboard-first dual-panel file manager for Windows power users. It keeps the classic [Open Salamander](https://github.com/OpenSalamander/salamander) workflow alive and moves it forward for current machines: Unicode and long paths, dark mode, Windows Terminal integration, native ARM64, modern viewing, active plugin packaging, Wine compatibility, maintained language packs, and a real release pipeline.
+Sally is a fast, keyboard-first dual-panel file manager for Windows power users. It keeps the classic [Open Salamander](https://github.com/OpenSalamander/salamander) workflow alive and moves it forward for current machines: Unicode and long paths, dark mode, Windows Terminal integration, native ARM64, modern viewing, active plugin packaging, Wine compatibility, built-in languages, and a real release pipeline.
 
 **Website:** [sally-filemanager.app](https://sally-filemanager.app/) | **Manual:** [online](https://sally-filemanager.app/manual/), [keyboard shortcuts](https://sally-filemanager.app/manual/sally/shortcuts_keyboard.html) | **Download:** [latest release](https://github.com/0xeb/sally/releases/latest), [changelog](https://sally-filemanager.app/changelog/) | **Star:** [help Sally get discovered](https://github.com/0xeb/sally) | **Support:** [PayPal](https://paypal.me/EliasBachaalany) or [Buy Me a Coffee](https://buymeacoffee.com/0xeb)
 
@@ -19,7 +19,7 @@ Open Salamander became loved because it made serious file work feel direct: two 
 
 - **Built for real file names**: Unicode and Windows long paths work through copy, move, delete, rename, drag/drop, panel state, directory history, Find, viewers, editors, startup paths, and network/UNC navigation.
 - **Classic workflow, current polish**: the dense dual-panel interface remains, now with `Light`, `Dark`, and `System` theme modes across the core UI and first-party plugins.
-- **Small project, fast movement**: user reports have turned into fixes for ARM64 FTP, Unicode context menus, viewer edge cases, Windows 11 automation changes, network long paths, release packaging, and language packs.
+- **Small project, fast movement**: user reports have turned into fixes for ARM64 FTP, Unicode context menus, viewer edge cases, Windows 11 automation changes, network long paths, release packaging, and translations.
 - **Open and actively shipped**: runtime zips, symbols, and x64/x86/ARM64 builds are published through GitHub Releases.
 - **AI-assisted development velocity**: AI helps grind through modernization work, tests, translations, and release plumbing while the project stays open source and user-driven.
 
@@ -92,7 +92,7 @@ Sally is not a one-off binary drop. The release machinery is part of the product
 - Separate debug-symbol zips for crash dump investigation.
 - GitHub release updater over HTTPS through the Check Version plugin.
 - [Wine compatibility work](#running-on-linux-with-wine) makes Sally run under Wine (10.0 and newer) by avoiding hard dependency on `imageres.dll` and falling back to `shell32.dll` resources where needed.
-- Modern CMake build covers Sally, bundled plugins, trace server, shell extension, helper tools, English language resources, and release population.
+- Modern CMake build covers Sally, bundled plugins, trace server, shell extension, helper tools, every UI language, and release population.
 - Clang-CL/xwin toolchains support Windows x64 and ARM64 cross-compilation with the MSVC ABI.
 
 ### Localization Is Alive
@@ -101,9 +101,10 @@ Sally ships 10 maintained UI languages across supported release packages:
 
 Chinese (Simplified), Czech, Dutch, French, German, Hungarian, Romanian, Russian, Slovak, and Spanish.
 
-Translation source archives remain committed under `translations/`. Translation
-updates are welcome as pull requests; the maintainer validates them and builds
-the shipping language packs before each release.
+Every language is built into `sally.exe` and the plugins, so there are no
+language packs to download or keep in sync. Translations live next to the English
+resources as ordinary `.rc` files, and fixes are welcome as issues or pull requests
+(see [Translations](#translations)).
 
 ## Downloads
 
@@ -160,14 +161,27 @@ cmake --build build --config RelWithDebInfo --target populate
 
 Output: `build/out/sally/<Config>_<Arch>/`
 
-When you run Sally from `build/out`, rebuild and repopulate that exact configuration first. For example, use `cmake --build build --config Release --target populate` before launching `build/out/sally/Release_x64/` so plugin DLLs and `.slg` language files stay in sync.
+When you run Sally from `build/out`, rebuild and repopulate that exact configuration first. For example, use `cmake --build build --config Release --target populate` before launching `build/out/sally/Release_x64/` so the plugin DLLs stay in sync.
 
 ## Contributing
 
 Contributions are welcome. See the [Developer Guide](doc/DEV.md) for repository structure, build targets, and internals.
 
-If you want to help with UI translations, update the relevant `.slt` archives
-under `translations/` and open a pull request.
+### Translations
+
+Sally's languages are in `src/lang/<tag>/lang.rc` (for example `src/lang/de-DE/lang.rc`),
+and each translated plugin has its own in `src/plugins/<plugin>/lang/<tag>/lang.rc`. The
+English originals are the `lang.rc` files one level up.
+
+- To fix a translation, edit the text in the translated `lang.rc` and open a pull request.
+  If a longer text needs more room, adjust the size or position of the affected controls,
+  but keep every resource ID, style and the order of controls identical to the English file.
+- To report a wrong or missing translation instead, open an issue that names the language
+  and the dialog, menu or message.
+- To add a language, create a `<tag>/lang.rc` for Sally and every translated plugin, add its
+  line to each module's `languages.rc`, and add an entry to `src/common/BuiltinLanguages.h`.
+
+The [Developer Guide](doc/DEV.md#translations) has the details.
 
 Spotted a mistake in the [manual](https://sally-filemanager.app/manual/)? Open an issue with the
 page address and the correction.

@@ -1,0 +1,120 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for diskmap. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/diskmap/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#define SALAMANDER
+#include "..\..\DiskMap\Resources\DiskMap.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDC_ZAREVAKDISKMAP MENU 
+BEGIN
+    POPUP "&Fájl"
+    BEGIN
+        MENUITEM "&Fájl megnyitása",                       IDM_FILE_OPEN
+        MENUITEM "&Kikeresés a panelen\tF",        IDM_FILE_FOCUSINSALAMANDER
+        MENUITEM SEPARATOR
+        MENUITEM "Megsz&akítás\tEsc",                      IDM_FILE_ABORT
+        MENUITEM "F&rissítés\tCtrl+R",            IDM_FILE_REFRESH
+        MENUITEM SEPARATOR
+        MENUITEM "&Bezárás\tAlt+F4",                      IDM_FILE_EXIT
+    END
+    POPUP "&Nézet"
+    BEGIN
+        MENUITEM "&Nagyítás\t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "&Kicsinyítés\t -",                IDM_VIEW_ZOOMOUT
+        MENUITEM "&Alaphelyzet\t Shift+Backspace",   IDM_VIEW_GOTOROOT
+        MENUITEM SEPARATOR
+        MENUITEM "Nap&lózási ablak...\tCtrl+L",              IDM_VIEW_LOG
+    END
+
+    POPUP "Beállítás&ok"
+    BEGIN
+	MENUITEM "&Mappák kiemelése",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
+	MENUITEM "Esz&köztipp mutatása\tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+        POPUP "Eszköztipp &elérési útja"
+        BEGIN
+            MENUITEM "&Fájlnév",            IDM_PATHFORMAT_FILENAME
+            MENUITEM "&Relatív",            IDM_PATHFORMAT_RELATIVEVIEW
+//            MENUITEM "&Relative to Root",  IDM_PATHFORMAT_RELATIVEROOT
+            MENUITEM "&Abszolút",            IDM_PATHFORMAT_ABSOLUTE
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "ES&C gombos bezárás megerősítése",       IDM_OPTIONS_CONSFIRMCLOSE, CHECKED
+    END
+    POPUP "&Súgó"
+    BEGIN
+//        POPUP "&Debug"
+//        BEGIN
+//            MENUITEM "&Export Directory Structure...", IDM_DEBUG_EXPORTDIR
+//        END
+//        MENUITEM SEPARATOR
+        MENUITEM "&Névjegy...",                  IDM_HELP_ABOUT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME,            "DiskMap"
+    IDS_PLUGIN_DESCRIPTION,     "A lemez fájljainak faszerkezetét jeleníti meg."
+    IDS_PLUGIN_ABOUT,           "Sally DiskMap Plugin névjegy"
+    IDS_PLUGIN_MENU,            "&DiskMap megjelenítése"
+    IDS_CLOSE_CONFIRMATION,     "Be akarja zárni a DiskMap-ot?"
+    IDS_CLOSE_CONFIRMATION_CHECKBOX, "Ne mutassa ezt az üzenetet és kérdés nélkül zárja be a DiskMap-ot"
+
+    IDS_DISKMAP_TITLE,               "DiskMap"
+    IDS_DISKMAP_TITLEPREFIX,         "DiskMap - "
+
+    IDS_DISKMAP_LOAD_TITLE,          "Fájlok keresése..."
+    IDS_DISKMAP_LOAD_FOOTER,         "...megszakításhoz ESC gomb"
+    IDS_DISKMAP_LOAD_HSIZE,          "Méret:"
+    IDS_DISKMAP_LOAD_HFILE,          "Fájlok:"
+    IDS_DISKMAP_LOAD_HDIRS,          "Mappák:"
+
+    IDS_DISKMAP_ABORT_TITLE,         "Fájlkeresés megszakítva..."
+    IDS_DISKMAP_ABORT_FOOTER,        "...a nézet frissítéséhez Ctrl+R"
+
+    IDS_DISKMAP_LOG_TITLE,           "Napló"
+    IDS_DISKMAP_LOG_HTYPE,           "Típus"
+    IDS_DISKMAP_LOG_HTEXT,           "Szöveg"
+    IDS_DISKMAP_LOG_HFILE,           "Fájl vagy mappa"
+    IDS_DISKMAP_LOG_LINFO,           "Információ"
+    IDS_DISKMAP_LOG_LWARN,           "Figyelem"
+    IDS_DISKMAP_LOG_LERROR,          "Hiba"
+
+    IDS_DISKMAP_SHELL_FOCUS,         "&Fájlra ugrás a panelen"
+    IDS_DISKMAP_SHELL_ZOOMIN,        "&Nagyítás"
+    IDS_DISKMAP_SHELL_ZOOMOUT,       "&Kicsinyítés"
+    IDS_DISKMAP_SHELL_DIROPEN,       "&Megnyitás a panelen"
+    IDS_DISKMAP_SHELL_DIRCHANGE,     "&Mappa váltása"
+
+    IDS_DISKMAP_TTIP_TIMECREATE,     "Létrehozva:"
+    IDS_DISKMAP_TTIP_TIMEMODIFY,     "Módosítva:"
+    IDS_DISKMAP_TTIP_TIMEACCESS,     "Hozzáférve:"
+    IDS_DISKMAP_TTIP_SIZEDATA,       "Adatméret:"
+    IDS_DISKMAP_TTIP_SIZEREAL,       "Tényleges méret:"
+    IDS_DISKMAP_TTIP_SIZEDISK,       "Lemezméret:"
+    IDS_DISKMAP_TTIP_COUNTFILE,      "Fájlok:"
+    IDS_DISKMAP_TTIP_COUNTDIRS,      "Mappák:"
+
+    IDS_DISKMAP_FORMAT_BYTE0,        "bájt"
+    IDS_DISKMAP_FORMAT_BYTE1,        "bájt"
+    IDS_DISKMAP_FORMAT_BYTEN,        "bájt"
+
+    IDS_DISKMAP_EMPTY_TITLE,         "Nincs mit megjeleníteni..."
+    IDS_DISKMAP_EMPTY_FOOTER,        "...ez a mappa nem tartalmaz leképezhető fájlokat"
+END

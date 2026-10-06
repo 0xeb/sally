@@ -1,0 +1,122 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for uniso. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uniso/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uniso.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 270, 83
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка UnISO"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Снимать атрибут ""только чтение"" при копировании из архива",IDC_CFG_READONLY,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,11,232,10
+    CONTROL         "&Отображать сессию как папку (разрешить доступ ко всем сессиям)",IDC_CFG_SESSIONASDIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,23,250,10
+    CONTROL         "О&тображать образ загрузчика диска как файл",IDC_CFG_BOOTIMAGEASFILE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,35,175,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,2,58,266,1
+    DEFPUSHBUTTON   "ОК",IDOK,158,64,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,213,64,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "Невозможно открыть файл."
+    IDS_UNKNOW_ERROR            "Неизвестная ошибка."
+    IDS_UNPACKING_ARCHIVE       "Распаковка архива ISO"
+    IDS_ERROR_UNPACKING         "Ошибка распаковки архива."
+    IDS_CANT_HANDLE_FILE        "Невозможно обработать файл."
+    IDS_INSUFFICIENT_MEMORY     "Недостаточно памяти."
+    IDS_ERR_TOO_LONG_NAME       "Невозможно завершить операцию. Слишком длинное имя файла."
+    IDS_ABOUT                   "О модуле"
+    IDS_PLUGIN_DESCRIPTION      "Просмотр и извлечение образов CD/DVD в формате ISO."
+    IDS_CANT_CREATE_TEMP        "Невозможно создать временную папку."
+    IDS_CANT_DELETE_TEMP_FILE   "Невозможно создать временный файл."
+    IDS_UNKNOWN_FILE_FORMAT     "Неизвестный формат файла или некорректный образ ISO.\n\nЕсли Вы уверены, что образ ISO корректен, пожалуйста, создайте issue на https://github.com/0xeb/sally/issues для содействия в части поддержки данного формата."
+    IDS_CANT_OPEN_FILE          "Невозможно открыть файл ""%s""."
+    IDS_ERR_TMP                 "Не удалось создать временный файл."
+    IDS_CANT_SET_ATTRS          "Невозможно установить атрибуты файла."
+    IDS_CANT_CREATE_DIR         "Невозможно создать папку ""%s""."
+    IDS_YES                     "Да"
+    IDS_NO                      "Нет"
+    IDS_ERROR                   "Ошибка"
+    IDS_WARNING                 "Предупреждение"
+    IDS_ERROR_OPENING_MULTISESSION  "Произошли ошибки при чтении мультисессионного образа.\n\nОтображаются только корректные сессии."
+    IDS_UNKNOWN_TRACK_TYPE      "Неизвестный тип дорожки."
+    IDS_READERROR               "Ошибка чтения"
+    IDS_WRITEERROR              "Ошибка записи"
+    IDS_CCD_BAD_FORMAT          "Некорректный формат файла .CCD.\n\nОтображаемый образ может быть неполным."
+    IDS_CCD_MISSING             "Отсутствует файл .CCD.\n\nОтображаемый образ может быть неполным."
+    IDS_ERROR_READING_SECTOR    "Невозможно прочитать сектор #%08X."
+    IDS_ERROR_LISTING_IMAGE     "Ошибка чтения структуры папок в секторе #%08X.\n\nНеполный образ ISO."
+    IDS_INTERNAL_PLUGIN_ERROR   "Внутренняя ошибка модуля."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Неизвестный способ размещения (%d).\n\nПожалуйста, создайте issue на https://github.com/0xeb/sally/issues и помогите устранить эту проблему."
+    IDS_UDF_INVALID_TAG_ID      "Недопустимый идентификатор атрибута UDF."
+    IDS_UDF_ERROR_READING_VAT   "Ошибка чтения виртуальной таблицы размещения в секторе #%08X."
+    IDS_UDF_MISSING_VAT         "Отсутствует виртуальная таблица размещения."
+    IDS_UDF_BAD_ROOT_ICB        "Некорректный корневой ICB.\n\nНевозможно прочитать структуру папок."
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "Файл ""%s"" не может быть извлечен.\n\nНесоответствие размера и блоков ICB."
+    IDS_CANT_OPEN_TRACK         "Невозможно открыть дорожку #%d."
+    IDS_BOOT_OR_MBR             "Файл является образом дискеты или раздела жесткого диска.\nПопытайтесь изменить расширение имени файла на "".ima"", чтобы открыть этот образ при помощи модуля UnFAT."
+    IDS_UNSUPPORTED_APFS        "Данный образ диска содержит файловую систему APFS.\nЭта файловая система пока не поддерживается."
+
+    IDS_ERR_HFS_READ            "Невозможно прочитать заголовок раздела. Файл слишком мал."
+    IDS_ERR_HFS_INVALID_PARTITION "Повреждены структуры менеджера разделов."
+    IDS_ERR_HFS_UNRECOGNIZED    "Этот образ диска не содержит раздел HFS Plus."
+    IDS_ERR_HFS_ORIGINAL_HFS    "Этот образ диска содержит файловую систему HFS и не содержит HFS Plus.\nФайловая система HFS не поддерживается."
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "Невозможно найти блок #%08X.\nФайл %s не будет извлечен."
+    IDS_ERR_HFS_SEEK            "Невозможно найти блок #%08X."
+    IDS_ERR_HFS_BTREE_NODETYPE  "Неподдерживаемый тип корневого элемента в файле каталога."
+    IDS_ERR_HFS_BTREE_FRAGMENTED "Файл каталога разделен на 8 или более фрагментов. Это не поддерживается модулем."
+    IDS_ERR_HFS_FILE_FRAGMENTED "Файл ""%s"" разделен на 8 или более фрагментов. Это не поддерживается модулем.\nФайл не будет извлечен."
+
+    IDS_ERR_TOO_LONG_PATH       "Образ диска содержит слишком длинный путь, который не может быть обработан Sally."
+
+    IDS_ERR_DMG_READ_HDR        "Невозможно прочитать заголовок пакета. Файл слишком мал."
+    IDS_ERR_DMG_ENCRYPTED       "Пакет зашифрован.\nЗашифрованные пакеты не поддерживаются."
+    IDS_ERR_DMG_NO_FOOTER       "Этот файл не является пакетом DMG либо файл неполный.\nОтсутствует завершающий блок DMG."
+    IDS_ERR_DMG_PLIST           "Этот файл не является пакетом DMG либо файл неполный.\nОтсутствует корректный список свойств."
+    IDS_ERR_DMG_BLOCK_UNDEFINED "Этот пакет не содержит блок данных раздела HFS Plus в позиции %I64u.\nЭтот блок данных необходим для корректной обработки пакета."
+
+    IDS_ERR_BF_READ             "Невозможно прочитать данные из образа диска в позиции %I64u."
+    IDS_ERR_BF_SEEK             "Невозможно найти позицию %I64u в образе диска."
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "Внутренняя ошибка: Неподдерживаемый метод поиска."
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "Этот образ диска содержит блок, сжатый неизвестным методом.\nТакие образы дисков не поддерживаются."
+    IDS_ERR_BF_ZLIB             "Произошла ошибка при распаковке блока сжатых даных методом ZLIB. Возможно, образ диска поврежден."
+    IDS_ERR_BF_BZIP2            "Произошла ошибка при распаковке блока сжатых даных методом BZIP2. Возможно, образ диска поврежден."
+
+    IDS_ERR_ISZ_NO_HEADER       "Файл не является сжатым образом ISZ либо файл неполный.\nОтсутствует корректный заголовок ISZ."
+    IDS_ERR_ISZ_READ_HDR        "Невозможно прочитать заголовок сжатого образа. Файл слишком мал."
+    IDS_ERR_ISZ_SEGMENTED       "Этот образ сегментирован.\nСегментированные образы не поддерживаются."
+    IDS_ERR_ISZ_ENCRYPTED       "Этот образ зашифрован.\nЗашифрованные образы не поддерживаются."
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "Звуковые дорожки не могут быть извлечены."
+
+    IDS_CANCELING_OPERATION     "Выполняется отмена операции. Пожалуйста, подождите..."
+
+    IDS_INFO_LABEL              "Информация об образе\n\n"
+    IDS_INFO_LABEL_LABEL        "Информация об образе ""%s""\n\n"
+    IDS_INFO_CNT_SESSIONS       "Количество сессий: %d"
+    IDS_INFO_SESSION_NUM        "\nСессия %d\n"
+    IDS_INFO_CNT_TRACKS         "  Количество дорожек: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  Дорожка: %d, %s, Размер: %d КБайт\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  Дорожка: %d, %s, Размер: %d КБайт - ""%s""\n"
+}

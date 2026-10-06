@@ -1,0 +1,126 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for checksum. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checksum/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checksum.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CALCULATE DIALOGEX 0, 0, 344, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+CAPTION "Calcular sumas de comprobación"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,334,54
+    LTEXT           "Calculando:",IDC_LABEL,5,68,42,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,50,68,105,8
+    PUSHBUTTON      "Con&figurar...",IDC_BUTTON_CONFIGURE,162,65,55,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Guardar...",IDC_BUTTON_SAVE,223,65,55,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Detener",IDC_BUTTON_CLOSE,284,65,55,14,WS_CLIPSIBLINGS
+    LTEXT           "portapapeles",IDC_LABEL_HINT,5,68,46,8,WS_CLIPSIBLINGS
+END
+
+IDD_VERIFY DIALOGEX 0, 0, 260, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,250,54
+    LTEXT           "Verificando:",IDC_LABEL,5,68,42,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,50,68,93,8
+    LTEXT           "",IDC_LABEL_RESULT,5,68,140,8,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Enfocar",IDC_BUTTON_FOCUS,149,65,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Detener",IDC_BUTTON_CLOSE,205,65,50,14,WS_CLIPSIBLINGS
+END
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 189, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuración de sumas"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Calcular sumas de comprobación ",IDC_STATIC_1,8,5,174,76,WS_GROUP
+    CONTROL         "&CRC/SFV",IDC_CFG_CRC,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,15,16,105,10
+    CONTROL         "&MD5",IDC_CFG_MD5,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,28,105,10
+    CONTROL         "SHA-&1",IDC_CFG_SHA1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,40,105,10
+    CONTROL         "SHA-&256",IDC_CFG_SHA256,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,52,105,10
+    CONTROL         "SHA-&512",IDC_CFG_SHA512,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,64,105,10
+    DEFPUSHBUTTON   "Aceptar",IDOK,14,88,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,69,88,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,124,88,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "Suma de comprobación"
+ IDS_ABOUTTITLE "Acerca del Plugin"
+ IDS_PLUGIN_DESCRIPTION "Verificador y calculador de sumas SFV, MD5, SHA-1, SHA-256 y SHA-512."
+ IDS_OUTOFMEM "Memoria agotada"
+ IDS_ERROROPENING, "Error al abrir fichero"
+ IDS_READERROR "Error de lectura"
+ IDS_WRITEERROR "Error de escritura"
+ IDS_SKIPPED "Saltado"
+ IDS_CALCULATING "Calculando..."
+ IDS_CANCELED "Cancelado"
+ IDS_HINT "Click derecho sobre un elemento para copiar una suma al portapapeles."
+ IDS_COPYTOCBOARD_CRC "Copiar valor &CRC al portapapeles\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "Copiar suma  &MD5 al portapapeles\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "Copiar suma SHA-&1 al portapapeles\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "Copiar suma SHA-&256 al portapapeles\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "Copiar suma SHA-&512 al portapapeles\tCtrl+5"
+ IDS_REMOVEITEM "&Eliminar elemento\tSupr"
+ IDS_SAVE_TITLE  "Guardar fichero de suma de comprobación"
+ IDS_SAVE_FILTER_CRC  "Ficheros SFV (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "Ficheros MD5 (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "Ficheros SHA-1 (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "Ficheros SHA-256 (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "Ficheros SHA-512 (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "El fichero '%s' ya existe.\n¿Desea reemplazarlo?"
+ IDS_ERRORCREATINGFILE "Error al crear fichero."
+ IDS_SKIPPEDFILES "Los ficheros saltados o cancelados durante el cálculo no han sido guardados."
+ IDS_ERROROPENING2 "Error al abrir el fichero '%s'."
+ IDS_MISSING "Ausente"
+ IDS_BADEXT "El fichero seleccionado no tiene extensión SFV, MD5, SHA1, SHA256 ni SHA512.¿Desea continuar de todos modos?"
+ IDS_BADFILE "El fichero seleccionado no es un fichero SFV, MD5, SHA-1, SHA-256 ni SHA-512 válido."
+ IDS_VERIFYING "Verificando..."
+ IDS_OK "Aceptar"
+ IDS_CORRUPT "Corrupto"
+ IDS_MENU_CALCULATE "&Calcular sumas de comprobación..."
+ IDS_MENU_VERIFY "&Verificando sumas de comprobación..."
+ IDS_CONFIG_CONFLICT "La configuración ya está abierta."
+ IDS_CONFIG_CHANGES_EFFECT "Los cambios tendrán efecto cuando la ventana 'Calcular sumas de comprobación' se abra la próxima vez."
+ IDS_ALLOK "Todos los ficheros son correctos"
+ IDS_RESULT "%d corruptos, %d ausentes, %d saltados"
+ IDS_BUSY "Sally está ocupado. El comando pedido no puede efectuarse, inténtelo más tarde."
+ IDS_CLOSE "&Cerrar"
+ IDS_READINGTREE "Leyendo árbol de directorios, espere por favor..."
+ IDS_ERRORREADINGDIR "Error al leer directorio"
+ IDS_NOFILES "No hay ficheros"
+ IDS_VERIFYTITLE "Verificar sumas de comprobación"
+ IDS_VERIFY_CRC "Verificar CRC"
+ IDS_VERIFY_MD5 "Verificar MD5"
+ IDS_VERIFY_SHA1 "Verificar SHA-1"
+ IDS_VERIFY_SHA256 "Verificar SHA-256"
+ IDS_VERIFY_SHA512 "Verificar SHA-512"
+ IDS_COLUMN_FILE "Fichero"
+ IDS_COLUMN_SIZE "Tamaño"
+ IDS_COLUMN_STATUS "Estado"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "Imposible terminar la operación porque el nombre es demasiado largo."
+}

@@ -27,7 +27,7 @@ CViewerWindowQueue CViewerMainWindow::ViewerWindowQueue;           // list of al
 CThreadQueue CViewerMainWindow::ThreadQueue("WebViewer Viewers");  // list of all window threads
 
 HINSTANCE DLLInstance = NULL; // handle to the SPL module - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to the SLG module - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 int ConfigVersion = 0;           // 0 - default, 1 - SS 1.6 beta 3, 2 - SS 1.6 beta 4, 3 - SS 2.5 beta 1, 4 - AS 3.1 beta 1, 5 - Sally (PNG/SVG)
 #define CURRENT_CONFIG_VERSION 5 // Sally: PNG/SVG viewer support
@@ -93,10 +93,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // let it load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Web Viewer" /* neprekladat! */);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // obtain the general Salamander interface
     SalamanderGeneral = salamander->GetSalamanderGeneral();

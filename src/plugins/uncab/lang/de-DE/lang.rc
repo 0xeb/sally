@@ -1,0 +1,123 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for uncab. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uncab/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uncab.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 11, 21, 223, 122
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nächstes CAB-Teilarchiv"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_TEXT,12,9,200,32
+    LTEXT           "Datenträger:",IDC_STATIC_1,12,48,46,8
+    LTEXT           "",IDC_DISKNAME,59,48,153,8
+    LTEXT           "CAB-Name:",IDC_STATIC_2,12,59,46,8
+    LTEXT           "",IDC_CABNAME,59,59,153,8
+    LTEXT           "&Pfad:",IDC_STATIC_3,12,70,19,8
+    EDITTEXT        IDC_FILENAME,12,80,184,12
+    PUSHBUTTON      "...",IDC_BROWSE,199,80,13,12
+    DEFPUSHBUTTON   "OK",IDOK,108,103,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,162,103,50,14
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,6,97,211,1
+END
+
+IDD_ERROR DIALOGEX 15, 34, 350, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fehler"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Name:",IDC_STATIC_1,5,10,25,8
+    LTEXT           "",IDS_FILENAME,34,10,309,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Fehler:",IDC_STATIC_2,5,23,25,8,NOT WS_GROUP
+    LTEXT           "Die Datei kann nicht entpackt werden, da es sich um die Fortsetzung eines vorangehenden Teilarchivs handelt. Beginnen Sie mit dem erstem Teilarchiv, um die Datei zu entpacken.",IDC_STATIC_3,34,23,309,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&Diesen Hinweis in Zukunft nicht mehr anzeigen.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,34,44,183,12
+    DEFPUSHBUTTON   "&Überspringen",IDSKIP,66,63,69,14,WS_GROUP
+    PUSHBUTTON      "&Alle Überspringen",IDALL,140,63,69,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,214,63,69,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 232, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnCAB - Konfiguration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "von einem vorangegangenen Teilarchiv fortgesetzt werden.",IDC_STATIC_1,23,22,202,8
+    CONTROL         "Beim Entpacken &Dateien automatisch überspringen, die",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,10,199,12
+    LTEXT           "Archivinhalt nicht aufgelistet werden kann.",IDC_STATIC_2,23,44,146,8
+    CONTROL         "Keinen &Warnhinweis zeigen, wenn der gesamte",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,189,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,220,1
+    DEFPUSHBUTTON   "OK",IDOK,63,66,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,118,66,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 248, 108
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnCAB - Achtung"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Es können nicht alle Dateien des mehrteiligen Archivs aufgelistet (und im Dateifenster gezeigt) werden, da einige Teilarchive nicht gefunden wurden.",IDC_STATIC_1,11,9,229,24
+    LTEXT           "Um den gesamten Archivinhalt aufzulisten, kopieren Sie bitte alle Teilarchive in dasselbe Verzeichnis und öffnen das erste Teilarchiv.",IDC_STATIC_2,11,40,229,16
+    CONTROL         "&Diesen Hinweis in Zukunft nicht mehr anzeigen",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,65,171,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,83,237,1
+    DEFPUSHBUTTON   "OK",IDOK,189,90,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnCAB"
+  IDS_PLUGIN_DESCRIPTION, "Durchsucht und entpackt CAB-Archive."
+  IDS_ABOUT, "Über Plugin"
+  IDS_LOWMEM, "Nicht genügend Speicher."
+  IDS_UNKNOWN, "Unbekannter Fehler aufgetreten."
+  IDS_BROWSEARCHIVETITLE, "Verzeichnis wählen"
+  IDS_LIST, "Kann den Archiveintrag nicht zur Dateiliste hinzufügen."
+  IDS_EXTRPROGTITLE, "Entpacke CAB-Archiv - %s"
+  IDS_PREPAREDATA, "Daten werden vorbereitet und Verzeichnisse erstellt..."
+  IDS_EXTRACTFILES, "Entpacke..."
+  IDS_EXTRACTING, "Entpacke: "
+  IDS_UNABLEGETFIELPOS, "Kann den Dateizeiger nicht ermitteln: "
+  IDS_UNABLEWRITE, "Kann nicht in die Datei schreiben:"
+  IDS_UNABLESEEK, "Kann den Dateizeiger nicht setzen: "
+  IDS_TOOLONGNAME, "Kann den Vorgang nicht beenden da der Pfadname zu lang ist."
+  IDS_TOOLONGMASK, "Kann den Vorgang nicht beenden da die Maske zu lang ist."
+  IDS_EXPIRE, "Das Plugin ist abgelaufen. Bitte überprüfen Sie auf unserer Webseite, ob eine neuere Version vorhanden ist."
+  IDS_UNABLECREATE, "Erstellen oder Öffnen der Datei nicht möglich."
+  IDS_UNABLEREAD, "Lesen der Datei nicht möglich."
+  IDS_BROWSEFOLDERTEXT, "Wählen Sie das Verzeichnis, dass '%s' enthält."
+  IDS_NOTFOUND, "Datei nicht gefunden."
+  IDS_SKIPPING, "Überspringe Datei"
+  IDS_NEXTVOLTEXT, "Bitte legen Sie den Datenträger mit dem %d. CAB-Teilarchiv ein oder wählen Sie die passende Datei auf der Festplatte.\n\nDrücken Sie 'OK', wenn Sie bereit sind."
+
+  // FDIERROR - Error codes returned in erf.erfOper field
+  IDS_CABINET_NOT_FOUND, "CAB-Datei nicht gefunden."
+  IDS_NOT_A_CABINET, "Die CAB-Datei hat nicht das richtige Format."
+  IDS_UNKNOWN_CABINET_VERSION, "Die CAB-Datei hat eine unbekannte Versionsnummer."
+  IDS_CORRUPT_CABINET, "Die CAB-Datei ist defekt."
+  IDS_BAD_COMPR_TYPE, "Unbekannter Kompressionstyp in einem CAB-Verzeichnis."
+  IDS_MDI_FAIL, "Entpacken von Daten aus einer CAB-Datei fehlgeschlagen."
+  IDS_RESERVE_MISMATCH, "In diesem Satz haben nicht alle Cabinets dieselbe RESERVE Größe."
+  IDS_WRONG_CABINET, "Falsche CAB-Datei."
+  IDS_USER_ABORT, "Benutzerabbruch."
+  IDS_ERROR, "Fehler"
+}

@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for tar. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/tar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\tar.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "Просмотр и извлечение из архивов Unix."
+ IDS_ABOUT, "О модуле"
+ IDS_TARERR_TITLE, "Ошибка модуля TAR"
+ IDS_TARERR_UNKNOWN, "Формат архива не определен или не поддерживается."
+ IDS_TARERR_HEADER, "Некорректные данные в заголовке TAR - архив поврежден."
+ IDS_TARERR_CHECKSUM, "Неправильная контрольная сумма файла или заголовка - архив поврежден."
+ IDS_TARERR_FDATA, "Внутренняя ошибка: повреждена структура данных файла."
+ IDS_TARERR_BADSIG, "Неизвестная сигнатура блока - пропущен."
+ IDS_TARERR_NOTFOUND, "Требуемый файл не найден в архиве."
+ IDS_TARERR_MEMORY, "Ошибка выделения памяти."
+ IDS_UNPACKPROGRESS_TITLE, "Распаковка"
+ IDS_UNPACKPROGRESS_TEXT, "Извлечение "
+ IDS_SKIPPROGRESS_TEXT, "Пропуск "
+ IDS_GZERR_TITLE, "Ошибка GZip"
+ IDS_GZERR_BADMETHOD, "Неизвестный метод сжатия, невозможно распаковать."
+ IDS_GZERR_ENCRYPTED, "Файл зашифрован. Шифрование архивов GZip не поддерживается."
+ IDS_GZERR_MULTIPART, "Файл является частью многотомного архива. Многотомные архивы GZip не поддерживаются."
+ IDS_GZERR_BADFLAGS, "Заголовок архива GZip содержит неизвестные атрибуты, извлечение невозможно."
+ IDS_GZERR_FOPEN, "Ошибка открытия архивного файла: "
+ IDS_ERR_FREAD, "Ошибка чтения архивного файла: "
+ IDS_TARERR_FWRITE, "Ошибка записи файла: "
+ IDS_TARERR_WRSIZE, "Функция записи ""WriteFile"" не выполнила запись требуемых данных."
+ IDS_GZERR_BADBLOCKTYPE, "Некорректный блок в потоке GZip, невозможно извлечь."
+ IDS_ERR_INTERNAL, "Внутренняя ошибка в модуле TAR. Пожалуйста, сообщите о произошедшей проблеме на https://github.com/0xeb/sally/issues."
+ IDS_ERR_MEMORY, "Ошибка выделения памяти."
+ IDS_GZERR_CRC, "Ошибка контрольной суммы CRC."
+ IDS_ERR_CORRUPT, "Некорректные данные в сжатом потоке, архив поврежден."
+ IDS_ERR_EOF, "Неожиданный конец файла."
+ IDS_GZERR_SEEK, "Ошибка поиска в архивном файле: "
+ IDS_RPM_VIEWTITLE, "Средство просмотра RPM"
+ IDS_ERR_RPMTITLE, "Ошибка RPM"
+ IDS_RPMERR_TMPNAME, "Ошибка определения имени временного файла."
+ IDS_RPMERR_TMPFILE, "Ошибка создания временного файла."
+ IDS_ERR_NORPM, "Файл не распознан как архив RPM."
+ IDS_ERR_BADRPMVERSION, "Требуемая архивом версия RPM не поддерживается."
+ IDS_ERR_BADSIGNATURE, "Неизвестная сигнатура архива RPM."
+ IDS_CPIOERR_BADSIG, "Запись имеет некорректную сигнатуру."
+ IDS_CPIOERR_HEADER, "Поврежденная запись заголовка файла."
+ IDS_CPIOERR_FORMAT, "Неизвестный формат заголовка cpio."
+ IDS_LZH_NOT_IMPLEMENTED, "Архивы LZH не поддерживаются."
+}

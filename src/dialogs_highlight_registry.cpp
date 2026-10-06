@@ -6,6 +6,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/BuiltinLanguages.h"
 #include "mainwnd.h"
 #include "usermenu.h"
 #include "edtlbwnd.h"
@@ -383,7 +384,6 @@ CConfiguration::CConfiguration()
     CnfrmCopyMoveOptionsNS = TRUE;
     //  PanelTooltip = TRUE;
     KeepPluginsSorted = TRUE;
-    ShowSLGIncomplete = TRUE;
 
     LastUsedSpeedLimit = 1024 * 1024; // default 1 MB/s
 
@@ -537,10 +537,6 @@ CConfiguration::CConfiguration()
     // Language
     LoadedSLGName.clear();
     SLGName.clear();
-    DoNotDispCantLoadPluginSLG = FALSE;
-    DoNotDispCantLoadPluginSLG2 = FALSE;
-    UseAsAltSLGInOtherPlugins = FALSE;
-    AltPluginSLGName.clear();
 
     // the ConversionTable variable is not loaded from the configuration
     ConversionTable = L"*";
@@ -889,16 +885,8 @@ CCfgPageRegional::CCfgPageRegional()
 void CCfgPageRegional::LoadControls()
 {
     CLanguage language;
-    if (language.Init(SLGName.c_str(), NULL))
-    {
-        // wide - GetLocaleInfo narrows a language's own native display
-        // name through CP_ACP; this dialog already sets other controls via
-        // SetDlgItemTextW (WM_INITDIALOG above), so it's already wide-capable.
-        wchar_t buff[200];
-        language.GetLanguageName(buff, 200);
-        SetDlgItemTextW(HWindow, IDE_LANGUAGE, buff);
-        language.Free();
-    }
+    if (language.Init(sally::languages::LangIdFromPersistedName(SLGName.c_str())))
+        SetDlgItemTextW(HWindow, IDE_LANGUAGE, language.DisplayName.c_str());
 }
 
 void CCfgPageRegional::Transfer(CTransferInfo& ti)
@@ -913,7 +901,6 @@ void CCfgPageRegional::Transfer(CTransferInfo& ti)
         {
             gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_LANGUAGE_CHANGE));
             Configuration.SLGName = SLGName;
-            Configuration.ShowSLGIncomplete = TRUE; // if the language is not complete, show a message at startup (recruit translators)
         }
         // if the table has changed and the old one is already loaded we need to restart Salamander
         if (StrICmpW(Configuration.ConversionTable.c_str(), DirName.c_str()) != 0)
@@ -932,27 +919,13 @@ CCfgPageRegional::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
-    case WM_INITDIALOG:
-    {
-        if (IsSLGIncomplete[0] != 0)
-        {
-            new CStaticText(HWindow, IDC_CFGREG_INCOMPLETE_TITLE, STF_BOLD);
-            SetDlgItemTextW(HWindow, IDC_CFGREG_INCOMPLETE_TITLE, LoadStrW(IDS_SLGINCOMPLETE_TITLE));
-            SetDlgItemTextW(HWindow, IDC_CFGREG_INCOMPLETE_TEXT, LoadStrW(IDS_SLGINCOMPLETE_TEXT));
-            SetDlgItemTextW(HWindow, IDC_CFGREG_INCOMPLETE_URL, IsSLGIncomplete);
-            CHyperLink* hl = new CHyperLink(HWindow, IDC_CFGREG_INCOMPLETE_URL);
-            hl->SetActionOpen(IsSLGIncomplete);
-        }
-        break;
-    }
-
     case WM_COMMAND:
     {
         switch (LOWORD(wParam))
         {
         case IDB_LANGUAGE:
         {
-            CLanguageSelectorDialog dlg(HWindow, SLGName, NULL);
+            CLanguageSelectorDialog dlg(HWindow, SLGName);
             dlg.Initialize();
             if (dlg.Execute() == IDOK)
             {

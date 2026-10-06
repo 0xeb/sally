@@ -202,7 +202,7 @@ int SortByExtDirsAsFiles = FALSE; // current value of the Salamander configurati
 int InactiveBeepWhenDone = TRUE;  // current value of the Salamander configuration variable SALCFG_MINBEEPWHENDONE
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 // general interface of Salamander - valid from startup until the plug-in is closed
 CSalamanderGeneralAbstract* SalamanderGeneral = NULL;
@@ -352,10 +352,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // let the language module (.slg) load
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"FTP Client" /* neprekladat! */);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // get the general interface of Salamander
     SalamanderGeneral = salamander->GetSalamanderGeneral();

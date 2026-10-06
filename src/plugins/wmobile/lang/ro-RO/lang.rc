@@ -1,0 +1,133 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for wmobile. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/wmobile/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\wmobile.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_PROGRESSDLG DIALOGEX 18, 80, 353, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,8,11,32,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,11,305,8
+    RTEXT           "Total:",IDC_STATIC_1,11,35,24,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,39,34,301,12
+    PUSHBUTTON      "Anuleaza",IDCANCEL,151,57,50,14
+END
+
+IDD_PROGRESS2DLG DIALOGEX 10, 30, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,3,11,37,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,11,305,8
+    RTEXT           "",IDT_OPERATION2,8,23,32,8
+    CONTROL         "",IDT_FILENAME2,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,23,305,8
+    RTEXT           "Fisier:",IDC_STATIC_1,16,41,24,8
+    CONTROL         "",IDP_PROGRESSBAR2,"Static",0,43,40,297,12
+    RTEXT           "Total:",IDC_STATIC_2,16,56,24,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,43,55,297,12
+    PUSHBUTTON      "Anuleaza",IDCANCEL,155,78,50,14
+END
+
+IDD_ATTRIBUTES DIALOGEX 30, 29, 187, 203
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Schimba Atributele"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,74,12,107,1
+    LTEXT           "Seteaza Atributele",IDC_STATIC_2,9,8,63,8
+    CONTROL         "&Arhiva",IDC_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,18,41,12
+    CONTROL         "A&scuns",IDC_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,75,18,40,12
+    CONTROL         "&Citire-doar",IDC_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,16,30,49,12
+    CONTROL         "S&istem",IDC_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,75,30,40,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,82,58,99,1
+    LTEXT           "Schimba Data si Ora",IDC_STATIC_4,9,54,71,8
+    LTEXT           "&Modificat",IDC_STATIC_5,16,71,33,8
+    CONTROL         "",IDC_ATTR_MODIFIED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,69,66,12
+    CONTROL         "",IDC_ATTR_MODIFIED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,69,50,12
+    LTEXT           "Crea&t",IDC_STATIC_6,16,87,30,8
+    CONTROL         "",IDC_ATTR_CREATED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,85,66,12
+    CONTROL         "",IDC_ATTR_CREATED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,85,50,12
+    LTEXT           "Acc&esat",IDC_STATIC_7,16,103,37,8
+    CONTROL         "",IDC_ATTR_ACCESSED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,101,66,12
+    CONTROL         "",IDC_ATTR_ACCESSED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,101,50,12
+    PUSHBUTTON      "Seteaza C&urent",IDC_ATTR_CURRENT,112,118,67,14
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,37,141,144,1
+    LTEXT           "Optiuni",IDC_STATIC_9,9,137,26,8
+    CONTROL         "Include su&bdirectoarele",IDC_RECURSESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,147,91,12
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,9,172,172,1
+    DEFPUSHBUTTON   "OK",IDOK,13,181,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,69,181,50,14
+    PUSHBUTTON      "Help",IDHELP,125,181,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Windows Mobil"
+  IDS_PLUGIN_DESCRIPTION, "Acceseaza fisierele pe dispozitivul dvs Windows Mobile."
+  IDS_ABOUT, "Despre Plugin"
+}
+
+STRINGTABLE
+BEGIN
+  IDS_WMPLUGINTITLE          "Windows Mobil Plugin"
+  IDS_WMPLUGINTITLE_ERROR    "Eroare Windows Mobil Plugin"
+  IDS_WMPLUGINTITLE_QUESTION "Intrebare Windows Mobil Plugin"
+  IDS_ERR_CONNECTION         "Nu ma pot conecta la dispozitiv.\n\nVa rugam asigurati-va ca ati instalat transport underlying (ex., ActiveSync) si aveti un dispozitiv conectat."
+  IDS_CONNECTING             "Ma conectez la dispozitiv, va rugam asteptati..."
+  IDS_PATH_ERROR             "Cale: %s\nEroare: %s"
+  IDS_YESNO_CANCEL           "Doriti sa anulati aceasta operatiune?"
+  IDS_ERR_MEMORYLOW          "Am ramas fara memorie."
+  IDS_ERR_PATHTOOLONG        "Nu pot termina operatiunea din cauza cale prea lunga."
+  IDS_ERR_CREATEDIR          "Nu pot crea directorul ""%s""."
+  IDS_YESNO_CREATEDIR        "Directorul ""%s"" nu exista.\n\nDoriti sa-l creati?"
+  IDS_ERR_DIRNAMEISFILE      "Numele ""%s"" a fost deja folosit pentru un fisier."
+  IDS_ERR_INVALIDDATEFORMAT  "Data are format invalid."
+  IDS_ERR_NAMETOOLONG        "Nu pot termina operatiunea pentru ca nume prea lung."
+  IDS_ERR_FILEINPATH         "Calea specificata contine calea catre un fisier. Nu pot deschide fisierul."
+  IDS_YESNO_CONNETCLOSEPLUGIN "Nu ma pot conecta la dispozitiv.\r\n\r\nDoriti sa inchideti plugin?"
+  IDS_SORRY_CREATEDIR1        "Ne pare rau, dar acest plugin nu e capabil sa creeze director pe disk sau cale arhiva."
+  IDS_SORRY_CREATEDIR2        "Ne pare rau, dar acest plugin nu e capabil sa creeze director pe fisierul sistem specificat."
+  IDS_SORRY_CREATEDIR3        "Ne pare rau, dar acest plugin nu poate crea director in afara drive-ului curent deschis."
+  IDS_ERR_INVALIDPATH         "Calea specificata e invalida."
+  IDS_READ                    "Citesc"
+  IDS_READING                 "Citesc"
+  IDS_WAIT_READINGDIRTREE     "Citesc arborele director, va rugam asteptati..."
+  IDS_DELETE                  "Sterg"
+  IDS_DELETING                "Sterg"
+  IDS_YESNO_DELETENOEMPTYDIR  "Directorul ""%s"" nu e gol\nDoriti sa-l stergeti?"
+  IDS_YESNO_DELETEHIDDENFILE  "Doriti sa stergeti fisierul cu atribute SISTEM sau ASCUNS?"
+  IDS_YESNO_DELETEHIDDENDIR   "Doriti sa stergeti directorul cu atribute SISTEM sau ASCUNS?"
+  IDS_ERR_TARGETPATHNOEXISTS  "Calea tinta nu exista. Plugin Windows Mobil nu suporta crearea de cale tinta."
+  IDS_ERR_COPYTOOTHERFS       "Plugin Windows Mobil nu suporta copierea sau mutarea in alte plugin fisier sistem."
+  IDS_ERR_COPYTOARCHIVES      "Plugin Windows Mobil nu suporta copierea sau mutarea in arhive."
+  IDS_COPY                    "Copie"
+  IDS_COPYING                 "Copie"
+  IDS_MOVE                    "Mut"
+  IDS_MOVING                  "Mut"
+  IDS_TO                      "in"
+  IDS_ERR_COPYDIRTOITSELF     "Nu pot copia un director peste el insusi."
+  IDS_ERR_COPYFILETOITSELF    "Nu pot copia un fisier peste el insusi."
+  IDS_YESNO_OVERWRITEHIDDENFILE "Doriti sa suprascrieti fisierul cu atributele SISTEM sau ASCUNS?"
+  IDS_ERR_MOVEDIRTOITSELF     "Nu pot muta un director peste el insusi."
+  IDS_ERR_MOVEFILETOITSELF    "Nu pot muta un fisier peste el insusi."
+  IDS_ATTRIBUTES              "Atribute"
+  IDS_CHANGING                "Schimb"
+END

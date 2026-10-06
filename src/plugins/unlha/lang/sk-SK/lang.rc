@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for unlha. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Prehliada a extrahuje LHA archívy."
+ IDS_ABOUT, "O plugine"
+ IDS_FILECORRUPT, "Neplatný LZH súbor alebo neznámy formát súboru."
+ IDS_CHECKSUMERROR, "Chyba kontrolného súčtu hlavičky.\nArchív je poškodený - nie všetky súbory môžu byť vypísané."
+ IDS_LOWMEM, "Nedostatok pamäti."
+ IDS_WRITEERROR, "Chyba zápisu"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "Chyba pri otváraní archívu."
+ IDS_LIST, "Nie je možné pridať záznam archívu do výpisu súborov."
+ IDS_SYMLINK, "Archív obsahuje jeden alebo viac UNIX značiek spojenia, ktoré nebudú zobrazené."
+ IDS_UNPACKERROR, "Nie je možné extrahovať súbor."
+ IDS_CRCERROR, "Chyba v komprimovaných dátach. CRC nesúhlasí."
+ IDS_READERROR, "Chyba pri čítaní archívu."
+ IDS_EXTRPROGTITLE, "Extrahovanie LHA archívu - %s"
+ IDS_PREPAREDATA, "pripravujem dáta a vytváram adresáre..."
+ IDS_UNPACKING, "extrahujem: "
+ IDS_EXTRACTFILES, "extrahujem..."
+ IDS_TOOLONGNAME, "Nie je možné dokončiť operáciu, kvôli príliš dlhému názvu cesty."
+ IDS_TOOLONGMASK, "Nie je možné dokončiť operáciu, kvôli príliš dlhej maske."
+ IDS_METHOD, "Neznáma komprimačná metóda. Súbor nie je možné extrahovať."
+ IDS_METHOD2, "preskakujem neznámu metódu..."
+}

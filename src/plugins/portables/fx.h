@@ -78,7 +78,7 @@ namespace Fx
         static HINSTANCE FindStringResourceInstance(_In_ UINT nID) throw()
         {
             HINSTANCE hLangInst = FxGetLangInstance();
-            // The string may be loaded after the language module is loaded.
+            // The string may be loaded after the resource module is set.
             _ASSERTE(hLangInst);
             return hLangInst;
         }

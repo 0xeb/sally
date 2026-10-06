@@ -1,0 +1,120 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for diskmap. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/diskmap/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#define SALAMANDER
+#include "..\..\DiskMap\Resources\DiskMap.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDC_ZAREVAKDISKMAP MENU 
+BEGIN
+    POPUP "&Файл"
+    BEGIN
+        MENUITEM "&Открыть файл",                       IDM_FILE_OPEN
+        MENUITEM "&Показать на панели\tF",        IDM_FILE_FOCUSINSALAMANDER
+        MENUITEM SEPARATOR
+        MENUITEM "О&тмена\tEsc",                      IDM_FILE_ABORT
+        MENUITEM "О&бновить\tCtrl+R",            IDM_FILE_REFRESH
+        MENUITEM SEPARATOR
+        MENUITEM "&Закрыть\tAlt+F4",                      IDM_FILE_EXIT
+    END
+    POPUP "&Вид"
+    BEGIN
+        MENUITEM "У&величить \t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "У&меньшить\t -",                IDM_VIEW_ZOOMOUT
+        MENUITEM "&Нормальный\t Shift+Backspace",   IDM_VIEW_GOTOROOT
+        MENUITEM SEPARATOR
+        MENUITEM "&Журнал...\tCtrl+L",              IDM_VIEW_LOG
+    END
+
+    POPUP "&Параметры"
+    BEGIN
+	MENUITEM "&Выделять папки",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
+	MENUITEM "П&оказывать подсказку\tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+        POPUP "&Формат пути в подсказке"
+        BEGIN
+            MENUITEM "&Имя файла",            IDM_PATHFORMAT_FILENAME
+            MENUITEM "&Относительный",            IDM_PATHFORMAT_RELATIVEVIEW
+//            MENUITEM "&Relative to Root",  IDM_PATHFORMAT_RELATIVEROOT
+            MENUITEM "&Абсолютный",            IDM_PATHFORMAT_ABSOLUTE
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Подтверждение при выходе по Esc",       IDM_OPTIONS_CONSFIRMCLOSE, CHECKED
+    END
+    POPUP "&Справка"
+    BEGIN
+//        POPUP "&Debug"
+//        BEGIN
+//            MENUITEM "&Export Directory Structure...", IDM_DEBUG_EXPORTDIR
+//        END
+//        MENUITEM SEPARATOR
+        MENUITEM "&О модуле...",                  IDM_HELP_ABOUT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME,            "Карта диска"
+    IDS_PLUGIN_DESCRIPTION,     "Отображает иерархическую структуру данных на диске."
+    IDS_PLUGIN_ABOUT,           "О модуле"
+    IDS_PLUGIN_MENU,            "Показать &карту диска"
+    IDS_CLOSE_CONFIRMATION,     "Вы действительно хотите закрыть карту диска?"
+    IDS_CLOSE_CONFIRMATION_CHECKBOX, "Больше не показывать это сообщение"
+
+    IDS_DISKMAP_TITLE,               "Карта диска"
+    IDS_DISKMAP_TITLEPREFIX,         "Карта диска - "
+
+    IDS_DISKMAP_LOAD_TITLE,          "Поиск файлов..."
+    IDS_DISKMAP_LOAD_FOOTER,         "...нажмите Esc для отмены"
+    IDS_DISKMAP_LOAD_HSIZE,          "Размер:"
+    IDS_DISKMAP_LOAD_HFILE,          "Файлы:"
+    IDS_DISKMAP_LOAD_HDIRS,          "Папки:"
+
+    IDS_DISKMAP_ABORT_TITLE,         "Вы отменили поиск файлов..."
+    IDS_DISKMAP_ABORT_FOOTER,        "...нажмите Ctrl+R, чтобы обновить окно просмотра"
+
+    IDS_DISKMAP_LOG_TITLE,           "Журнал"
+    IDS_DISKMAP_LOG_HTYPE,           "Тип"
+    IDS_DISKMAP_LOG_HTEXT,           "Текст"
+    IDS_DISKMAP_LOG_HFILE,           "Файл или папка"
+    IDS_DISKMAP_LOG_LINFO,           "Информация"
+    IDS_DISKMAP_LOG_LWARN,           "Предупреждение"
+    IDS_DISKMAP_LOG_LERROR,          "Ошибка"
+
+    IDS_DISKMAP_SHELL_FOCUS,         "&Показать в панели"
+    IDS_DISKMAP_SHELL_ZOOMIN,        "У&величить"
+    IDS_DISKMAP_SHELL_ZOOMOUT,       "У&меньшить"
+    IDS_DISKMAP_SHELL_DIROPEN,       "&Открыть в панели"
+    IDS_DISKMAP_SHELL_DIRCHANGE,     "Поменять &папку"
+
+    IDS_DISKMAP_TTIP_TIMECREATE,     "Создан:"
+    IDS_DISKMAP_TTIP_TIMEMODIFY,     "Изменен:"
+    IDS_DISKMAP_TTIP_TIMEACCESS,     "Открыт:"
+    IDS_DISKMAP_TTIP_SIZEDATA,       "Размер:"
+    IDS_DISKMAP_TTIP_SIZEREAL,       "Реальный размер:"
+    IDS_DISKMAP_TTIP_SIZEDISK,       "На диске:"
+    IDS_DISKMAP_TTIP_COUNTFILE,      "Файлов:"
+    IDS_DISKMAP_TTIP_COUNTDIRS,      "Папок:"
+
+    IDS_DISKMAP_FORMAT_BYTE0,        "байтов"
+    IDS_DISKMAP_FORMAT_BYTE1,        "байт"
+    IDS_DISKMAP_FORMAT_BYTEN,        "байта(ов)"
+
+    IDS_DISKMAP_EMPTY_TITLE,         "Отображать нечего..."
+    IDS_DISKMAP_EMPTY_FOOTER,        "...эта папка не содержит файлов для отображения на карте"
+END

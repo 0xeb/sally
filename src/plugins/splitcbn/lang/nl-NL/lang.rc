@@ -1,0 +1,166 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for splitcbn. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/splitcbn/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\splitcbn.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 53, 55, 240, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Spliten & Combineren Configuratie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Gebruik originele extensie in output bestandsnamen",IDC_CHECK_INCLUDE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,6,187,10
+    CONTROL         "Creëer &batch bestandvoor het combineren",IDC_CHECK_CREATE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,19,154,10
+    CONTROL         "Splits naar het &ander paneel",IDC_CHECK_SPLITOTHER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,32,108,10
+    CONTROL         "Splits naar een &subdirectory genoemd naar het bronbestand",IDC_CHECK_SPLITSUB,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,45,216,10
+    CONTROL         "&Combineer naar het ander paneel",IDC_CHECK_COMBINEOTHER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,58,126,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,4,76,232,1
+    DEFPUSHBUTTON   "OK",IDOK,68,83,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,125,83,50,14
+    PUSHBUTTON      "Help",IDHELP,182,83,50,14
+END
+
+IDD_SPLIT DIALOGEX 32, 33, 278, 125
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Splitsen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_SPLIT_ICON,6,7,20,20,WS_GROUP
+    CONTROL         "",IDC_STATIC_TITLE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,35,9,231,8
+    EDITTEXT        IDC_EDIT_DIR,35,19,218,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,257,19,14,14,WS_GROUP
+    CONTROL         "&Grootte voor elk onderdeel:",IDC_RADIO_SIZE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,35,43,104,10
+    CONTROL         "&Aantal onderdelen:",IDC_RADIO_NUMBER,"Button",BS_AUTORADIOBUTTON,35,60,76,10
+    COMBOBOX        IDC_COMBO_SIZE,140,42,132,83,CBS_DROPDOWN | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDC_EDIT_NUMBER,140,59,60,14,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Grootte laatste onderdeel:",IDC_STATIC_1,46,79,90,8
+    EDITTEXT        IDC_EDIT_LASTPART,138,79,133,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,7,97,265,1
+    PUSHBUTTON      "&Configureer...",IDC_BUTTON_CONFIG,7,105,57,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,107,105,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,164,105,50,14
+    PUSHBUTTON      "Help",IDHELP,221,105,50,14
+END
+
+IDD_COMBINE DIALOGEX 30, 28, 284, 194
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Combineren"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Partiële bestanden:",IDC_STATIC_1,7,9,67,8
+    LISTBOX         IDC_LIST_FILES,7,19,207,108,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_WANTKEYBOARDINPUT | WS_VSCROLL | WS_HSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Boven",IDC_BUTTON_UP,221,20,57,14,WS_GROUP
+    PUSHBUTTON      "&Onder",IDC_BUTTON_DOWN,221,43,57,14
+    PUSHBUTTON      "Toevoe&gen...",IDC_BUTTON_ADD,221,66,57,14
+    PUSHBUTTON      "&Verwijderen",IDC_BUTTON_REMOVE,221,89,57,14
+    PUSHBUTTON      "&CRC...",IDC_BUTTON_CRC,221,112,57,14
+    LTEXT           "Combineren &tot:",IDC_STATIC_2,7,136,57,8
+    EDITTEXT        IDC_EDIT_TARGET,7,146,251,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE2,264,146,14,14,WS_GROUP
+    LTEXT           "",IDC_STATIC_3,7,166,272,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,114,176,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,171,176,50,14
+    PUSHBUTTON      "Help",IDHELP,228,176,50,14
+END
+
+IDD_CRC DIALOGEX 39, 34, 162, 106
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "CRC Test"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Sluiten",IDCANCEL,105,85,50,14
+    LTEXT           "Gecalculeerde CRC:",IDC_STATIC_1,7,7,68,8
+    EDITTEXT        IDC_EDIT_CRC1,21,23,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC2,86,23,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "Originele CRC:",IDC_STATIC_2,7,44,51,8
+    EDITTEXT        IDC_EDIT_CRC3,21,61,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC4,86,61,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,77,10,79,1
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,60,48,96,1
+    ICON            "",IDC_ICON_WARN,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+    ICON            "",IDC_ICON_OK,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "Splitsen & Combineren"
+ IDS_PLUGIN_DESCRIPTION, "Bestanden splitsen en combineren."
+ IDS_OPENERROR, "Er is een fout opgetreden bij het openen van het bestand."
+ IDS_SELECTDIR, "Selecteer de doelmap."
+ IDS_ZEROSIZE, "Het bestand is niet groot genoeg om gesplitst te worden."
+ IDS_INSERTDISK, "Plaats een geformateerde floppy met voldoende schrijfruimte."
+ IDS_FIXEDNOSENSE, "Het gebruik van autodetectie op een fixed drive heeft geen zin.\nWilt u doorgaan?"
+ IDS_OUTOFSPACE, "Onvoldoende schrijfruimte op doel schijf."
+ IDS_OUTOFMEM, "Onvoldoende geheugen."
+ IDS_READERROR, "Leesfout"
+ IDS_WRITEERROR, "Schrijffout"
+ IDS_INSERTNEXT, "Plaats de volgende floppy en druk op OK."
+ IDS_SPLIT, "Splits"
+ IDS_COMBINE, "Samenvoegen"
+ IDS_TOOMANYPARTS, "Het aantal onderdelen is groter dan 100.\nWilt u doorgaan?"
+ IDS_WRITING, "Schrijven"
+ IDS_TOOLONGNAME, "De originele bestandsnaam is te lang en het resulterende batch bestand kan op sommige systemen niet werken.Wilt u doorgaan?"
+ IDS_ADDFILTER, "Alle bestanden (*.*)"
+ IDS_ADDTITLE, "Toevoegen partiële bestanden"
+ IDS_BROWSETITLE, "Kies doel bestand"
+ IDS_CRCERROR, "CRC mislukt.\n\nDe partiële bestanden zijn beschadigd, zijn niet compleet of waren \nin een verkeerde volgorde gecombineerd. Het output bestand is waarschijnlijk ongeldig."
+ IDS_PROCESSING, "Verwerken"
+ IDS_ZEROFILES, "Er valt niets te combineren."
+ IDS_CANCEL, "Wilt u deze operatie annuleren?"
+ IDS_CRCTITLE, "CRC Test"
+ IDS_CRCDEC, "%lu (dec)"
+ IDS_CRCHEX, "%X (hex)"
+ IDS_CRCNOTFOUND, "NIET GEVONDEN"
+ IDS_CALCCRC, "Calculeren CRC"
+ IDS_SPLITTITLE, "Splits ""%%s"" (%s bytes) naar:"
+ IDS_144FLOPPY, "1.44 MB (3.5"" Floppy)"
+ IDS_720FLOPPY, "720 KB (3.5"" Floppy)"
+ IDS_12FLOPPY, "1.2 MB (5.25"" Floppy)"
+ IDS_360FLOPPY, "360 KB (5.25"" Floppy)"
+ IDS_AUTODETECT, "Automatische detectie"
+ IDS_FILECRCTITLE, "CRC32 van het bestand ""%s"" is:"
+ IDS_BATTOOLONG, "Fout opgetreden bij het aanmaken van het batch bestand."
+ IDS_BYTES, "bytes"
+ IDS_BYTE, "byte"
+ IDS_PATHERROR, "Padverwijzing fout"
+ IDS_TARGETPATHEXIST, "Het doelpad bestaat niet. Wilt u die aanmaken?"
+ IDS_WINPATH, "Kan het niet samenvoegen naar een niet-Windows padverwijzing."
+ IDS_SPECIFYFILE, "De gekozen padverwijzing specificeert niet een bestand."
+ IDS_MENU1 "&Splits bestand..."
+ IDS_MENU2 "&Combineer bestanden..."
+ IDS_ABOUTTITLE "Omtrent plugin"
+ IDS_BATFILE_GENBYSAL, "Gegenereerd door Sally"
+ IDS_BATFILE_CTRL_C_TO_QUIT, "Druk op Ctrl-C om te stoppen."
+ IDS_BATFILE_DESCR, "Dit batch bestand hercreëer het bestand '%s'."
+ IDS_SIZE_B, "B"
+ IDS_SIZE_KB, "KB"
+ IDS_SIZE_K, "K"
+ IDS_SIZE_MB, "MB"
+ IDS_SIZE_GB, "GB"
+ IDS_100MB_ZIP, "100 MB (ZIP)"
+ IDS_250MB_ZIP, "250 MB (ZIP)"
+ IDS_120MB_LS120, "120 MB (LS-120)"
+ IDS_650MB_CDR, "650 MB (CD-R)"
+ IDS_700MB_CDR, "700 MB (CD-R)"
+ IDS_TOOLONGNAME2, "Kan bewerking niet afmaken omdat de naam te lang is."
+}

@@ -458,24 +458,15 @@ CZIPUnpackProgress::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CSalamanderGeneral::CSalamanderGeneral()
 {
     Plugin = NULL;
-    LanguageModule = NULL;
     HelpFileName.clear();
 }
 
 CSalamanderGeneral::~CSalamanderGeneral()
 {
-    if (LanguageModule != NULL)
-    {
-        TRACE_E("CSalamanderGeneral::~CSalamanderGeneral(): unexpected situation!");
-        HANDLES(FreeLibrary(LanguageModule));
-    }
 }
 
 void CSalamanderGeneral::Clear()
 {
-    if (LanguageModule != NULL)
-        HANDLES(FreeLibrary(LanguageModule));
-    LanguageModule = NULL;
     HelpFileName.clear();
 }
 

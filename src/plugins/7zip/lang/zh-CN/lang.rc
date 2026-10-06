@@ -1,0 +1,197 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for 7zip. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/7zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\7zip.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 23, 38, 220, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "7-Zip 配置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "面板设置",IDC_STATIC_1,5,6,37,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,44,10,173,1
+    CONTROL         "压缩前显示有扩展选项的对话框(&O)",IDC_CFG_SHOWEXTENDEDOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,19,202,10
+    CONTROL         "列表压缩包时显示扩展信息(&I)",IDC_CFG_EXTENDEDLISTINFO,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,31,148,10
+    CONTROL         "压缩的",IDC_CFG_LISTINFOPACKEDSIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,43,60,10
+    CONTROL         "方法",IDC_CFG_LISTINFOMETHOD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,55,38,10
+    LTEXT           "默认压缩参数",IDC_STATIC_3,5,70,54,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,61,74,156,1
+    LTEXT           "压缩等级(&L):",IDC_STATIC_5,10,85,49,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,65,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "压缩方法(&M):",IDC_STATIC_6,10,103,51,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,65,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "字典大小(&D):",IDC_STATIC_7,10,121,50,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,65,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "单词大小(&W):",IDC_STATIC_8,10,139,52,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,65,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "创建固实压缩包(&S)",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,155,84,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,3,175,214,1
+    DEFPUSHBUTTON   "确定",IDOK,53,181,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,108,181,50,14
+    PUSHBUTTON      "帮助",IDHELP,163,181,50,14
+END
+
+IDD_NEWARCHIVE DIALOGEX 27, 37, 290, 224
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "创建新的压缩包"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "压缩包:",IDC_STATIC_1,16,7,31,8
+    LTEXT           "",IDC_NA_ARCHIVE,48,7,233,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,8,21,274,1
+    CONTROL         "加密文件(&E)",IDC_NA_ENCRYPTFILES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,28,58,10
+    LTEXT           "密码(&P):",IDC_NA_PASSWORD_TXT,105,29,32,8
+    EDITTEXT        IDC_NA_PASSWORD,156,27,94,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "确认密码(&A):",IDC_NA_CONFIRMPASSWORD_TXT,105,46,50,8
+    EDITTEXT        IDC_NA_CONFIRMPASSWORD,156,44,94,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "压缩参数",IDC_STATIC_3,8,67,37,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,47,71,235,1
+    LTEXT           "压缩等级(&L):",IDC_STATIC_5,16,85,49,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,71,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "压缩方法(&M):",IDC_STATIC_6,16,103,51,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,71,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "字典大小(&C):",IDC_STATIC_7,16,121,50,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,71,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "单词大小(&W):",IDC_STATIC_8,16,139,52,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,71,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "创建固实压缩包(&S)",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,159,87,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,8,181,274,1
+    CONTROL         "不要再次显示本对话框(以后你可以在配置对话框中更改此选项)(&D)",IDC_NA_NOTAGAIN,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,187,261,12
+    PUSHBUTTON      "配置(&O)...",IDC_SHOW_CONFIG,10,204,50,14,WS_GROUP
+    DEFPUSHBUTTON   "确定",IDOK,120,204,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,175,204,50,14
+    PUSHBUTTON      "帮助",IDHELP,230,204,50,14
+END
+
+IDD_ENTERPASSWORD DIALOGEX 6, 15, 257, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "输入 7-Zip 密码"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,16,12,20,20
+    LTEXT           "这个文件是加密的。请输入密码以解密。",IDC_STATIC_1,48,12,204,8
+/*    LTEXT           "File:",IDC_STATIC_2,48,26,17,8
+    LTEXT           "",IDC_FILE,65,26,175,8 */
+    LTEXT           "密码:",IDC_STATIC_3,48,40,22,8
+    EDITTEXT        IDC_PASSWORD,73,38,166,12,ES_PASSWORD | ES_AUTOHSCROLL
+/*
+ // preparation for skip and skip all
+    DEFPUSHBUTTON   "OK",IDOK,12,63,50,14
+    PUSHBUTTON      "Skip",IDC_SKIP,72,63,50,14
+    PUSHBUTTON      "Skip all",IDC_SKIPALL,132,63,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,192,63,50,14
+*/    
+    DEFPUSHBUTTON   "确定",IDOK,132,63,50,14
+    PUSHBUTTON      "取消",IDCANCEL,192,63,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME,             "7-Zip"
+  IDS_ABOUT,                  "关于插件"
+  IDS_PLUGIN_DESCRIPTION,     "创建、浏览以及解压 7-Zip 压缩包。"
+  IDS_INSUFFICIENT_MEMORY,    "内存不足。"
+  IDS_CANT_LOAD_LIBRARY,      "不能加载库 7za.dll."
+  IDS_CANT_GET_CRATEOBJECT,   "不能得到方法 CreateObject."
+  IDS_CANT_GET_CLASS_OBJECT,  "不能得到类对象。"
+  IDS_CANT_OPEN_ARCHIVE,      "不能打开压缩包 '%s'。"
+  IDS_CANT_OPEN_ARCHIVE_PWD,  "不能打开压缩包 '%s'。\n可能输入了错误的压缩包密码。"
+  IDS_ERROR,                  "内部错误。"
+  IDS_PACKING_ARCHIVE,        "正在压缩 7-Zip 压缩包"
+  IDS_UNPACKING_ARCHIVE,      "正在解压 7-Zip 压缩包"
+  IDS_UPDATING_ARCHIVE,       "更新 7-Zip 压缩包"
+  IDS_TESTING_ARCHIVE,        "正在测试 7-Zip 压缩包"
+  IDS_TESTING_ARCHIVE_NAME    "正在测试压缩包 '%s'..."
+  IDS_READING_DIRTREE,        "正在读取目录树..."
+  IDS_CANT_CREATE_ARCHIVE,    "不能创建压缩包。"
+  IDS_TESTARCHIVE,            "测试压缩包"
+  IDS_TESTARCHIVECORRUPTED,   "压缩包 '%s' 已损坏。"
+  IDS_TESTARCHIVEOK,          "压缩包 '%s' 没问题。"
+  IDS_INCORRECTPASSWORD,      "错误的密码"
+  IDS_INCORRECTPASSWORDBODY,  "密码不正确。请重新输入密码。密码中的字母必须\n以正确的大小写输入。确保 CapsLock 没有意外开启。"
+  IDS_PASSWORDSNOTMATCH,      "你输入的密码不匹配。"
+  IDS_EMPTYPASSWORD,          "密码至少应该有一位长度。"
+  IDS_UPDATE_NOT_SUPPORTED,   "此压缩包不支持更新操作。"
+  IDS_CANT_MOVE_TMPARCHIVE,   "不能移动临时压缩包 '%s'。"
+  IDS_CANT_DELETE_TMPARCHIVE, "不能删除临时压缩包 '%s'。"
+  IDS_7Z_UPDATE_ERROR,        "更新压缩包时发生错误。\n\n这不是 Sally 7zip 插件的问题。问题在于 7za.dll，\n因此请不要给我们发送臭虫报告，我们了解这个问题。"
+  IDS_7Z_SOLID_DELETE_UNSUP,  "不支持从固实压缩包中删除文件。"
+  IDS_CANT_UPDATE_ARCHIVE,    "不能更新临时压缩包 '%s'。"
+  IDS_CANT_CREATE_TMPFILE,    "不能创建临时文件。"
+//  IDS_CANT_CREATEMUTEX,       "Cannot create mutex."
+  IDS_ARCHIVE_CHANGED,        "压缩包文件 '%s' 已经改变。将在面板中重新打开压缩包。"
+  IDS_DELETE_ERROR,           "删除错误"
+  IDS_ADD_FILES_TO_ARCHIVE,   "添加文件到压缩包"
+  IDS_CREATE_NEW_ARCHIVE,     "创建新的压缩包"
+  IDS_REMOVING_FILES,         "正在移除文件..."
+  IDS_READING_ARCHIVEITEMS,   "正在读取压缩包项目..."
+  IDS_UNPACKING,              "正在解压..."
+  IDS_PACKING,                "正在压缩..."
+  IDS_REMOVING,               "正在移除..."
+  IDS_UPDATING,               "正在更新..."
+  IDS_CANCELING_OPERATION,    "正在取消操作，请稍等..."
+  IDS_UNSUPPORTED_METHOD,     "不支持的方法。"
+  IDS_CRC_FAILED,             "CRC 错误。"
+  IDS_UNKNOWN_ERROR,          "未知错误。"
+  IDS_DATA_ERROR,             "解压文件 '%s' 时发生数据错误。"
+  IDS_DATA_ERROR_PWD,         "解压文件 '%s' 时发生数据错误。\n可能输入了错误的密码。"
+  IDS_BTN_DELETE,             "删除(&D)"
+  IDS_BTN_DELETE_ALL,         "删除所有(&L)"
+  IDS_BTN_KEEP,               "保留(&K)"
+  IDS_BTN_KEEP_ALL,           "保留所有(&E)"
+  IDS_ERROR_PROCESSING_FILE,  "处理文件 '%s' 错误。\n\n你想要删除还是保留此文件？"
+  IDS_ERROR_PROCESSING_FILE_PWD, "处理文件 '%s' 错误。\n可能输入了错误的密码。\n\n你想要删除还是保留此文件？"
+  IDS_OVERWRITE_FILE,         "覆盖文件";
+  IDS_READONLY_ARCHIVE,       "压缩包文件是只读的。请先清除只读属性。"
+  IDS_CANT_REMOVE_DIRECTORY,  "不能移动目录 '%s'"
+  IDS_CANT_READ_ARCHIVE       "从压缩包文件读取错误。"
+  IDS_CANT_READ               "读取输入文件错误。"
+  IDS_CANT_WRITE              "{!}不能写 %d 字节{}。"
+  IDS_BTN_RETRY               "重试"
+  IDS_BTN_ABORT               "中止"
+  IDS_STORE,                  "存储"
+  IDS_FASTEST,                "最快"
+  IDS_FAST,                   "快速"
+  IDS_NORMAL,                 "普通"
+  IDS_MAXIMUM,                "最大"
+  IDS_ULTRA,                  "极限"
+  IDS_METHOD_LZMA,            "LZMA"
+  IDS_METHOD_LZMA2,           "LZMA2"
+  IDS_METHOD_PPMD,            "PPMd"
+  IDS_PACK_UPDATE_ERROR,      "压缩/更新压缩包时发生错误。"
+  IDS_UNPACK_ERROR,           "解压压缩包时发生错误。"
+  IDS_TEST_ERROR,             "测试压缩包时发生错误。"
+  IDS_UNSUPPORTED_ARCHIVE,    "不支持或无法识别的压缩包类型。\n压缩包文件可能严重损坏。"
+  IDS_7Z_FATAL_ERROR          "由于严重错误压缩包未能创建。"
+  IDS_7Z_UPDATE_UNKNOWN_ERROR "由于未知错误 %x 压缩包没有更新。"
+  IDS_7Z_CREATE_UNKNOWN_ERROR "由于未知错误 %x 压缩包没有创建。"
+//  IDS_7Z_SOLID_UPDATE_UNSUP   "Updating files in solid archives is not supported."
+  IDS_LISTINFO_PAKEDSIZE      "压缩的"
+  IDS_LISTINFO_PAKEDSIZE_DESC "文件压缩后的大小"
+  IDS_LISTINFO_METHOD         "方法"
+  IDS_LISTINFO_METHOD_DESC    "压缩方法"
+  IDS_ARCLOCK_ERROR           "压缩包锁定错误"
+  IDS_ERRADDFILE_TOOLONG,     "无法添加 1 个或更多文件到列表。整个路径太长。\n压缩包列表中可能会缺少一些目录或文件。"
+  IDS_ERRADDDIR_TOOLONG,      "无法添加 1 个或更多目录到列表。整个路径太长。\n压缩列表中可能会缺少一些目录或文件。"
+  IDS_NAMEISTOOLONG,          "带完整路径的名称 ""%s"" 太长。\n\n路径: %s"
+}

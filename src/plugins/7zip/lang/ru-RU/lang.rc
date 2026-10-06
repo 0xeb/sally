@@ -1,0 +1,197 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for 7zip. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/7zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\7zip.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 23, 38, 280, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка 7-Zip"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Настройки панели",IDC_STATIC_1,5,6,68,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,75,10,202,1
+    CONTROL         "&Перед упаковкой показывать окно с расширенными параметрами",IDC_CFG_SHOWEXTENDEDOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,19,245,10
+    CONTROL         "Показывать дополнительную &информацию при просмотре архива",IDC_CFG_EXTENDEDLISTINFO,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,31,246,10
+    CONTROL         "Сжатый размер",IDC_CFG_LISTINFOPACKEDSIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,43,67,10
+    CONTROL         "Метод сжатия",IDC_CFG_LISTINFOMETHOD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,55,63,10
+    LTEXT           "Параметры сжатия по умолчанию",IDC_STATIC_3,5,70,122,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,129,74,148,1
+    LTEXT           "&Уровень сжатия:",IDC_STATIC_5,10,85,62,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,73,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Метод сжатия:",IDC_STATIC_6,10,103,55,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,73,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Размер сло&варя:",IDC_STATIC_7,10,121,61,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,73,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Разм&ер слова:",IDC_STATIC_8,10,139,61,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,73,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Создать непрер&ывный архив",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,155,114,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,3,175,274,1
+    DEFPUSHBUTTON   "ОК",IDOK,113,181,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,168,181,50,14
+    PUSHBUTTON      "Справка",IDHELP,223,181,50,14
+END
+
+IDD_NEWARCHIVE DIALOGEX 27, 37, 321, 224
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Создать новый архив"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Архив:",IDC_STATIC_1,16,7,26,8
+    LTEXT           "",IDC_NA_ARCHIVE,47,7,265,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,8,21,305,1
+    CONTROL         "Заши&фровать файлы",IDC_NA_ENCRYPTFILES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,28,87,10
+    LTEXT           "Па&роль:",IDC_NA_PASSWORD_TXT,123,29,30,8
+    EDITTEXT        IDC_NA_PASSWORD,193,27,80,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "П&ароль повторно:",IDC_NA_CONFIRMPASSWORD_TXT,123,46,68,8
+    EDITTEXT        IDC_NA_CONFIRMPASSWORD,193,44,80,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Параметры сжатия",IDC_STATIC_3,8,67,70,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,80,71,233,1
+    LTEXT           "&Уровень сжатия:",IDC_STATIC_5,16,85,62,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,87,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Метод сжатия:",IDC_STATIC_6,16,103,55,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,87,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Размер &словаря:",IDC_STATIC_7,16,121,61,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,87,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Размер с&лова:",IDC_STATIC_8,16,139,52,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,87,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Создать непрер&ывный архив",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,159,114,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,8,181,305,1
+    CONTROL         "Больше не показы&вать это окно (можно изменить в настройках)",IDC_NA_NOTAGAIN,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,187,240,12
+    PUSHBUTTON      "Нас&тройка...",IDC_SHOW_CONFIG,10,204,60,14,WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,151,204,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,206,204,50,14
+    PUSHBUTTON      "Справка",IDHELP,261,204,50,14
+END
+
+IDD_ENTERPASSWORD DIALOGEX 6, 15, 257, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Введите пароль 7-Zip"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,16,12,20,20
+    LTEXT           "Файл зашифрован, введите пароль для расшифровки.",IDC_STATIC_1,48,12,204,8
+/*    LTEXT           "File:",IDC_STATIC_2,48,26,17,8
+    LTEXT           "",IDC_FILE,65,26,175,8 */
+    LTEXT           "Пароль:",IDC_STATIC_3,48,40,35,8
+    EDITTEXT        IDC_PASSWORD,87,38,151,12,ES_PASSWORD | ES_AUTOHSCROLL
+/*
+ // preparation for skip and skip all
+    DEFPUSHBUTTON   "OK",IDOK,12,63,50,14
+    PUSHBUTTON      "Skip",IDC_SKIP,72,63,50,14
+    PUSHBUTTON      "Skip all",IDC_SKIPALL,132,63,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,192,63,50,14
+*/    
+    DEFPUSHBUTTON   "ОК",IDOK,132,63,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,192,63,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME,             "7-Zip"
+  IDS_ABOUT,                  "О модуле"
+  IDS_PLUGIN_DESCRIPTION,     "Создание, просмотр и извлечение архивов 7-Zip."
+  IDS_INSUFFICIENT_MEMORY,    "Недостаточно памяти."
+  IDS_CANT_LOAD_LIBRARY,      "Не удается загрузить библиотеку ""7za.dll""."
+  IDS_CANT_GET_CRATEOBJECT,   "Не удается вызвать метод CreateObject."
+  IDS_CANT_GET_CLASS_OBJECT,  "Не удается определить класс объекта."
+  IDS_CANT_OPEN_ARCHIVE,      "Не удается открыть архив ""%s""."
+  IDS_CANT_OPEN_ARCHIVE_PWD,  "Не удается открыть архив ""%s"".\nВозможно, введен неверный пароль."
+  IDS_ERROR,                  "Внутренняя ошибка."
+  IDS_PACKING_ARCHIVE,        "Создание архива 7-Zip"
+  IDS_UNPACKING_ARCHIVE,      "Распаковка архива 7-Zip"
+  IDS_UPDATING_ARCHIVE,       "Обновление архива 7-Zip"
+  IDS_TESTING_ARCHIVE,        "Тестирование архива 7-Zip"
+  IDS_TESTING_ARCHIVE_NAME    "Выполняется тестирование архива ""%s""..."
+  IDS_READING_DIRTREE,        "Чтение структуры папок..."
+  IDS_CANT_CREATE_ARCHIVE,    "Не удается создать архив."
+  IDS_TESTARCHIVE,            "Протестировать архив"
+  IDS_TESTARCHIVECORRUPTED,   "Архив ""%s"" поврежден."
+  IDS_TESTARCHIVEOK,          "Архив ""%s"" не содержит ошибок."
+  IDS_INCORRECTPASSWORD,      "Неправильный пароль"
+  IDS_INCORRECTPASSWORDBODY,  "Неправильный пароль. Пожалуйста, введите пароль повторно. Буквы пароля должны\nвводиться в правильном регистре. Убедитесь, что случайно не включен CapsLock."
+  IDS_PASSWORDSNOTMATCH,      "Введенные вами пароли не совпадают."
+  IDS_EMPTYPASSWORD,          "Длина пароля должна быть не менее одного знака."
+  IDS_UPDATE_NOT_SUPPORTED,   "Для этого архива не поддерживаются операции обновления."
+  IDS_CANT_MOVE_TMPARCHIVE,   "Не удается переместить временный архив ""%s""."
+  IDS_CANT_DELETE_TMPARCHIVE, "Не удается удалить временный архив ""%s""."
+  IDS_7Z_UPDATE_ERROR,        "При обновлении архива произошла ошибка.\n\nИсточник ошибки не в модуле 7zip программы Sally, а в сторонней библиотеке ""7za.dll"",\nпоэтому НЕ отправляйте нам отчет об этой ошибке, нам о ней известно."
+  IDS_7Z_SOLID_DELETE_UNSUP,  "Удаление файлов из непрерывных архивов не поддерживается."
+  IDS_CANT_UPDATE_ARCHIVE,    "Не удается обновить архив ""%s""."
+  IDS_CANT_CREATE_TMPFILE,    "Не удается создать временный файл."
+//  IDS_CANT_CREATEMUTEX,       "Cannot create mutex."
+  IDS_ARCHIVE_CHANGED,        "Архив ""%s"" был изменен. Он будет открыт заново на панели."
+  IDS_DELETE_ERROR,           "Ошибка удаления"
+  IDS_ADD_FILES_TO_ARCHIVE,   "Добавить файлы в архив"
+  IDS_CREATE_NEW_ARCHIVE,     "Создать новый архив"
+  IDS_REMOVING_FILES,         "Удаление файлов..."
+  IDS_READING_ARCHIVEITEMS,   "Чтение содержимого архива..."
+  IDS_UNPACKING,              "Извлечение..."
+  IDS_PACKING,                "Упаковка..."
+  IDS_REMOVING,               "Удаление..."
+  IDS_UPDATING,               "Обновление..."
+  IDS_CANCELING_OPERATION,    "Отмена операции. Пожалуйста, подождите..."
+  IDS_UNSUPPORTED_METHOD,     "Неподдерживаемый метод."
+  IDS_CRC_FAILED,             "Ошибка проверки контрольных сумм (CRC)."
+  IDS_UNKNOWN_ERROR,          "Неизвестная ошибка."
+  IDS_DATA_ERROR,             "При извлечении файла ""%s"" возникла ошибка в данных."
+  IDS_DATA_ERROR_PWD,         "При извлечении файла ""%s"" возникла ошибка в данных.\nВозможно, введен неверный пароль."
+  IDS_BTN_DELETE,             "У&далить"
+  IDS_BTN_DELETE_ALL,         "Удалить вс&е"
+  IDS_BTN_KEEP,               "Остави&ть"
+  IDS_BTN_KEEP_ALL,           "Остав&ить все"
+  IDS_ERROR_PROCESSING_FILE,  "Ошибка обработки файла ""%s"".\n\nУдалить его или оставить?"
+  IDS_ERROR_PROCESSING_FILE_PWD, "Ошибка обработки файла ""%s"".\nВозможно, введен неверный пароль.\n\nУдалить этот файл или оставить?"
+  IDS_OVERWRITE_FILE,         "Перезаписать все";
+  IDS_READONLY_ARCHIVE,       "Архив доступен только для чтения. Пожалуйста, снимите сначала атрибут ""только чтение""."
+  IDS_CANT_REMOVE_DIRECTORY,  "Не удается удалить папку ""%s"""
+  IDS_CANT_READ_ARCHIVE       "Ошибка чтения архива."
+  IDS_CANT_READ               "Ошибка чтения входного файла."
+  IDS_CANT_WRITE              "{!}Не удается записать %d байт{|1|}."
+  IDS_BTN_RETRY               "Повторить"
+  IDS_BTN_ABORT               "Прервать"
+  IDS_STORE,                  "Без сжатия"
+  IDS_FASTEST,                "Скоростной"
+  IDS_FAST,                   "Быстрый"
+  IDS_NORMAL,                 "Нормальный"
+  IDS_MAXIMUM,                "Максимальный"
+  IDS_ULTRA,                  "Ультра"
+  IDS_METHOD_LZMA,            "LZMA"
+  IDS_METHOD_LZMA2,           "LZMA2"
+  IDS_METHOD_PPMD,            "PPMd"
+  IDS_PACK_UPDATE_ERROR,      "При создании/обновлении архива произошла ошибка."
+  IDS_UNPACK_ERROR,           "При извлечении архива произошла ошибка."
+  IDS_TEST_ERROR,             "При тестировании архива произошла ошибка."
+  IDS_UNSUPPORTED_ARCHIVE,    "Неопознанный или неподдерживаемый тип архива.\nВозможно, файл архива поврежден."
+  IDS_7Z_FATAL_ERROR          "Архив не был создан из-за неустранимой ошибки."
+  IDS_7Z_UPDATE_UNKNOWN_ERROR "Архив не был обновлен из-за неизвестной ошибки %x."
+  IDS_7Z_CREATE_UNKNOWN_ERROR "Архив не был создан из-за неизвестной ошибки %x."
+//  IDS_7Z_SOLID_UPDATE_UNSUP   "Updating files in solid archives is not supported."
+  IDS_LISTINFO_PAKEDSIZE      "Сжатый"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Размер сжатого файла"
+  IDS_LISTINFO_METHOD         "Метод"
+  IDS_LISTINFO_METHOD_DESC    "Метод сжатия"
+  IDS_ARCLOCK_ERROR           "Ошибка блокирования архива"
+  IDS_ERRADDFILE_TOOLONG,     "Невозможно включить 1 или несколько файлов в перечень. Полный путь слишком длинный.\nНекоторые папки или файлы могут быть потеряны при чтении оглавления архива."
+  IDS_ERRADDDIR_TOOLONG,      "Невозможно включить 1 или несколько папок в перечень. Полный путь слишком длинный.\nНекоторые папки или файлы могут быть потеряны при чтении оглавления архива."
+  IDS_NAMEISTOOLONG,          "Имя ""%s"" с полным путем слишком длинное.\n\nПуть: %s"
+}

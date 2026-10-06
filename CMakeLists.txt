@@ -192,38 +192,18 @@ set_target_properties(sally PROPERTIES
 )
 
 # ==============================================================================
-# Language Resource: English .SLG
+# Built-in languages
 # ==============================================================================
+# English (lang/lang.rc) and every translation (lang/<tag>/lang.rc) are compiled into
+# sally.exe, each under its own LANGUAGE; Sally picks one at startup. lang/languages.rc
+# includes them all (one resource script: same-named lang.rc sources would share one .res).
 
+set(SAL_CORE_LANG_RC "${SAL_SRC}/lang/languages.rc")
 # RC files need defines set via source properties, not target_compile_definitions
-set_source_files_properties("${SAL_SRC}/lang/lang.rc" PROPERTIES
+set_source_files_properties(${SAL_CORE_LANG_RC} PROPERTIES
   COMPILE_DEFINITIONS "_LANG;_LANG_SALLY;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
 )
-
-add_library(sal_lang_english SHARED "${SAL_SRC}/lang/lang.rc")
-
-target_include_directories(sal_lang_english PRIVATE
-  "${SAL_SRC}"
-  "${SAL_SHARED}"
-)
-
-if(MSVC)
-  target_link_options(sal_lang_english PRIVATE
-    /NOENTRY /MANIFEST:NO /NOIMPLIB
-    $<${SAL_IS_RELEASE}:/LTCG:OFF>  # No code to optimize in resource-only DLL
-  )
-elseif(MINGW)
-  # Resource-only DLL: use minimal entry stub
-  target_sources(sal_lang_english PRIVATE "${SAL_SRC}/common/dllstub.c")
-endif()
-
-set_target_properties(sal_lang_english PROPERTIES
-  OUTPUT_NAME english
-  SUFFIX .slg
-  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/lang"
-  LIBRARY_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/lang"
-  ARCHIVE_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/lang"
-)
+target_sources(sally PRIVATE ${SAL_CORE_LANG_RC})
 
 # ==============================================================================
 # Bug Reporter: salmon.exe
@@ -528,12 +508,6 @@ install(TARGETS salext
 # MSVC runtime
 sal_install_runtime()
 
-# Language files
-install(TARGETS sal_lang_english
-  RUNTIME DESTINATION lang
-  LIBRARY DESTINATION lang
-)
-
 # Plugins
 sal_install_plugins()
 
@@ -550,7 +524,7 @@ sal_generate_plugins_ver()
 sal_create_populate_target()
 
 # Ensure populate depends on main targets
-add_dependencies(populate sally salmon salspawn tserver salext sal_lang_english)
+add_dependencies(populate sally salmon salspawn tserver salext)
 
 message(STATUS "")
 message(STATUS "=== Sally CMake Build ===")

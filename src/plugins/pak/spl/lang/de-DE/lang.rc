@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for pak. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 216, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "PAK Archiv optimieren"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Gültige Datengröße:",IDC_STATIC_1,8,9,77,8
+    LTEXT           "",IDC_VALIDSIZE,86,9,118,8
+    LTEXT           "Gesamte Dateigröße:",IDC_STATIC_2,8,20,77,8
+    LTEXT           "",IDC_TOTALSIZE,86,20,118,8
+    LTEXT           "Verschwendeter Platz:",IDC_STATIC_3,8,31,77,8
+    LTEXT           "",IDC_WASTEDSPACE,86,31,118,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,200,1
+    DEFPUSHBUTTON   "Optimieren",IDOK,53,53,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,113,53,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "Kann die Datei nicht öffnen: %s"
+ IDS_PAK_ERRINIT, "Kann die Paklib-Schnittstelle nicht initialisieren. Es ist bereits eine Datei geöffnet."
+ IDS_PAK_ERROPEN2, "Kann die Datei nicht öffnen. Es ist bereits eine Datei geöffnet."
+ IDS_PAK_ERRGETFILESIZE, "Kann die Dateigröße nicht ermitteln: %s"
+ IDS_PAK_INVLAIDDATA, "Ungültiges Datenformat."
+ IDS_PAK_LOWMEMORY, "Nicht genügend Speicher."
+ IDS_PAK_CENTRDIR, "Aktuelles PAK Hauptverzeichnis"
+ IDS_PAK_ERRSETFILEPTR, "Kann den Datei-Zeiger nicht setzen: %s"
+ IDS_PAK_ERRREADFILE, "Kann die Datei nicht lesen: %s"
+ IDS_PAK_ERRGETFILEPTR, "Kann den Datei-Zeiger nicht ermitteln: %s"
+ IDS_PAK_ERRWRITEFILE, "Kann die Datei nicht schreiben: %s"
+ IDS_PAK_TOOLONGNAME, "Kann die Datei nicht hinzufügen, der Name ist zu lang."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Durchsucht und entpackt Quake PAK-Archive."
+ IDS_ABOUT, "Über Plugin"
+ IDS_LOWMEM, "Nicht genügend Speicher."
+ IDS_ERRLIST, "Kann die Datei nicht zur Liste hinzufügen."
+ IDS_ERRLOADPAKLIB, "Kann paklib.dll nicht laden oder die Prozeduradresse nicht ermitteln: "
+ IDS_EXTRPROGTITLE, "Entpacke PAK Archiv - %s"
+ IDS_PREPAREDATA, "Bereite Daten vor..."
+ IDS_EXTRACTFILES, "Entpacke..."
+ IDS_EXTRACTING, "Entpacke: "
+ IDS_TOOLONGNAME, "Kann den Vorgang nicht beenden, der Pfadname ist zu lang."
+ IDS_UNABLESEEK, "Setzen des Datei-Zeigers nicht möglich: "
+ IDS_UNABLEGETFIELPOS, "Kann den Datei-Zeiger nicht setzen: "
+ IDS_UNABLEWRITE, "Kann die Datei nicht schreiben:"
+ IDS_ERROPEN, "Kann die Datei nicht öffnen: "
+ IDS_TOOLONGMASK, "Kann den Vorgang nicht beenden, die Maske ist zu lang."
+ IDS_DELPROGTITLE, "Lösche aus dem PAK-Archiv - %s"
+ IDS_DELFILES, "Lösche..."
+ IDS_DELETING, "Lösche: "
+ IDS_CANCELING, "Breche den Vorgang ab, bitte warten..."
+ IDS_ADDPROGTITLE, "Packe ins PAK-Archiv - %s"
+ IDS_TOOLARGE, "Kann die Datei nicht hinzufügen: Die Datei ist zu groß."
+ IDS_ADDFILES, "Packe..."
+ IDS_TOOLONGNAME2, "Kann die Datei nicht hinzufügen, der Dateiname ist zu lang."
+ IDS_PACKING, "Packe: "
+ IDS_UNABLEREAD, "Kann die Datei nicht lesen: "
+ IDS_ERRCONNECT, "Kann das Plugin nicht mit dem Sally verbinden."
+ IDS_OPTIMIZING, "Optimiere, bitte warten..."
+ IDS_OPTPROGTITLE, "Optimiere PAK-Archiv - %s"
+ IDS_NEEDOPT, "Das Löschen der Dateien wurde nicht erfolgreich beendet. Sie müssen die PAK-Optimierung u.U. nochmals vom PAK-Pluginmenü starten, um überflüssigen Plattenplatz frei zu machen."
+ IDS_MENUOPTIMIZE, "PAK &optimieren"
+ IDS_EXPIRE, "Das PAK-Plugin ist abgelaufen. Bitte überprüfen Sie auf unserer Webseite, ob eine neue Version vorhanden ist."
+}

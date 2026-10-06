@@ -1,0 +1,122 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for uniso. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uniso/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uniso.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 300, 83
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnISO Configuratie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Verwijder het alleen lezen attribuut wanneer er gekopieerd wordt van een archief",IDC_CFG_READONLY,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,11,286,10
+    CONTROL         "&Toon sessie als map (toegang tot all sessies toegestaan)",IDC_CFG_SESSIONASDIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,23,202,10
+    CONTROL         "T&oon boot image disk als bestand",IDC_CFG_BOOTIMAGEASFILE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,35,125,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,2,58,296,1
+    DEFPUSHBUTTON   "OK",IDOK,188,64,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,243,64,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "Kan bestand niet openen."
+    IDS_UNKNOW_ERROR            "Ongespecificeerde fout."
+    IDS_UNPACKING_ARCHIVE       "Uitpakken ISO archieven"
+    IDS_ERROR_UNPACKING         "Er is een fout opgetreden bij het uitpakken van het archief."
+    IDS_CANT_HANDLE_FILE        "Kan dit bestand niet verwerken."
+    IDS_INSUFFICIENT_MEMORY     "Onvoldoende geheugen."
+    IDS_ERR_TOO_LONG_NAME       "Kan bewerking niet afmaken omdat de naam te lang is."
+    IDS_ABOUT                   "Over plugin"
+    IDS_PLUGIN_DESCRIPTION      "Bladeren en CD/DVD ISO image bestanden uitpakken."
+    IDS_CANT_CREATE_TEMP        "Kan tijdelijke map niet aanmaken."
+    IDS_CANT_DELETE_TEMP_FILE   "Kan tijdelijk bestand niet verwijderen."
+    IDS_UNKNOWN_FILE_FORMAT     "Onbekend bestandsformaat of ongeldig ISO image.\n\nAls u zeker weet dat dit een geldige ISO image is, maak dan een issue aan op https://github.com/0xeb/sally/issues en help ons dit formaat te ondersteunen."
+    IDS_CANT_OPEN_FILE          "Kan bestand '%s' niet openen."
+    IDS_ERR_TMP                 "Aanmaken van tijdelijk bestand is mislukt."
+    IDS_CANT_SET_ATTRS          "Kan bestandattributen niet instellen."
+    IDS_CANT_CREATE_DIR         "Kan map '%s' niet aanmaken."
+    IDS_YES                     "Ja"
+    IDS_NO                      "Nee"
+    IDS_ERROR                   "Fout"
+    IDS_WARNING                 "Waarschuwing"
+    IDS_ERROR_OPENING_MULTISESSION  "Een of meerdere fouten is/zijn opgetreden tijdens het lezen van de multisessie image.\n\nAlleen correct gelezen sessies worden getoond."
+    IDS_UNKNOWN_TRACK_TYPE      "Onbekend track type."
+    IDS_READERROR               "Leesfout"
+    IDS_WRITEERROR              "Schrijffout"
+    IDS_CCD_BAD_FORMAT          "Slecht formaat van .CCD bestand.\n\nGetoonde image kan incompleet zijn."
+    IDS_CCD_MISSING             "Ontbrekend .CCD bestand.\n\nGetoonde image kan incompleet zijn."
+    IDS_ERROR_READING_SECTOR    "Kan de sector #%08X niet lezen."
+    IDS_ERROR_LISTING_IMAGE     "Fout bij het lezen van de mapstructuur in sector #%08X.\n\nIncomplete inhoud van het ISO image."
+    IDS_INTERNAL_PLUGIN_ERROR   "Interne plugin fout."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Onbekende allocatie strategie (%d).\n\nMaak een issue aan op https://github.com/0xeb/sally/issues en help ons dit probleem op te lossen."
+    IDS_UDF_INVALID_TAG_ID      "Ongeldig UDF Tag ID."
+    IDS_UDF_ERROR_READING_VAT   "Leesfout van virtuele allocatie tabel in sector #%08X."
+    IDS_UDF_MISSING_VAT         "Virtuele allocatie tabel ontbreekt."
+    IDS_UDF_BAD_ROOT_ICB        "Slecht startpad ICB.\n\nKan de mapstructuur niet lezen."
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "Bestand ""%s"" kan niet uitgepakt worden.\n\nInconsistentie tussen bestandsgrootte en ICB blocks."
+    IDS_CANT_OPEN_TRACK         "Kan track #%d niet openen."
+    IDS_BOOT_OR_MBR             "Dit bestand schijnt een floppy, een hardeschijf of een hard disk partitie image te zijn.\nProbeer het bestand te hernoemen naar .ima om de UnFAT plugin te activeren."
+    IDS_UNSUPPORTED_APFS        "Deze schijfimage bevat het APFS-bestandssysteem.\nDit bestandssysteem wordt nog niet ondersteund."
+
+    IDS_ERR_HFS_READ            "Kan partitie header niet lezen. Bestand is te klein."
+    IDS_ERR_HFS_INVALID_PARTITION "Corrupte structuren in de Partitie Manager."
+    IDS_ERR_HFS_UNRECOGNIZED    "Deze disk image bevat geen HFS Plus partitie."
+    IDS_ERR_HFS_ORIGINAL_HFS    "Deze disk image bevat HFS en geen HFS Plus bestandssysteem.\nHFS wordt niet ondersteund."
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "Kan blok #%08X niet vinden.\nBestand %s zal niet uitgepakt worden."
+    IDS_ERR_HFS_SEEK            "Kan blok #%08X niet vinden."
+    IDS_ERR_HFS_BTREE_NODETYPE  "Niet ondersteunde BTree start node type in de Catalogus."
+    IDS_ERR_HFS_BTREE_FRAGMENTED "Het Catalogus bestand is gefragmenteerd in meer dan 8 fragmenten wat niet ondersteund wordt."
+    IDS_ERR_HFS_FILE_FRAGMENTED "Het bestand '%s' is gefragmenteerd in meer dan 8 fragmenten wat ondersteund wordt.\nHet bestand zal niet uitgepakt worden."
+
+    IDS_ERR_TOO_LONG_PATH       "De disk image bevat een te lang pad waar Sally niet mee om kan gaan."
+
+    IDS_ERR_DMG_READ_HDR        "Kan het pakket kenmerk niet lezen. Bestand is te klein."
+    IDS_ERR_DMG_ENCRYPTED       "Dit pakket is gecodeerd.\nGecodeerde pakketten worden niet ondersteund."
+    IDS_ERR_DMG_NO_FOOTER       "Dit bestand lijkt niet op een DMG pakket of is incompleet.\nHet bevat geen geldig DMG voetprint."
+    IDS_ERR_DMG_PLIST           "Dit bestand lijkt niet op een geldig DMG pakket of is incompleet.\nHet bevat geen geldige eigenschappenlijst."
+    IDS_ERR_DMG_BLOCK_UNDEFINED "Dit pakket bevat geen data blok van de HFS Plus partitie beginnend bij %I64u.\nDit blok is nodig voor de juiste verwerking van het pakket."
+
+    IDS_ERR_BF_READ             "Kan data van disk image niet lezen op positie %I64u."
+    IDS_ERR_BF_SEEK             "Kan niet zoeken in de disk image bij de positie %I64u."
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "Interne fout: Zoek methode wordt niet ondersteund."
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "Deze disk image bevat een gecomprimeerd blok met een onbekende methode.\nZulke disk images worden niet ondersteund."
+    IDS_ERR_BF_ZLIB             "Uitpakken van een ZLIB-gecomprimeerd blok is mislukt. De disk image schijnt corrupt te zijn."
+    IDS_ERR_BF_BZIP2            "Uitpakken van een BZIP2-gecomprimeerd blok is mislukt. De disk image schijnt corrupt te zijn."
+
+    IDS_ERR_ISZ_NO_HEADER       "Dit bestand schijnt niet een comprimeerd ISZ image te zijn of is incompleet.\nHet bevat geen geldig ISZ kenmerk."
+    IDS_ERR_ISZ_READ_HDR        "Kan gecomprimeerd image kenmerk niet lezen. Bestand is te klein."
+    IDS_ERR_ISZ_SEGMENTED       "Dit image is gesegmenteerd.\nGesegmenteerde images worden niet ondersteund."
+    IDS_ERR_ISZ_ENCRYPTED       "Dit image is gecodeerd.\nGecodeerde images worden niet ondersteund."
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "Audio tracks kunnen niet uitgepakt worden."
+
+    IDS_CANCELING_OPERATION     "Bezig met annuleren, een moment geduld alstublieft..."
+
+    IDS_INFO_LABEL              "Informatie over image\n\n"
+    IDS_INFO_LABEL_LABEL        "Informatie over image ""%s""\n\n"
+    IDS_INFO_CNT_SESSIONS       "Aantal sessies: %d"
+    IDS_INFO_SESSION_NUM        "\nSessie %d\n"
+    IDS_INFO_CNT_TRACKS         "  Aantal tracks: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  Track: %d, %s, Grootte: %d KBytes\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  Track: %d, %s, Grootte: %d KBytes - ""%s""\n"
+}

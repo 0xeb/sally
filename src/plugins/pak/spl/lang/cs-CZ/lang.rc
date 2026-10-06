@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for pak. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 225, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Optimalizace PAK archivu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Velikost platných dat:",IDC_STATIC_1,8,9,74,8
+    LTEXT           "",IDC_VALIDSIZE,95,9,118,8
+    LTEXT           "Celková velikost souboru:",IDC_STATIC_2,8,20,86,8
+    LTEXT           "",IDC_TOTALSIZE,95,20,118,8
+    LTEXT           "Nadbytečné místo:",IDC_STATIC_3,8,31,65,8
+    LTEXT           "",IDC_WASTEDSPACE,95,31,118,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,209,1
+    DEFPUSHBUTTON   "Optimalizovat",IDOK,52,53,55,14
+    PUSHBUTTON      "Storno",IDCANCEL,117,53,55,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "Nelze otevřít soubor: %s"
+ IDS_PAK_ERRINIT, "Nelze inicializovat paklib rozhraní. Již je otevřen jeden soubor."
+ IDS_PAK_ERROPEN2, "Nelze otevřít soubor. Již je otevřen jeden soubor."
+ IDS_PAK_ERRGETFILESIZE, "Nelze získat velikost souboru: %s"
+ IDS_PAK_INVLAIDDATA, "Neplatný formát dat."
+ IDS_PAK_LOWMEMORY, "Nedostatek paměti."
+ IDS_PAK_CENTRDIR, "aktuální hlavní PAK adresář"
+ IDS_PAK_ERRSETFILEPTR, "Nelze nastavit ukazatel souboru: %s"
+ IDS_PAK_ERRREADFILE, "Nelze číst ze souboru: %s"
+ IDS_PAK_ERRGETFILEPTR, "Nelze získat ukazatel souboru: %s"
+ IDS_PAK_ERRWRITEFILE, "Nelze zapsat do souboru: %s"
+ IDS_PAK_TOOLONGNAME, "Nelze přidat soubor, kvůli příliš dlouhému názvu."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Prohlíží a extrahuje Quake PAK archivy."
+ IDS_ABOUT, "O pluginu"
+ IDS_LOWMEM, "Nedostatek paměti."
+ IDS_ERRLIST, "Nelze přidat soubor do výpisu."
+ IDS_ERRLOADPAKLIB, "Nelze nahrát paklib.dll nebo získat procesní adresu: "
+ IDS_EXTRPROGTITLE, "Extrahování PAK archivu - %s"
+ IDS_PREPAREDATA, "připravuji data..."
+ IDS_EXTRACTFILES, "extrahuji..."
+ IDS_EXTRACTING, "extrahuji: "
+ IDS_TOOLONGNAME, "Nelze dokončit operaci, kvůli příliš dlouhému názvu cesty."
+ IDS_UNABLESEEK, "Nelze nastavit ukazatel souboru: "
+ IDS_UNABLEGETFIELPOS, "Nelze získat ukazatel souboru: "
+ IDS_UNABLEWRITE, "Nelze zapsat do souboru:"
+ IDS_ERROPEN, "Nelze otevřít soubor: "
+ IDS_TOOLONGMASK, "Nelze dokončit operaci, kvůli příliš dlouhé masce."
+ IDS_DELPROGTITLE, "Odstraňuji z PAK archivu - %s"
+ IDS_DELFILES, "odstraňuji..."
+ IDS_DELETING, "odstraňuji: "
+ IDS_CANCELING, "stornování operace, čekejte prosím..."
+ IDS_ADDPROGTITLE, "Komprimace PAK archivu - %s"
+ IDS_TOOLARGE, "Nelze přidat soubore: Soubor je příliš velký."
+ IDS_ADDFILES, "Komprimuji..."
+ IDS_TOOLONGNAME2, "Nelze přidat soubor, kvůli příliš dlouhému názvu."
+ IDS_PACKING, "komprimuji: "
+ IDS_UNABLEREAD, "Nelze číst ze souboru: "
+ IDS_ERRCONNECT, "Nelze připojit plugin k Sally."
+ IDS_OPTIMIZING, "optimalizace, čekejte prosím..."
+ IDS_OPTPROGTITLE, "Optimalizace PAK archivu - %s"
+ IDS_NEEDOPT, "Odstranění souborů bylo úspěšně dokončeno. Může být potřeba spustit PAK optimalizaci z nabídky PAK pluginu, aby nedošlo k plýtvání místem na disku."
+ IDS_MENUOPTIMIZE, "&Optimalizovat PAK"
+ IDS_EXPIRE, "Promiňte, plugin vypršel. Prosím prohlédněte naší web stránku pro novější verzi."
+}

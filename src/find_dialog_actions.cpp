@@ -222,7 +222,7 @@ void CFindDialog::OnDelete(BOOL toRecycle)
     // failure drops rows for files that still exist on disk.
     if (!shellResult.success && shellResult.errorCode != ERROR_CANCELLED)
     {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+        gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE),
                              GetErrorTextOwned(shellResult.errorCode).c_str());
     }
 
@@ -1040,7 +1040,7 @@ void CFindIgnoreDialog::Validate(CTransferInfo& ti)
         CFindIgnoreItem* item = IgnoreList->At(i);
         if (item->Enabled && !IsIgnorePathValid(item->Path.c_str()))
         {
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ACBADDRIVE));
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ACBADDRIVE));
             ti.ErrorOn(IDC_FFI_NAMES);
             EditLB->SetCurSel(i);
             PostMessage(HWindow, WM_USER_EDIT, 0, 0);
@@ -1108,7 +1108,7 @@ CFindIgnoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDC_FFI_RESET:
         {
-            if (gPrompter->ConfirmError(LoadStrW(IDS_QUESTION), LoadStrW(IDS_FINDIGNORE_RESET)).type == PromptResult::kOk)
+            if (gPrompter->ConfirmError(HWindow, LoadStrW(IDS_QUESTION), LoadStrW(IDS_FINDIGNORE_RESET)).type == PromptResult::kOk)
             {
                 IgnoreList->Reset();
                 FillList();
@@ -1466,7 +1466,7 @@ void CFindDialog::OnDrag(BOOL rightMouseButton)
     int commonPrefixChars;
     if (!GetCommonPrefixPath(commonPrefixPath, commonPrefixChars))
     {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
+        gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
         return;
     }
 
@@ -1497,7 +1497,7 @@ void CFindDialog::OnDrag(BOOL rightMouseButton)
                                                 selCount, MyEnumFileNames, &data);
     if (dataObject == NULL)
     {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
+        gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
         dropSource->Release();
         return;
     }
@@ -1543,7 +1543,7 @@ void CFindDialog::OnContextMenu(int x, int y)
     std::vector<std::wstring> namesW;
     if (!GetCommonPrefixPathW(prefixW, namesW))
     {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
+        gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
         return;
     }
     ContextMenu = CreateIContextMenu2W(HWindow, prefixW.c_str(), namesW);
@@ -1600,7 +1600,7 @@ void CFindDialog::OnContextMenu(int x, int y)
         DestroyMenu(hMenu);
     }
     else
-        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
+        gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
 }
 
 BOOL CFindDialog::InvokeContextMenu(const wchar_t* lpVerb)
@@ -1639,10 +1639,10 @@ BOOL CFindDialog::InvokeContextMenu(const wchar_t* lpVerb)
                 ret = TRUE;
             }
             else
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
+                gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
         }
         else
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
     }
     SetCursor(hOldCursor);
     return TRUE;
@@ -1726,7 +1726,7 @@ void CFindDuplicatesDialog::Validate(CTransferInfo& ti)
     BOOL sameSize = IsDlgButtonChecked(HWindow, IDC_FD_SAME_SIZE);
     if (!sameName && !sameSize)
     {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FIND_DUPS_NO_OPTION));
+        gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FIND_DUPS_NO_OPTION));
         ti.ErrorOn(IDC_FD_SAME_NAME);
     }
 }
@@ -1980,7 +1980,7 @@ void CFindLogDialog::OnFocusFile()
                     // the menu message queue might still be processing
         if (SalamanderBusy)
         {
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
+            gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_SALAMANDBUSY2));
             return;
         }
     }

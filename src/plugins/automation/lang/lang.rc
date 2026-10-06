@@ -18,8 +18,7 @@
 // Neutral resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
-LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
-
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -191,7 +190,7 @@ END
 // Generated from the TEXTINCLUDE 3 resource.
 //
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
-LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #include "..\version.rc2"
 #endif
 

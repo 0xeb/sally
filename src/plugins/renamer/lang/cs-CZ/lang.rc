@@ -1,0 +1,482 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for renamer. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/renamer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\renamer.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_RENAME DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Hromadné přejmenování"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_MENUSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,368,1
+    LTEXT           "Mas&ka:",IDC_STATIC_1,16,11,52,8
+    COMBOBOX        IDC_MASK,72,9,95,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Zahrnout podadresáře",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,177,10,88,12
+    PUSHBUTTON      "Přej&menovat",IDOK,301,9,60,14
+    CONTROL         "Manuá&lní režim",IDC_MANUAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,27,64,12
+    CONTROL         "",IDS_MANSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,72,32,290,1
+    EDITTEXT        IDE_MANUAL,6,41,355,138,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Nový náze&v:",IDS_LABELNEWNAME,16,43,52,8
+    COMBOBOX        IDC_NEWNAME,72,41,274,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_NEWNAME,349,41,12,12
+    LTEXT           "Nahrazení",IDS_LABELREPLACE,6,60,36,8
+    CONTROL         "",IDS_REPLACESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,44,64,318,1
+    LTEXT           "N&ajít:",IDS_LABELSEARCHFOR,16,77,52,8
+    COMBOBOX        IDC_SEARCH,72,75,274,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_SEARCH,349,75,12,12
+    LTEXT           "Nahra&dit:",IDS_LABELREPLACEWITH,16,94,52,8
+    COMBOBOX        IDC_REPLACE,72,92,274,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_REPLACE,349,92,12,12
+    CONTROL         "&Rozlišovat velikost písmen",IDC_CASESENSITIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,72,109,100,12
+    CONTROL         "&Jen první v každém názvu",IDC_GLOBAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,72,123,99,12
+    CONTROL         "&Celá slova",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,177,109,60,12
+    CONTROL         "Re&gulární výraz",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,177,123,77,12
+    CONTROL         "N&ezahrnovat příponu",IDC_EXCLUDEEXT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,265,109,82,12
+    LTEXT           "Změna velikosti písmen",IDS_LABELCASE,6,139,80,8
+    CONTROL         "",IDS_CHANGECASESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,88,143,274,1
+    LTEXT           "Název &souboru:",IDS_LABELNAME,16,155,55,8
+    COMBOBOX        IDC_NAMECASE,72,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Příp&ona:",IDS_LABELEXT,186,155,38,8
+    COMBOBOX        IDC_EXTCASE,236,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Za&hrnout cestu",IDC_PATHPART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,72,170,92,12
+    LTEXT           "&Ukázka:",IDS_PREVIEW,6,182,51,8
+    RTEXT           "",IDS_COUNT,100,182,261,8
+    CONTROL         "",IDL_PREVIEW,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,0,192,368,68
+END
+
+IDD_CUT DIALOGEX 9, 20, 225, 88
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Přidání části řetězce"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Část řetěz&ce z:",IDC_STATIC_1,7,9,55,8
+    COMBOBOX        IDC_CUTFROM,69,7,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Začátek na pozici",IDC_STATIC_2,7,28,60,8
+    EDITTEXT        IDE_START,69,26,48,12,ES_AUTOHSCROLL
+    LTEXT           "vztaženo",IDC_STATIC_3,126,28,38,8
+    COMBOBOX        IDC_START,170,26,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Konec na pozici",IDC_STATIC_4,7,47,55,8
+    EDITTEXT        IDE_END,69,45,48,12,ES_AUTOHSCROLL
+    LTEXT           "vztaženo",IDC_STATIC_5,126,47,38,8
+    COMBOBOX        IDC_END,170,45,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,69,67,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,123,67,50,14
+END
+
+IDD_COUNTER DIALOGEX 9, 20, 170, 130
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Přidání počitadla"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Začátek na:",IDC_STATIC_1,7,9,42,8
+    EDITTEXT        IDE_START,58,7,105,12,ES_AUTOHSCROLL
+    LTEXT           "&Krokování:",IDC_STATIC_2,7,25,38,8
+    EDITTEXT        IDE_STEP,58,23,105,12,ES_AUTOHSCROLL
+    LTEXT           "Zákl&ad:",IDC_STATIC_3,7,41,36,8
+    COMBOBOX        IDC_BASE,58,39,105,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Min. šířka:",IDC_STATIC_4,7,57,51,8
+    EDITTEXT        IDE_MINWIDTH,58,55,105,12,ES_AUTOHSCROLL
+    LTEXT           "&Doplnění:",IDC_STATIC_5,7,73,46,8
+    COMBOBOX        IDC_FILL,58,71,105,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Zarovnat &vlevo",IDC_LEFT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,90,76,12
+    DEFPUSHBUTTON   "OK",IDOK,33,109,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,87,109,50,14
+END
+
+IDD_DEFINESET DIALOGEX 9, 20, 257, 192
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Definování znakové sady"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Znaky v &sadě:",IDC_STATIC_1,7,7,65,8
+    EDITTEXT        IDE_SET,7,17,243,12,ES_AUTOHSCROLL
+    LTEXT           "Příklady:\n\nPoužijte '-' pro zahrnutí rozsahu znaků (např. A-Z).\n\nPro zahrnutí '-' napište znak na začátku nebo konci sady (např. -AZ).",IDC_STATIC_2,7,36,243,40
+    LTEXT           "Pro zahrnutí ']' napište znak na začátku sady.\n\nPro zahrnutí '^' znaku v určité znakové sadě napište kdekoliv, ale ne na začátku sady.",IDC_STATIC_3,7,84,243,32
+    LTEXT           "Pro zahrnutí POSIX znakové třídy použijte [:třída:], kde třída je jedním z alpha, alnum, ascii, blank, cntrl, digit, graph, lower, print, punct, space, upper, word, xdigit.\n\nPro zahrnutí opačného lomítka použijte \\\\.",IDC_STATIC_4,7,124,243,40
+    DEFPUSHBUTTON   "OK",IDOK,76,171,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,130,171,50,14
+END
+
+IDD_SUBEXPRESSION DIALOGEX 9, 20, 192, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zadání podvýrazu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Čí&slo podvýrazu:",IDC_STATIC_1,7,9,56,8
+    COMBOBOX        IDC_NUMBER,68,7,117,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Příklad: Použitím 0 zadáte celý odpovídající výraz.",IDC_STATIC_2,7,23,177,8
+    LTEXT           "&Velikost písmen:",IDC_STATIC_3,7,37,57,8
+    COMBOBOX        IDC_CASE,68,35,117,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,44,57,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,98,57,50,14
+END
+
+IDD_PROGRESS DIALOGEX 6, 15, 194, 60
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Hromadné přejmenování"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDS_MESSAGE,7,7,180,8
+    LTEXT           "",IDS_PROGRESS,7,22,180,10,0,WS_EX_STATICEDGE
+    DEFPUSHBUTTON   "Storno",IDCANCEL,72,39,50,14
+END
+
+IDD_COMMAND DIALOGEX 9, 20, 368, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Provedení Shell příkazu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Příkaz:",IDC_STATIC_1,7,7,82,8
+    COMBOBOX        IDC_COMMAND,7,17,354,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,257,37,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,311,37,50,14
+END
+
+IDD_ERROR DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Chyba Shell příkazu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Příkaz nemusí být úspěšně dokončen.",IDC_STATIC_1,7,7,218,8
+    LTEXT           "Příkazový řádek:",IDC_STATIC_2,7,22,56,8
+    EDITTEXT        IDE_COMMAND,63,22,298,8,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    LTEXT           "Výstupní kód:",IDC_STATIC_3,7,34,56,8
+    LTEXT           "",IDS_EXITCODE,65,34,296,8
+    LTEXT           "&Std-Chyba:",IDC_STATIC_4,7,46,82,8
+    EDITTEXT        IDE_STDERR,7,56,354,176,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON   "Ignorovat",IDOK,257,239,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,311,239,50,14
+END
+
+IDD_CONFIG DIALOGEX 45, 31, 266, 160
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Hromadné přejmenování - Pokročilé možnosti"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nastavení externího editoru pro manuální režim:",IDC_STATIC_1,7,7,249,8
+    LTEXT           "&Příkaz:",IDC_STATIC_2,14,21,52,8
+    EDITTEXT        IDE_COMMAND,79,19,164,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_BROWSE,246,19,13,12,WS_GROUP
+    LTEXT           "&Argumenty:",IDC_STATIC_3,14,37,52,8
+    EDITTEXT        IDE_ARGUMENTS,79,35,164,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ARGHELP,246,35,13,12,WS_GROUP
+    LTEXT           "Počáteční a&dresář:",IDC_STATIC_4,14,53,64,8
+    EDITTEXT        IDE_INITDIR,79,51,164,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_INITDIRHELP,246,51,13,12,WS_GROUP
+    LTEXT           "Písmo manuálního režimu:",IDC_STATIC_5,7,74,113,8
+    PUSHBUTTON      "&Změnit",IDB_FONT,14,84,50,14,WS_GROUP
+    LTEXT           "Potvrzení:",IDC_STATIC_6,7,109,60,8
+    CONTROL         "Ukončení hlavního okna &ESC klávesou.",IDC_CONFIRMESCCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,118,201,12
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,7,138,252,1
+    DEFPUSHBUTTON   "OK",IDOK,101,142,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,155,142,50,14
+    PUSHBUTTON      "Nápověda",IDHELP,209,142,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Hromadné přejmenování"
+  IDS_DESCRIPTION, "Hromadné přejmenování s náhledem v reálném čase."
+  IDS_ABOUT, "O pluginu"
+  IDS_RENAMERERR, "Hromadné přejmenování - Chyba"
+  IDS_LOWMEM, "Nedostatek paměti."
+  IDS_PLUGMENU_RENAME, "&Přejmenovat..."
+  IDS_PLUGMENU_UNDO, "&Zrušit..."
+  IDS_RENAME, "&Přejmenovat"
+  IDS_VALIDATE, "O&věřit"
+  IDS_ORIGNAME_COLUMN, "Původní název"
+  IDS_NEWNAME_COLUMN, "Nový název"
+  IDS_SIZE_COLUMN, "Velikost"
+  IDS_DATE_COLUMN, "Datum"
+  IDS_TIME_COLUMN, "Čas"
+  IDS_PATH_COLUMN, "Cesta"
+
+  // menu
+  IDS_MENU_FILE, "&Příkazy"
+  IDS_MENU_VIEW, "Zo&brazení"
+  IDS_MENU_OPTIONS, "Nas&tavení"
+  IDS_MENU_HELP, "&Nápověda"
+  IDS_MENU_RENAME, "&Přejmenovat\tAlt+R"
+  IDS_MENU_VALIDATE, "O&věřit\tCtrl+I"
+  IDS_MENU_EXIT, "&Konec\tAlt+F4"
+  IDS_MENU_SORTOLD, "Seřadit podle půvo&dního názvu\tCtrl+F1"
+  IDS_MENU_SORTNEW, "Seřadit podle &nového názvu\tCtrl+F1"
+  IDS_MENU_SORTSIZE, "Seřadit podle ve&likosti\tCtrl+F2"
+  IDS_MENU_SORTTIME, "Seřadit podle ča&su\tCtrl+F3"
+  IDS_MENU_SORTPATH, "Seřadit podle &cesty\tCtrl+F4"
+  IDS_MENU_FILENAMES, "Přejmenovat &název souboru\tCtrl+N"
+  IDS_MENU_RELATIVEPATH, "Přejmenovat r&elativní cestu\tCtrl+R"
+  IDS_MENU_FULLPATH, "Přejmenovat p&lnou cestu\tCtrl+F"
+  IDS_MENU_FONT, "&Manuální režim písma..."
+  IDS_MENU_LAST, "P&osledně používaný\tCtrl+L"
+  IDS_MENU_RESET, "Rese&tovat\tCtrl+D"
+  IDS_MENU_REGEXP, "Re&gulární výraz"
+  IDS_MENU_CUSTOMFONT, "Použít vl&astní písmo..."
+  IDS_MENU_AUTOFONT, "Použít &výchozí písmo"
+  IDS_MENU_REMOVESOURCEPATH, "Odstranit práz&dné adresáře"
+  IDS_MENU_UNDO, "&Obnovit\tCtrl+U"
+  IDS_MENU_EDIT, "Úprav&y"
+  IDS_MENU_STORELIST, "&Uložit seznam do schránky\tF2"
+  IDS_MENU_LOADLIST, "&Nahrát seznam ze schránky\tF3"
+  IDS_MENU_EDITLIST, "&Otevřít seznam v externím editoru...\tF4"
+  IDS_MENU_FILTER, "&Filtrovat seznam přes Shell příkaz...\tF5"
+  IDS_MENU_ALLFILES, "&Všechny soubory\tF6"
+  IDS_MENU_RENAMED, "Úspěšně přej&menované soubory\tF7"
+  IDS_MENU_NOTRENAMED, "&Nepřejmenované soubory\tF8"
+  IDS_MENU_ADVANCED, "&Pokročilé..."
+  IDS_MENU_BATCHRENDLG, "&Dialog Hromadného přejmenování \tF1"
+
+  IDS_VAR_ORIGNAME, "$(OriginalName)"
+  IDS_CASE_DONTCHANGE, "Neměnit"
+  IDS_CASE_LOWER, "Malá písmena"
+  IDS_CASE_UPPER, "Velká písmena"
+  IDS_CASE_MIXED, "První písmena velká"
+  IDS_INVALIDMASK, "Neplatná maska."
+  IDS_TOOLONGPATH, "Nelze číst adresář, kvůli příliš dlouhému názvu cesty"
+  IDS_ERRREADDIR, "Nelze číst adresář."
+  IDS_ERROR, "Chyba"
+  IDS_DIRTEXT, "ADR"
+  IDS_CANCELCNFRM, "Chcete zrušit tuto operaci?"
+  IDS_QUESTION, "Dotaz"
+  IDS_VAR_ORIGINALNAME, "Původní název"
+  IDS_VAR_DRIVE, "Jednotka"
+  IDS_VAR_PATH, "Cesta"
+  IDS_VAR_RELATIVEPATH, "Relativní cesta"
+  IDS_VAR_NAME, "Název"
+  IDS_VAR_NAMEPART, "Část název"
+  IDS_VAR_EXTPART, "Část přípona"
+  IDS_VAR_SIZE, "Velikost"
+  IDS_VAR_TIME, "Čas"
+  IDS_VAR_DATE, "Datum"
+  IDS_VAR_COUNTER, "Počitadlo..."
+  IDS_VAR_LOWER, "Malá písmena"
+  IDS_VAR_UPPER, "Velká písmena"
+  IDS_VAR_MIXED, "První písmena velká"
+  IDS_VAR_STRIPDIA, "Odebrání diakritiky"
+  IDS_VAR_CUT, "Část řetězce..."
+  IDS_LEFT, "k začátku"
+  IDS_RIGHT, "ke konci"
+  IDS_BADCUTOFFSET, "Prosím zadejte kladnou hodnotu."
+  IDS_DECIMAL, "Desítkový"
+  IDS_HEX_LOWER, "Hexadecimální (abcdef)"
+  IDS_HEX_UPPER, "Hexadecimální (ABCDEF)"
+  IDS_FILL_SPACES, "Mezera"
+  IDS_FILL_ZEROS, "Nula"
+  IDS_FILL_UNDERSCORES, "Podtržení"
+
+  IDS_EXP_UNMATCHEDPAR, "Název proměnné musí být ukončený ')'."
+  IDS_EXP_VARNOTFOUND, "Proměnná nebyla nalezena."
+  IDS_EXP_UNEXPECTEDCHAR, "Očekáván název proměnné v závorkách nebo znak '$'."
+  IDS_EXP_SMALLBUFFER, "Rozšířený řetězec je příliš velký."
+  IDS_EXP_TRAILINGDOLLAR, "Neočekávaný konec řetězce, znak '$' musí být následován názvem proměnné nebo znakem '$'."
+  IDS_EXP_EMPTYSTR, "Zde není povolen prázdný řetězec."
+  IDS_EXP_UNEXPECTARG, "Zde není očekáván argument."
+  IDS_EXP_EXPECTCUTORCASE, "Očekáváno zadání velikosti písmen ('lower', 'upper', 'mixed', nebo 'stripdia') nebo název vyjmutý zadáním (dvou celých čísel)."
+  IDS_EXP_EXPECTENDCUT, "Očekávaný konec názvu vyjmutý zadáním (celého čísla)."
+  IDS_EXP_UNEXPECTEDARGUMENT, "Neočekávaný argument."
+  IDS_EXP_MISTIMEFORMAT, "Chybějící formát času."
+  IDS_EXP_INVALIDTIMEFMT, "Neplatný formát času."
+  IDS_EXP_MISDATEFORMAT, "Chybějící formát datumu"
+  IDS_EXP_INVALIDDATEFMT, "Neplatný formát data."
+  IDS_EXP_TOOMUCHARGUMENTS, "Příliš mnoho argumentů."
+  IDS_EXP_EXPECTSTART, "Očekáván začátek počitadla (celé číslo)."
+  IDS_EXP_EXPECTSTEP, "Očekáváno krokování počitadla (číslo)."
+  IDS_EXP_EXPECTBASEALIGNWIDTH, "Očekáván základ (jeden z 'dxX'), zarovnání ('l') nebo zadání šířky (kladné celé číslo)."
+  IDS_EXP_EXPECTALIGNWIDTH, "Očekáváno zarovnání ('l') nebo zadání šířky (kladné celé číslo)."
+  IDS_EXP_EXPECTWIDTH, "Očekáváno zadání šířky (kladné celé číslo)"
+  IDS_EXP_EXPECTFILL, "Očekáváno zadání filtru (jedno písmeno)"
+
+  IDS_NEWNAMEERR, "<Chyba nového názvu: %s>"
+  IDS_TRANSFERERROR, "<Neplatná hodnota v některém vstupním poli>"
+  IDS_REGEXPERR, "<Chyba regulárního výrazu: %s>"
+  IDS_BMERR, "<Boyer-Moore chyba: %s>"
+  IDS_GENERICERR, "<Chyba: %s>"
+  IDS_REPLACEERR, "<Chyba nahrazení vzorce: %s>"
+
+  IDS_REP_EXPCLOSEPAR1, "Očekávána uzavírající závorka nebo zadání velikosti písmen ('lower', 'upper', 'mixed', nebo 'stripdia')."
+  IDS_REP_EXPCLOSEPAR2, "Očekávána uzavírající závorka."
+  IDS_REP_EXPCLOSEPAR3, "Očekávána uzavírající závorka nebo znak ':' následován zadáním velikosti písmen ('lower', 'upper', 'mixed', nebo 'stripdia')."
+  IDS_REP_BADREF, "Odkaz na neurčený podvýraz."
+  IDS_EXP_EXPECTSUBNUM1, "Očekáváno číslo podvýrazu"
+  IDS_EXP_EXPECTSUBNUM2, "Očekáváno číslo podvýrazu, číslo podvýrazu v závorkách nebo znak '$'."
+  IDS_EXP_TRAILINGBACKSLASH, "Neočekávaný konec řetězce, opačné lomítko nemůže být na konci řetězce."
+
+  IDS_REENOERROR, "Žádná chyba."
+  IDS_REELOWMEMORY, "Nedostatek paměti."
+  IDS_REEEMPTY, "Regulární výraz je prázdný."
+  IDS_REETOOBIG, "Regulární výraz je příliš velký."
+  IDS_REETOOMANYPARENTHESISES, "Příliš mnoho ()."
+  IDS_REEUNMATCHEDPARENTHESIS, "Nespárované ()."
+  IDS_REEOPERANDCOULDBEEMPTY, "*+ operand by mohl být prázdný."
+  IDS_REENESTED, "Vložený *?+."
+  IDS_REEUNMATCHEDBRACKET, "Nespárované []."
+  IDS_REEFOLLOWSNOTHING, "?+* následuje prázdno."
+  IDS_REETRAILINGBACKSLASH, "Koncové \\."
+  IDS_REEINTERNALDISASTER, "Interní zhroucení."
+  IDS_REEINVALIDPOSIXCLASS, "Neznámý název POSIX třídy."
+  IDS_REEEXPECTINGXDIGIT, "Očekávány dvě hexadecimální čísla po \\x."
+  IDS_REESTACKOVERFLOW, "Přeplnění zásobníku"
+  IDS_REENOPATTERN, "Požadován zkompilovaný výraz."
+  IDS_REEERRORSTARTINGTHREAD, "Nelze spustit nové vlákno."
+  IDS_REEEXPECTINGEXTENDEDPATTERN1, "Očekáván jeden z :=!< po (?"
+  IDS_REEEXPECTINGEXTENDEDPATTERN2, "Očekáván jeden z =! po (?<"
+  IDS_REEBADFIXEDWIDTHLOOKBEHIND, "Look-Behind vzor neupevnil šířku."
+
+  IDS_RE_POSIX_ALPHA, "Písmena (alpha)"
+  IDS_RE_POSIX_ALNUM, "Písmena a číslice (alnum)"
+  IDS_RE_POSIX_ASCII, "ASCII znaky (ascii)"
+  IDS_RE_POSIX_CNTRL, "Řídící znaky (cntrl)"
+  IDS_RE_POSIX_DIGIT, "Desítkové číslice (digit)"
+  IDS_RE_POSIX_GRAPH, "Tisknutelné znaky jiné než Mezera (graph)"
+  IDS_RE_POSIX_LOWER, "Malé písmena (lower)"
+  IDS_RE_POSIX_PRINT, "Tisknutelné znaky (print)"
+  IDS_RE_POSIX_PUNCT, "Zvláštní znaky (punct)"
+  IDS_RE_POSIX_SPACE, "Mezera (space)"
+  IDS_RE_POSIX_UPPER, "Velké písmena (upper)"
+  IDS_RE_POSIX_WORD, "Písmena a číslice + '_' (word)"
+  IDS_RE_POSIX_XDIGIT , "Hexadecimální číslice (xdigit)"
+  IDS_RE_LEFTPAREN, "Levá závorka '('"
+  IDS_RE_RIGHTPAREN, "Pravá závorka ')'"
+  IDS_RE_LEFTBRACKET, "Levá hranatá závorka '['"
+  IDS_RE_CIRCUMFLEX,  "Stříška '^'"
+  IDS_RE_DOLLAR, "Dolar '$'"
+  IDS_RE_DOT, "Tečka '.'"
+  IDS_RE_PIPE, "Pipe '|'"
+  IDS_RE_ASTERISK, "Hvězdička '*'"
+  IDS_RE_PLUS, "Plus '+'"
+  IDS_RE_QUESTIONMARK, "Otazník '?'"
+  IDS_RE_BACKSLASH, "Opačné lomítko '\\'"
+  IDS_RE_ANYCHAR, "Každý znak"
+  IDS_RE_ANYFROM, "Každý ze sady znaků"
+  IDS_RE_ANYBUT, "Každý kromě sady znaků"
+  IDS_RE_ANYFROMPOSIX, "Znak POSIX třídy"
+  IDS_RE_ANYBUTPOSIX, "Znak POSIX třídy"
+  IDS_RE_BOL, "Začátek z názvu"
+  IDS_RE_EOL, "Konec z názvu"
+  IDS_RE_OR, "Nebo"
+  IDS_RE_ITERATION, "0 nebo více shodných"
+  IDS_RE_POSITIVEITERATION, "1 nebo více shodných"
+  IDS_RE_ITERATION_GREEDY, "Co nejvíce shodné"
+  IDS_RE_ITERATION_UNGREEDY, "Co nejméně shodné"
+  IDS_RE_ONEORZERO, "1 nebo 0 shodné"
+  IDS_RE_ZEROORONE, "0 nebo 1 shodné"
+  IDS_RE_SUBEXPRESSION, "Podvýraz"
+  IDS_RE_NOTCAPTURESUBEXP, "Nechycené podvýrazy"
+  IDS_RE_LITERALS, "Zvláštní přesný znak jako"
+  IDS_RE_WORDCHAR, "Písmena"
+  IDS_RE_NONWORDCHAR, "Znaky bez písmen"
+  IDS_RE_SPACE, "Mezera"
+  IDS_RE_NONSPACE, "Znaky bez mezery"
+  IDS_RE_DIGIT, "Číslice"
+  IDS_RE_NONDIGIT, "Znaky bez číslic"
+  IDS_RE_WORDB, "Ohraničené slova"
+  IDS_RE_NONWORDB, "Ne-(Ohraničené slova)"
+  IDS_RE_NUMBER, "Desítkové číslo"
+  IDS_RE_HEXNUMBER, "Hexadecimální číslo"
+  IDS_RE_WORD, "Slovo"
+  IDS_RE_PATHCOMPONENT, "Součást cesty"
+  IDS_RE_FILENAME, "Název souboru (Název v $1, Přípona v $2)"
+  IDS_RE_DEFINESET, "Definovat sadu..."
+  IDS_RE_MATCHEDEXPR, "Odpovídající regulární výraz"
+  IDS_RE_MATCHEDSUBEXP, "Odpovídající pod výraz..."
+  IDS_RE_PLOOKA, "Kladný Look-Ahead"
+  IDS_RE_NLOOKA, "Záporný Look-Ahead"
+  IDS_RE_PLOOKB, "Kladný Look-Behind"
+  IDS_RE_NLOOKB, "Záporný Look-Behind"
+  IDS_RE_ZEROWIDTHASSERT, "Prosazení nulové šířky"
+
+  IDS_EMPTYSTR, "Zde není povolen prázdný řetězec."
+  IDS_EMPTYMSG_DEF, "V seznamu nejsou žádné položky."
+  IDS_EMPTYMSG_NOMATCH, "Žádné soubory odpovídající zadané masce."
+  IDS_EMPTYMSG_BADMASK, "Neplatná maska."
+  IDS_EMPTYMSG_GENERATING, "Vytváření seznamu souborů. Stiskněte ESC pro přerušení"
+  IDS_EMPTYMSG_ERROR, "Vyskytla se chyba při vytváření seznamu souborů."
+  IDS_CNFRM_CLOSE, "Chcete zavřít Hromadné přejmenování?"
+  IDS_CNFRM_ESC_CLOSE2, "&Příště zavřít Hromadné přejmenování bez dotazu"
+
+  IDS_CANCELING, "Stornování operace, čekejte prosím..."
+  IDS_NOTVALID_FILENAME, "Neplatný název souboru."
+  IDS_NOTVALID_RELATIVEPATH, "Neplatná relativní cesta."
+  IDS_NOTVALID_FULLPATH, "Neplatná úplná cesta."
+  IDS_DUPLICATENAME, "Zdvojený název."
+  IDS_DEPENDENCE, "Cyklická závislost názvu nebo závislost na soubor, který nemůže být přejmenován."
+
+  IDS_RENAMING, "Přejmenování souborů, stiskněte ESC pro zrušení..."
+  IDS_PREPARING, "Připravuji data pro operaci přejmenování..."
+  IDS_DIRNOTSAMEROOT, "Přesuňte adresář jinam disková jednotka není podporována."
+  IDS_DIRDIR, "Adresář se stejným názvem již existuje."
+  IDS_FILEDIR, "Tento název byl již použit pro adresář."
+  IDS_CNFRM_SHOVERWRITE, "Chcete přepsat soubor se SYSTÉMOVÝM nebo SRYTÝM atributem?"
+  IDS_OVEWWRITETITLE, "Potvrzení přepsání souboru"
+  IDS_OVERWRITEERROR, "Nelze přepsat soubor: "
+  IDS_MOVEERROR, "Nelze přejmenovat soubor: "
+  IDS_DELETEERROR, "Nelze odstranit soubor: "
+  IDS_WRITEERROR, "Nelze zapsat soubor: "
+  IDS_READERROR, "Nelze načíst soubor: "
+  IDS_OPENFILEERROR, "Nelze otevřít soubor: "
+  IDS_DIRCASEERROR, "Nelze upravit velikost písmen názvu adresáře: "
+  IDS_CREATEDIR, "Nelze vytvořit adresář: "
+  IDS_UNDOING, "Ruším provedené přejmenování..."
+  IDS_REMOVEDIR,"Nelze odstranit adresář: "
+  IDS_UNDOQUEST, "Zrušit provedené přejmenování?"
+  IDS_SOMEERRORS, "Některé soubory nebyly úspěšně přejmenovány. Tyto soubory budou nyní vypsány, aby bylo možné chyby opravit a znovu se pokusit o přejmenování.\n\nPro zobrazení úspěšně přejmenovaných souborů použijte možnosti v nabídce 'Zobrazení'."
+  IDS_VALIDATEOK, "Ověření úspěšně dokončeno."
+  IDS_NOTTODO, "Není co zpracovat."
+  IDS_WAITINGFORWINDOWS, "Čekám na uzavření všech oken Hromadného přejmenování..."
+  IDS_MISLINES, "Příliš málo řádků."
+  IDS_BADLINECOUNT, "Počet vložených řádků musí být stejný s počtem vybraných souborů pro operaci přejmenování."
+  IDS_CREATETEMP, "Nelze vytvořit dočasný soubor. "
+  IDS_WRITETEMP, "Nelze zapsat do dočasného souboru. "
+  IDS_OPENTEMP, "Nelze otevřít dočasný soubor. "
+  IDS_SIZEOFTEMP, "Nelze získat velikost dočasného souboru. "
+  IDS_READTEMP, "Nelze číst z dočasného souboru. "
+  IDS_PROCESS, "Nelze spustit nové zpracování: "
+  IDS_ERRLAUNCHEDIT, "Nelze spustit externí editor. Zkontrolujte konfiguraci pluginu Hromadné přejmenování pro nastavení externího editoru. "
+  IDS_LONGDATA, "Nelze dokončit operaci, kvůli příliš dlouhým datům."
+  IDS_EXTEDIT, "Když ukončíte úpravu a uložíte Vaše změny v externím editoru, stiskněte OK pro aktualizaci seznamu názvů z upravovaného souboru.\n\nStiskněte Storno pro návrat bez změny seznamu názvů."
+  IDS_CREATEPIPE, "Nelze vytvořit pipe: "
+  IDS_WRITEPIPE, "Nelze zapsat do pipe. "
+  IDS_EXEFILES, "Spustitelné (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tVšechny soubory (*.*)\t*.*\t\t"
+  IDS_EXP_FULLNAME, "Úplný název"
+  IDS_EXP_DRIVE, "Jednotka"
+  IDS_EXP_PATH, "Cesta"
+  IDS_EXP_NAME, "Název"
+  IDS_EXP_NAMEPART, "Část název"
+  IDS_EXP_EXTPART, "Část přípona"
+  IDS_EXP_FULLPATH, "Úplná cesta"
+  IDS_EXP_WINDIR, "Windows adresář"
+  IDS_EXP_SYSDIR, "Systémový adresář"
+  IDS_EXP_DOSFULLNAME, "DOS Úplný název"
+  IDS_EXP_DOSDRIVE, "DOS Jednotka"
+  IDS_EXP_DOSPATH, "DOS Cesta"
+  IDS_EXP_DOSNAME, "DOS Název"
+  IDS_EXP_DOSNAMEPART, "DOS Část název"
+  IDS_EXP_DOSEXTPART, "DOS Část přípona"
+  IDS_EXP_DOSFULLPATH, "DOS Úplná cesta"
+  IDS_EXP_DOSWINDIR, "DOS Windows adresář"
+  IDS_EXP_DOSSYSDIR, "DOS Systémový adresář"
+  IDS_EXP_ENVVAR, "Proměnná prostředí"
+  IDS_EXP_BROWSE, "Procházet..."
+  IDS_EXP_SALDIR, "Sally adresář"
+  IDS_CFG_CONFLICT, "Konfigurace je již otevřena."
+  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
+  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+}

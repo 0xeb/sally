@@ -1,0 +1,133 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for wmobile. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/wmobile/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\wmobile.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_PROGRESSDLG DIALOGEX 18, 80, 353, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,8,11,32,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,11,305,8
+    RTEXT           "Total:",IDC_STATIC_1,11,35,24,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,39,34,301,12
+    PUSHBUTTON      "Cancelar",IDCANCEL,151,57,50,14
+END
+
+IDD_PROGRESS2DLG DIALOGEX 10, 30, 355, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,5,11,37,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,45,11,305,8
+    RTEXT           "",IDT_OPERATION2,5,23,37,8
+    CONTROL         "",IDT_FILENAME2,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,45,23,305,8
+    RTEXT           "Fichero:",IDC_STATIC_1,12,41,30,8
+    CONTROL         "",IDP_PROGRESSBAR2,"Static",0,45,40,297,12
+    RTEXT           "Total:",IDC_STATIC_2,12,56,30,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,45,55,297,12
+    PUSHBUTTON      "Cancelar",IDCANCEL,152,78,50,14
+END
+
+IDD_ATTRIBUTES DIALOGEX 30, 29, 187, 203
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Cambiar atributos"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,75,12,106,1
+    LTEXT           "Disponer atributos",IDC_STATIC_2,9,8,64,8
+    CONTROL         "&Archivo",IDC_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,18,41,12
+    CONTROL         "&Oculto",IDC_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,78,18,40,12
+    CONTROL         "Sólo-&lectura",IDC_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,16,30,53,12
+    CONTROL         "&Sistema",IDC_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,78,30,40,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,85,58,96,1
+    LTEXT           "Cambiar fecha y hora",IDC_STATIC_4,9,54,74,8
+    LTEXT           "&Modificado",IDC_STATIC_5,16,71,38,8
+    CONTROL         "",IDC_ATTR_MODIFIED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,69,66,12
+    CONTROL         "",IDC_ATTR_MODIFIED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,69,50,12
+    LTEXT           "&Creado",IDC_STATIC_6,16,87,30,8
+    CONTROL         "",IDC_ATTR_CREATED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,85,66,12
+    CONTROL         "",IDC_ATTR_CREATED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,85,50,12
+    LTEXT           "Acce&dido",IDC_STATIC_7,16,103,37,8
+    CONTROL         "",IDC_ATTR_ACCESSED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,101,66,12
+    CONTROL         "",IDC_ATTR_ACCESSED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,101,50,12
+    PUSHBUTTON      "Disponer ac&tual",IDC_ATTR_CURRENT,109,118,70,14
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,44,141,137,1
+    LTEXT           "Opciones",IDC_STATIC_9,9,137,33,8
+    CONTROL         "&Incluir subdirectorios",IDC_RECURSESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,147,87,12
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,9,172,172,1
+    DEFPUSHBUTTON   "Aceptar",IDOK,13,181,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,69,181,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,125,181,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Windows Mobile"
+  IDS_PLUGIN_DESCRIPTION, "Acceder a ficheros en dispositivo Windows Mobile."
+  IDS_ABOUT, "Acerca del Plugin"
+}
+
+STRINGTABLE
+BEGIN
+  IDS_WMPLUGINTITLE          "Plugin Windows Mobile"
+  IDS_WMPLUGINTITLE_ERROR    "Error en Plugin Windows Mobile"
+  IDS_WMPLUGINTITLE_QUESTION "Pregunta del Plugin Windows Mobile"
+  IDS_ERR_CONNECTION         "Imposible conectar con el dispositivo.\n\nAsegúrese de tener instalado el transporte subyacente (ej. ActiveSync) y de tener un dispositivo conectado."
+  IDS_CONNECTING             "Conectando con el dispositivo, espere..."
+  IDS_PATH_ERROR             "Ruta: %s\nError: %s"
+  IDS_YESNO_CANCEL           "¿Desea cancelar esta operación?"
+  IDS_ERR_MEMORYLOW          "Fuera de memoria."
+  IDS_ERR_PATHTOOLONG        "Imposible terminar la operación por ruta demasiado larga."
+  IDS_ERR_CREATEDIR          "Imposible crear el directorio ""%s""."
+  IDS_YESNO_CREATEDIR        "El directorio ""%s"" no existe.\n\n¿Desea crearlo?"
+  IDS_ERR_DIRNAMEISFILE      "El nombre ""%s"" ya ha sido usado para un fichero."
+  IDS_ERR_INVALIDDATEFORMAT  "La fecha tiene formato incorrecto."
+  IDS_ERR_NAMETOOLONG        "Imposible terminar la operación por nombre demasiado largo."
+  IDS_ERR_FILEINPATH         "La ruta especificada contiene una ruta a un fichero. Incapaz de abrir el fichero."
+  IDS_YESNO_CONNETCLOSEPLUGIN "No es posible conectar con el dispositivo.\r\n\r\n¿Desea cerrar el plugin?"
+  IDS_SORRY_CREATEDIR1        "Lo siento, este plugin no puede crear directorio en ruta de disco o de archivo."
+  IDS_SORRY_CREATEDIR2        "Lo siento, este plugin no puede crear directorio en el sistema de ficheros especificado."
+  IDS_SORRY_CREATEDIR3        "Lo siento, este plugin no puede crear directorio fuera de la unidad que está abierta."
+  IDS_ERR_INVALIDPATH         "La ruta especificada es incorrecta."
+  IDS_READ                    "Leer"
+  IDS_READING                 "Leyendo"
+  IDS_WAIT_READINGDIRTREE     "Leyendo árbol de directorios, espere..."
+  IDS_DELETE                  "Borrar"
+  IDS_DELETING                "Borrando"
+  IDS_YESNO_DELETENOEMPTYDIR  "El directorio ""%s"" no está vacío\n¿Desea borrarlo?"
+  IDS_YESNO_DELETEHIDDENFILE  "¿Desea borrar el fichero con atributo SYSTEM o HIDDEN?"
+  IDS_YESNO_DELETEHIDDENDIR   "¿Desea borrar el directorio con atributo SYSTEM o HIDDEN?"
+  IDS_ERR_TARGETPATHNOEXISTS  "La ruta destino no existe. El plugin WIndows Mobile no admite crear la ruta destino."
+  IDS_ERR_COPYTOOTHERFS       "El plugin WIndows Mobile no admite copiar o trasladar hacia otros sistemas de ficheros plugin."
+  IDS_ERR_COPYTOARCHIVES      "El plugin WIndows Mobile no admite copiar o trasladar hacia archivos."
+  IDS_COPY                    "Copiar"
+  IDS_COPYING                 "Copiando"
+  IDS_MOVE                    "Trasladar"
+  IDS_MOVING                  "Trasladando"
+  IDS_TO                      "hacia"
+  IDS_ERR_COPYDIRTOITSELF     "Imposible copiar un directorio a sí mismo."
+  IDS_ERR_COPYFILETOITSELF    "Imposible copiar un fichero a sí mismo."
+  IDS_YESNO_OVERWRITEHIDDENFILE "¿Desea sobreescribir el fichero con atributo SYSTEM o HIDDEN?"
+  IDS_ERR_MOVEDIRTOITSELF     "Imposible trasladar un directorio a sí mismo."
+  IDS_ERR_MOVEFILETOITSELF    "Imposible trasladar un fichero a sí mismo."
+  IDS_ATTRIBUTES              "Atributos"
+  IDS_CHANGING                "Cambiando"
+END

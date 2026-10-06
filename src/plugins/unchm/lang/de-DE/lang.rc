@@ -1,0 +1,48 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for unchm. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unchm/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unchm.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "Die Datei kann nicht geöffnet werden."
+    IDS_UNKNOW_ERROR            "Unbekannter Fehler."
+    IDS_UNPACKING_ARCHIVE       "Entpacke CHM-Archiv"
+    IDS_ERROR_UNPACKING         "Fehler beim Entpacken der Datei."
+    IDS_CANT_HANDLE_FILE        "Diese Datei kann nicht verarbeitet werden."
+    IDS_INSUFFICIENT_MEMORY     "Nicht genügend Arbeitsspeicher."
+    IDS_ABOUT                   "Über Plugin"
+    IDS_PLUGIN_DESCRIPTION      "Durchsucht und entpackt CHM-Dateien."
+    IDS_CANT_CREATE_TEMP        "Kann kein temporäres Verzeichnis erstellen."
+    IDS_CANT_DELETE_TEMP_FILE   "Kann temporäre Datei nicht löschen."
+    IDS_UNKNOWN_FILE_FORMAT     "Unbekanntes Dateiformat oder ungültiges CHM-Abbild.\n\nWenn Sie sicher sind, dass dies ein gültiges CHM-Abbild ist, erstellen Sie bitte ein Issue auf https://github.com/0xeb/sally/issues und helfen uns dieses Format zu unterstützen."
+    IDS_CANT_OPEN_FILE          "Diese Datei kann nicht geöffnet werden."
+    IDS_ERR_TMP                 "Erstellen einer temporären Datei ist fehlgeschlagen."
+    IDS_CANT_SET_ATTRS          "Dateiattribute können nicht gesetzt werden."
+    IDS_CANT_CREATE_DIR         "Verzeichnis '%s' kann nicht erstellt werden."
+    IDS_YES                     "Ja"
+    IDS_NO                      "Nein"
+    IDS_ERROR                   "Fehler"
+    IDS_WARNING                 "Warnung"
+    IDS_READERROR               "Lesefehler"
+    IDS_WRITEERROR              "Schreibfehler"
+    IDS_INTERNAL_PLUGIN_ERROR   "Interner Pluginfehler."
+    IDS_INVALIDNUMBER           "Ungültige Zahl."
+    IDS_CANCELOPER              "Vorgang wird abgebrochen, Bitte warten..."
+    IDS_CHMLIBCOPYRIGHT         "CHMLIB Bibliothek Copyright © 2001-2010 Jed Wing"
+}

@@ -1,0 +1,126 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for checksum. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checksum/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checksum.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CALCULATE DIALOGEX 0, 0, 353, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+CAPTION "Výpočet kontrolného súčtu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,343,54
+    LTEXT           "Počítam:",IDC_LABEL,5,68,31,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,39,68,116,8
+    PUSHBUTTON      "&Konfigurácia...",IDC_BUTTON_CONFIGURE,162,65,58,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Uložiť...",IDC_BUTTON_SAVE,226,65,58,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Prerušiť",IDC_BUTTON_CLOSE,290,65,58,14,WS_CLIPSIBLINGS
+    LTEXT           "schránka tip",IDC_LABEL_HINT,5,68,43,8,WS_CLIPSIBLINGS
+END
+
+IDD_VERIFY DIALOGEX 0, 0, 260, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,250,54
+    LTEXT           "Overujem:",IDC_LABEL,5,68,38,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,46,68,97,8
+    LTEXT           "",IDC_LABEL_RESULT,5,68,140,8,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Zamerať",IDC_BUTTON_FOCUS,149,65,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Prerušiť",IDC_BUTTON_CLOSE,205,65,50,14,WS_CLIPSIBLINGS
+END
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 189, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Kontrolný súčet - Konfigurácia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Počítať kontrolné súčty ",IDC_STATIC_1,8,5,174,76,WS_GROUP
+    CONTROL         "&CRC/SFV",IDC_CFG_CRC,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,15,16,105,10
+    CONTROL         "&MD5",IDC_CFG_MD5,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,28,105,10
+    CONTROL         "SHA-&1",IDC_CFG_SHA1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,40,105,10
+    CONTROL         "SHA-&256",IDC_CFG_SHA256,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,52,105,10
+    CONTROL         "SHA-&512",IDC_CFG_SHA512,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,64,105,10
+    DEFPUSHBUTTON   "OK",IDOK,14,88,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,69,88,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,124,88,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "Kontrolný súčet"
+ IDS_ABOUTTITLE "O plugine"
+ IDS_PLUGIN_DESCRIPTION "Overenie a výpočet SFV, MD5, SHA-1, SHA-256, a SHA-512 kontrolného súčtu."
+ IDS_OUTOFMEM "Nedostatok pamäti"
+ IDS_ERROROPENING, "Chyba pri otváraní súboru"
+ IDS_READERROR "Chyba pri čítaní"
+ IDS_WRITEERROR "Chyba pri zápise"
+ IDS_SKIPPED "Preskočený"
+ IDS_CALCULATING "Počítam..."
+ IDS_CANCELED "Zrušené"
+ IDS_HINT "Pravý klik na položku na kopírovanie kontrolného súčtu do schránky."
+ IDS_COPYTOCBOARD_CRC "Kopírovať &CRC hodnotu do schránky\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "Kopírovať &MD5 kontrolný súčet do schránky\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "Kopírovať SHA-&1 kontrolný súčet do schránky\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "Kopírovať SHA-&256 kontrolný súčet do schránky\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "Kopírovať SHA-&512 kontrolný súčet do schránky\tCtrl+5"
+ IDS_REMOVEITEM "&Odstrániť položku\tDelete"
+ IDS_SAVE_TITLE  "Uloženie súboru s kontrolným súčtom"
+ IDS_SAVE_FILTER_CRC  "SFV súbory (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "MD5 súbory (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "SHA-1 súbory (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "SHA-256 súbory (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "SHA-512 súbory (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "Súbor '%s' už existuje.\nChcete ho prepísať?"
+ IDS_ERRORCREATINGFILE "Chyba pri vytváraní súboru."
+ IDS_SKIPPEDFILES "Preskočené alebo zrušené súbory počas výpočtu nebudú uložené."
+ IDS_ERROROPENING2 "Chyba pri otváraní súboru '%s'."
+ IDS_MISSING "Nenájdený"
+ IDS_BADEXT "Vybraný súbor nemá príponu SFV, MD5, SHA1, SHA256 ani SHA512. Chcete pokračovať?"
+ IDS_BADFILE "Vybraný súbor nie je platný SFV, MD5, SHA-1, SHA-256 ani SHA-512 súbor."
+ IDS_VERIFYING "Overujem..."
+ IDS_OK "OK"
+ IDS_CORRUPT "Poškodený"
+ IDS_MENU_CALCULATE "&Vypočítať kontrolný súčet..."
+ IDS_MENU_VERIFY "&Overiť kontrolný súčet..."
+ IDS_CONFIG_CONFLICT "Nastavenie je už otvorené."
+ IDS_CONFIG_CHANGES_EFFECT "Vykonané zmeny sa prejavia pri ďalšom otvorení okna 'Výpočet kontrolného súčtu'."
+ IDS_ALLOK "Všetky súbory OK"
+ IDS_RESULT "%d poškodené, %d nenájdené, %d preskočené"
+ IDS_BUSY "Sally je zaneprázdnený. Požadovaný príkaz nemôže byť vykonaný, prosím skúste znovu neskôr."
+ IDS_CLOSE "&Zatvoriť"
+ IDS_READINGTREE "Čítanie stromu adresárov, čakajte prosím..."
+ IDS_ERRORREADINGDIR "Chyba pri čítaní adresára"
+ IDS_NOFILES "Žiadne súbory"
+ IDS_VERIFYTITLE "Overenie kontrolného súčtu"
+ IDS_VERIFY_CRC "Overenie CRC"
+ IDS_VERIFY_MD5 "Overenie MD5"
+ IDS_VERIFY_SHA1 "Overenie SHA-1"
+ IDS_VERIFY_SHA256 "Overenie SHA-256"
+ IDS_VERIFY_SHA512 "Overenie SHA-512"
+ IDS_COLUMN_FILE "Súbor"
+ IDS_COLUMN_SIZE "Veľkosť"
+ IDS_COLUMN_STATUS "Stav"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "Nie je možné dokončiť operáciu kvôli príliš dlhému názvu."
+}

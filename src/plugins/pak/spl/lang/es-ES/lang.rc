@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for pak. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 219, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Optimizar archivo PAK"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Tamaño datos válidos:",IDC_STATIC_1,8,9,78,8
+    LTEXT           "",IDC_VALIDSIZE,87,9,120,8
+    LTEXT           "Tamaño total ficheros:",IDC_STATIC_2,8,20,78,8
+    LTEXT           "",IDC_TOTALSIZE,87,20,120,8
+    LTEXT           "Espacio malgastado:",IDC_STATIC_3,8,31,71,8
+    LTEXT           "",IDC_WASTEDSPACE,87,31,120,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,203,1
+    DEFPUSHBUTTON   "Optimizar",IDOK,54,53,50,14
+    PUSHBUTTON      "Cancelar",IDCANCEL,114,53,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "Imposible abrir fichero: %s"
+ IDS_PAK_ERRINIT, "Imposible iniciar interfaz paklib. Ya hay un fichero abiierto."
+ IDS_PAK_ERROPEN2, "Imposible abrir fichero. Ya hay un fichero abierto."
+ IDS_PAK_ERRGETFILESIZE, "No es posible conseguir tamaño de fichero: %s"
+ IDS_PAK_INVLAIDDATA, "Formato de datos incorrecto."
+ IDS_PAK_LOWMEMORY, "Memoria insuficiente."
+ IDS_PAK_CENTRDIR, "directorio central PAK actual"
+ IDS_PAK_ERRSETFILEPTR, "Imposible disponer puntero a fichero: %s"
+ IDS_PAK_ERRREADFILE, "Imposible leer desde fichero: %s"
+ IDS_PAK_ERRGETFILEPTR, "Imposible conseguir puntero de fichero: %s"
+ IDS_PAK_ERRWRITEFILE, "Imposible grabar en fichero: %s"
+ IDS_PAK_TOOLONGNAME, "Imposible añadir fichero por nombre demasiado largo."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Hojear y extraer archivos PAK de Quake."
+ IDS_ABOUT, "Acerca del Plugin"
+ IDS_LOWMEM, "Memoria insuficiente."
+ IDS_ERRLIST, "Imposible añadir fichero a la lista."
+ IDS_ERRLOADPAKLIB, "Imposible cargar paklib.dll o conseguir dirección del procedimiento: "
+ IDS_EXTRPROGTITLE, "Desempaquetando archivo PAK - %s"
+ IDS_PREPAREDATA, "preparando los datos..."
+ IDS_EXTRACTFILES, "desempaquetando..."
+ IDS_EXTRACTING, "desempaquetando: "
+ IDS_TOOLONGNAME, "Imposible terminar la operación por nomnre de ruta muy largo."
+ IDS_UNABLESEEK, "Imposible disponer puntero a fichero: "
+ IDS_UNABLEGETFIELPOS, "Imposible conseguir puntero de fichero: "
+ IDS_UNABLEWRITE, "Imposible grabar en fichero:"
+ IDS_ERROPEN, "Imposible abrir fichero: "
+ IDS_TOOLONGMASK, "Imposible terminar la operación por plantilla muy larga."
+ IDS_DELPROGTITLE, "Borrando del archivo PAK - %s"
+ IDS_DELFILES, "borrando..."
+ IDS_DELETING, "borrando: "
+ IDS_CANCELING, "cancelando la operación, espere..."
+ IDS_ADDPROGTITLE, "Empaquetando en archivo PAK - %s"
+ IDS_TOOLARGE, "Imposible añadir fichero. Es demasiado grande."
+ IDS_ADDFILES, "empaquetando..."
+ IDS_TOOLONGNAME2, "Imposible añadir fichero por nombre demasiado largo."
+ IDS_PACKING, "empaquetando: "
+ IDS_UNABLEREAD, "Imposible leer desde fichero: "
+ IDS_ERRCONNECT, "Imposible conectar plugin con Sally."
+ IDS_OPTIMIZING, "optimizando, espere..."
+ IDS_OPTPROGTITLE, "Optimizando archivo PAK - %s"
+ IDS_NEEDOPT, "El borrado de ficheros no terminó bien. Puede que tenga que optimizar desde el menú del plugin PAK para evitar malgastar especio en el disco."
+ IDS_MENUOPTIMIZE, "&Optimizar PAK"
+ IDS_EXPIRE, "Lo siento pero el plugin ha expirado. Compruebe nuestra página web para una versión más reciente."
+}

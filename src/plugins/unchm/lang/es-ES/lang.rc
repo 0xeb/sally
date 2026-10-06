@@ -1,0 +1,48 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for unchm. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unchm/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unchm.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "No se puede abrir el fichero."
+    IDS_UNKNOW_ERROR            "Error sin especificar."
+    IDS_UNPACKING_ARCHIVE       "Desempaquetando archivo CHM"
+    IDS_ERROR_UNPACKING         "Error al desempaquetar el fichero."
+    IDS_CANT_HANDLE_FILE        "No es posible gestionar este fichero."
+    IDS_INSUFFICIENT_MEMORY     "Memoria insuficiente."
+    IDS_ABOUT                   "Acerca del Plugin"
+    IDS_PLUGIN_DESCRIPTION      "Hojear y extraer ficheros CHM."
+    IDS_CANT_CREATE_TEMP        "Imposible crear directorio temporal."
+    IDS_CANT_DELETE_TEMP_FILE   "Imposible borrar fichero temporal."
+    IDS_UNKNOWN_FILE_FORMAT     "Formato de fichero desconocido o no es una imagen CHM válida.\n\nSi está seguro de que ésta es una imagen CHM válida, abra una incidencia en https://github.com/0xeb/sally/issues y ayúdenos a incorporar este formato."
+    IDS_CANT_OPEN_FILE          "No es posible abrir este fichero."
+    IDS_ERR_TMP                 "Ha fallado la creación del fichero temporal."
+    IDS_CANT_SET_ATTRS          "No es posible ajustar atributos del fichero."
+    IDS_CANT_CREATE_DIR         "Imposible crear el directorio '%s'."
+    IDS_YES                     "Sí"
+    IDS_NO                      "No"
+    IDS_ERROR                   "Error"
+    IDS_WARNING                 "Aviso"
+    IDS_READERROR               "Error de lectura"
+    IDS_WRITEERROR              "Error de escritura"
+    IDS_INTERNAL_PLUGIN_ERROR   "Error interno del plugin."
+    IDS_INVALIDNUMBER           "Número incorrecto."
+    IDS_CANCELOPER              "cancelando la operación, espere..."
+    IDS_CHMLIBCOPYRIGHT         "Biblioteca CHMLIB Copyright © 2001-2010 Jed Wing"
+}

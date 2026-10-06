@@ -279,5 +279,7 @@
 #define IDS_LISTINFO_PAKEDSIZE_DESC 1251
 #define IDS_SIZE_KB                 1252
 #define IDS_SIZE_MB                 1253
+// Wait For dialog explanation; too long for dialog control text in some languages.
+#define IDS_WAITFOR_INFO            1255
 
 #endif // __ZIP_RH2

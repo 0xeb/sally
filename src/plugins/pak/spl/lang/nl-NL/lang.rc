@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for pak. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 222, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Optimaliseren PAK archief"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Geldige gegevens grootte:",IDC_STATIC_1,8,9,91,8
+    LTEXT           "",IDC_VALIDSIZE,101,9,109,8
+    LTEXT           "Totale bestandsgrootte:",IDC_STATIC_2,8,20,82,8
+    LTEXT           "",IDC_TOTALSIZE,101,20,109,8
+    LTEXT           "Verspilde ruimte:",IDC_STATIC_3,8,31,70,8
+    LTEXT           "",IDC_WASTEDSPACE,101,31,109,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,206,1
+    DEFPUSHBUTTON   "Optimaliseren",IDOK,49,53,57,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,116,53,57,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "Kan bestand: %s niet openen"
+ IDS_PAK_ERRINIT, "Kan paklib interface niet initialiseren. Er is al een bestand geopend."
+ IDS_PAK_ERROPEN2, "Kan bestand niet openen. Er is al een bestand geopend."
+ IDS_PAK_ERRGETFILESIZE, "Kan bestandsgrootte: %s niet achterhalen"
+ IDS_PAK_INVLAIDDATA, "Ongeldig data formaat."
+ IDS_PAK_LOWMEMORY, "Onvoldoende geheugen."
+ IDS_PAK_CENTRDIR, "huidige PAK centrale map"
+ IDS_PAK_ERRSETFILEPTR, "Kan bestandsverwijzing niet instellen: %s"
+ IDS_PAK_ERRREADFILE, "Kan bestand: %s niet lezen"
+ IDS_PAK_ERRGETFILEPTR, "Kan bestandsverwijzing niet ophalen: %s"
+ IDS_PAK_ERRWRITEFILE, "Kan bestand: %s niet schrijven"
+ IDS_PAK_TOOLONGNAME, "Kan bestand niet toevoegen vanwege te lange naam."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Bladeren en Quake PAK archieven uitpakken."
+ IDS_ABOUT, "Over plugin"
+ IDS_LOWMEM, "Onvoldoende geheugen."
+ IDS_ERRLIST, "Kan bestand niet toevoegen aan lijst."
+ IDS_ERRLOADPAKLIB, "Kan paklib.dll niet laden of procedureadres niet ophalen: "
+ IDS_EXTRPROGTITLE, "Uitpakken PAK archief - %s"
+ IDS_PREPAREDATA, "voorbereiding gegevens..."
+ IDS_EXTRACTFILES, "uitpakken..."
+ IDS_EXTRACTING, "uitpakken: "
+ IDS_TOOLONGNAME, "Kan bewerking niet voltooien wegens te lange padnaam."
+ IDS_UNABLESEEK, "Kan bestandsverwijzing niet instellen: "
+ IDS_UNABLEGETFIELPOS, "Kan bestandsverwijzing niet ophalen: "
+ IDS_UNABLEWRITE, "Kan niet naar bestand schrijven:"
+ IDS_ERROPEN, "Kan bestand niet openen: "
+ IDS_TOOLONGMASK, "Kan operatie niet voltooien wegens te lange masker."
+ IDS_DELPROGTITLE, "Verwijderen van PAK archief - %s"
+ IDS_DELFILES, "verwijderen..."
+ IDS_DELETING, "verwijderen: "
+ IDS_CANCELING, "bewerking annuleren, ogenblik geduld a.u.b..."
+ IDS_ADDPROGTITLE, "Inpakken naar PAK archief - %s"
+ IDS_TOOLARGE, "Kan bestand niet toevoegen: bestand is te groot."
+ IDS_ADDFILES, "inpakken..."
+ IDS_TOOLONGNAME2, "Kan bestand niet toevoegen wegens te lange naam."
+ IDS_PACKING, "inpakken: "
+ IDS_UNABLEREAD, "Kan bestand niet inlezen: "
+ IDS_ERRCONNECT, "Kan plugin niet verbinden met Sally."
+ IDS_OPTIMIZING, "optimaliseren, ogenblik geduld a.u.b..."
+ IDS_OPTPROGTITLE, "Optimiseer PAK archief - %s"
+ IDS_NEEDOPT, "Bestanden verwijderen is mislukt. U moet wellicht een PAK optimalisatie uitvoeren uit het PAK plugin menu om geen vrije schijfruimte te verspillen."
+ IDS_MENUOPTIMIZE, "&Optimaliseren PAK"
+ IDS_EXPIRE, "Excuses, de plugin is niet meer geldig. Bezoek onze web site voor een nieuwere versie."
+}

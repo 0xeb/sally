@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for nethood. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/nethood/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\nethood.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 22, 38, 230, 127
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuración de red"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Ver participaciones &administrativas",IDC_SYSSHARES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,7,129,10
+    CONTROL         "Ver participaciones administrativas como elementos &ocultos",IDC_HIDESYSSHARES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,22,211,10
+    CONTROL         "Ver elementos de &Mis sitios de red a nivel superior",IDC_NETSHORTCUTS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,37,180,10
+    CONTROL         "Ver ordenadores en &red a nivel superior",IDC_SHOWWORKGRP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,52,146,10
+    CONTROL         "Ver &discos conectados por Escritorio remoto",IDC_SHOWTSC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,67,159,10
+    CONTROL         "&Explorar la red al iniciar Sally",IDC_PRELOAD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,82,134,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,99,216,1
+    DEFPUSHBUTTON   "Aceptar",IDOK,35,106,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,90,106,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,145,106,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_COLUMN_COMMENTS     "Comentario"
+    IDS_INFOLINE_SELECTION_PLURAL "{!}<%d> objeto{|1|s} seleccionado{1:0|1|s}"
+    IDS_MENUITEM            "Red"
+    IDS_REFRESHING          "Explorando la red…"
+    IDS_NETWORK_UNAVAILABLE "La red no está disponible."
+    IDS_ABOUT               "Acerca del Plugin"
+    IDS_TSCLIENT            "%1 en %2"
+    IDS_TSFOLDER            "Ordenador local"
+    IDS_TSHOST              "Ordenador huésped"
+    IDS_TSFOLDERCOMMENT     "Discos de %s"
+END
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME         "Red"
+    IDS_DESCRIPTION         "Proporciona acceso a los ordenadores de la red."
+END

@@ -1,0 +1,375 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for filecomp. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/filecomp/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\filecomp.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_COMPAREFILES DIALOGEX 10, 24, 227, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Compara Fisierele"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Compara fisierul:",IDC_STATIC_1,10,9,207,8
+    COMBOBOX        IDE_PATH1,10,19,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE1,207,19,13,12
+    CONTROL         "C&u fisierul:",IDC_STATIC_2,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,37,207,8
+    COMBOBOX        IDE_PATH2,10,47,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE2,207,47,13,12
+    DEFPUSHBUTTON   "OK",IDOK,29,71,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,88,71,50,14
+    PUSHBUTTON      "&Avansat...",IDADVANCED,147,71,50,14
+END
+
+IDD_CFGCOLORS DIALOGEX 15, 24, 266, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Culori"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Obiect",IDC_STATIC_1,6,6,23,8,NOT WS_GROUP
+    COMBOBOX        IDC_ITEMS,6,16,159,82,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Line numbers:",IDC_STATIC_2,173,38,51,8,NOT WS_GROUP
+    LTEXT           "Text:",IDC_STATIC_3,228,38,24,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION1,11,51,154,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION2,11,67,154,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION3,11,83,154,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION4,11,99,154,8,NOT WS_GROUP
+    PUSHBUTTON      "text",IDB_LINENUM1,173,48,30,14
+    PUSHBUTTON      "text",IDB_TEXT1,228,48,30,14
+    PUSHBUTTON      "text",IDB_LINENUM2,173,64,30,14
+    PUSHBUTTON      "text",IDB_TEXT2,228,64,30,14
+    PUSHBUTTON      "text",IDB_LINENUM3,173,80,30,14
+    PUSHBUTTON      "text",IDB_TEXT3,228,80,30,14
+    PUSHBUTTON      "text",IDB_LINENUM4,173,96,30,14
+    PUSHBUTTON      "text",IDB_TEXT4,228,96,30,14
+    PUSHBUTTON      "&Restore Defaults",IDB_DEFAULT,188,202,70,14
+    LTEXT           "",IDS_PREVIEW2,133,129,125,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "",IDS_PREVIEW1,6,129,126,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "Previzualizare",IDC_STATIC_4,6,120,60,8,NOT WS_GROUP
+END
+
+IDD_ADVANCEDOPTIONS DIALOGEX 70, 33, 227, 286
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Optiuni Avansate"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ignorari",IDC_STATIC_1,5,6,29,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,36,10,187,1
+    CONTROL         "T&ot spatiul alb",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,11,16,160,12
+    CONTROL         "Sc&himbari in totalul de spatiu alb",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,28,160,12
+    CONTROL         "Ca&z",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,40,160,12
+    LTEXT           "Tipuri de fisiere",IDC_STATIC_3,5,60,54,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,61,64,162,1
+    CONTROL         "A&utodetect",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY | WS_GROUP | WS_TABSTOP,11,70,60,12
+    CONTROL         "&Binar",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,82,60,12
+    CONTROL         "&Text",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,94,60,12
+    LTEXT           "Codarea fisierelor text:",IDC_STATIC_15,11,111,77,8
+    LTEXT           "Primul fisier:",IDC_STATIC_5,11,126,44,8
+    LTEXT           "Al doilea fisier:",IDC_STATIC_6,11,143,52,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,64,124,139,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,64,141,139,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,206,124,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,206,141,14,12
+    LTEXT           "Linia se termina",IDC_STATIC_7,5,163,55,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,62,167,161,1
+    LTEXT           "&Primul fisier:",IDC_STATIC_9,11,175,44,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,64,173,35,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,104,173,35,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,144,173,35,12
+    CONTROL         "NULL",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,184,173,33,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,64,185,35,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,104,185,35,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,144,185,35,12
+    CONTROL         "NULL",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,184,185,33,12
+    LTEXT           "Al doilea fisier:",IDC_STATIC_10,11,187,52,8
+    LTEXT           "Optiuni Unicode",IDC_STATIC_11,5,205,56,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,63,209,160,1
+    CONTROL         "Combina semnele &diacritice la literele precompuse",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,215,180,12
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,4,237,219,1
+    CONTROL         "&Foloseste aceste setari in compararile viitoare",IDC_USEINFUTURE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,242,166,12
+    CONTROL         "",IDC_STATIC_14,"Static",SS_ETCHEDHORZ | WS_GROUP,4,257,219,1
+    DEFPUSHBUTTON   "OK",IDOK,58,266,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,114,266,50,14
+    PUSHBUTTON      "Help",IDHELP,170,266,50,14
+END
+
+IDD_CFGGENERAL DIALOGEX 28, 34, 266, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "General"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Selectarea fisierelor",IDC_STATIC_1,6,7,68,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,76,11,184,1
+    CONTROL         "Confirm &selectarea fisierelor inainte de a lansa Comparatorul de Fisiere",IDC_CONFIRM,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,17,248,12
+    LTEXT           "Optiuni de vizualizare a fisierului",IDC_STATIC_3,6,36,110,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,118,40,142,1
+    LTEXT           "&Nr. linii context de vizualizat daca diferentele sunt vizualizate:",IDC_STATIC_5,12,48,208,8,NOT WS_GROUP
+    EDITTEXT        IDE_CONTEXT,221,46,16,12,ES_AUTOHSCROLL
+    LTEXT           "Marimea &Tab:",IDC_STATIC_6,12,62,49,8,NOT WS_GROUP
+    EDITTEXT        IDE_TABSIZE,93,60,16,12
+    LTEXT           "&White space character:",IDC_STATIC_7,12,76,80,8
+    COMBOBOX        IDC_WHITESPACE,93,74,55,98,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Arata diferentele &detaliat prin default",IDC_DETAILDIFFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,91,189,12
+    CONTROL         "Imparte vizualizarea fisierului in mod &orizontal",IDC_VIEW_HORIZONTAL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,103,189,12
+    LTEXT           "Vizualizarea fontului fisierului",IDC_STATIC_8,6,121,99,8
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,107,125,153,1
+    PUSHBUTTON      "&Font",IDB_FONT,12,134,50,14
+    EDITTEXT        IDE_FONT,65,134,177,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    LTEXT           "Altul",IDC_STATIC_10,6,156,18,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,26,160,234,1
+    CONTROL         "&Incarca plugin la pornirea Sally",IDC_LOADONSTART,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,166,162,12
+END
+
+IDD_CFGDEFOPTIONS DIALOGEX 31, 27, 266, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Optiuni de Comparare Default"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ignorari",IDC_STATIC_1,6,7,29,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,37,11,223,1
+    CONTROL         "T&ot spatiul alb",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,17,160,12
+    CONTROL         "&Schimbari in cantitatea de spatiu alb",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,29,160,12
+    CONTROL         "Ca&z",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,41,160,12
+    LTEXT           "Tipuri de fisiere",IDC_STATIC_3,6,59,54,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,62,63,198,1
+    CONTROL         "A&utodetect",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,13,69,74,12
+    CONTROL         "&Binar",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON,13,81,74,12
+    CONTROL         "&Text",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON,13,93,74,12
+    LTEXT           "Codarea fisierelor text:",IDC_STATIC_13,13,110,77,8
+    LTEXT           "Primul fisier:",IDC_STATIC_5,13,125,45,8
+    LTEXT           "Al doilea fisier:",IDC_STATIC_6,13,142,52,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,66,123,171,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,66,140,171,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,240,123,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,240,140,14,12
+    LTEXT           "Linia se termina",IDC_STATIC_7,6,158,55,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,63,162,197,1
+    LTEXT           "Primul fisier:",IDC_STATIC_9,13,170,47,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,66,168,39,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,109,168,39,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,152,168,39,12
+    CONTROL         "NULL",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,195,168,39,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,66,180,39,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,109,180,39,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,152,180,39,12
+    CONTROL         "NULL",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,195,180,39,12
+    LTEXT           "Al doilea fisier:",IDC_STATIC_10,13,182,52,8
+    LTEXT           "Optiuni Unicode",IDC_STATIC_11,6,197,56,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,64,201,196,1
+    CONTROL         "Combina semnele &diacritice la literele precompuse",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,207,180,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_MENU MENU 
+BEGIN
+    POPUP "&Fisier"
+    BEGIN
+        MENUITEM "Compara...\tCtrl+O",          CM_COMPARE
+        MENUITEM "Recompara\tCtrl+R",           CM_RECOMPARE
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit\tAlt+F4",               CM_EXIT
+    END
+    POPUP "&Editeaza"
+    BEGIN
+        MENUITEM "Copie\tCtrl+C",                CM_COPY
+    END
+    POPUP "&Vizualizeaza"
+    BEGIN
+        MENUITEM "Arata &Spatiu Alb\tCtrl+W",   CM_SHOWWHITESPACE
+        MENUITEM "Arata Doar &Diferentele\tCtrl+D", CM_ONLYDIFFERENCES
+        MENUITEM "Difere&ntele Detaliate\tF4",   CM_DETAILDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "&Prima Diferenta\tAlt+Home", CM_FIRSTDIFF
+        MENUITEM "Dif&erenta Anterioara\tAlt+Up Arrow", CM_PREVDIFF
+        MENUITEM "&Urmatoarea Diferenta\tAlt+Down Arrow", CM_NEXTDIFF
+        MENUITEM "U&ltima Diferenta\tAlt+End",   CM_LASTDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "Arata Re&ferinta\tF2",             CM_SHOWCARET
+        MENUITEM SEPARATOR
+        MENUITEM "Maximizeaza &Vizualizarea fisierului din stanga\tCtrl+,", CM_MAXLEFTVIEW
+        MENUITEM "&Maximizeaza vizualizarea fisierului din Dreapta\tCtrl+.", CM_MAXRIGHTVIEW
+        MENUITEM "Vizualizare egala a Ma&rimii fisierului\tCtrl+E", CM_SAMESIZEVIEW
+        MENUITEM "&Toggle Full Screen\tF11",    CM_MAXIMIZE
+        MENUITEM "Vizualizare &Orizontala\tCtrl+H",    CM_VIEW_HORIZONTAL
+    END
+    POPUP "&Optiuni"
+    BEGIN
+        MENUITEM "&Auto-Copiere Selectie in Clipboard", CM_AUTOCOPY
+        MENUITEM SEPARATOR
+        MENUITEM "&Configurare...",           CM_OPTIONS
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&Continut\tF1",               CM_HELP
+        MENUITEM "Scurtaturi pe &Tastatura",         CM_HELPKEYBOARD
+        MENUITEM SEPARATOR
+        MENUITEM "&Despre",                      CM_ABOUT
+    END
+END
+
+IDM_CTX_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Selecteaza &Tot",                 CM_SELECTALL
+        MENUITEM "&Copie",                       CM_COPY
+    END
+END
+
+IDM_CTX_1COLOR_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Culoare Custom...",             CM_CUSTOMBACKGROUND
+        MENUITEM "Culoare Automata",             CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_2COLOR_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Custom Culoare de Text...",     CM_CUSTOMTEXT
+        MENUITEM "Culoare Automata de Text",     CM_AUTOTEXT
+        MENUITEM SEPARATOR
+        MENUITEM "Culoare Custom de Fundal...", CM_CUSTOMBACKGROUND
+        MENUITEM "Culoare Automata de Fundal", CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_FONT_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Custom Font...",              CM_CUSTOMFONT
+        MENUITEM "Automatic Font",              CM_AUTOFONT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGIN_DESCRIPTION, "Compararea vizuala a doua fisere text sau fisiere binare."
+  IDS_ABOUT, "Despre Plugin"
+  IDS_SPLERROR, "Eroare - Comparator de fisiere"
+  IDS_PLUGINNAME, "Comparator de Fisiere"
+  IDS_LOWMEM, "Memorie insuficienta."
+  IDS_COMPAREFILES, "Compara Fisierele..."
+  IDS_CONFIGURATION, "Configureaza..."
+  //IDS_SOMEWINDOWSOPEN, "Some File Comparator windows are opened. Do you want to close them?"
+  IDS_READFILE, "Nu pot citi din fisier '%s'. "
+  IDS_ACCESFILE, "Nu pot accesa fisierul '%s'. "
+  IDS_ACCESFILE2, "Nu pot accesa fiserul. "
+  IDS_INTERNALERROR, "Eroare interna in algoritmul de comparare."
+  IDS_LARGEFILE, "Nu pot deschide fisierul '%s' pentru comparare tip text, fisierul e prea mare.\nFolositi compararea binara."
+  IDS_OPEN, "Nu pot deschide fisierul: '%s'. "
+  IDS_NODIFFERRENCE, "Fisierele sunt identice."
+  IDS_ALLDIFFSIGNORED, "Fisierele par egale. Diferentele dintre ele au fost ignorate conform setarilor."
+  IDS_BINARYDIFFER, "Fisierele binare difera."
+  IDS_MAXLINES, "Numararea liniilor maxime a fost atinsa"
+  IDS_MAINWNDHEADER, "{!}%s %s: %s %s- Comparatorul de Fisiere - %d Diferenta{|1|s}"
+  IDS_MAINWNDHEADER_NODIF "%s %s: %s %s- Comparatorul de Fisere - Fara Diferente"
+  IDS_MAINWNDHEADERCOMPUTING, "%s : %s - Comparator de fisiere - Diferente de Computing (apasa ESC pentru anulare)"
+  IDS_MAINWNDHEADERCOMPUTING2, "%s %s: %s %s - Comparator de Fisiere - Diferente de Computing"
+  IDS_MAINWNDHEADERCOMPUTING_PROGRESS, "%s : %s - Comparator de Fisiere - Diferente de Computing (%d%% Done)"
+  IDS_MAINWNDHEADERCOMPUTING_PROGRESS_FOUND, "{!}%s : %s - Comparator de Fisiere - Diferente de Computing (%d%% Done, %d Gasit{})"
+  IDS_MAINWNDHEADERTOOMANY, "%s : %s - Comparator de Fisiere - Mai mult de 32 768 diferente"
+  IDS_DIFFERENCES, "&Diferenta"
+  IDS_MISSINGPATH, "Lipseste numele fisierului."
+  IDS_ERROR, "Eroare"
+  IDS_SELECTALL, "Selecteaza &Tot"
+  IDS_RECOMPARE, "Recompara (Ctrl+R)"
+  IDS_COPY, "&Copie"
+  IDS_COPYCLIP, "Copie in Clipboard (Ctr+C)"
+  IDS_FIRSTDIFF, "Mergi la prima diferenta (Alt+Home)"
+  IDS_PREVDIFF, "Mergi la diferenta anterioara (Alt+Up Arrow)"
+  IDS_NEXTDIFF, "Mergi la diferenta urmatoare (Alt+Down Arrow)"
+  IDS_LASTDIFF, "Mergi la ultima diferenta (Alt+End)"
+  IDS_CANCELED, "Operatiune anulata."
+  IDS_CLOSEDIFF, "Doriti sa inchideti Comparatorul de Fisiere?"
+  IDS_COMMONTEXT, "Text nechimbat"
+  IDS_SELECTEDTEXT, "Text selectat"
+  IDS_CHANGEDTEXT, "Text schimbat"
+  IDS_FOCUSEDCHANGE, "Text schimbat in diferenta scoasa in evidenta"
+  IDS_FOCUSEDFRAME, "Frama in jurul diferentei scoase in evidenta"
+  IDS_FOCUSEDCHANGE2, "Diferenta evidentiata"
+  IDS_COMMONFOCUSED, "Text neschimbat in diferenta evidentiata"
+  IDS_COMMONFOCUSED2, "Neschimbat + evidentiat"
+  IDS_COMMONCOLORS, "Culori comune"
+  IDS_RIGHTCOLORS, "Culorile din panoul dreapta"
+  IDS_LEFTCOLORS, "Culorile din panoul stanga"
+  IDS_POSITIVEVALUE, "Va rugam introduceti o valoare pozitiva"
+  IDS_SELECTFIRST, "Selectati primul fisier"
+  IDS_SELECTSECOND, "Selectati al doilea fiser"
+  IDS_FILEDOESNOTEXIST, "Fisierul %s nu exista.\nVa rugam specificat un nume valid de fiser."
+  IDS_ALLFILES, "Toate fisierele (*.*)"
+  // font description in configuration dialog box   "10 pt. MS Shell Dlg"
+  IDS_FONTDESCRIPTION, "%d pt. %s"
+  IDS_BINREPORT1, "{!}%d: %s byte{|1|s} schimbat la offset %s"
+  IDS_BINREPORT2, "{!}%s byte{|1|s} schimbat la offset %s"
+  IDS_ADD1, "%d: Insereaza o linie %d din fisierul din dreapta (%s) dupa linia %d in fisierul din stanga (%s)"
+  IDS_ADD2, "%d: Insereaza linii %d-%d din fisierul din dreapta (%s) dupa linia %d in fisierul din stanga (%s)"
+  IDS_DELETE1, "%d: Sterge rand %d din fisierul din stanga (%s)"
+  IDS_DELETE2, "%d: Sterge liniile %d-%d din fisierul din stanga (%s)"
+  IDS_CHANGEFROM1, "%d: Schimba linia %d in fisierul din stanga (%s) to"
+  IDS_CHANGEFROM2, "%d: Schimba liniile %d-%d in fisierul din stanga (%s) la"
+  IDS_CHANGETO1, "%s linia %d din fisierul din dreapta (%s)"
+  IDS_CHANGETO2, "%s linii %d-%d din fisierul din dreapta (%s)"
+  IDS_CONFIGURATIONTITLE, "Configurarea Comparatorului de fisiere"
+  IDS_OK, "OK"
+  IDS_CANCEL, "Anuleaza"
+  IDS_OPTIONSCHANGED, "Optiunile de comparare default s-au schimbat.\nCompari din nou fisierele cu noile optiuni?"
+  IDS_DETAILCANCEL, "Ati anulat operatiunea in timp ce se prelucrau datele diferentelor detaliate. Analiza diferentelor detaliate poate lua ceva timp, mai ales pentru fisierele mari cu blocuri diferite mari.\n\nAti dori sa inchideti detaliile diferite si sa rulati comparatia din nou?"
+  IDS_INVALIDNUMBER, "Numar invalid!"
+  IDS_NOTVALIDFILE, "Nu pot deschide '%s'."
+  IDS_INVALIDARGS, "Argumente invalide. Folosire:\n\tfilecomp.exe [optiune] prima a doua\nOptiunile sunt:\n\t-w\tAsteapta pana ce Comparatorul de fisiere se inchide.\n\t--asteapta\tAsteapta pana ce Comparatorul de fisere se inchide."
+  IDS_MSGERR, "Nu pot trimite mesaj la plugin Comparator de fisiere."
+  IDS_LAUNCHSAL, "Nu pot lansa Sally."
+  IDS_MSGERR2, "Nu pot trimite mesaj la plugin Comparator de fisiere. Asigurati-va ca optiunea 'Lansare la pornirea Sally' e setata in configurarea Comparatorului de fisiere."
+  IDS_ERRORUNICODE, "A esuat conversia la Unicode."
+  IDS_ENCMENU_AUTO, "Automat"
+  IDS_ENCMENU_ASCII8, "ASCII-8"
+  IDS_ENCMENU_ASCII8NOINPUTENC, "Fara conversie de input"
+  IDS_ENCMENU_ASCII8AUTOINPUTENC, "Conversie automata de input"
+  IDS_ENCMENU_UNICODE, "Unicode"
+  IDS_ENCMENU_UTF8, "UTF-8"
+  IDS_ENCMENU_UTF16LE, "UTF-16"
+  IDS_ENCMENU_UTF16BE, "UTF-16 (Big Endian)"
+  IDS_ENCMENU_UTF32LE, "UTF-32"
+  IDS_ENCMENU_UTF32BE, "UTF-32 (Big Endian)"
+  IDS_AUTOINPUTENC ", conversie automata de input"
+  IDS_NOINPUTENC ", fara conversie de input"
+  IDS_MAXLEFTVIEW   "Maximizeaza &Vizualizarea fisierului din stanga\tCtrl+,"
+  IDS_MAXTOPVIEW    "MaximizeazaVizualizarea fisierului de S&us\tCtrl+,"
+  IDS_MAXRIGHTVIEW  "Maximizeaza Vizualizarea fisierului din Dr&eapta\tCtrl+."
+  IDS_MAXBOTTOMVIEW "Maximizeaza Vizualizarea fisierului de Jo&s\tCtrl+."
+  IDS_ERROR_COPY_LARGE_SELECTION "Selectia facuta e prea mare pentru a fi copiata in clipboard."
+  IDS_ERROR_COPY_OOM  "Nu exista memorie suficienta pentru copierea textului selectat in clipboard."
+  IDS_ERROR_COPY_FAILED "Nu pot copia textul selectat in clipboard."
+  IDS_LOWMEM_TRY_BINARY "Compararea in mod text a esuat pentru ca nu e suficienta memorie disponibila sau fisierele sunt prea mari. Puteti incerca compararea binara."
+}

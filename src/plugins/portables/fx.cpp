@@ -317,13 +317,9 @@ namespace Fx
     {
         CFxString s;
 
-        // Load language module.
+        // The plug-in's resources (every language) are in its own DLL.
         GetPluginEnglishName(s);
-        HINSTANCE hLangInst = salamander->LoadLanguageModule(salamander->GetParentWindow(), s);
-        if (hLangInst == nullptr)
-        {
-            return false;
-        }
+        HINSTANCE hLangInst = FxGetModuleInstance();
 
 #if _FX_ATL_INTERWORK
         ATL::_AtlBaseModule.SetResourceInstance(hLangInst);
@@ -373,13 +369,13 @@ namespace Fx
 
     void WINAPI CFxPluginInterface::GetPluginName(CFxString& name) const
     {
-        // Load the name from the language module.
+        // Load the name from the plug-in's resources.
         name.LoadString(IDS_FX_PLUGIN_NAME);
     }
 
     void WINAPI CFxPluginInterface::GetPluginDescription(CFxString& description) const
     {
-        // Load the description from the language module.
+        // Load the description from the plug-in's resources.
         description.LoadString(IDS_FX_PLUGIN_DESCRIPTION);
     }
 

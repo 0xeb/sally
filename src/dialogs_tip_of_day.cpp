@@ -1956,6 +1956,7 @@ CExitingOpenSal::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        SetDlgItemTextW(HWindow, IDC_STATIC_1, LoadStrW(IDS_EXITING_RUNNING_INFO));
         SetTimer(HWindow, 666, 200, NULL);
         PostMessage(HWindow, WM_TIMER, 666, 0);
         break;

@@ -1,0 +1,48 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for unchm. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unchm/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unchm.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "不能打开文件。"
+    IDS_UNKNOW_ERROR            "未指定的错误。"
+    IDS_UNPACKING_ARCHIVE       "正在解压 CHM 压缩包"
+    IDS_ERROR_UNPACKING         "解压文件错误。"
+    IDS_CANT_HANDLE_FILE        "不能处理此文件。"
+    IDS_INSUFFICIENT_MEMORY     "内存不足。"
+    IDS_ABOUT                   "关于插件"
+    IDS_PLUGIN_DESCRIPTION      "浏览并解压 CHM 文件。"
+    IDS_CANT_CREATE_TEMP        "不能创建临时目录。"
+    IDS_CANT_DELETE_TEMP_FILE   "不能删除临时文件。"
+    IDS_UNKNOWN_FILE_FORMAT     "未知文件格式或不是有效的 CHM 镜像。\n\n如果你确定这是有效的 CHM 镜像，请在 https://github.com/0xeb/sally/issues 提交问题并帮助我们支持此格式。"
+    IDS_CANT_OPEN_FILE          "不能打开此文件。"
+    IDS_ERR_TMP                 "创建临时文件失败。"
+    IDS_CANT_SET_ATTRS          "不能设置文件属性。"
+    IDS_CANT_CREATE_DIR         "不能创建目录 '%s'。"
+    IDS_YES                     "是"
+    IDS_NO                      "否"
+    IDS_ERROR                   "错误"
+    IDS_WARNING                 "警告"
+    IDS_READERROR               "读取错误"
+    IDS_WRITEERROR              "写入错误"
+    IDS_INTERNAL_PLUGIN_ERROR   "内部插件错误。"
+    IDS_INVALIDNUMBER           "无效数字。"
+    IDS_CANCELOPER              "正在取消操作，请等待..."
+    IDS_CHMLIBCOPYRIGHT         "CHMLIB 库版权所有 © 2001-2010 Jed Wing"
+}

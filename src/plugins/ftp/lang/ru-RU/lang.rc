@@ -1,0 +1,2373 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for ftp. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/ftp/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\ftp.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CFGGENERAL DIALOGEX 37, 31, 445, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Общие"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "О&тображать приветственное сообщение сервера при соединении",IDC_WELCOMEMESSAGE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,246,12
+    CONTROL         "Приоритет &соединениям, используемым на панелях (ускорение просмотра)",IDC_PRIORITYTOPANELCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,488,130,280,12
+    CONTROL         "&Общий лимит скорости для FTP-клиента:",IDC_ENABLETOTSPEEDLIM,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,488,143,158,12
+    EDITTEXT        IDE_TOTALSPEEDLIMIT,647,143,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Поддержка &шестнадцатеричных кодов в путях  (аналогично URL-адресам, например: ""%20"" означает символ пробела)",IDC_ACCEPTHEXESCSEQ,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,436,12
+    CONTROL         "&Автоматически закрывать простаивающий диалог операции, если операция была успешно завершена",IDC_CLOSEOPERDLGIFSUCCESS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,376,12
+    CONTROL         "А&втоматически открывать диалог ""Устранение ошибки"" при ошибках, если диалог операции простаивает",IDC_OPENSOLVEERRIFIDLE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,388,12
+    LTEXT           "КБ/с",IDC_STATIC_1,679,145,17,8,WS_DISABLED
+    LTEXT           "&Пароль для анонимных соединений (адрес эл. почты):",IDC_STATIC_2,5,69,197,8
+    EDITTEXT        IDE_ANONYMOUSPASSWD,203,67,237,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_CFGDEFAULTS DIALOGEX 37, 31, 445, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Параметры по умолчанию"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,263,9,174,1
+    LTEXT           "Дополнительные параметры соединений, используемые по умолчанию",IDC_STATIC_2,5,5,256,8
+    LTEXT           "&Прокси-сервер:",IDC_STATIC_3,14,17,58,8
+    COMBOBOX        IDC_PROXYSERVER,73,15,297,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Добавить...",IDB_ADDPROXYSRV,377,14,60,14,WS_GROUP
+    CONTROL         "Пассивн&ый режим передачи (рекомендуется при использовании сетевого экрана или прокси-сервера)",IDC_PASSIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,29,378,12
+    CONTROL         "Подде&рживать соединение (не позволять серверу разорвать соединение при простое)",IDC_KEEPALIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,42,322,12
+    CONTROL         "&Максимальное количество одновременных подключений к серверу:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,480,137,253,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,734,137,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Общее огран&ичение скорости для этого сервера:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,480,151,189,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,734,151,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Использовать кэш для просмотренных фа&йлов и папок сервера (ускорение просмотра)",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,55,322,12
+    CONTROL         "С&жатие данных при передаче, если сервер поддерживает сжатие (MODE Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,68,283,12
+    LTEXT           "КБ/с",IDC_STATIC_4,766,153,17,8,WS_DISABLED
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,102,95,335,1
+    LTEXT           "Поддержание соединения",IDC_STATIC_6,5,91,95,8
+    LTEXT           "По&сылать команду:",IDC_STATIC_7,14,105,70,8
+    COMBOBOX        IDC_KEEPALIVESEND,85,103,133,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "к&аждые:",IDC_STATIC_8,223,105,32,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,256,103,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "секунд",IDC_STATIC_9,288,105,26,8
+    LTEXT           "Прекратить отправк&у спустя:",IDC_STATIC_10,14,120,106,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,190,118,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "минут",IDC_STATIC_11,223,120,22,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,149,145,288,1
+    LTEXT           "Режим передачи файлов по умолчанию",IDC_STATIC_13,5,141,142,8
+    CONTROL         "&Бинарный режим (нет изменений при передачах)",IDC_BINARYMODE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,151,189,12
+    CONTROL         "Р&ежим ASCII (концы строк файлов преобразовываются к используемым в системе по умолчанию)",IDC_ASCIIMODE,
+                    "Button",BS_AUTORADIOBUTTON,14,164,358,12
+    CONTROL         "А&втоматический - ASCII режим для:",IDC_AUTODETECT,"Button",BS_AUTORADIOBUTTON,14,177,139,12
+    EDITTEXT        IDE_ASCIIMASKS,154,177,283,12,ES_AUTOHSCROLL
+    RTEXT           "использование масок",IDT_ASCIIMASKHINTS,358,191,78,8,WS_TABSTOP
+END
+
+IDD_CFGCONFIRMATIONS DIALOGEX 37, 31, 445, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Подтверждения"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Показывать ""Вы закрываете сервер. Хотите отключиться или сохранить соединение?""",IDC_ALWAYSNOTCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,319,12
+    CONTROL         "П&оказывать ""Вы действительно хотите отключиться?""",IDC_ALWAYSDISCONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,204,12
+    CONTROL         "По&казывать ""Соединение разорвано. Подключиться повторно?""",IDC_ALWAYSRECONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,238,12
+    CONTROL         "Пок&азывать ""Конечное имя уже используется. Перезаписать?"" при быстром переименовании",IDC_ALWAYSOVERWRITE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,344,12
+    CONTROL         "Пока&зывать ""Соединение с FTP-сервером было прервано""",IDC_WARNWHENCONLOST,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,57,218,12
+    CONTROL         "Показ&ывать ""Если хотите всегда отображать скрытые файлы и папки на этом FTP-сервере...""",IDC_HINTLISTHIDDENFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,70,344,12
+END
+
+IDD_CFGADVANCED DIALOGEX 37, 31, 445, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Дополнительно"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Максимальный размера кэша в памяти:",IDC_STATIC_1,5,7,143,8
+    EDITTEXT        IDE_MEMCACHESIZELIMIT,196,5,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "КБ",IDC_STATIC_2,228,7,11,8
+    LTEXT           "&Тайм-аут сетевых операций:",IDC_STATIC_3,5,21,104,8
+    EDITTEXT        IDE_SRVREPLIESTIMEOUT,196,19,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "секунд",IDC_STATIC_4,228,21,26,8
+    LTEXT           "&Интервал между попытками переподключения:",IDC_STATIC_5,5,35,171,8
+    EDITTEXT        IDE_DELAYBETWCONRETR,196,33,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "секунд",IDC_STATIC_6,228,35,26,8
+    LTEXT           "&Количество попыток переподключения:",IDC_STATIC_7,5,49,144,8
+    EDITTEXT        IDE_CONNECTRETRIES,196,47,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Разорвать соединение, если оно простаивает более:",IDC_STATIC_8,5,63,190,8
+    EDITTEXT        IDE_NODATATRTIMEOUT,196,61,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "секунд",IDC_STATIC_9,228,63,26,8
+    LTEXT           "&Возобновлять копирование файла только, если уже скопировано минимум:",IDC_STATIC_10,5,77,270,8
+    EDITTEXT        IDE_RESUMEMINFILESIZE,335,75,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "байт",IDC_STATIC_11,374,77,18,8
+    LTEXT           "Коли&чество проверяемых байт (в конце файла) при возобновлении копирования с сервера:",IDC_STATIC_12,5,91,329,8
+    EDITTEXT        IDE_RESUMEOVERLAP,335,89,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "байт",IDC_STATIC_13,374,91,18,8
+END
+
+IDD_CFGLOGS DIALOGEX 23, 39, 445, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Журналы"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "КБ",IDC_STATIC_1,322,23,11,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,174,12,263,1
+    CONTROL         "&Вести журнал взаимодействия с серверами",IDC_ENABLELOGGING,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,7,167,12
+    CONTROL         "&Максимальный размер журнала для одного сервера:",IDC_LOGMAXSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,21,201,12
+    EDITTEXT        IDE_LOGMAXSIZE,290,21,28,12,ES_AUTOHSCROLL
+    CONTROL         "М&аксимальное количество хранимых журналов разорванных соединений:",IDC_MAXCLOSEDCONLOGS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,35,275,12
+    EDITTEXT        IDE_MAXCLOSEDCONLOGS,290,35,28,12,ES_AUTOHSCROLL
+    CONTROL         "&Не вести журнал соединений, используемых для файловых операций",IDC_DISABLELOGWORKERS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,49,260,12
+END
+
+IDD_CONNECT DIALOGEX 23, 72, 491, 164
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Соединиться с FTP-сервером"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDL_BOOKMARKS,7,7,179,129,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Адрес:",IDT_HOSTADDRESS,195,9,31,8
+    COMBOBOX        IDE_HOSTADDRESS,259,7,225,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "На&чальный путь:",IDT_INITIALPATH,195,23,63,8
+    COMBOBOX        IDE_INITIALPATH,259,21,225,117,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,272,47,212,1
+    CONTROL         " А&нонимный вход",IDC_ANONYMOUSLOGIN,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,195,42,75,12
+    LTEXT           "&Имя пользователя:",IDT_USERNAME,205,58,70,8
+    EDITTEXT        IDE_USERNAME,276,56,208,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Парол&ь:",IDT_PASSWORD,205,72,67,8
+    EDITTEXT        IDE_PASSWORD,276,70,58,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    EDITTEXT        IDE_PASSWORD_LOCKED,339,70,58,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "Раз&блокировать...",IDB_PASSWORD_CHANGE,402,69,82,14
+    CONTROL         "Со&хранить пароль",IDC_SAVEPASSWORD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,205,84,76,12
+    LTEXT           "(небезопасно)",IDC_SAVEPASSWORD_HINT,286,86,198,8,WS_TABSTOP
+    PUSHBUTTON      "&Дополнительно...",IDB_ADVACED,195,107,72,14,WS_GROUP
+    EDITTEXT        IDE_ADVANCEDINFO,273,108,211,12,ES_AUTOHSCROLL | ES_READONLY | WS_GROUP
+    PUSHBUTTON      "&Создать...",IDB_NEWBOOKMARK,6,142,50,14,WS_GROUP
+    PUSHBUTTON      "&Переименовать...",IDB_RENAMEBOOKMARK,60,142,72,14
+    PUSHBUTTON      "&Удалить...",IDB_REMOVEBOOKMARK,136,142,50,14
+    DEFPUSHBUTTON   "Соединиться",IDOK,229,142,60,14,WS_GROUP
+    PUSHBUTTON      "&Закрыть",IDB_CLOSE,294,142,60,14
+    PUSHBUTTON      "Отмена",IDCANCEL,359,142,60,14
+    PUSHBUTTON      "Справка",IDHELP,424,142,60,14
+END
+
+IDD_CONNECTADVANCED DIALOGEX 22, 28, 424, 301
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Дополнительные параметры"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Прокси-сервер:",IDC_STATIC_1,7,10,58,8
+    COMBOBOX        IDC_PROXYSERVER,101,8,248,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Добавить...",IDB_ADDPROXYSRV,356,7,60,14,WS_GROUP
+    LTEXT           "Путь &на панели:",IDC_STATIC_2,7,25,60,8
+    EDITTEXT        IDE_TARGETPATH,101,23,248,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "&Обзор...",IDB_BROWSE,356,22,60,14,WS_GROUP
+    LTEXT           "Со&единиться с пoртом:",IDC_STATIC_3,7,40,84,8
+    EDITTEXT        IDC_CONNECTTOPORT,101,38,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Тип сервера:",IDC_STATIC_4,7,54,49,8
+    COMBOBOX        IDC_SERVERTYPE,101,52,317,61,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Режим передачи файлов:",IDC_STATIC_5,7,69,93,8
+    COMBOBOX        IDC_TRANSFERMODE,101,67,317,57,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Команда &листинга:",IDC_STATIC_6,7,84,70,8
+    COMBOBOX        IDC_LISTCOMMAND,101,82,91,57,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Начальные &команды FTP:",IDC_STATIC_7,7,99,92,8
+    EDITTEXT        IDE_INITFTPCOMMANDS,101,97,316,12,ES_AUTOHSCROLL | WS_GROUP
+    RTEXT           "разделяйте команды точкой с запятой (CWD []; HELP)",IDC_STATIC_8,222,111,193,8
+    GROUPBOX        "     ",IDC_STATIC_9,7,129,410,46
+    CONTROL         " Поддерживать соединение (не позвол&яет серверу разорвать соединение при простое)",IDC_USEKEEPALIVE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,15,127,324,12
+    LTEXT           "Посылат&ь команду:",IDC_STATIC_10,15,143,69,8
+    COMBOBOX        IDC_KEEPALIVESEND,85,141,134,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "кажд&ые:",IDC_STATIC_11,224,143,32,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,257,141,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "секунд",IDC_STATIC_12,289,143,26,8
+    LTEXT           "Прекратить отправк&у спустя:",IDC_STATIC_13,15,158,106,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,191,156,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "минут",IDC_STATIC_14,224,158,22,8
+    CONTROL         "Пасс&ивный режим передачи (рекомендуется при использовании сетевого экрана или прокси-сервера)",IDC_USEPASSIVEMODE,
+                    "Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,7,186,378,12
+    CONTROL         "&Максимальное количество одновременных подключений к серверу:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,448,206,253,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,702,206,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "О&бщее ограничение скорости для этого сервера:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,448,221,188,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,702,221,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Использовать кэш для просмотренных фа&йлов и папок сервера (ускорение просмотра)",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,200,322,12
+    CONTROL         "Шифров&ать управляющее подключение протоколами TLS/SSL",IDC_ENCRYPTCONTROLCONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,214,232,12
+    CONTROL         "Шифровать &соединения (передача файлов и вывод содержимого папок) протоколами TLS/SSL",IDC_ENCRYPTDATACONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,228,348,12
+    CONTROL         "С&жатие данных при передаче, если сервер поддерживает сжатие (MODE Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,242,283,12
+    LTEXT           "Примечание: неопределено = использовать значения по умолчанию (см. ""Параметры по умолчанию"")",IDC_STATIC_15,7,258,367,8
+    LTEXT           "КБ/с",IDC_STATIC_16,735,223,17,8,WS_DISABLED
+    DEFPUSHBUTTON   "ОК",IDOK,126,279,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,187,279,50,14
+    PUSHBUTTON      "Справка",IDHELP,248,279,50,14
+END
+
+IDD_RENAMEDLG DIALOGEX 10, 24, 227, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Переименовать закладку"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "ОК",IDOK,57,42,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,119,42,50,14
+END
+
+IDD_NEWBOOKMARKDLG DIALOGEX 10, 24, 227, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Новая закладка"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Название закладки:",IDT_NEWNAME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    CONTROL         "",IDC_COPYFOCUSEDSRV,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,35,199,12
+    DEFPUSHBUTTON   "ОК",IDOK,57,55,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,119,55,50,14
+END
+
+IDD_ENTERSTRDLG DIALOGEX 10, 24, 243, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Введите имя пользователя"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CONNECTINGTOAS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,9,8,227,8
+    LTEXT           "&Имя пользователя:",IDT_STRING,9,23,223,8
+    EDITTEXT        IDE_STRING,9,33,225,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,65,60,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,127,60,50,14
+END
+
+IDD_LOGINERRORDLG DIALOGEX 10, 24, 294, 165
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ошибка подключения к FTP-серверу"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Имя пользователя:",IDC_STATIC_1,7,55,70,8
+    EDITTEXT        IDE_USERNAME,78,53,210,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "П&ароль:",IDC_STATIC_2,7,70,30,8
+    EDITTEXT        IDE_PASSWORD,78,68,210,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Учетная запись:",IDC_STATIC_3,7,85,60,8
+    EDITTEXT        IDE_ACCOUNT,78,83,210,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Повторить",IDOK,91,110,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,153,110,50,14
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,7,132,281,1
+    CONTROL         "&Повторить в следующий раз без запроса (только для этого соединения)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,137,269,12
+    CONTROL         "Применят&ь ко всем соединениям с ошибками",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,149,172,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,280,8
+    LTEXT           "Ответ сервера:",IDT_ERRORTITLE,7,22,282,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,282,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_LOGINERRORDLGEX DIALOGEX 10, 24, 299, 195
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ошибка подключения к FTP-серверу"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Имя пользователя:",IDC_STATIC_1,7,55,70,8
+    EDITTEXT        IDE_USERNAME,105,53,188,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "П&ароль:",IDC_STATIC_2,7,70,31,8
+    EDITTEXT        IDE_PASSWORD,105,68,188,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Учетная запись:",IDC_STATIC_3,7,85,60,8
+    EDITTEXT        IDE_ACCOUNT,105,83,188,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "И&мя пользователя прокси:",IDC_STATIC_4,7,100,97,8
+    EDITTEXT        IDE_PROXYUSER,105,98,188,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Паро&ль прокси:",IDC_STATIC_5,7,115,58,8
+    EDITTEXT        IDE_PROXYPASSWD,105,113,188,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Повторить",IDOK,90,140,55,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,154,140,55,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,162,286,1
+    CONTROL         "&Повторить в следующий раз без запроса (только для текущего соединения)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,167,283,12
+    CONTROL         "Применят&ь в дальнейшем ко всем соединениям с ошибкой",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,179,221,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,285,8
+    LTEXT           "Ответ сервера:",IDT_ERRORTITLE,7,22,287,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,287,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_WELCOMEMSGDLG DIALOGEX 10, 24, 396, 170
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Приветственное сообщение"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_WELCOMEMSG,5,5,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Закрыть",IDOK,126,152,65,14,WS_GROUP
+    PUSHBUTTON      "&Сохранить как",IDB_SAVEMSGAS,204,152,65,14
+END
+
+IDD_LOGSDLG DIALOGEX 17, 51, 396, 165
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Журналы FTP"
+MENU IDM_LOGSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_MENULINE,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,396,1
+    COMBOBOX        IDC_LISTOFLOGS,5,5,386,104,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDE_SERVERLOG,5,19,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+END
+
+IDD_SENDCOMMANDDLG DIALOGEX 10, 24, 312, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Послать команду FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Команда:",IDC_STATIC_1,9,9,37,8
+    COMBOBOX        IDC_FTPCOMMAND,9,19,294,90,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDE_FTPCOMMAND_PASSWD,9,19,294,12,ES_PASSWORD | ES_AUTOHSCROLL | NOT WS_VISIBLE | WS_GROUP
+    CONTROL         "&Секретная команда (скрыть ввод, не показывать и не запоминать в журнале)",IDC_SECRETCOMMAND,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,34,288,12
+    CONTROL         "Разрешить к&оманде смену рабочего пути на сервере (а также пути на панели)",IDC_CHANGEPATHINPANEL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,46,291,12
+    CONTROL         "Разрешить ко&манде вносить изменения по рабочему пути (обновлять его)",IDC_REFRESHWORKINGPATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,58,275,12
+    DEFPUSHBUTTON   "ОК",IDOK,71,79,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,131,79,50,14
+    PUSHBUTTON      "Справка",IDHELP,191,79,50,14
+END
+
+IDD_LISTWAITDLG DIALOGEX 10, 24, 377, 91
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "FTP-клиент"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDT_ACTION,9,9,361,16
+    LTEXT           "Путь:",IDT_PATHONFTP1,9,27,22,8
+    LTEXT           "",IDT_PATHONFTP2,32,27,338,8
+    LTEXT           "Осталось примерно:",IDT_ESTIMATEDTIME1,9,38,75,8
+    LTEXT           "",IDT_ESTIMATEDTIME2,85,38,285,8
+    LTEXT           "Прошло:",IDT_ELAPSEDTIME1,9,49,75,8
+    LTEXT           "",IDT_ELAPSEDTIME2,85,49,285,8
+    LTEXT           "Состояние:",IDT_OPERSTATUS1,9,60,41,8
+    LTEXT           "",IDT_OPERSTATUS2,51,60,319,8
+    CONTROL         "",IDC_OPERPROGRESS,"Static",0,9,71,360,12
+END
+
+IDD_CFGSERVERTYPES DIALOGEX 37, 31, 445, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Серверы"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Поддерживаемые типы серверов:",IDC_STATIC_1,5,5,122,8
+    LISTBOX         IDL_SUPPORTEDSERVERS,5,15,364,197,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Создать...",IDB_NEWSERVER,378,14,60,14,WS_GROUP
+    PUSHBUTTON      "&Изменить...",IDB_EDITSERVER,378,32,60,14
+    PUSHBUTTON      "&Вверх",IDB_MOVESERVERUP,378,50,60,14
+    PUSHBUTTON      "В&низ",IDB_MOVESERVERDOWN,378,68,60,14
+    PUSHBUTTON      "&Другое",IDB_OTHERSERVERACT,378,86,60,14
+END
+
+IDD_EDITSERVERTYPE DIALOGEX 22, 28, 421, 241
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Редактирование типа сервера"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Правило автоопределения типа сервера:",IDC_STATIC_1,7,7,150,8
+    EDITTEXT        IDE_AUTODETECTCOND,7,17,390,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ADCONDINSERT,402,17,12,12,WS_GROUP
+    RTEXT           "(пусто = всегда true)",IDC_STATIC_2,321,31,76,8
+    LTEXT           "&Столбцы на панели:",IDC_STATIC_3,7,39,91,8
+    CONTROL         "",IDL_SRVTYPECOLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,49,339,68
+    PUSHBUTTON      "Созд&ать...",IDB_NEWCOLUMN,354,49,60,14,WS_GROUP
+    PUSHBUTTON      "&Изменить...",IDB_EDITCOLUMN,354,67,60,14
+    PUSHBUTTON      "&Удалить...",IDB_REMOVECOLUMN,354,85,60,14
+    PUSHBUTTON      "Пере&местить",IDB_MOVECOLUMN,354,103,60,14
+    LTEXT           "Пра&вила анализа листинга:",IDC_STATIC_4,7,127,101,8
+    EDITTEXT        IDE_PARSINGRULES,7,137,407,76,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    PUSHBUTTON      "&Тест анализатора...",IDB_TESTPARSER,7,221,82,14,WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,242,221,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,303,221,50,14
+    PUSHBUTTON      "Справка",IDHELP,364,221,50,14
+END
+
+IDD_EDITSRVTYCOLUMN DIALOGEX 58, 53, 277, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Редактирование столбца"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Идентификатор:",IDC_STATIC_1,11,12,60,8
+    EDITTEXT        IDE_COL_ID,90,10,177,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Названи&е:",IDC_STATIC_2,11,27,39,8
+    COMBOBOX        IDC_COL_NAME,90,25,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Тип:",IDC_STATIC_3,11,43,18,8
+    COMBOBOX        IDC_COL_TYPE,90,41,177,65,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Фиктивное значение:",IDC_STATIC_4,11,59,78,8
+    EDITTEXT        IDE_COL_EMPTY,90,57,135,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "",IDT_COL_FORMHELP,229,59,42,8
+    LTEXT           "&Описание:",IDC_STATIC_5,11,74,40,8
+    COMBOBOX        IDC_COL_DESCR,90,72,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Выравнивание:",IDC_STATIC_6,11,89,57,8
+    COMBOBOX        IDC_COL_ALIGNMENT,90,87,94,37,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    DEFPUSHBUTTON   "ОК",IDOK,53,113,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,113,113,50,14
+    PUSHBUTTON      "Справка",IDHELP,173,113,50,14
+END
+
+IDD_SRVTYPETESTPARSER DIALOGEX 30, 34, 441, 262
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Тест анализатора"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Raw-листинг:",IDC_STATIC_1,7,7,50,8
+    EDITTEXT        IDE_PARSER_RAWLIST,7,17,426,83,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    CONTROL         "&Имитация неполного (прерванного) raw-листинга",IDC_PARSER_LISTINCOMPL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,189,12
+    PUSHBUTTON      "&Анализ raw-листинга",IDB_PARSER_PARSELIST,204,107,90,14,WS_GROUP
+    PUSHBUTTON      "За&грузить raw-листинг из файла...",IDB_PARSER_LOADLIST,301,107,132,14
+    LTEXT           "Ре&зультаты анализа:",IDC_STATIC_2,7,129,75,8
+    CONTROL         "",IDL_PARSER_COLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,426,94
+    DEFPUSHBUTTON   "Закрыть",IDOK,323,241,50,14,WS_GROUP
+    PUSHBUTTON      "Справка",IDHELP,383,241,50,14
+END
+
+IDD_OPERATIONDLG DIALOGEX 25, 31, 398, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPSOURCETITLE,5,8,65,8
+    CONTROL         "",IDT_OPSOURCETEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,74,8,319,8
+    RTEXT           "",IDT_OPTARGETTITLE,5,19,65,8
+    CONTROL         "",IDT_OPTARGETTEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,74,19,319,8
+    RTEXT           "Осталось:",IDC_STATIC_1,5,30,65,8
+    CONTROL         "",IDT_OPTIMELEFT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,74,30,319,8
+    RTEXT           "Прошло:",IDC_STATIC_2,5,41,65,8
+    CONTROL         "",IDT_OPELAPSEDTIME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,74,41,319,8
+    RTEXT           "Состояние:",IDC_STATIC_3,5,52,65,8
+    CONTROL         "",IDT_OPSTATUS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,74,52,319,8
+    ICON            "",IDI_ERRORICON,272,51,18,20,WS_GROUP
+    CONTROL         "Недостаточно места на диске",IDT_ERRORMSG,"Static",SS_LEFTNOWORDWRAP | WS_GROUP | WS_TABSTOP,286,52,107,8
+    RTEXT           "Прогресс:",IDC_STATIC_4,5,64,65,8
+    CONTROL         "",IDC_OPPROGRESS,"Static",WS_GROUP,74,63,317,12
+    PUSHBUTTON      "&Подробнее >>",IDB_SHOWDETAILS,92,100,64,14,WS_GROUP
+    PUSHBUTTON      "Оши&бки >>",IDB_SHOWERRORS,163,100,50,14
+    PUSHBUTTON      "Скр&ыть",IDB_HIDE,35,100,50,14,WS_DISABLED
+    PUSHBUTTON      "П&ауза",IDB_PAUSERESUME,220,100,57,14
+    PUSHBUTTON      "",IDCANCEL,284,100,50,14
+    PUSHBUTTON      "Справка",IDHELP,341,100,50,14
+    CONTROL         "",IDC_DLGSPLITBAR,"Static",SS_ETCHEDHORZ | WS_GROUP,7,122,384,1
+    LTEXT           "&Соединения:",IDT_CONNECTIONS,7,129,60,8
+    CONTROL         "",IDL_CONNECTIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,383,35
+    PUSHBUTTON      "Устранен&ие ошибки",IDB_OPCONSSOLVEERROR,133,181,80,14,WS_GROUP
+    PUSHBUTTON      "&Добавить",IDB_OPCONSADD,220,181,50,14
+    PUSHBUTTON      "Оста&новить",IDB_OPCONSSTOP,277,181,50,14
+    PUSHBUTTON      "Пау&за",IDB_OPCONSPAUSERESUME,334,181,57,14
+    LTEXT           "Опера&ции:",IDT_OPERATIONSTEXT,7,195,381,8
+    CONTROL         "",IDL_OPERATIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,205,383,35
+    CONTROL         "По&казывать только ошибки",IDB_OPOPERSSHOWONLYERR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,247,108,12
+    PUSHBUTTON      "&Устранение ошибки",IDB_OPOPERSSOLVEERROR,197,247,80,14,WS_GROUP
+    PUSHBUTTON      "По&вторить",IDB_OPOPERSRETRY,284,247,50,14
+    PUSHBUTTON      "П&ропустить",IDB_OPOPERSSKIP,341,247,50,14
+    CONTROL         "Закрыть этот диало&г по завершении операции",IDC_OPCLOSEWINWHENDONE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,81,178,12
+END
+
+IDD_COPYMOVEDLG DIALOGEX 10, 24, 244, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_TGTPATHSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,226,8
+    COMBOBOX        IDC_TGTPATH,10,19,225,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "&Только добавить в очередь (не выполнять в активном соединении)",IDC_ADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,292,47,197,12
+    DEFPUSHBUTTON   "ОК",IDOK,37,42,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,97,42,50,14
+    PUSHBUTTON      "Справка",IDHELP,157,42,50,14
+END
+
+IDD_CONFIRMDELETEDLG DIALOGEX 10, 24, 331, 61
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Подтверждение удаления"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "&Да",IDOK,112,39,50,14,WS_GROUP
+    PUSHBUTTON      "&Нет",IDCANCEL,169,39,50,14
+    ICON            "",IDC_DELICON,8,8,18,20,WS_GROUP
+    LTEXT           "",IDT_DELSUBJECT,41,12,284,16,SS_NOPREFIX
+    CONTROL         "&Только добавить в очередь (не выполнять в активном соединении)",IDC_DELADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,352,40,197,12
+END
+
+IDD_CHANGEATTRSDLG DIALOGEX 10, 24, 332, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Изменение атрибутов"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CHATTRSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,7,10,318,8
+    GROUPBOX        " Владелец ",IDC_STATIC_1,7,26,102,51,WS_GROUP
+    GROUPBOX        " Группа ",IDC_STATIC_2,115,26,102,51,WS_GROUP
+    GROUPBOX        " Другие ",IDC_STATIC_3,223,26,102,51,WS_GROUP
+    CONTROL         "Чтен&ие",IDC_READOWNER,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,36,83,12
+    CONTROL         "З&апись",IDC_WRITEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,48,83,12
+    CONTROL         "Исполнение (Дост&уп)",IDC_EXECUTEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,60,89,12
+    CONTROL         "Чт&ение",IDC_READGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,124,36,84,12
+    CONTROL         "Запи&сь",IDC_WRITEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,124,48,84,12
+    CONTROL         "Исп&олнение (Доступ)",IDC_EXECUTEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,124,60,89,12
+    CONTROL         "&Чтение",IDC_READOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,232,36,84,12
+    CONTROL         "Запис&ь",IDC_WRITEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,232,48,84,12
+    CONTROL         "Испо&лнение (Доступ)",IDC_EXECUTEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,232,60,89,12
+    LTEXT           "Примечание: неопределенный выбор = не изменять атрибут",IDC_STATIC_4,7,81,220,8
+    LTEXT           "Число&вое значение:",IDC_STATIC_5,7,101,74,8
+    EDITTEXT        IDE_NUMATTRVALUE,82,99,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = Исполнение, 2 = Запись, 4 = Чтение)",IDC_STATIC_6,114,101,153,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,50,126,276,1
+    LTEXT           "Параметры",IDC_STATIC_8,7,122,41,8
+    CONTROL         "Включая вложенные &папки",IDC_INCLUDESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,132,108,12
+    CONTROL         "И&зменить атрибуты файлов",IDC_CHATTRSETFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,144,110,12
+    CONTROL         "Изме&нить атрибуты папок",IDC_CHATTRSETDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,156,105,12
+    CONTROL         "&Только добавить в очередь (не выполнять в активном соединении)",IDC_CHATTRADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,359,160,252,12
+    DEFPUSHBUTTON   "ОК",IDOK,81,178,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,141,178,50,14
+    PUSHBUTTON      "Справка",IDHELP,201,178,50,14
+END
+
+IDD_CFGOPERATIONS DIALOGEX 37, 31, 445, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Операции 1"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,165,9,276,1
+    LTEXT           "Копирование и перемещение с FTP-сервера",IDC_STATIC_2,5,5,158,8
+    LTEXT           "Есл&и конечный файл уже существует:",IDC_STATIC_3,9,17,137,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,280,15,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если конечная  п&апка уже существует:",IDC_STATIC_4,9,31,140,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,280,29,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если &не удается создать конечный файл:",IDC_STATIC_5,9,45,149,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,280,43,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Е&сли не удается создать конечную папку:",IDC_STATIC_6,9,59,150,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,280,57,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если произошла ошибка переда&чи, а конечный файл был создан:",IDC_STATIC_7,9,73,236,8
+    COMBOBOX        IDC_RETRYONCREATED,280,71,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если произошла ошибка &при возобновлении передачи файла:",IDC_STATIC_8,9,87,224,8
+    COMBOBOX        IDC_RETRYONRESUMED,280,85,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если выбран режим A&SCII для передачи бинарного файла:",IDC_STATIC_9,9,101,212,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,280,99,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,143,124,298,1
+    LTEXT           "Изменение атрибутов на FTP-сервере",IDC_STATIC_11,5,120,136,8
+    LTEXT           "Если невозможно сохранить т&екущие атрибуты (например режим ""s"" Unix):",IDC_STATIC_12,9,132,270,8
+    COMBOBOX        IDC_UNKNOWNATTRS,280,130,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,95,155,346,1
+    LTEXT           "Удаление с FTP-сервера",IDC_STATIC_14,5,151,88,8
+    LTEXT           "Если пап&ка не пуста:",IDC_STATIC_15,9,163,77,8
+    COMBOBOX        IDC_NONEMPTYDIRDEL,280,161,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если &файл скрыт:",IDC_STATIC_16,9,177,66,8
+    COMBOBOX        IDC_HIDDENFILEDEL,280,175,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если папка скр&ыта:",IDC_STATIC_17,9,191,72,8
+    COMBOBOX        IDC_HIDDENDIRDEL,280,189,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_CFGOPERATIONS2 DIALOGEX 37, 31, 445, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Операции 2"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,166,9,275,1
+    LTEXT           "Копирование и перемещение на FTP-сервер",IDC_STATIC_2,5,5,159,8
+    LTEXT           "Есл&и конечный файл уже существует:",IDC_STATIC_3,9,17,137,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,280,15,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если конечная п&апка уже существует:",IDC_STATIC_4,9,31,137,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,280,29,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если &не удается создать конечный файл:",IDC_STATIC_5,9,45,149,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,280,43,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ес&ли не удается создать конечную папку:",IDC_STATIC_6,9,59,150,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,280,57,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если произошла ошибка переда&чи, а конечный файл был создан:",IDC_STATIC_7,9,73,236,8
+    COMBOBOX        IDC_RETRYONCREATED,280,71,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Если произошла ошибка &при возобновлении передачи файла:",IDC_STATIC_8,9,87,224,8
+    COMBOBOX        IDC_RETRYONRESUMED,280,85,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Е&сли был выбран режим ASCII для передачи бинарного файла:",IDC_STATIC_9,9,101,228,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,280,99,160,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_SOLVEITEMERRDETAILED DIALOGEX 10, 24, 341, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,51,88,55,14,WS_GROUP
+    PUSHBUTTON      "&Пропустить",IDB_SCRD_SKIP,112,88,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,173,88,55,14
+    PUSHBUTTON      "Справка",IDHELP,234,88,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,328,1
+    CONTROL         "&Запомнить выбор и не показывать этот диалог при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,326,12
+    LTEXT           "П&одробности:",IDC_STATIC_3,7,9,65,8
+    EDITTEXT        IDE_SCRD_DETAILS,74,9,259,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "П&уть источника:",IDC_STATIC_4,7,27,65,8
+    EDITTEXT        IDE_SCRD_SRCPATH,74,27,259,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_5,7,39,65,8
+    EDITTEXT        IDE_SCRD_SRCNAME,74,39,259,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_6,7,51,65,8
+    EDITTEXT        IDE_SCRD_TGTPATH,74,51,259,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_7,7,65,65,8
+    EDITTEXT        IDE_SCRD_TGTNAME,74,63,260,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILEDEX DIALOGEX 10, 24, 369, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,12,88,58,14,WS_GROUP
+    PUSHBUTTON      "&Возобновить",CM_SIED_RESUME,74,88,58,14
+    PUSHBUTTON      "П&ерезаписать",CM_SIED_OVERWRITE,136,88,58,14
+    PUSHBUTTON      "П&ропустить",IDB_SCRD_SKIP,198,88,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,252,88,50,14
+    PUSHBUTTON      "Справка",IDHELP,306,88,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,354,1
+    CONTROL         "&Запомнить выбор и не показывать этот диалог при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,326,12
+    LTEXT           "П&одробности:",IDC_STATIC_3,7,9,65,8
+    EDITTEXT        IDE_SCRD_DETAILS,74,9,288,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "П&уть источника:",IDC_STATIC_4,7,27,65,8
+    EDITTEXT        IDE_SCRD_SRCPATH,74,27,288,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_5,7,39,65,8
+    EDITTEXT        IDE_SCRD_SRCNAME,74,39,288,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_6,7,51,65,8
+    EDITTEXT        IDE_SCRD_TGTPATH,74,51,288,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_7,7,65,65,8
+    EDITTEXT        IDE_SCRD_TGTNAME,74,63,288,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED2 DIALOGEX 10, 24, 341, 147
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,51,101,55,14,WS_GROUP
+    PUSHBUTTON      "&Пропустить",IDB_SCRD_SKIP,112,101,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,173,101,55,14
+    PUSHBUTTON      "Справка",IDHELP,234,101,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,327,1
+    CONTROL         "&Запомнить выбор и не показывать этот диалог при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,326,12
+    LTEXT           "&Описание ошибки:",IDC_STATIC_3,7,9,68,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,327,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "П&уть источника:",IDC_STATIC_4,7,40,65,8
+    EDITTEXT        IDE_SCRD_SRCPATH,74,40,258,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_5,7,52,65,8
+    EDITTEXT        IDE_SCRD_SRCNAME,74,52,258,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_6,7,64,65,8
+    EDITTEXT        IDE_SCRD_TGTPATH,74,64,258,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_7,7,78,65,8
+    EDITTEXT        IDE_SCRD_TGTNAME,74,76,258,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3 DIALOGEX 10, 24, 298, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ошибка создания конечной папки под альтернативным именем"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,30,101,55,14,WS_GROUP
+    PUSHBUTTON      "&Пропустить",IDB_SCRD_SKIP,91,101,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,152,101,55,14
+    PUSHBUTTON      "Справка",IDHELP,213,101,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,284,1
+    CONTROL         "Выполнять выб&ранное действие при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,274,12
+    LTEXT           "&Описание ошибки:",IDC_STATIC_2,7,9,68,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,286,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "П&уть источника:",IDC_STATIC_3,7,40,65,8
+    EDITTEXT        IDE_SCRD_SRCPATH,74,40,217,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_4,7,52,65,8
+    EDITTEXT        IDE_SCRD_SRCNAME,74,52,217,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_5,7,64,65,8
+    EDITTEXT        IDE_SCRD_TGTPATH,74,64,217,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_6,7,78,65,8
+    EDITTEXT        IDE_SCRD_TGTNAME,74,76,216,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3EX DIALOGEX 10, 24, 369, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ошибка создания конечной папки под альтернативным именем"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,12,101,58,14,WS_GROUP
+    PUSHBUTTON      "&Возобновить",CM_SIED_RESUME,74,101,58,14
+    PUSHBUTTON      "&Перезаписать",CM_SIED_OVERWRITE,136,101,58,14
+    PUSHBUTTON      "П&ропустить",IDB_SCRD_SKIP,198,101,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,252,101,50,14
+    PUSHBUTTON      "Справка",IDHELP,306,101,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,354,1
+    CONTROL         "В&ыполнять выбранное действие при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,274,12
+    LTEXT           "&Описание ошибки:",IDC_STATIC_2,7,9,68,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,357,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "П&уть источника:",IDC_STATIC_3,7,40,65,8
+    EDITTEXT        IDE_SCRD_SRCPATH,74,40,288,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_4,7,52,65,8
+    EDITTEXT        IDE_SCRD_SRCNAME,74,52,288,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_5,7,64,65,8
+    EDITTEXT        IDE_SCRD_TGTPATH,74,64,288,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_6,7,78,65,8
+    EDITTEXT        IDE_SCRD_TGTNAME,74,76,288,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLE DIALOGEX 10, 24, 342, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,52,70,55,14,WS_GROUP
+    PUSHBUTTON      "П&ропустить",IDB_SCRD_SKIP,113,70,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,174,70,55,14
+    PUSHBUTTON      "Справка",IDHELP,235,70,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,328,1
+    CONTROL         "&Запомнить выбор и не показывать этот диалог при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,326,12
+    LTEXT           "П&уть источника:",IDC_STATIC_3,7,9,65,8
+    EDITTEXT        IDE_SCRD_SRCPATH,74,9,261,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_4,7,21,65,8
+    EDITTEXT        IDE_SCRD_SRCNAME,74,21,261,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_5,7,33,65,8
+    EDITTEXT        IDE_SCRD_TGTPATH,74,33,261,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_6,7,47,65,8
+    EDITTEXT        IDE_SCRD_TGTNAME,74,45,261,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLEEX DIALOGEX 10, 24, 397, 116
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,8,70,55,14,WS_GROUP
+    PUSHBUTTON      "&Перезаписать",CM_SIED_OVERWRITE,67,70,65,14
+    PUSHBUTTON      "Перезаписать &все",CM_SIED_OVERWRITEALL,136,70,75,14
+    PUSHBUTTON      "П&ропустить",IDB_SCRD_SKIP,215,70,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,274,70,55,14
+    PUSHBUTTON      "Справка",IDHELP,333,70,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,383,1
+    CONTROL         "&Запомнить выбор и не показывать этот диалог при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,326,12
+    LTEXT           "П&уть источника:",IDC_STATIC_3,7,9,65,8
+    EDITTEXT        IDE_SCRD_SRCPATH,74,9,317,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_4,7,21,65,8
+    EDITTEXT        IDE_SCRD_SRCNAME,74,21,317,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_5,7,33,65,8
+    EDITTEXT        IDE_SCRD_TGTPATH,74,33,317,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_6,7,47,65,8
+    EDITTEXT        IDE_SCRD_TGTNAME,74,45,315,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRASCIITR DIALOGEX 16, 27, 348, 118
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Режим передачи ASCII установлен для файла с бинарным содержимым"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Бинарный режим",IDOK,18,70,78,14,WS_GROUP
+    PUSHBUTTON      "&Игнорировать",CM_SATR_IGNORE,102,70,60,14
+    PUSHBUTTON      "П&ропустить",IDB_SCRD_SKIP,168,70,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,224,70,50,14
+    PUSHBUTTON      "Справка",IDHELP,280,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,333,1
+    CONTROL         "З&апомнить выбор и не показывать этот диалог при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,326,12
+    LTEXT           "П&уть источника:",IDC_STATIC_3,7,9,65,8
+    EDITTEXT        IDE_SCRD_SRCPATH,74,9,265,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_4,7,21,65,8
+    EDITTEXT        IDE_SCRD_SRCNAME,74,21,265,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_5,7,33,65,8
+    EDITTEXT        IDE_SCRD_TGTPATH,74,33,265,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_6,7,45,65,8
+    EDITTEXT        IDE_SCRD_TGTNAME,74,45,265,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMERRUNKATTR DIALOGEX 10, 24, 339, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Некоторые из имеющихся атрибутов не могут быть сохранены"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Игнорировать",IDOK,43,70,70,14,WS_GROUP
+    PUSHBUTTON      "П&ропустить",IDB_SCRD_SKIP,119,70,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,180,70,55,14
+    PUSHBUTTON      "Справка",IDHELP,241,70,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,326,1
+    CONTROL         "З&апомнить выбор и не показывать этот диалог при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,326,12
+    LTEXT           "&Путь:",IDC_STATIC_3,7,9,70,8
+    EDITTEXT        IDE_SCRD_SRCPATH,80,9,253,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Имя:",IDC_STATIC_4,7,21,70,8
+    EDITTEXT        IDE_SCRD_SRCNAME,80,21,253,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Текущие атрибуты:",IDC_STATIC_5,7,33,70,8
+    EDITTEXT        IDE_SCRD_CURATTR,80,33,253,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Н&овые атрибуты:",IDC_STATIC_6,7,45,70,8
+    EDITTEXT        IDE_SCRD_NEWATTR,80,45,253,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSETNEWATTR DIALOGEX 10, 24, 332, 190
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Установка новых атрибутов"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Владелец ",IDC_STATIC_1,7,56,102,51,WS_GROUP
+    GROUPBOX        " Группа ",IDC_STATIC_2,115,56,102,51,WS_GROUP
+    GROUPBOX        " Прочие ",IDC_STATIC_3,223,56,102,51,WS_GROUP
+    CONTROL         "Ч&тение",IDC_READOWNER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,66,84,12
+    CONTROL         "Запис&ь",IDC_WRITEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,78,84,12
+    CONTROL         "Испо&лнение (Доступ)",IDC_EXECUTEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,90,89,12
+    CONTROL         "Чте&ние",IDC_READGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,124,66,84,12
+    CONTROL         "З&апись",IDC_WRITEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,124,78,84,12
+    CONTROL         "Исп&олнение (Доступ)",IDC_EXECUTEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,124,90,89,12
+    CONTROL         "&Чтение",IDC_READOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,232,66,84,12
+    CONTROL         "&Запись",IDC_WRITEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,232,78,84,12
+    CONTROL         "Исполнение (Дост&уп)",IDC_EXECUTEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,232,90,89,12
+    LTEXT           "Числово&е значение:",IDC_STATIC_4,7,117,74,8
+    EDITTEXT        IDE_NUMATTRVALUE,82,115,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = Исполнение, 2 = Запись, 4 = Чтение)",IDC_STATIC_5,114,117,153,8
+    DEFPUSHBUTTON   "Установить новые атрибуты",IDOK,52,144,116,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,174,144,50,14
+    PUSHBUTTON      "Справка",IDHELP,230,144,50,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,165,318,1
+    CONTROL         "В&сегда применять эти атрибуты при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,172,274,12
+    LTEXT           "&Путь:",IDC_STATIC_7,7,9,70,8
+    EDITTEXT        IDE_SCRD_SRCPATH,80,9,242,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Имя:",IDC_STATIC_8,7,21,70,8
+    EDITTEXT        IDE_SCRD_SRCNAME,80,21,242,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Теку&щие атрибуты:",IDC_STATIC_9,7,33,70,8
+    EDITTEXT        IDE_SCRD_CURATTR,80,33,242,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVELOWMEMORYERR DIALOGEX 10, 24, 294, 90
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Недостаточно системных ресурсов для завершения операции"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,28,46,55,14,WS_GROUP
+    PUSHBUTTON      "Пропу&стить",IDB_SCRD_SKIP,89,46,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,150,46,55,14
+    PUSHBUTTON      "Справка",IDHELP,211,46,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,280,1
+    CONTROL         "Выполнять выб&ранное действие при возникновении аналогичной ошибки",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,274,12
+    LTEXT           "П&уть:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SCRD_SRCPATH,32,9,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Имя:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SCRD_SRCNAME,32,21,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSIMPLEERR DIALOGEX 10, 24, 342, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Удалить",IDOK,52,46,55,14,WS_GROUP
+    PUSHBUTTON      "П&ропустить",IDB_SISE_SKIP,113,46,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,174,46,55,14
+    PUSHBUTTON      "Справка",IDHELP,235,46,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,328,1
+    CONTROL         "З&апомнить выбор и не показывать этот диалог при возникновении аналогичной ошибки",IDC_SISE_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,326,12
+    LTEXT           "&Путь:",IDC_STATIC_3,7,9,27,8
+    EDITTEXT        IDE_SISE_PATH,37,9,297,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Имя:",IDC_STATIC_4,7,21,27,8
+    EDITTEXT        IDE_SISE_NAME,37,21,297,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR DIALOGEX 10, 24, 294, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,28,82,55,14,WS_GROUP
+    PUSHBUTTON      "Пропу&стить",IDB_SSCD_SKIP,89,82,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,150,82,55,14
+    PUSHBUTTON      "Справка",IDHELP,211,82,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,280,1
+    CONTROL         "Выполнять выб&ранное действие при возникновении аналогичной ошибки",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,274,12
+    LTEXT           "П&уть:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SSCD_PATH,32,9,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Имя:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SSCD_NAME,32,21,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Описание ошибки:",IDC_STATIC_4,7,40,68,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,50,282,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2 DIALOGEX 10, 24, 298, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,30,106,55,14,WS_GROUP
+    PUSHBUTTON      "П&ропустить",IDB_SSCD_SKIP,91,106,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,152,106,55,14
+    PUSHBUTTON      "Справка",IDHELP,213,106,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,284,1
+    CONTROL         "В&ыполнять выбранное действие при возникновении аналогичной ошибки",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,274,12
+    LTEXT           "П&уть источника:",IDC_STATIC_2,7,9,65,8
+    EDITTEXT        IDE_SSCD_SRCPATH,74,9,217,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_3,7,21,65,8
+    EDITTEXT        IDE_SSCD_SRCNAME,74,21,217,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_4,7,33,65,8
+    EDITTEXT        IDE_SSCD_TGTPATH,74,33,217,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_5,7,45,65,8
+    EDITTEXT        IDE_SSCD_TGTNAME,74,45,217,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Описание ошибки:",IDC_STATIC_6,7,64,68,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,286,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2EX DIALOGEX 10, 24, 369, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,12,106,58,14,WS_GROUP
+    PUSHBUTTON      "&Возобновить",CM_SSCD_RESUME,74,106,58,14
+    PUSHBUTTON      "&Перезаписать",CM_SSCD_OVERWRITE,136,106,58,14
+    PUSHBUTTON      "П&ропустить",IDB_SSCD_SKIP,198,106,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,252,106,50,14
+    PUSHBUTTON      "Справка",IDHELP,306,106,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,354,1
+    CONTROL         "В&ыполнять выбранное действие при возникновении аналогичной ошибки",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,274,12
+    LTEXT           "П&уть источника:",IDC_STATIC_2,7,9,65,8
+    EDITTEXT        IDE_SSCD_SRCPATH,74,9,287,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "И&мя источника:",IDC_STATIC_3,7,21,65,8
+    EDITTEXT        IDE_SSCD_SRCNAME,74,21,287,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Путь назна&чения:",IDC_STATIC_4,7,33,65,8
+    EDITTEXT        IDE_SSCD_TGTPATH,74,33,287,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Конечное имя:",IDC_STATIC_5,7,45,65,8
+    EDITTEXT        IDE_SSCD_TGTNAME,74,45,287,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Описание ошибки:",IDC_STATIC_6,7,64,68,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,357,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR3 DIALOGEX 10, 24, 294, 112
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Повторить",IDOK,28,70,55,14,WS_GROUP
+    PUSHBUTTON      "&Пропустить",IDB_SSCD_SKIP,89,70,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,150,70,55,14
+    PUSHBUTTON      "Справка",IDHELP,211,70,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,280,1
+    CONTROL         "Выполнять выб&ранное действие при возникновении аналогичной ошибки",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,274,12
+    LTEXT           "П&уть:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SSCD_PATH,32,9,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Описание ошибки:",IDC_STATIC_3,7,28,68,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,38,282,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_VIEWERRASCIITRFORBINFILE DIALOGEX 25, 38, 423, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "FTP-клиент"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Бинарный режим",IDOK,108,57,78,14,WS_GROUP
+    PUSHBUTTON      "&Игнорировать",IDIGNORE,193,57,65,14
+    PUSHBUTTON      "Отмена",IDCANCEL,265,57,50,14
+    CONTROL         "Загрузка файла с бинарным содержимым в ASCII-режиме передачи. Файл может быть  поврежден по",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,7,376,8
+    CONTROL         "причине нежелательного преобразования концов строк к принятым по умолчанию в системе. Вы",IDC_STATIC_2,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,16,376,8
+    CONTROL         "можете повторно загрузить файл в бинарном режиме (без преобразования). Если вы уверены, что файл",IDC_STATIC_3,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,25,376,8
+    CONTROL         "является обычным текстовым файлом, нажмите ""Игнорировать"" для закрытия данного сообщения.",IDC_STATIC_4,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,34,376,8
+    ICON            "",IDI_INFOICON,7,7,18,20
+END
+
+IDD_PROXYSERVER DIALOGEX 10, 24, 294, 231
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Добавить прокси-сервер"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "И&мя:",IDC_STATIC_1,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,10,24,8
+    EDITTEXT        IDE_PRXSRV_NAME,78,8,208,12,ES_AUTOHSCROLL
+    LTEXT           "&Тип:",IDC_STATIC_2,7,25,21,8
+    COMBOBOX        IDC_PRXSRV_TYPE,78,23,208,170,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Адрес:",IDC_STATIC_3,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,40,31,8
+    EDITTEXT        IDE_PRXSRV_ADDRESS,78,38,208,12,ES_AUTOHSCROLL
+    CONTROL         "По&рт:",IDC_STATIC_4,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,55,22,8
+    EDITTEXT        IDE_PRXSRV_PORT,78,53,39,12,ES_AUTOHSCROLL
+    CONTROL         "Им&я пользователя:",IDC_STATIC_5,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,70,70,8
+    EDITTEXT        IDE_PRXSRV_USER,78,68,208,12,ES_AUTOHSCROLL
+    CONTROL         "&Пароль:",IDC_STATIC_6,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,85,67,8
+    EDITTEXT        IDE_PRXSRV_PASSWD,78,83,58,12,ES_PASSWORD | ES_AUTOHSCROLL
+    EDITTEXT        IDE_PRXSRV_PASSWD_LOCKED,141,83,58,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "Разбл&окировать...",IDB_PRXSRV_PASSWD_CHANGE,203,82,83,14
+    CONTROL         "&Сохранить пароль",IDC_PRXSRV_SAVEPASSWD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,99,76,12
+    LTEXT           "(небезопасно)",IDC_PRXSRV_SAVEPASSWD_HINT,88,101,188,8,WS_TABSTOP
+    LTEXT           "Сценарий в&хода:",IDC_STATIC_7,7,120,62,8
+    EDITTEXT        IDE_PRXSRV_SCRIPT,7,130,279,68,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN
+    DEFPUSHBUTTON   "ОК",IDOK,116,210,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,176,210,50,14
+    PUSHBUTTON      "Справка",IDHELP,236,210,50,14
+END
+
+IDD_CERTIFICATE DIALOGEX 10, 24, 270, 120
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Проблема подлинности сервера"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Сервер предоставил сертификат со следующими проблемами:",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,9,258,8
+    GROUPBOX        " Отчет проверки сертификата ",IDC_STATIC_2,9,21,252,54
+    LTEXT           "",IDT_CERTIFICATE_ERROR,16,32,238,40
+    LTEXT           "Принятие сертификата потенциально опасно и не рекомендовано.",IDC_STATIC_3,7,80,258,8,NOT WS_GROUP
+    LTEXT           "",IDC_STATIC_4,5,95,260,1,SS_ETCHEDHORZ | WS_GROUP
+    PUSHBUTTON      "Про&смотр сертификата",IDB_CERTIFICATE_VIEW,8,100,95,14,WS_GROUP
+    PUSHBUTTON      "Прин&ять сертификат",IDOK,110,100,95,14
+    DEFPUSHBUTTON   "Отмена",IDCANCEL,212,100,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SRVCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Соединиться\tEnter",             IDOK
+        MENUITEM SEPARATOR
+        MENUITEM "Созд&ать...\tInsert",             IDB_NEWBOOKMARK
+        MENUITEM "К&опировать в...",                 CM_COPYSRVTO
+        MENUITEM "Пе&реименовать...\tF2",              IDB_RENAMEBOOKMARK
+        MENUITEM "У&далить...\tDelete",          IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "&Переместить вверх\tAlt+Стрелка вверх",      CM_MOVEUPBOOKMARK
+        MENUITEM "П&ереместить вниз\tAlt+Стрелка вниз",  CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_SRVCONTEXTMENU2 MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Создать...\tInsert",             IDB_NEWBOOKMARK
+        MENUITEM "К&опировать в...",                 CM_COPYSRVTO
+        MENUITEM "Пе&реименовать...\tF2",              IDB_RENAMEBOOKMARK
+        MENUITEM "У&далить...\tDelete",          IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "&Переместить вверх\tAlt+Стрелка вверх",      CM_MOVEUPBOOKMARK
+        MENUITEM "П&ереместить вниз\tAlt+Стрелка вниз",  CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_ACTPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "От&соединиться...",              CM_DISCONNECTSRV
+        MENUITEM "По&казать сертификат...",        CM_SHOWCERT
+        POPUP "&Режим передачи данных"
+        BEGIN
+            MENUITEM "&Автоматический",                  CM_TRMODEAUTO
+            MENUITEM "A&SCII",                      CM_TRMODEASCII
+            MENUITEM "&Бинарный",                     CM_TRMODEBINARY
+        END
+        MENUITEM "Об&новить",                    CM_REFRESHPATH
+        MENUITEM SEPARATOR
+        MENUITEM "&Добавить закладку...",            CM_ADDBOOKMARK
+        MENUITEM "Показать &журнал...",                CM_SHOWLOG
+        MENUITEM "&Послать команду FTP...",        CM_SENDFTPCOMMAND
+        MENUITEM "П&оказать raw-листинг...",        CM_SHOWRAWLISTING
+        MENUITEM "В&ыводить скрытые файлы и папки (Unix)", CM_LISTHIDDENFILES
+    END
+END
+
+IDM_CHNGDRVCONTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Соединиться с FTP-сервером...",   CM_CONNECTSRV
+        MENUITEM "&Управление закладками...",      CM_ORGBOOKMARKS
+        MENUITEM "Показать &журналы...",               CM_SHOWLOGS
+    END
+END
+
+IDM_DETPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Показывать на панели",              CM_OPENDETACHED
+        MENUITEM SEPARATOR
+        MENUITEM "&Отсоединиться",                 CM_DISCONNECTSRV
+        MENUITEM SEPARATOR
+        MENUITEM "&Добавить закладку...",            CM_ADDBOOKMARK
+        MENUITEM "Показать &журнал...",                CM_SHOWLOG
+    END
+END
+
+IDM_LOGSMENU MENU 
+BEGIN
+    POPUP "&Журнал"
+    BEGIN
+        MENUITEM "К&опировать",                       CM_COPYLOG
+        MENUITEM "Ко&пировать все",                   CM_COPYALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "&Сохранить все...",                 CM_SAVELOG
+        MENUITEM "Сох&ранить все как...",             CM_SAVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "Оч&истить...",                   CM_CLEARLOG
+        MENUITEM "У&далить...",                  CM_REMOVELOG
+        MENUITEM "Уд&алить все...",              CM_REMOVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "&Закрыть\tAlt+F4",              IDCANCEL
+    END
+    POPUP "Параметр&ы"
+    BEGIN
+        MENUITEM "&Всегда показывать журнал активной панели", CM_SHOWLOGFORPANEL
+    END
+    POPUP "&Справка"
+    BEGIN
+        MENUITEM "Журналы &FTP\tF1",               CM_HELPFORLOGSWND
+    END
+END
+
+IDM_SERVERSOTHERACT MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "К&опировать в...",                 CM_COPYSERVERTO
+        MENUITEM "&Переименовать...\tF2",              CM_RENAMESERVER
+        MENUITEM "У&далить...\tDelete",          CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "&Импортировать из файла...",        CM_IMPORTSERVER
+        MENUITEM "Э&кспортировать в файл...",          CM_EXPORTSERVER
+    END
+END
+
+IDM_SERVERSACTIONS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Создать...\tInsert",             IDB_NEWSERVER
+        MENUITEM "И&зменить...",                    IDB_EDITSERVER
+        MENUITEM "К&опировать в...",                 CM_COPYSERVERTO
+        MENUITEM "Пе&реименовать...\tF2",              CM_RENAMESERVER
+        MENUITEM "У&далить...\tDelete",          CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "&Переместить вверх\tAlt+Стрелка вверх",      IDB_MOVESERVERUP
+        MENUITEM "П&ереместить вниз\tAlt+Стрелка вниз",  IDB_MOVESERVERDOWN
+        MENUITEM SEPARATOR
+        MENUITEM "И&мпортировать из файла...",        CM_IMPORTSERVER
+        MENUITEM "Э&кспортировать в файл...",          CM_EXPORTSERVER
+    END
+END
+
+IDM_SRVTYPEMOVECOLUMN MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Переместить вверх\tAlt+Стрелка вверх",           CM_MOVECOLUMNUP
+        MENUITEM "П&ереместить вниз\tAlt+Стрелка вниз",       CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_SRVTYPERULESMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "&Вставить"
+        BEGIN
+            MENUITEM "Н&ачало правила",              CM_STRM_RULESTART
+            MENUITEM "&Конец правила",                CM_STRM_RULEEND
+            MENUITEM "Строковы&й комментарий",               CM_STRM_COMMENT
+            MENUITEM SEPARATOR
+            POPUP "&Пропустить"
+            BEGIN
+                MENUITEM "Пробелы (если таковые имеются)",       CM_STRM_SKIPWSIFANY
+                MENUITEM "Пробелы (хотя бы один)", CM_STRM_SKIPWS
+                MENUITEM "Определенное количество пробелов", CM_STRM_SKIPNUMOFWS
+                MENUITEM "Пробелы и концы строк (хотя бы один)", CM_STRM_SKIPWSENDEOLS
+                MENUITEM "Остаток строки (хотя бы один символ)", CM_STRM_SKIPRESTOFLINE
+                MENUITEM "Слово",                        CM_STRM_SKIPWORD
+                MENUITEM "Определенное количество символов",  CM_STRM_SKIPNUMOFLETTERS
+                MENUITEM "Все символы до конца строки поиска", CM_STRM_SKIPALLTO
+                MENUITEM "Все символы до ближайшего числа", CM_STRM_SKIPALLTONUMBER
+            END
+            POPUP "&Назначить столбцу"
+            BEGIN
+                MENUITEM "Остаток строки (хотя бы один символ)", CM_STRM_ASGNRESTOFLINE
+                MENUITEM "Слово",                        CM_STRM_ASGNWORD
+                MENUITEM "Число",                      CM_STRM_ASGNNUM
+                MENUITEM "Положительное число",             CM_STRM_ASGNPOSNUM
+                MENUITEM "Число с разделителями",      CM_STRM_ASGNNUMWITHSEP
+                MENUITEM "Трехбуквенный месяц (английский, немецкий)", CM_STRM_ASGN3LETTERMONTH
+                MENUITEM "Трехбуквенный месяц (пользовательский)", CM_STRM_ASGN3LETMONTHGEN
+                MENUITEM "Текстовый месяц (немецкий)",         CM_STRM_ASGNTEXTMONTH
+                MENUITEM "Текстовый месяц (пользовательский)",   CM_STRM_ASGNTEXTMONTHGEN
+                MENUITEM "Номер месяца",                CM_STRM_ASGNMONTH
+                MENUITEM "День по счету",                  CM_STRM_ASGNDAY
+                MENUITEM "Год по счету",                 CM_STRM_ASGNYEAR
+                MENUITEM "Время",                        CM_STRM_ASGNTIME
+                MENUITEM "Год или время",                CM_STRM_ASGNYEARORTIME
+                MENUITEM "Определенное количество символов",  CM_STRM_ASGNNUMOFLETTERS
+                MENUITEM "Все символы до конца строки поиска", CM_STRM_ASGNALLTO
+                MENUITEM "Все символы до строки поиска", CM_STRM_ASGNALLUPTO
+                MENUITEM "Ссылка Unix (имя ссылки и назначение раздельно)", CM_STRM_ASGNUNIXLINK
+                MENUITEM "Устройство Unix",                 CM_STRM_ASGNUNIXDEV
+                MENUITEM "Выражение",                  CM_STRM_ASGNEXPR
+            END
+            POPUP "&Удалить пробелы в столбце"
+            BEGIN
+                MENUITEM "Начальные",                     CM_STRM_CUTWSINIT
+                MENUITEM "Конечные",                    CM_STRM_CUTWSTRAIL
+                MENUITEM "Начальные и конечные",        CM_STRM_CUTWSBOTH
+            END
+            POPUP "Пере&менные состояния и операторы выражений"
+            BEGIN
+                MENUITEM "Является первой непустой строкой", CM_STRM_STVARISFIRSTNELINE
+                MENUITEM "Является последней непустой строкой",  CM_STRM_STVARISLASTNELINE
+                MENUITEM "Следующий символ",              CM_STRM_STVARNEXTCHAR
+                MENUITEM "Следующее слово",                   CM_STRM_STVARNEXTWORD
+                MENUITEM "Остаток строки",                CM_STRM_STVARRESTOFLINE
+                MENUITEM SEPARATOR
+                MENUITEM "Равно",                       CM_STRM_OPEREQUAL
+                MENUITEM "Не равно",                   CM_STRM_OPERNOTEQUAL
+                MENUITEM "Строка равна (без учета регистра)", CM_STRM_OPERSTREQUAL
+                MENUITEM "Строка не равна (без учета регистра)", CM_STRM_OPERSTRNOTEQUAL
+                MENUITEM "Подстрока находится в строке",      CM_STRM_OPERISINSTR
+                MENUITEM "Подстрока не находится в строке",  CM_STRM_OPERISNOTINSTR
+                MENUITEM "Строка заканчивается строкой",     CM_STRM_OPERENDWITH
+                MENUITEM "Строка не заканчивается строкой", CM_STRM_OPERNOTENDWITH
+            END
+            POPUP "&Другие"
+            BEGIN
+                MENUITEM "Продолжить только, если",            CM_STRM_IF
+                MENUITEM "Добавить строку к столбцу",        CM_STRM_ADDSTRTOCOL
+                MENUITEM "Вернуться назад на определенное количество символов", CM_STRM_BACK
+                MENUITEM "Вырезать конец строки столбца", CM_STRM_CUTENDOFSTR
+            END
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "О&тменить",                       CM_STRM_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Вырезат&ь",                        CM_STRM_CUT
+        MENUITEM "&Копировать",                       CM_STRM_COPY
+        MENUITEM "В&ставить",                      CM_STRM_PASTE
+        MENUITEM "&Удалить",                     CM_STRM_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Выделить &все",                 CM_STRM_SELECTALL
+    END
+END
+
+IDM_SRVTYPECOLUMNS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Создать...\tInsert",             IDB_NEWCOLUMN
+        MENUITEM "&Изменить...",                    IDB_EDITCOLUMN
+        MENUITEM "У&далить...\tDelete",          IDB_REMOVECOLUMN
+        MENUITEM SEPARATOR
+        MENUITEM "&Переместить вверх\tAlt+Стрелка вверх",      CM_MOVECOLUMNUP
+        MENUITEM "П&ереместить вниз\tAlt+Стрелка вниз",  CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_DIREXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Повторить",                      IDOK
+        MENUITEM "И&спользовать существующую папку",     CM_SDEX_USEEXISTINGDIR
+        MENUITEM "&Использовать другое имя",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_FILEEXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Повторить",                      IDOK
+        MENUITEM "&Возобновить",                     CM_SIED_RESUME
+        MENUITEM "Возобнови&ть или перезаписать",        CM_SIED_RESUMEOROVR
+        MENUITEM "&Использовать другое имя",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_TRANSFERFAILEDERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Повторить",                      IDOK
+        MENUITEM "&Использовать другое имя",         CM_SCRD_USEALTNAME
+        MENUITEM "Возобнови&ть или перезаписать",        CM_SIED_RESUMEOROVR
+    END
+END
+
+IDM_CANTCRFILEERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Повторить",                      IDOK
+        MENUITEM "&Использовать другое имя",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_UNKATTRSERRIGNORE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Игнорировать",                     IDOK
+        MENUITEM "&Повторить",                      CM_SIEA_RETRY
+        MENUITEM "&Установить новые атрибуты...",      CM_SIEA_SETNEWATTRS
+    END
+END
+
+IDM_DELETEERRORRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Удалить",                     IDOK
+        MENUITEM "&Повторить",                      CM_SISE_RETRY
+    END
+END
+
+IDM_DELETEERRORONSRVRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Повторить",                      IDOK
+        MENUITEM "Пом&етить как удаленные",            CM_SSCD_MARKASDELETED
+    END
+END
+
+IDM_RESUMEERRORONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Повторить",                      IDOK
+        MENUITEM "&Использовать другое имя",         CM_SSCD_USEALTNAME
+        MENUITEM "Возобнови&ть или перезаписать",        CM_SSCD_RESUMEOROVR
+    END
+END
+
+IDM_RESUMETESTFAILEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Повторить",                      IDOK
+        MENUITEM "&Использовать другое имя",         CM_SSCD_USEALTNAME
+        MENUITEM "Возобнови&ть или перезаписать",        CM_SSCD_RESUMEOROVR
+        MENUITEM "Уменьшить размер &файла и повторить попытку возобновить", CM_SSCD_REDUCEFILESIZE
+    END
+END
+
+IDM_UPLTESTIFFINISHEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Повторить",                      IDOK
+        MENUITEM "&Использовать другое имя",         CM_SSCD_USEALTNAME
+        MENUITEM "Возобнови&ть или перезаписать",        CM_SSCD_RESUMEOROVR
+        MENUITEM "Пометит&ь файл, как успешно загруженный", CM_SSCD_MARKASUPLOADED
+    END
+END
+
+IDM_ASCIITRFORBINFILE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Использовать бинарный режим",            IDOK
+        MENUITEM "&Повторить",                      CM_SATR_RETRY
+    END
+END
+
+IDM_ADDPROXYSERVER MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Добавить...",                     IDB_ADDPROXYSRV
+        MENUITEM "&Изменить...",                    CM_EDITPROXYSRV
+        MENUITEM "Уд&алить...",                  CM_DELETEPROXYSRV
+        MENUITEM SEPARATOR
+        MENUITEM "&Переместить вверх",                    CM_MOVEUPPROXYSRV
+        MENUITEM "Переме&стить вниз",                  CM_MOVEDOWNPROXYSRV
+    END
+END
+
+IDM_PRXSRVSCRIPTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "Встав&ить"
+        BEGIN
+            MENUITEM "&3xx: (послать только если сервер запрашивает пароль/учетную запись)", CM_PSS_3XX
+            MENUITEM SEPARATOR
+            MENUITEM "Адрес про&кси",              CM_PSS_PROXYHOST
+            MENUITEM "Порт п&рокси",                 CM_PSS_PROXYPORT
+            MENUITEM "Имя пользователя пр&окси",            CM_PSS_PROXYUSER
+            MENUITEM "Пароль прок&си",             CM_PSS_PROXYPASSWD
+            MENUITEM "Адр&ес",                    CM_PSS_HOST
+            MENUITEM "Пор&т",                       CM_PSS_PORT
+            MENUITEM "&Имя пользователя",                  CM_PSS_USER
+            MENUITEM "&Пароль",                   CM_PSS_PASSWD
+            MENUITEM "Учетн&ую запись",                    CM_PSS_ACCOUNT
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "От&менить",                       CM_PSS_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Вырезат&ь",                        CM_PSS_CUT
+        MENUITEM "&Копировать",                       CM_PSS_COPY
+        MENUITEM "В&ставить",                      CM_PSS_PASTE
+        MENUITEM "&Удалить",                     CM_PSS_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "В&ыделить все",                 CM_PSS_SELECTALL
+    END
+END
+
+IDM_UNLOCKPASSWORD MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Разблокировать пароль...",         CM_UNLOCKPASSWORD
+        MENUITEM "&Сбросить пароль",             CM_CLEARPASSWORD
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_FTPPLUGINTITLE, "FTP-клиент"
+ IDS_PLUGINNAME, "FTP-клиент"
+ IDS_PLUGINDESCR, "Передача файлов и папок по FTP."
+ IDS_ABOUTPLUGINTITLE, "О модуле"
+ IDS_FTPCHNGDRVITEM, "/\tFTP-клиент"
+ IDS_FTPERRORTITLE, "Ошибка FTP"
+ IDS_TOOLONGPATH, "Не удается завершить операцию, так как путь слишком длинный."
+ IDS_HOSTNAMEMISSING, "В указанном пути отсутствует имя хоста."
+ IDS_INVALIDPORT, "В пути указано нечисловое значение порта или оно не находится в диапазоне от 1 до 65535."
+ IDS_INVALIDNUMBER, "Недопустимое число."
+ IDS_CONFIGTITLE, "Настройка FTP"
+ IDS_INCORRECTSYNTAX, "Недопустимый формат маски."
+ IDS_MUSTBEPOSITIVE, "Следует указать положительное значение."
+ IDS_MUSTBEGRTHANZERO, "Значение должно быть больше ноля."
+ IDS_KAEVERYGRTHSTOP, "Время прекращения не может быть меньше интервала отправки (чтобы осуществить хотя бы одну отправку)."
+ IDS_KAEVERYTOOBIG, "Интервал отправки не должен превышать 10000 секунд."
+ IDS_KASTOPTOOBIG, "Время прекращения не должно превышать 10000 минут."
+ IDS_KEEPALIVECMDNOOP, "NOOP (без передачи данных)"
+ IDS_KEEPALIVECMDPWD, "PWD (без передачи данных)"
+ IDS_KEEPALIVECMDNLST, "NLST (передача данных)"
+ IDS_KEEPALIVECMDLIST, "LIST (передача данных)"
+ IDS_CONNECTFTPSERVER, "&Соединиться с FTP-сервером..."
+ IDS_DISCONNECT, "Отсоед&иниться...\tF12"
+ IDS_ADDBOOKMARK, "&Добавить закладку..."
+ IDS_SHOWLOGS, "Показать &журналы..."
+ IDS_SENDFTPCOMMAND, "&Послать команду FTP..."
+ IDS_ORGBOOKMARKSCMD, "&Управление закладками..."
+ IDS_SHOWRAWLISTING, "П&оказать raw-листинг..."
+ IDS_REFRESHPATH, "Об&новить"
+ IDS_LISTHIDDENFILES, "В&ыводить скрытые файлы и папки (Unix)"
+ IDS_SHOWCERT, "По&казать сертификат..."
+
+ IDS_QUICKCONNECT, "Быстрое соединение"
+
+ IDS_ADVSTRNONE, "дополнительные параметры отсутствуют"
+ IDS_ADVSTRTARGETPATH, "Путь назначения: %s"
+ IDS_ADVSTRSERVERTYPE, "Тип сервера: %s"
+ IDS_ADVSTRPORT, "Порт: %d"
+ IDS_ADVSTRSERVERPASVYES, "Пассивный режим"
+ IDS_ADVSTRSERVERPASVNO, "Активный режим"
+ IDS_ADVSTRKEEPALIVEYES, "Заданный пользователем"
+ IDS_ADVSTRKEEPALIVENO, "Не поддерживать соединение"
+ IDS_ADVSTRMAXCONCURCON, "Макс. соединений: %d"
+ IDS_ADVSTRUNLIMITEDCON, "Неогр.  кол-во соединений"
+ IDS_ADVSTRSPEEDLIM, "Огранич. скорости: %g КБ/с"
+ IDS_ADVSTRUNLIMITEDSPEED, "Неограниченная скорость"
+ IDS_ADVSTRTRMODBINARY, "Режим передачи: Бинарный"
+ IDS_ADVSTRTRMODASCII, "Режим передачи: ASCII"
+ IDS_ADVSTRTRMODAUTO, "Режим передачи: Автоматический"
+ IDS_ADVSTRUSECACHEYES, "Использовать кэш"
+ IDS_ADVSTRUSECACHENO, "Не использовать кэш"
+ IDS_ADVSTRINITFTPCMDS, "Начальные команды: %s"
+ IDS_ADVSTRLISTCOMMAND, "Команда листинга: %s"
+ IDS_ADVSTRPROXYSRV, "Прокси: %s"
+ IDS_ADVSTRPROXYNOTUSED, "Не используется"
+ IDS_ADVSTRSSLCONTRONLY, "Шифрование"
+ IDS_ADVSTRSSLCONTRDATA, "Полное шифрование"
+ IDS_ADVSTRMODEZ, "MODE Z"
+ IDS_ADVSTRNOMODEZ, "Без MODE Z"
+
+ IDS_SRVTYPEAUTODETECT, "Автоопределение"
+ IDS_TRANSFMODEDEFAULT, "По умолчанию (см. ""Параметры по умолчанию"" в настройках FTP)"
+ IDS_TRANSFMODEBINARY, "Бинарный (не изменять при передаче)"
+ IDS_TRANSFMODEASCII, "ASCII (преобразовать в стандартные концы строки)"
+ IDS_TRANSFMODEAUTO, "Автовыбор (см. ""Параметры по умолчанию"" в настройках FTP)"
+ IDS_SELECTTARGETDIR, "Выберите папку для панели назначения."
+ IDS_RENAMESRVTO, "Переименовать ""%s"" в"
+ IDS_COPYDATAFROM, "&Копировать данные из закладки ""%s"""
+ IDS_MAYNOTBEEMPTY, "Введите значение."
+ IDS_REMOVECONFIRM, "Вы действительно хотите удалить закладку ""%s""?"
+ IDS_HOSTMAYNOTBEEMPTY, "Перед попыткой соединения, введите адрес FTP-сервера (имя, IP, или URL)."
+ IDS_ORGANIZEBOOKMARKS, "Управление закладками"
+ IDS_CLOSECONINPANEL, "Вы закрываете FTP-сервер на панели. Отсоединиться или сохранить соединение с этим сервером?\n\nЕсли выберите ""Сохранить"", то соединение будет доступно через меню смены диска."
+ IDS_ALWAYSNOTCLOSE, "&Всегда выбирать ""Сохранить""\tвыключить\tВы можете изменить этот параметр на странице подтверждений в настройках FTP"
+ IDS_DISCONNECTBUTTON, "&Отсоединиться"
+ IDS_KEEPCONBUTTON, "&Сохранить"
+
+ IDS_ADDBOOKMARKTITLE, "Добавить закладку"
+ IDS_ADDBOOKMARKTEXT, "Имя новой закладки:"
+
+ IDS_WINSOCKETSERROR, "Не удается инициализировать библиотеку Windows Sockets.\n\nОшибка: %s"
+
+ IDS_WANTDISCONNECT, "Отсоединиться от FTP-сервера?"
+ IDS_ALWAYSCLOSE, "&Закрыть соединение в следующий раз без запроса\tвключить\tВы можете изменить этот параметр на странице подтверждений в настройках FTP"
+
+ IDS_GETTINGIPOFSERVER, "Получение IP-адреса сервера ""%s"", нажмите Esc для отмены..."
+ IDS_OPENINGCONTOSERVER, "Установление соединения с FTP-сервером ""%s"" (IP: %s, порт: %d),\nнажмите Esc для отмены..."
+ IDS_WAITINGTORETRY, "Не удается соединиться с сервером ""%s"" (IP: %s, порт: %d).\nОшибка: %s"
+ IDS_WAITINGTORETRY2, "Не удается соединиться с сервером ""%s"" (порт: %d).\nОшибка: %s"
+ IDS_WAITINGTORETRYSUF, "%s\n\nОжидание %d сек. до переподключения (попытка № %d из %d), нажмите Esc для отмены..."
+ IDS_WAITINGFORLOGIN, "Ожидание приглашения входа в систему, нажмите Esc для отмены..."
+ IDS_SENDINGLOGINCMD, "Отправка команды ""%s"", нажмите Esc для отмены..."
+ IDS_CLOSINGCONNECTION, "Закрытие соединения с ""%s"", нажмите Esc для отмены..."
+ IDS_SENDINGCOMMAND, "Отправка команды ""%s"", нажмите Esc для отмены..."
+ IDS_ABORTINGCOMMAND, "Прерывание команды FTP, нажмите Esc для отмены..."
+ IDS_OPENINGCONTOSERVER2, "Установление соединения с FTP-сервером ""%s"" (порт: %d),\nнажмите Esc для отмены..."
+ IDS_PREPARINGACTDATACON, "Подготовка активного соединения для передачи данных, нажмите Esc для отмены..."
+
+ IDS_GETIPESC, "Отменить получение IP-адреса сервера?"
+ IDS_GETIPTIMEOUT, "Тайм-аут получения IP-адреса сервера."
+ IDS_OPENCONESC, "Отменить установление соединения с сервером?"
+ IDS_OPENCONTIMEOUT, "Тайм-аут установления соединения с FTP-сервером."
+ IDS_OPENPROXYSRVCONTIMEOUT, "Тайм-аут установления соединения с прокси-сервером."
+ IDS_WAITRETRESC, "Нажмите ""Прервать"", чтобы прекратить дальнейшие попытки входа в систему. Нажмите ""Повторить"", чтобы пропустить ожидание до следующей попытки входа в систему. Нажмите ""Ожидать"" для продолжения ожидания до следующей попытки входа в систему."
+ IDS_WAITRETRESCABORTBTN, "&Прервать"
+ IDS_WAITRETRESCRETRYBTN, "П&овторить"
+ IDS_WAITRETRESCWAITBTN, "О&жидать"
+
+ IDS_WAITFORLOGESC, "Вы хотите прекратить ожидание приглашения входа в систему?"
+ IDS_WAITFORLOGTIMEOUT, "Тайм-аут ожидания приглашения входа в систему."
+ IDS_CLOSECONESC, "Вы хотите немедленно разорвать соединение?"
+ IDS_LOGMSGACTIONCANCELED, "Операция отменена пользователем.\r\n"
+ IDS_LOGMSGDISCONTIMEOUT, "Тайм-аут отключения от сервера. Соединение было разорвано.\r\n"
+ IDS_SENDCOMMANDESC, "Прервать выполнение команды FTP?"
+ IDS_SENDCOMMANDESC2, "Отменить команду FTP? Соединение с FTP-сервером будет разорвано."
+ IDS_ABORTCOMMANDESC, "Отменить прерывание команды FTP? Соединение с FTP-сервером будет разорвано."
+ IDS_PREPACTDATACONESC, "Отменить подготовку активного соединения для передачи данных? Соединение с FTP-сервером будет разорвано."
+ IDS_SNDORABORCMDTIMEOUT, "Тайм-аут отправки или прерывания команды FTP."
+ IDS_LISTCMDTIMEOUT, "Тайм-аут отправки или прерывания команды листинга. Примечание: если передача данных не началась, попробуйте\nизменить режим передачи (см. ""Соединиться с FTP-сервером - Дополнительно - Пассивный режим передачи"")"
+ IDS_PREPACTDATACONTIMEOUT, "Тайм-аут подготовки активного соединения для передачи данных."
+ IDS_LOGMSGFATALERROR, "Во время связи с сервером произошла неустранимая ошибка. Соединение было разорвано.\r\n"
+ IDS_LOGMSGFATALERROR2, "Произошла неустранимая ошибка. Соединение было разорвано.\r\n"
+
+ IDS_UNKNOWNERROR, "Неизвестная ошибка (возможно, не хватает системных ресурсов)."
+ IDS_GETIPERROR, "Не удается получить IP-адрес сервера ""%s"".\n\nОшибка: %%s"
+ IDS_OPENCONERROR, "Не удается установить соединение с сервером ""%s"" (IP: %s, порт: %d).\n\nОшибка: %%s"
+ IDS_CONNECTIONLOSTERROR, "Соединение с сервером было неожиданно прервано."
+ IDS_NOTFTPSERVERERROR, "Не удалось соединиться с сервером. Вероятно, это не FTP-сервер / FTP прокси-сервер.\n\nОтвет сервера: %s"
+ IDS_SENDCOMMANDERROR, "Не удается отправить команду серверу.\n\nОшибка: %s"
+ IDS_LOGINERROR, "Не удается выполнить авторизацию на FTP-сервере или прокси-сервере FTP.\n\nОшибка: %s"
+ IDS_ABORTCOMMANDERROR, "Не удается отменить команду.\n\nОшибка: %s"
+ IDS_GETCURWORKPATHERROR, "Не удается определить текущий рабочий путь FTP-сервера.\n\nОтвет сервера: %s"
+ IDS_CHANGEWORKPATHERROR, "Не удается сменить путь на FTP-сервере.\n\nПуть: %s\nОтвет сервера: %s"
+ IDS_CREATEDIRERROR, "Не удается создать папку на FTP-сервере.\n\nПапка: %s\nОтвет сервера: %s"
+ IDS_QUICKRENAMEERROR, "Не удается переименовать файл или папку на FTP-сервере.\n\nИмя: %s\nНовое имя: %s\nОтвет сервера: %s"
+ IDS_QUICKRENAMEFILEERR, "Не удается переименовать файл на FTP-сервере.\n\nИмя: %s\nНовое имя: %s\n"
+ IDS_QUICKRENAMEFILEERRSUF1, "Ошибка: исходный файл заблокирован другой операцией."
+ IDS_QUICKRENAMEFILEERRSUF2, "Ошибка: конечный файл заблокирован другой операцией."
+ IDS_ERRINPROXYSCRIPT, "При обработке сценария прокси-сервера произошла ошибка.\n\nОшибка: %s"
+ IDS_PROXYSRVADREMPTY, "Адрес прокси-сервера пуст."
+ IDS_PROXYOPENCONERROR, "Прокси-сервер не может установить соединение с FTP-сервером ""%s"" (порт: %d).\n\nОшибка: %%s"
+ IDS_PROXYSENDREQERROR, "Не удается отправить запрос прокси-серверу.\n\nОшибка: %%s"
+ IDS_PROXYRECVREPERROR, "Не удается получить ответ прокси-сервера.\n\nОшибка: %%s"
+ IDS_PROXYUNEXPECTEDREPLY, "От прокси-сервера получен непредусмотренный ответ. Возможно, вы выбрали неверный тип прокси-сервера."
+
+ IDS_ENTERPASSTITLE, "Введите пароль"
+ IDS_ENTERPASSTEXT, "&Пароль:"
+ IDS_ENTERACCTTITLE, "Введите учетную запись"
+ IDS_ENTERACCTTEXT, "&Учетная запись:"
+ IDS_CONNECTINGTOAS1, "Соединение с ""%s""."
+ IDS_CONNECTINGTOAS2, "Соединение с ""%s"" как ""%s""."
+
+ IDS_HIDDENPASSWORD, "скрыт"
+
+ IDS_LCONLOSTFORMATERROR, "Соединение с FTP-сервером на левой панели было прервано.\n\nОшибка: %s"
+ IDS_RCONLOSTFORMATERROR, "Соединение с FTP-сервером на правой панели было прервано.\n\nОшибка: %s"
+ IDS_DCONLOSTFORMATERROR, "Соединение с FTP-сервером было прервано.\n\nОшибка: %s"
+ IDS_NONEREPLY, "(отсутствует)"
+ IDS_WARNWHENCONLOST, "&Больше не показывать это сообщение\tвключить\tВы можете изменить этот параметр на странице подтверждений в настройках FTP"
+
+ IDS_LOGHEADER, "Соединение с ""%s"" (%s) к порту %d.\r\nЖурнал UID %d, время %s.\r\n\r\n"
+ IDS_RECONLOGHEADER, "\r\n-----\r\n\r\nПереподключение к ""%s"" (%s) к порту %d (попытка № %d).\r\nВремя %s.\r\n\r\n"
+ IDS_PRXSRVLOGHEADER, "Адрес FTP-сервера: %s, порт: %d, пользователь: %s\r\nИмя прокси-сервера: %s, тип: %s\r\nАдрес прокси-сервера: %s, порт: %d, пользователь: %s\r\nСоединение с ""%s"" (%s) к порту %d.\r\nЖурнал UID %d, время %s.\r\n\r\n"
+ IDS_PRXSRVRECONLOGHEADER, "\r\n-----\r\n\r\nАдрес FTP-сервера: %s, порт: %d, пользователь: %s\r\nИмя прокси-сервера: %s, тип: %s\r\nАдрес прокси-сервера: %s, порт: %d, пользователь: %s\r\nПереподключение к ""%s"" (%s) к порту %d (попытка № %d).\r\nВремя %s.\r\n\r\n"
+
+ IDS_NOLOGS, "Нет журналов для просмотра."
+
+ IDS_FTPINLEFTPANEL, "левая панель"
+ IDS_FTPINRIGHTPANEL, "правая панель"
+ IDS_FTPNOTINPANEL, "не на панели"
+ IDS_FTPOPERATION, "использовано для операции"
+ IDS_FTPDISCONNECTED, "отключено"
+ IDS_OPERSTOPPED, "остановлено"
+ IDS_FTPINACTIVE, "соединение неактивно"
+
+ IDS_FSHAVENOLOG, "Отсутствует журнал данного соединения с FTP-сервером. Возможно, ведение журнала было отключено для этого соединения (см. страницу ""Журналы"" в настройках FTP)."
+
+ IDS_CLEARLOGQUESTION, "Вы действительно хотите очистить журнал ""%s""?"
+ IDS_REMOVELOGQUESTION, "Вы действительно хотите удалить журнал ""%s""?"
+ IDS_REMOVEALLLOGSQUESTION, "Вы действительно хотите удалить все журналы?"
+ IDS_TEXTCOPIEDTOCLIPBOARD, "Текст успешно скопирован в буфер обмена."
+ IDS_COPYTOCLIPBOARDERROR, "Не удается скопировать текст в буфер обмена."
+ IDS_SAVELOGFILTER, "Файлы журналов (*.log)|*.log|Все файлы (*.*)|*.*|"
+ IDS_SAVEASTITLE, "Сохранить журнал как"
+ IDS_SAVEALLASTITLE, "Сохранить все журналы как"
+ IDS_SAVELOGERROR, "Не удается сохранить журнал в файл.\n\nОшибка: %s"
+
+ IDS_CMDMAYNOTBEEMPTY, "Следует ввести команду."
+ IDS_SECRETFTPCOMMAND, "(секретная команда)"
+ IDS_SERVERREPLYTITLE, "Ответ FTP-сервера на ""%s"""
+
+ IDS_RECONNECTTOSRV, "Соединение с FTP-сервером разорвано. Подключиться повторно?"
+ IDS_ALWAYSRECONNECT, "&В следующий раз переподключиться без запроса\tвключить\tВы можете изменить этот параметр на странице подтверждений в настройках FTP"
+
+ IDS_LOGMSGLOGINSUCCESS, "Авторизация выполнена, получение системной информации...\r\n"
+ IDS_LOGMSGCHANGINGPATH, "Переход по пути ""%s""...\r\n"
+ IDS_LOGMSGSENDINGUSRCMD, "Отправка команды пользователя ""%s""...\r\n"
+ IDS_LOGMSGREFRESHINGPATH, "Обновление пути ""%s""...\r\n"
+ IDS_LOGMSGDETACHED, "Соединение убрано с панели...\r\n"
+ IDS_LOGMSGATTACHED, "Соединение возвращено на панель...\r\n"
+ IDS_LOGMSGDISCONNECT, "Отключение от сервера...\r\n"
+ IDS_LOGMSGLISTINGCACHEDPATH, "Листинг пути ""%s"" из кэша...\r\n"
+ IDS_LOGMSGLISTINGPATH, "Листинг пути ""%s""...\r\n"
+ IDS_LOGMSGRESOLVINGLINK, "Разрешение ссылки ""%s""...\r\n"
+ IDS_LOGMSGVIEWCACHEDFILE, "Просмотр файла ""%s"" из кэша...\r\n"
+ IDS_LOGMSGVIEWFILE, "Получение файла ""%s"" для просмотра...\r\n"
+ IDS_LOGMSGCREATEDIR, "Создание папки ""%s""...\r\n"
+ IDS_LOGMSGQUICKRENAME, "Переименование ""%s"" на ""%s""...\r\n"
+ IDS_LOGMSGDOWNLOADFILE, "Скачивание файла ""%s""...\r\n"
+ IDS_LOGMSGUPLOADFILE, "Закачивание файла ""%s""...\r\n"
+ IDS_LOGMSGPAUSE, "Пользователь хочет приостановить это соединение...\r\n"
+ IDS_LOGMSGRESUME, "Пользователь хочет возобновить это приостановленное соединение...\r\n"
+ IDS_LOGMSGUPLOADISCOMPL, "Файл ""%s"" полностью загружен на сервер (размер на сервере %s)...\r\n"
+ IDS_LOGMSGUPLOADISCOMPL2, "Текстовый файл ""%s"" полностью загружен на сервер...\r\n"
+ IDS_LOGMSGUPLOADISNOTCOMPL, "Файл ""%s"" был загружен на сервер не полностью (размер на сервере не %s)...\r\n"
+ IDS_LOGMSGUPLOADISNOTCOMPL2, "Текстовый файл ""%s"" был загружен на сервер не полностью...\r\n"
+ IDS_LOGMSGDWNLOADFORCRESUM, "Принудительное возобновление передачи файла ""%s"" (содержимое файла был получено, но сервер не подтвердил успешность загрузки).\r\n"
+ IDS_LOGMSGUPLOADRENFILE, "Переименование файла для закачивания в ""%s""...\r\n"
+ IDS_LOGMSGDOWNLOADFILE2, "Скачивание файла ""%s"" в ""%s""...\r\n"
+
+ IDS_UNABLETOREADLIST, "Не удается считать с сервера перечень файлов и папок. Оглавление, отображаемое на панели, может быть неполным."
+ IDS_UNABLETOREADLISTSUFFIX, "\n\nОшибка: %s"
+ IDS_UNABLETOREADLISTSUFFIX2, "\n\nОтвет сервера: %s"
+ IDS_UNABLETOREADLISTSUFFIX3, "\n\nОшибка: %s\nПримечание: если передача данных не началась, попробуйте изменить режим передачи данных (см. ""Соединиться с FTP-сервером - Дополнительно - Пассивный режим передачи"")"
+ IDS_UNABLETOREADLISTSUFFIX4, "\n\nОтвет сервера: %s\nПримечание: если передача данных не началась, попробуйте изменить режим передачи данных (см. ""Соединиться с FTP-сервером - Дополнительно - Пассивный режим передачи"")"
+ IDS_LOGMSGPASVNOTSUPPORTED, "Пассивный режим не поддерживается этим сайтом, попытка переключиться на активный...\r\n"
+ IDS_LISTPATHERROR, "Не удается считать перечень файлов и папок для нового пути на сервере.\nВы действительно хотите открыть этот путь на панели?\n\nПуть: %s\nОтвет сервера: %s"
+ IDS_OPENACTDATACONERROR, "Не удается подготовить активное соединение для передачи данных.\n\nОшибка: %s"
+
+ IDS_LOGMSGUNABLETOOPEN, "Не удается установить соединение для передачи данных в пассивном режиме (IP: %s, порт: %d)...\r\n"
+ IDS_LOGMSGUNABLETOOPEN2, "Не удается установить соединение для передачи данных в пассивном режиме (IP: %s, порт: %d), ошибка: %s...\r\n"
+ IDS_LOGMSGDATACONTERMINATED, "Соединение для передачи данных было прервано пользователем...\r\n"
+ IDS_LOGMSGDATACONRECON, "Восстановление соединения для передачи данных...\r\n"
+ IDS_LOGMSGDATCONERROR, "Ошибка соединения для передачи данных: %s\r\n"
+ IDS_LOGMSGUNEXPREPLY, "Непредусмотренный ответ: "
+ IDS_LOGMSGNODATATRTIMEOUT, "Соединение для передачи данных было разорвано по причине длительного простоя...\r\n"
+ IDS_LOGMSGDATACONNOTOPENED, "Соединение для передачи данных не было установлено...\r\n"
+ IDS_ERRDATACONNODATATRTIMEOUT, "Соединение для передачи данных было разорвано по причине длительного простоя."
+ IDS_ERRDATACONNOTOPENED, "Соединение для передачи данных не было установлено."
+ IDS_LOGMSGUNABLETOCONPRX, "Не удается установить соединение с прокси-сервером (IP: %s, порт: %d)...\r\n"
+ IDS_LOGMSGUNABLETOCONPRX2, "Не удается установить соединение с прокси-сервером (IP: %s, порт: %d), ошибка: %s...\r\n"
+ IDS_ERRDATACONSSLCONNECTERROR, "Не удается установить шифрованное соединение для передачи данных (SSL)."
+ IDS_ERRDATACONDECOMPRERROR, "Данные повреждены либо неполные, поэтому невозможно их корректно распаковать (MODE Z)."
+ IDS_LOGMSGDECOMPRERROR, "Не удается распаковать данные (MODE Z), они повреждены.\r\n"
+
+ IDS_LINENUMCOLUMN, "Строка"
+ IDS_LINENUMCOLUMNDESC, "Номера строк raw-листинга FTP-сервера"
+ IDS_RAWLISTCOLUMN, "Листинг"
+ IDS_RAWLISTCOLUMNDESC, "Raw-листинг FTP-сервера"
+
+ IDS_LISTWNDDOWNLOADING, "Загрузка списка файлов и папок с %s, нажмите Esc для отмены..."
+ IDS_LISTWNDDOWNLOADSPEED, "на %s/с"
+ IDS_LISTWNDCONNECTIONIDLE, "соединение простаивает %s"
+ IDS_LISTWNDSTATUS1, "%s из %s (%s)"
+ IDS_LISTWNDSTATUS2, "%s (%s)"
+ IDS_LISTWNDESTIMTIMEUNKNOWN, "(неизвестно)"
+ IDS_LISTWNDABORTINGCOMMAND, "Прерывание загрузки списка файлов и папок, нажмите Esc для отмены..."
+ IDS_LISTWNDSENDCOMMANDESC, "Прервать загрузку перечня? Оглавление файлов и папок на панели может оказаться неполным.\n\nПримечание: если передача данных не началась, попробуйте изменить режим передачи (см. ""Соединиться с FTP-сервером - Дополнительно - Пассивный режим передачи"")"
+ IDS_LISTWNDSENDCOMMANDESC2, "Отменить загрузку перечня? Соединение с FTP-сервером будет разорвано, и оглавление файлов и папок на панели может оказаться неполным.\n\nПримечание: если передача данных не началась, попробуйте изменить режим передачи (см. ""Соединиться с FTP-сервером - Дополнительно - Пассивный режим передачи"")"
+ IDS_LISTWNDABORTCOMMANDESC, "Отменить прерывание? Соединение с FTP-сервером будет разорвано."
+
+ IDS_LISTWNDDOWNLFILEABORTING, "Прекращение скачивания файла, нажмите Esc для отмены..."
+ IDS_LISTWNDDOWNLOADINGFILE, "Скачивается %s файл из %s, нажмите Esc для отмены..."
+ IDS_LISTWNDDOWNLFILESENDCMDESC, "Отменить скачивание? Это может привести к просмотру неполного файла."
+ IDS_LISTWNDDOWNLFILESENDCMDESC2, "Отменить скачивание? Соединение с FTP-сервером будет разорвано. Это может привести к просмотру неполного файла."
+ IDS_LISTWNDDOWNLFILETIMEOUT, "Тайм-аут скачивания."
+
+ IDS_RAWLISTINGTITLE, "Raw-листинг"
+ IDS_RAWLISTINGFILTER, "Файлы листинга (*.txt)|*.txt|Все файлы (*.*)|*.*|"
+ IDS_RAWLISTSAVEASTITLE, "Сохранить raw-листинг как"
+ IDS_RAWLISTSAVEERROR, "Не удается сохранить raw-листинг в файл.\nОшибка: %s"
+
+ IDS_SRVTYPEREMOVECONF, "Вы действительно хотите удалить поддержку серверов типа ""%s""?"
+ IDS_SRVTYPENEWTITLE, "Новый тип сервера"
+ IDS_SRVTYPENEWSUBJECT, "&Название типа сервера:"
+ IDS_SRVTYPERENAMETITLE, "Переименовать тип сервера"
+ IDS_SRVTYPECOPYFROM, "&Копировать данные типа сервера ""%s"""
+ IDS_SRVTYPEUSERDEF, "(пользовательский)"
+ IDS_SRVTYPENOTUNIQUE, "Указанный тип сервера ""%s"" уже существует. Пожалуйста, выберите другое название."
+ IDS_SRVTYPEFILEFILTER, "Файлы типов сервера (*.str)|*.str|Все файлы (*.*)|*.*|"
+ IDS_SRVTYPESAVEASTITLE, "Экспортировать тип сервера в"
+ IDS_SRVTYPEEXPORTERROR, "Не удается экспортировать тип сервера в файл.\n\nОшибка: %s"
+ IDS_SRVTYPEIMPORTERROR, "Не удается импортировать тип сервера из файла.\n\nОшибка: %s"
+ IDS_SRVTYPEIMPMOREDATA, "Файл содержит слишком длинную строку или больше данных, чем ожидалось."
+ IDS_SRVTYPEIMPNOTSTRFILE, "Файл поврежден, либо не поддерживается сервером."
+ IDS_SRVTYPEIMPSYNERR, "Некорректный формат файла, или недостаточно системных ресурсов."
+ IDS_SRVTYPEOVERWRITE, "Тип сервера ""%s"" уже существует. Заменить?"
+ IDS_SRVTYPEIMPERRINRULES, "Правила анализа содержат ошибку."
+ IDS_SRVTYPEIMPERRINACOND, "Правило автоопределения содержит ошибку."
+
+ IDS_ADCSTR_AND, "И"
+ IDS_ADCSTR_OR, "ИЛИ"
+ IDS_ADCSTR_NOT, "НЕ"
+ IDS_ADCSTR_LEFTPAR, "Начало подвыражения"
+ IDS_ADCSTR_RIGHTPAR, "Конец подвыражения"
+ IDS_ADCSTR_SYSTCONTAINS, "Ответ SYST содержит"
+ IDS_ADCSTR_WELMSGCONTAINS, "Приветственный ответ содержит"
+ IDS_ADCSTR_SYSTCONTAINSREG, "В ответе SYST найдено регулярное выражение"
+ IDS_ADCSTR_WELMSGCONTAINSREG, "В приветственном ответе найдено регулярное выражение"
+
+ IDS_SRVTYPECOL_ID, "Идентификатор"
+ IDS_SRVTYPECOL_NAME, "Имя"
+ IDS_SRVTYPECOL_DESCR, "Описание"
+ IDS_SRVTYPECOL_TYPE, "Тип"
+ IDS_SRVTYPECOL_EMPTYVAL, "Фиктивное значение"
+ IDS_SRVTYPECOL_ALIGN, "Выравнивание"
+
+ IDS_STC_STDNAME_NAME, "Имя"
+ IDS_STC_STDNAME_EXT, "Расш"
+ IDS_STC_STDNAME_SIZE, "Размер"
+ IDS_STC_STDNAME_DATE, "Дата"
+ IDS_STC_STDNAME_TIME, "Время"
+ IDS_STC_STDNAME_TYPE, "Тип"
+ IDS_STC_STDNAME_RIGHTS, "Права"
+ IDS_STC_STDNAME_USER, "Пользователь"
+ IDS_STC_STDNAME_GROUP, "Группа"
+ IDS_STC_STDNAME_DEVICE, "Устройство"
+ IDS_STC_STDNAME_BLKSIZE, "Блоков"
+ IDS_STC_STDNAME_ALLOCBLKS, "Выделено"
+ IDS_STC_STDNAME_LINKTGT, "ОбктСсылки"
+ IDS_STC_STDNAME_FORMAT, "Формат"
+ IDS_STC_STDNAME_LRECL, "Lrecl"
+ IDS_STC_STDNAME_RECORDS, "Записей"
+ IDS_STC_STDNAME_FILEMODE, "Fm"
+ IDS_STC_STDNAME_VOLUME, "Том"
+ IDS_STC_STDNAME_UNIT, "Блок"
+ IDS_STC_STDNAME_EXTENTS, "Ext"
+ IDS_STC_STDNAME_USED, "Занято"
+ IDS_STC_STDNAME_RECFM, "Recfm"
+ IDS_STC_STDNAME_BLKSZ, "BlkSz"
+ IDS_STC_STDNAME_DSORG, "Dsorg"
+ IDS_STC_STDNAME_VVMM, "VV.MM"
+ IDS_STC_STDNAME_CREATED, "Создан"
+ IDS_STC_STDNAME_INIT, "Init"
+ IDS_STC_STDNAME_MOD, "Режим"
+ IDS_STC_STDNAME_ID, "Id"
+ IDS_STC_STDNAME_TTR, "TTR"
+ IDS_STC_STDNAME_ALIASOF, "Alias-of"
+ IDS_STC_STDNAME_AC, "AC"
+ IDS_STC_STDNAME_ATTR, "Атрибуты"
+ IDS_STC_STDNAME_AMODE, "Amode"
+ IDS_STC_STDNAME_RMODE, "Rmode"
+ IDS_STC_STDNAME_CODE, "Код"
+ IDS_STC_STDNAME_RWEP, "RWEP"
+
+ IDS_STC_STDDESCR_NAME, "Имя"
+ IDS_STC_STDDESCR_EXT, "Расширение"
+ IDS_STC_STDDESCR_SIZE, "Размер"
+ IDS_STC_STDDESCR_DATE, "Дата изменения"
+ IDS_STC_STDDESCR_TIME, "Время изменения"
+ IDS_STC_STDDESCR_TYPE, "Тип файла"
+ IDS_STC_STDDESCR_RIGHTS, "Права доступа"
+ IDS_STC_STDDESCR_USER, "Пользователь"
+ IDS_STC_STDDESCR_GROUP, "Группа"
+ IDS_STC_STDDESCR_DEVICE, "Основной и дополнительный номера устройства"
+ IDS_STC_STDDESCR_BLKSIZE, "Размер в блоках"
+ IDS_STC_STDDESCR_ALLOCBLKS, "Выделенных блоков"
+ IDS_STC_STDDESCR_LINKTGT, "Объект ссылки"
+ IDS_STC_STDDESCR_FORMAT, "Формат"
+ IDS_STC_STDDESCR_LRECL, "Длина логической записи"
+ IDS_STC_STDDESCR_RECORDS, "Кол-во записей"
+ IDS_STC_STDDESCR_FILEMODE, "Режима доступа"
+ IDS_STC_STDDESCR_VOLUME, "Том"
+ IDS_STC_STDDESCR_UNIT, "Блок"
+ IDS_STC_STDDESCR_EXTENTS, "Диапазон"
+ IDS_STC_STDDESCR_USED, "Использовано"
+ IDS_STC_STDDESCR_RECFM, "Формат записи"
+ IDS_STC_STDDESCR_BLKSZ, "Длина физического блока"
+ IDS_STC_STDDESCR_DSORG, "Организация набора данных"
+ IDS_STC_STDDESCR_VVMM, "VV.MM"
+ IDS_STC_STDDESCR_CREATED, "Создан"
+ IDS_STC_STDDESCR_INIT, "Начальный размер"
+ IDS_STC_STDDESCR_MOD, "Режим"
+ IDS_STC_STDDESCR_ID, "Id"
+ IDS_STC_STDDESCR_TTR, "TTR"
+ IDS_STC_STDDESCR_ALIASOF, "Alias-of"
+ IDS_STC_STDDESCR_AC, "AC"
+ IDS_STC_STDDESCR_ATTR, "Атрибуты"
+ IDS_STC_STDDESCR_AMODE, "Amode"
+ IDS_STC_STDDESCR_RMODE, "Rmode"
+ IDS_STC_STDDESCR_CODE, "Код"
+ IDS_STC_STDDESCR_RWEP, "RWEP"
+
+ IDS_STC_TYPE_NAME, "Имя (необходимо)"
+ IDS_STC_TYPE_EXT, "Расширение (определяется по имени файла)"
+ IDS_STC_TYPE_SIZE, "Размер файла в байтах"
+ IDS_STC_TYPE_DATE, "Дата изменения"
+ IDS_STC_TYPE_TIME, "Время изменения"
+ IDS_STC_TYPE_TYPE, "Тип файла (определяется по расширению)"
+ IDS_STC_TYPE_ANYTEXT, "Любой текст"
+ IDS_STC_TYPE_ANYDATE, "Любая дата"
+ IDS_STC_TYPE_ANYTIME, "Любое время"
+ IDS_STC_TYPE_ANYNUM, "Любое число"
+
+ IDS_STC_ERR_NAMEERR, "Первый столбец в типе сервера должен быть видимым и иметь тип ""Имя""."
+ IDS_STC_ERR_EXTERR, "Столбец типа ""Расширение"" в типе сервера должен следовать за столбцом типа ""Имя"" и быть видимым."
+ IDS_STC_ERR_IDEMPTY, "Следует ввести идентификатор."
+ IDS_STC_ERR_IDINVALID, "Недопустимый формат идентификатора столбца в типе сервера. Он должен начинаться с буквы или символа подчеркивания и содержать только буквы, цифры, символы подчеркивания."
+ IDS_STC_ERR_IDRESERVED, "Идентификатор столбца в типе сервера не может использовать зарезервированные имена (""is_dir"", ""is_hidden"", и ""is_link"")."
+ IDS_STC_ERR_IDNOTUNIQUE, "Одинаковый идентификатор для двух столбцов в типе сервера недопустим."
+ IDS_STC_ERR_TYPEERR, "Неправильное (повторяющееся) использование типов столбца в типе сервера."
+ IDS_STC_ERR_INVALEMPTY, "Недопустимое фиктивное значение для столбца в типе сервера."
+ IDS_STC_ERR_EMPTYNAME, "Следует ввести имя."
+ IDS_STC_ERR_EMPTYDESCR, "Следует ввести описание."
+
+ IDS_SRVTYPECOL_REMOVECONF, "Вы действительно хотите удалить столбец ""%s""?"
+
+ IDS_SRVTYPE_EXITCONF, "Был внесен ряд изменений. Вы действительно хотите проигнорировать их и закрыть диалог?"
+
+ IDS_SRVTYPECOL_NEWTITLE, "Новый столбец"
+ IDS_SRVTYPECOL_FORMDATE, "дд.мм.гггг"
+ IDS_SRVTYPECOL_FORMTIME, "чч:мм:сс"
+ IDS_SRVTYPECOL_FORMNUM, "(число)"
+ IDS_SRVTYPECOL_FORMSTR, "(текст)"
+
+ IDS_SRVTYPECOL_ALIGNLEFT, "По левому краю"
+ IDS_SRVTYPECOL_ALIGNRIGHT, "По правому краю"
+
+ IDS_SRVTYPE_READRAWLISTERR, "Не удается загрузить raw-листинг из файла.\n\nОшибка: %s"
+ IDS_SRVTYPE_READRAWLISTLIMIT, "Внимание! Будет прочитан только первый 1 МБ текстового файла."
+ IDS_SRVTYPE_ONLYINPANEL, "(только на панели)"
+ IDS_SRVTYPE_SIZEISDIR, "ПАПКА"
+ IDS_STPAR_UNABLECOMPPARSER, "Не удается построить анализатор. Правила анализа содержат ошибку.\n\nОшибка: %s"
+ IDS_SRVTYPE_PARSEERROR, "Не удается проанализировать raw-листинг целиком."
+
+ IDS_STPAR_ERR_UNEXPSYM, "Найден непредвиденный символ."
+ IDS_STPAR_ERR_MISSINGRULEEND, "Отсутствует окончание правила (символ "";"")."
+ IDS_STPAR_ERR_INVALIDFUNCNAME, "Недопустимое имя функции."
+ IDS_STPAR_ERR_MISSINGFUNCPARS, "Отсутствуют параметры функции (символ ""("")."
+ IDS_STPAR_ERR_FUNCEXPECTED, "Имя функции не найдено (возможно, имеется лишний символ "","")."
+ IDS_STPAR_ERR_UNKNOWNFUNC, "Обнаружена неизвестная функция."
+ IDS_STPAR_ERR_MISSINGPAREND, "Отсутствует окончание параметров функции (символ "")"")."
+ IDS_STPAR_ERR_PAREXPECTED, "Параметр функции не найден (возможно, имеется лишний символ "","")."
+ IDS_STPAR_ERR_MISSINGCOLUMNID, "Отсутствует идентификатор столбца."
+ IDS_STPAR_ERR_INVALIDCOLUMNID, "Недопустимый идентификатор столбца."
+ IDS_STPAR_ERR_UNKNOWNCOLUMN, "Обнаружен неизвестный идентификатор столбца."
+ IDS_STPAR_ERR_GENERCOLUMN, "Столбец типа ""Расширение"" или ""Тип"" не может быть использован в правилах анализа."
+ IDS_STPAR_ERR_MISSINGCOLIDEND, "Отсутствует окончание идентификатора столбца (символ "">"")."
+ IDS_STPAR_ERR_MISSINGSTREND, "Отсутствует окончание строки (символ кавычек)."
+ IDS_STPAR_ERR_STRUNKNESCSEQ, "В строке использована неизвестная esc-последовательность (Для символа обратной косой черты используйте ""\\\\"")."
+ IDS_STPAR_ERR_INVALIDNUMBER, "Недопустимое число."
+ IDS_STPAR_ERR_INVALVARORBOOL, "Обнаружен непредвиденный символ (возможно, некорректная переменная состояния или логическое значение)."
+ IDS_STPAR_ERR_UNKNOWNSTVAR, "Обнаружена неизвестная переменная состояния."
+ IDS_STPAR_ERR_RIGHTPAREXPECT, "В выражении не найден правый операнд."
+ IDS_STPAR_ERR_UNEXPSYORUNKNOP, "Обнаружен непредвиденный символ или неизвестный оператор."
+ IDS_STPAR_ERR_UNSUPEXPRESSION, "Неподдерживаемое выражение. Допустим только один оператор."
+ IDS_STPAR_ERR_UNEXPTYPESINEXP, "Неправильное использование оператора. Несовместимые или неприменимые типы операндов."
+ IDS_STPAR_ERR_BADPARINFUNC, "Неправильное использование функции. Неожиданное количество или типы параметров."
+ IDS_STPAR_ERR_BADUSEOFCOLID, "Неправильное использование идентификатора столбца. Перед использованием столбцу необходимо присвоить значение."
+ IDS_STPAR_ERR_BADMONTH3STR, "Некорректная строка с трехбуквенными месяцами (формат: 12 трехбуквенных месяцев, разделенных пробелами)."
+ IDS_STPAR_ERR_MISSINGSTRPAR, "Не хватает строкового параметра (символа кавычек)."
+ IDS_STPAR_ERR_MISSINGRIGHTPAR, "Не хватает окончания подвыражения (символа "")"")."
+ IDS_STPAR_ERR_INVALREGEXP, "Некорректное регулярное выражение: %s"
+ IDS_STPAR_ERR_INVALREGEXP2, "Некорректное регулярное выражение"
+ IDS_STPAR_ERR_BADMONTHTXTSTR, "Некорректная строка списка месяцев (формат: 12 месяцев, разделенных пробелами)."
+
+ IDS_STPAR_UNABLECOMPAUTODCOND, "Правило автоопределения содержит ошибку.\n\nОшибка: %s"
+
+ IDS_LOGMSGUNKNOWNSRVTYPE, "Неизвестный тип сервера, не удается проанализировать листинг...\r\n"
+ IDS_UNKNOWNSRVTYPEINFO, "Не удается обработать листинг файлов и папок с сервера. На панели будет отображен только открытый текст листинга.\n\nПосетите наш веб-сайт для обновления Sally. Если вы уже используете последнюю версию программы, пожалуйста, создайте issue на https://github.com/0xeb/sally/issues и приложите raw-листинг (если он не конфиденциальный; щелкните правой кнопкой мыши по значку FTP на панели, выберите пункт меню ""Показать raw-листинг"", нажмите ""Сохранить как""). Пожалуйста, помогите нам сделать поддержку максимально возможного количества типов серверов."
+ IDS_LOGMSGUNKNOWNSRVTYPE2, "Не удается проанализировать листинг, используя выбранный тип сервера...\r\n"
+ IDS_UNKNOWNSRVTYPEINFO2, "Не удается обработать листинг файлов и папок с сервера. На панели будет отображен только открытый текст листинга.\n\nПопробуйте выбрать другой тип сервера или позвольте FTP-клиенту сделать это автоматически (см. ""Соединиться с FTP-сервером - Дополнительно"")."
+ IDS_LOGMSGPARSEDBYSRVTYPE, "Листинг текста был проанализирован типом сервера ""%s"" ...\r\n"
+ IDS_WAITWNDPARSINGLST, "Выполняется обработка списка файлов и папок сервера. Пожалуйста, подождите..."
+
+ IDS_PLSTR_BLOCKSINSELFILES, "{!}<%s> бло{ков|0|к|1|ка|4|ков} в <%s> выбранн{ых файлах|0|ом файле|1|ых файлах}"
+
+ IDS_INVALIDMEMCACHESIZE, "Предельный размер должен составлять от 100 КБ до 1 ГБ."
+ IDS_INVALIDRESUMEOVERLAP, "Количество проверяемых байт не должно превышать 1 ГБ."
+
+// IDS_NOPATHACCESSINPANEL, "No path is accessible on this FTP server. Do you wish to disconnect from this server?"
+
+ IDS_LOGMSGKEEPALIVE, "Отправка команды поддержания соединения...\r\n"
+ IDS_FINISHINGKEEPALIVECMD, "Завершение отправки команды поддержания соединения, нажмите Esc для отмены..."
+ IDS_KEEPALIVECMDESC, "Отменить отправку команды поддержания соединения? Соединение с FTP-сервером будет разорвано."
+ IDS_LOGMSGKEEPALIVECMDTIMEOUT, "Тайм-аут отправки команды поддержания соединения.\r\n"
+ IDS_LOGMSGOPENACTDATACONERROR, "Не удалось подготовить активное соединение для передачи данных.\r\n"
+ IDS_LOGMSGKAPASVNOTSUPPORTED, "Данный сайт не поддерживает пассивный режим передачи.\r\n"
+ IDS_LOGMSGKASTOPPED, "Отправка команд поддержания соединения прекращена...\r\n"
+ IDS_LOGMSGOPENACTDATACONERROR2, "Не удается соединиться с прокси-сервером.\r\n"
+
+ IDS_COPYFROMFTP, "Копировать %s с FTP-сервера в"
+ IDS_MOVEFROMFTP, "Переместить %s с FTP-сервера в"
+ IDS_COPYTITLE, "Копировать"
+ IDS_MOVETITLE, "Переместить"
+
+ IDS_DELETEFROMFTP, "Вы действительно хотите удалить %s с FTP-сервера?"
+
+ IDS_CHATTRNOTUNIXSRV, "Возможно, данный сервер не поддерживает команду изменения атрибутов. Она поддерживается только UNIX-серверами с традиционной моделью прав доступа.\n\nВы действительно хотите изменить атрибуты?"
+ IDS_CHANGEATTRSONFTP, "Изменение атрибутов %s на"
+ IDS_CHATTRNOTHINGTODO, "Атрибуты для изменения отсутствуют. Пожалуйста, выберите атрибуты файлов или папок, которые требуется изменить."
+ IDS_CHATTRNUMVAL3DIGITS, "Числовое значение должно состоять из трех цифр."
+ IDS_CHATTRNOTHINGTODO2, "Атрибуты для изменения отсутствуют. Пожалуйста, выберите атрибуты, которые требуется изменить."
+
+ IDS_MENUTRANSFERMODE, "&Режим передачи данных"
+ IDS_MENUTRMODEAUTO, "&Автоматический"
+ IDS_MENUTRMODEASCII, "A&SCII"
+ IDS_MENUTRMODEBINARY, "&Бинарный"
+
+ IDS_OPERATIONSUSERPROMPT, "Запросить у пользователя"
+ IDS_OPERATIONSAUTORENAME, "Использовать другое имя"
+ IDS_OPERATIONSRESUME, "Возобновить"
+ IDS_OPERATIONSRESUMEOROVERWR, "Возобновить или перезаписать"
+ IDS_OPERATIONSOVERWRITE, "Перезаписать"
+ IDS_OPERATIONSSKIP, "Пропустить"
+ IDS_OPERATIONSUSEEXISTINGDIR, "Использовать существующую папку"
+ IDS_OPERATIONSIGNORE, "Игнорировать"
+ IDS_OPERATIONSINBINMODE, "Использовать бинарный режим"
+ IDS_OPERATIONSDELETE, "Удалить"
+
+ IDS_MASKS_HINT, """*"" означает любое количество символов. ""?"" означает один любой символ.\nПример: *.a? (.a1, anything.ai и пр.)\nМаски разделяются точкой с запятой. Пример: *.txt;*.doc (a.txt, b.doc и пр.)\nМаски исключения предваряются символом ""|"". Пример: |*.txt;*.doc (все, кроме *.txt;*.doc)\nПри необходимости использования точки с запятой внутри маски, введите ее дважды. Пример: one;;mask"
+
+ IDS_OPERDLGDELETETITLE, "Удалить %s из %s"
+ IDS_OPERDLGCOPYDOWNLOADTITLE, "Копировать %s из %s"
+ IDS_OPERDLGMOVEDOWNLOADTITLE, "Переместить %s из %s"
+ IDS_OPERDLGCOPYUPLOADTITLE, "Копировать %s в %s"
+ IDS_OPERDLGMOVEUPLOADTITLE, "Переместить %s в %s"
+ IDS_OPERDLGCHATTRSTITLE, "Изменение атрибутов %s с %s"
+
+ IDS_OPERDLGSRCPATH, "Путь источника:"
+ IDS_OPERDLGTGTPATH, "Путь назначения:"
+ IDS_OPERDLGPATH, "Путь:"
+ IDS_OPERDLGCONFIRMCANCEL, "Вы действительно хотите отменить операцию?"
+ IDS_OPERDLGCLOSEBUTTON1, "Закрыть"
+ IDS_OPERDLGCLOSEBUTTON2, "Отмена"
+ IDS_OPERDLGCONFIRMCLOSE, "Часть операции не была успешно завершена.\n\nВы действительно хотите закрыть незавершенную операцию?"
+
+ IDS_OPERDLGCONS_ID, "ИД"
+ IDS_OPERDLGCONS_ACTION, "Действие"
+ IDS_OPERDLGCONS_STATUS, "Состояние"
+
+ IDS_OPERDLGOPERS_DESCR, "Описание"
+ IDS_OPERDLGOPERS_STATUS, "Состояние"
+
+ IDS_OPERDLGOPSTS_FINISHED, "Завершено"
+ IDS_OPERDLGOPSTS_SKIPPED, "Пропущено: %s"
+ IDS_OPERDLGOPSTS_FAILED, "Ошибка: %s"
+ IDS_OPERDLGOPSTS_WAITUSER, "Запросить у пользователя: %s, что делать?"
+ IDS_OPERDLGOPSTS_WAITING, "Ожидание"
+ IDS_OPERDLGOPSTS_PROCESSING, "Выполняется"
+ IDS_OPERDLGOPSTS_DELAYED, "Отложено: часть задач еще не завершена"
+ IDS_OPERDLGOPSTS_FORCEDTOFAIL, "Ошибка: часть задач не была успешно завершена"
+
+ IDS_OPERDOPDS_DELLINK, "Удаление ссылки %s из %s"
+ IDS_OPERDOPDS_DELFILE, "Удаление файла %s из %s"
+ IDS_OPERDOPDS_DELDIR, "Удаление папки %s из %s"
+ IDS_OPERDOPDS_CHATTREXPLDIR, "Просмотр папки %s из %s для изменения атрибутов"
+ IDS_OPERDOPDS_RESLINK, "Разрешение ссылки %s из %s"
+ IDS_OPERDOPDS_COPY1, "Копирование %s%s из %s в %s в режиме передачи %s"
+ IDS_OPERDOPDS_COPY2, "Копирование %s%s из %s в %s как %s в режиме передачи %s"
+ IDS_OPERDOPDS_MOVE1, "Перемещение %s%s из %s в %s в режиме передачи %s"
+ IDS_OPERDOPDS_MOVE2, "Перемещение %s%s из %s в %s как %s в режиме передачи %s"
+ IDS_OPERDOPDS_ASCIITRMODE, "ASCII"
+ IDS_OPERDOPDS_BINARYTRMODE, "бинарный"
+ IDS_OPERDOPDS_SIZEINBLOCKS, "блоков"
+ IDS_OPERDOPDS_MOVEDELDIR, "Удалить папку %s с %s после перемещения ее содержимого"
+ IDS_OPERDOPDS_MOVEDELDIRLNK, "Удалить ссылку на папку %s с %s после перемещения ее содержимого"
+ IDS_OPERDOPDS_COPYEXPLDIR, "Просмотр папки %s из %s для копирования в %s под %s"
+ IDS_OPERDOPDS_MOVEEXPLDIR, "Просмотр папки %s из %s для перемещения в %s под %s"
+ IDS_OPERDOPDS_MOVEEXPLDIRLNK, "Просмотр ссылки на папку %s из %s для перемещения в %s под %s"
+ IDS_OPERDOPDS_CHATTRFILE, "Изменить атрибуты файла %s с %s на %s"
+ IDS_OPERDOPDS_CHATTRDIR, "Изменить атрибуты папки %s с %s на %s"
+ IDS_OPERDOPDS_CHATTREXPLDIRLNK, "Просмотр ссылки на папку %s из %s для изменения атрибутов"
+ IDS_OPERDOPDS_DELEXPLDIR, "Просмотр папки %s из %s для удаления"
+
+ IDS_OPERDOPPR_OK, "Выполнено"
+ IDS_OPERDOPPR_LOWMEM, "Недостаточно системных ресурсов"
+ IDS_OPERDOPPR_CANTCRTGTFILE, "Не удается создать или открыть конечный файл, системная ошибка: %s"
+ IDS_OPERDOPPR_CANTCRTGTDIR, "Не удается создать конечную папку, системная ошибка: %s"
+ IDS_OPERDOPPR_TGTFILEEXISTS, "Конечный файл уже существует"
+ IDS_OPERDOPPR_TGTDIREXISTS, "Конечная папка уже существует"
+ IDS_OPERDOPPR_TRANSFERFAILED, "Ошибка передачи"
+ IDS_OPERDOPPR_ASCIITRBINFILE, "Установлен режим передачи ASCII для файла с бинарным содержимым"
+ IDS_OPERDOPPR_UNKNOWNATTRS, "Не удается сохранить некоторые из имеющихся атрибутов (%s)"
+ IDS_OPERDOPPR_UNKEXISTATTR, "неизвестно"
+ IDS_OPERDOPPR_INVALIDPATHTODIR, "Путь папки слишком длинный или недопустим"
+ IDS_OPERDOPPR_UNABLETOCWD, "Не удается сменить рабочий путь, ответ сервера:"
+ IDS_OPERDOPPR_UNABLETOPWD, "Не удается найти рабочий путь, ответ сервера:"
+ IDS_OPERDOPPR_DIREXPLENDLESSLOOP, "Просмотр данной папки приведет к зацикливанию"
+ IDS_OPERDOPPR_LISTENFAILURE, "Не удается подготовить активное соединение для передачи данных: %s"
+ IDS_OPERDOPPR_INCOMPLLISTING1, "Не удается целиком считать перечень файлов и папок с сервера, ошибка: %s"
+ IDS_OPERDOPPR_INCOMPLLISTING2, "Не удается целиком считать перечень файлов и папок с сервера, ответ сервера:"
+ IDS_OPERDOPPR_UNABLETOPARSELISTING, "Не удается обработать перечень файлов и папок сервера"
+ IDS_OPERDOPPR_DIRISHIDDEN, "Папка скрыта"
+ IDS_OPERDOPPR_DIRISNOTEMPTY, "Папка не пуста"
+ IDS_OPERDOPPR_FILEISHIDDEN, "Файл скрыт"
+ IDS_OPERDOPPR_INVALIDPATHTOLINK, "Полное имя ссылки слишком длинное или недопустимое"
+ IDS_OPERDOPPR_UNABLETORESOLVELNK, "Не удается разрешить ссылку на папку или файл, ответ сервера:"
+ IDS_OPERDOPPR_UNABLETODELFILE, "Не удается удалить файл или ссылку, ответ сервера:"
+ IDS_OPERDOPPR_UNABLETODELDIR, "Не удается удалить папку, ответ сервера:"
+ IDS_OPERDOPPR_UNABLETOCHATTRS, "Не удается изменить атрибуты, ответ сервера:"
+ IDS_OPERDOPPR_UNABLETORESUME, "Не удается возобновить передачу файла (возобновление не поддерживается сервером)"
+ IDS_OPERDOPPR_RESUMETESTFAILED, "Не удается возобновить передачу файла, неожиданный конец файла (файл изменился, либо сервер не смог правильно возобновить передачу, так как используется режим ASCII)"
+ IDS_OPERDOPPR_TGTFILEREADERROR, "Не удается прочесть конечный файл, системная ошибка: %s"
+ IDS_OPERDOPPR_TGTFILEWRITEERROR, "Не удается записать конечный файл, системная ошибка: %s"
+ IDS_OPERDOPPR_INCOMPLDOWNLOAD1, "Не удается загрузить файл с сервера, ошибка: %s"
+ IDS_OPERDOPPR_INCOMPLDOWNLOAD2, "Не удается загрузить файл с сервера, ответ сервера:"
+ IDS_OPERDOPPR_UNABLETODELSRCFILE, "Не удается удалить исходный файл или ссылку после успешной передачи, ответ сервера:"
+
+ IDS_OPERDLGCOACT_STOPPING, "Остановка"
+ IDS_OPERDLGCOACT_LOOKFORWORK, "Поиск операции для выполнения"
+ IDS_OPERDLGCOACT_SLEEPING, "Простой"
+ IDS_OPERDLGCOACT_WAITFORUSER, "Ожидание действия пользователя"
+ IDS_OPERDLGCOACT_DELLINK, "Удаление ссылки %s"
+ IDS_OPERDLGCOACT_DELFILE, "Удаление файла %s"
+ IDS_OPERDLGCOACT_DELDIR, "Удаление папки %s"
+ IDS_OPERDLGCOACT_EXPLDIR, "Просмотр папки %s"
+ IDS_OPERDLGCOACT_RESLINK, "Разрешение ссылки %s"
+ IDS_OPERDLGCOACT_COPY, "Копирование %s"
+ IDS_OPERDLGCOACT_MOVE, "Перемещение %s"
+ IDS_OPERDLGCOACT_CHATTR, "Изменение атрибутов %s"
+
+ IDS_OPERDLGCOACT_PREPARING, "Подготовка операции"
+ IDS_OPERDLGCOACT_CONNECTING, "Соединение"
+ IDS_OPERDLGCOACT_WAITRECON, "Подключиться не удалось, ожидание %d секунд до переподключения (попытка № %d из %d): %s"
+ IDS_OPERDLGCOACT_CONERROR, "Подключиться не удалось: %s"
+ IDS_OPERDLGCOACT_TIMELEFT, "осталось:"
+ IDS_OPERDLGCOACT_WAITFORLIST, "Ожидание листинга пути назначения"
+ IDS_OPERDLGCOACT_PAUSED, "Приостановлено"
+
+ IDS_WORKERLOGHEADER, "Хост: ""%s"", порт: %d.\r\nЖурнал UID %d, время %s.\r\n\r\n"
+ IDS_LOGMSGCONINWORKER, "\r\nСоединение убрано с панели для выполнения операции...\r\n"
+ IDS_LOGMSGCONFROMWORKER, "\r\nСоединение выведено на панель (оно было использовано для выполнения операции)...\r\n\r\n"
+ IDS_LOGMSGWORKERUSECON, "Использование соединения с панели...\r\n\r\n"
+ IDS_LOGMSGWORKERRETCON, "Соединение было возвращено на панель...\r\n"
+
+ IDS_CANCELEXISTINGOPER, "В очереди по-прежнему имеются незавершенные FTP-операции. Вы хотите отменить их?"
+
+ IDS_CLOSINGOPERCONS1, "Закрывается соединение, используемое для операции, нажмите Esc, чтобы разорвать его..."
+ IDS_CLOSINGOPERCONS2, "Закрываются все соединения, используемые для операции, нажмите Esc, чтобы разорвать их..."
+ IDS_CLOSINGOPERCONS3, "Закрываются все соединения, используемые для всех операций, нажмите Esc, чтобы разорвать их..."
+ IDS_TERMCONFOROPER1, "Вы хотите разорвать соединение, используемое для операции?"
+ IDS_TERMCONFOROPER2, "Вы хотите разорвать все соединения, используемое для операции?"
+ IDS_TERMCONFOROPER3, "Вы хотите разорвать все соединения, используемые для всех операций?"
+
+ IDS_WANTTOSTOPCON, "Вы действительно хотите разорвать соединение ""%d""?"
+
+ IDS_LOGMSGCMDTIMEOUT, "Тайм-аут отправки команды FTP.\r\n"
+ IDS_WORKERCONLOGHDR, "Соединение с ""%s"" (%s) к порту %d...\r\n\r\n"
+ IDS_WORKERWAITLOGTIM, "Тайм-аут ожидания приглашения входа.\r\n"
+ IDS_WORKERLOGPARCHANGED, "\r\n-----\r\n\r\nБыли изменены параметры авторизации, или принят/проверен сертификат сервера (SSL).\r\n\r\n"
+ IDS_PRXSRVWORKERCONLOGHDR, "Адрес FTP-сервера: %s, порт: %d, пользователь: %s\r\nИмя прокси-сервера: %s, тип: %s\r\nАдрес прокси-сервера: %s, порт: %d, пользователь: %s\r\nСоединение с ""%s"" (%s) к порту %d...\r\n\r\n"
+
+ IDS_WORKERGETIPERROR, "Ошибка получения IP-адреса: %s"
+ IDS_WORKEROPENCONERR, "Ошибка установления соединения: %s"
+ IDS_WORKERUNKNOWNPROXYHOST, "Следует указать адрес прокси-сервера"
+ IDS_WORKERUNKNOWNPROXYPASSWORD, "Следует указать пароль прокси-сервера"
+ IDS_WORKERUNKNOWNPASSWD, "Следует указать пароль"
+ IDS_WORKERUNKNOWNACCOUNT, "Следует указать учетную запись"
+ IDS_WORKERLOGINERR, "Ошибка входа: %s"
+
+ IDS_SOLVEERRSUBJECT, "Все соединения, используемые для этой операции, имеют следующие параметры."
+ IDS_SOLVEERRRETRY, "Вс&егда пытаться подключиться повторно (даже, если постоянно возникают ошибки авторизации)"
+ IDS_SOLVEERRREPLY, "Описание ошибки:"
+
+ IDS_CLOSINGDISKTHREAD, "Завершается последовательность дисковых операций, нажмите Esc, чтобы прервать их..."
+ IDS_CANCELDISKTHREAD, "Вы действительно хотите завершить последовательность дисковых операций?\n\nВнимание! Некоторые файлы на диске могут остаться открытыми."
+
+ IDS_SIED_TITLE1, "Ошибка создания конечной папки"
+ IDS_SIED_TITLE2, "Конечная папка уже существует"
+ IDS_SIED_TITLE3, "Ошибка создания конечного файла"
+ IDS_SIED_TITLE4, "Конечный файл уже существует"
+ IDS_SIED_TITLE5, "Передача не удалась"
+ IDS_SIED_TITLE6, "Конечная папка или ссылка на папку уже существует"
+ IDS_SIED_TITLE7, "Ошибка создания конечного файла под альтернативным именем"
+ IDS_SISE_TITLE1, "Подтверждение удаления скрытой папки"
+ IDS_SISE_TITLE2, "Подтверждение удаления скрытого файла"
+ IDS_SISE_TITLE3, "Подтверждение удаления непустой папки"
+ IDS_SSCD_TITLE1, "Ошибка смены рабочего пути на сервере"
+ IDS_SSCD_TITLE2, "Ошибка определения рабочего пути на сервере"
+ IDS_SSCD_TITLE3, "Ошибка чтения списка файлов и папок с сервера"
+ IDS_SSCD_TITLE4, "Ошибка подготовки активного соединения для передачи данных"
+ IDS_SSCD_TITLE5, "Ошибка разрешения ссылки"
+ IDS_SSCD_TITLE6, "Ошибка изменения атрибутов"
+ IDS_SSCD_TITLE7, "Ошибка удаления файла или ссылки"
+ IDS_SSCD_TITLE8, "Ошибка удаления папки"
+ IDS_SSCD_TITLE9, "Ошибка листинга пути назначения"
+ IDS_SSCD_TITLE10, "Ошибка чтения списка файлов и папок диска"
+ IDS_SSCD_TITLE11, "Ошибка открытия исходного файла"
+ IDS_SSCD_TITLE12, "Ошибка чтения исходного файла"
+ IDS_SCRD_TITLE1, "Ошибка обработки списка файлов и папок сервера"
+ IDS_SCRD_TITLE2, "Конечный файл заблокирован другой операцией"
+ IDS_SCRD_TITLE3, "Исходный файл заблокирован другой операцией"
+ IDS_SSCD2_TITLE1, "Ошибка докачки файла"
+ IDS_SSCD2_TITLE2, "Ошибка чтения конечного файла"
+ IDS_SSCD2_TITLE3, "Ошибка записи конечного файла"
+ IDS_SSCD2_TITLE4, "Ошибка загрузки файла с сервера"
+ IDS_SSCD2_TITLE5, "Ошибка удаления исходного файла после успешной передачи"
+ IDS_SIED_TITLE8, "Ошибка сохранения файла на сервер"
+ IDS_SSCD2_TITLE7, "Ошибка тестирования файла"
+
+ IDS_SIED_DETAIL1, "Конечный файл был создан или перезаписан."
+ IDS_SIED_DETAIL2, "Конечный файл был докачан."
+ IDS_SSCD2_UNABLETORESUME, "Возможно, сервер не поддерживает докачку"
+ IDS_SSCD2_RESUMETESTFAILED, "Неожиданный конец файла. Файл изменился, либо сервер не смог корректно возобновить его загрузку,\r\nтак как используется режим передачи ASCII."
+
+ IDS_DRAGDROP_TGTNOTEXIST, "Конечный путь не существует, а его создание не поддерживается."
+ IDS_DRAGDROP_TGTARCORFS, "Копирование и перемещение в архивы или виртуальные файловые системы модуля не поддерживаются."
+
+ IDS_OPERDLGCONNECTIONSIDLE, "передачи данных не было %s"
+ IDS_OPERDLGSTATUS1, "общая скорость передачи: %s/с"
+ IDS_OPERDLGSTATUS2, "%s из %s"
+ IDS_OPERDLGSTATUS3, "{!}%d из %d операц{ий|0|ии|1|ий}"
+ IDS_OPERDLGSTATUS4, "{!}%d операц{ий|0|ия|1|ий} неизвестного размера"
+ IDS_OPERDLGSTATUS5, "{!}%d ошиб{ок|0|ка|1|ки|4|ок}"
+ IDS_OPERDLGTIMLEFTWAIT, "(ожидание пользователя)"
+ IDS_OPERDLGTIMLEFTDONE, "(готово)"
+ IDS_OPERDLGCONNECTIONSIDLE2, "простой %s"
+
+ IDS_OPERDLGTITLE_DONE, "готово"
+ IDS_OPERDLGTITLE_ERRORS, "ошибки"
+ IDS_OPERDLGTITLE_STOPPED, "остановлено"
+ IDS_OPERDLGTITLE_PAUSED, "приостановлено"
+ IDS_OPERDLGTITLE_WAITING, "ожидание"
+
+ IDS_LOWDISKSPACEONTGTPATH, "Возможно, по пути назначения недостаточно дискового пространства.\nТребуется: %s\nДоступно: %s\nНе хватает: %s"
+
+ IDS_NEEDPARSEDLISTING, "Данная операция не может быть выполнена без корректно обработанного листинга файлов и папок сервера."
+
+ IDS_DOWNLOADFILEERROR, "Не удается загрузить файл с сервера.\n\nИмя: %s\nПуть: %s\n"
+ IDS_DOWNLOADFILEERRORSUFIX1, "Ошибка: %s"
+ IDS_DOWNLOADFILEERRORSUFIX2, "Ответ сервера: %s"
+ IDS_DOWNLOADFILEERRORSUFIX3, "Ошибка записи конечного файла: %s"
+ IDS_DOWNLOADFILEERRORSUFIX4, "Ошибка: файл заблокирован другой операцией."
+
+ IDS_HOMEDIRNOTDEFINED, "Вы указали домашнюю папку в качестве пути назначения, но домашняя папка не определена для данного соединения с FTP-сервером.\nПожалуйста, укажите другой путь назначения на FTP-сервере."
+ IDS_INVALIDPATH, "Указан неправильный путь."
+ IDS_COPYMOVE_NONSENSE, "Возможно, операция не имеет смысла. Все выбранные файлы и папки имеют одинаковое конечное имя (перезапишут друг друга).\nВы действительно хотите продолжить выполнение данной операции?"
+
+ IDS_OPERDOPPR_UPLCANTCRTGTDIRINV, "Папка назначения не может быть создана, ее имя недопустимо на данном сервере"
+ IDS_OPERDOPPR_UPLCANTCRTGTDIRFILEEX, "Папка назначения не может быть создана, уже существует файл или ссылка на файл с указанным именем"
+ IDS_OPERDOPPR_UPLCANTCRTGTDIR, "Не удалось создать папку назначения, ответ сервера:"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH, "Не удается считать перечень файлов с сервера, чтобы выявить конфликты имен файлов"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH2, "Не удается считать перечень файлов с сервера, чтобы выявить конфликты имен файлов, ответ сервера:"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH3, "Не удается считать перечень файлов с сервера, чтобы выявить конфликты имен файлов, ошибка: %s"
+ IDS_OPERDOPPR_UPLCANTLISTSRCPATH, "Не удается считать перечень файлов исходного пути, системная ошибка: %s"
+ IDS_OPERDOPPR_UPLCRDIRAUTORENFAILED, "Не удается создать папку назначения под альтернативным именем, ответ сервера:"
+ IDS_OPERDOPPR_UPLCANTDELSRCDISKDIR, "Не удается удалить папку, системная ошибка: %s"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILEINV, "Конечный файл не может быть создан или открыт, его имя недопустимо на данном сервере"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILEDIREX, "Конечный файл не может быть создан или открыт, уже существует папка или ссылка на папку с указанным именем"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILE, "Конечный файл не может быть создан или открыт, ответ сервера:"
+ IDS_OPERDOPPR_UPLCANNOTOPENSRCFILE, "Не удается открыть исходный файл, системная ошибка: %s"
+ IDS_OPERDOPPR_UPLTGTFILEEXISTS, "Конечный файл или ссылка на файл уже существует"
+ IDS_OPERDOPPR_UPLTGTDIREXISTS, "Конечная папка или ссылка на папку уже существует"
+ IDS_OPERDOPPR_SRCFILEINUSE, "Исходный файл или ссылка заблокирован(а) другой операцией"
+ IDS_OPERDOPPR_TGTFILEINUSE, "Конечный файл или ссылка заблокирован(а) другой операцией"
+ IDS_OPERDOPPR_SRCFILEREADERROR, "Не удается прочесть исходный файл, системная ошибка: %s"
+ IDS_OPERDOPPR_INCOMPLUPLOAD1, "Не удается сохранить файл на сервере, ошибка: %s"
+ IDS_OPERDOPPR_INCOMPLUPLOAD2, "Не удается сохранить файл на сервере, ответ сервера:"
+ IDS_OPERDOPPR_UPLCANTDELSRCDISKFILE, "Не удается удалить исходный файл после успешной передачи, системная ошибка: %s"
+ IDS_OPERDOPPR_UPLASCIIRESNOTSUP, "Возобновление в режиме передачи ASCII не поддерживается (совет: для использования докачки, закачивайте файлы в бинарном режиме)"
+ IDS_OPERDOPPR_UPUNABLERESUNKSIZ, "Не удается докачать файл, так как размер конечного файла в байтах неизвестен"
+ IDS_OPERDOPPR_UPUNABLERESBIGTGT, "Не удается докачать файл, так как конечный файл больше исходного (файл изменился)"
+ IDS_OPERDOPPR_UPLFILEAUTORENFAILED, "Не удается создать конечный файл под альтернативным именем, ответ сервера:"
+ IDS_OPERDOPPR_SKIPPEDBYUSER, "Пропущено пользователем"
+ IDS_OPERDOPPR_UPLTESTIFFINNOTSUP, "Не удается определить размер файла в байтах для проверки успешности его загрузки (файл был загружен целиком, но сервер не подтвердил его получение)"
+
+ IDS_UPLERR_CANTCRTGTDIRINV, "Имя папки назначения недопустимо на этом сервере."
+ IDS_UPLERR_CANTCRTGTDIRFILEEX, "Имя папки назначения уже используется для файла или ссылки на файл."
+ IDS_UPLERR_CANTCRTGTFILEINV, "Конечное имя файла недопустимо на этом сервере."
+ IDS_UPLERR_CANTCRTGTFILEDIREX, "Конечное имя файла уже используется для папки или ссылки на папку."
+ IDS_UPLERR_UPLCANTRESUMINASC, "Возобновление в режиме передачи ASCII не поддерживается.\r\nСовет: для использования докачки, закачайте файл заново в бинарном режиме."
+ IDS_UPLERR_UPLCANTRESUMBIGTGT, "Не удается докачать файл, так как конечный файл больше исходного\r\n(файл изменился)."
+ IDS_UPLERR_UPLTESTIFFINNOTSUP, "Не удается определить размер файла в байтах для проверки успешности его загрузки (файл был\r\nзагружен целиком, но сервер не подтвердил его получение)."
+
+ IDS_RENAME_FILEEXISTS, "Конечный файл уже существует. Перезаписать?"
+ IDS_RENAME_DIREXISTS, "Конечное имя уже используется для папки. Продолжить?"
+ IDS_RENAME_UNABLETOGETLIST, "Не удается проверить используется ли уже конечное имя. Продолжить?"
+ IDS_RENAME_FILEEXISTS2, "Конечное имя уже используется для файла. Продолжить?"
+
+ IDS_OPERDLGRESUMEBUTTON, "&Возобновить"
+ IDS_OPERDLGRESUMECONBUTTON, "&Возобновить"
+
+ IDS_PROXYSERVER_NOTUSED, "Не использовать (соединяться напрямую)"
+ IDS_PROXYSERVER_DEFAULT, "По умолчанию (см. ""Параметры по умолчанию"" в настройках FTP)"
+ IDS_PROXYSERVER_USERDEF, "Пользовательский"
+ IDS_PROXYSERVER_SOCKS4, "SOCKS 4"
+ IDS_PROXYSERVER_SOCKS4A, "SOCKS 4A"
+ IDS_PROXYSERVER_SOCKS5, "SOCKS 5"
+ IDS_PROXYSERVER_HTTP11, "HTTP 1.1"
+ IDS_PROXYSERVER_SITE1, "SITE host:port"
+ IDS_PROXYSERVER_SITE2, "SITE host port"
+ IDS_PROXYSERVER_SITE3, "SITE user@host:port"
+ IDS_PROXYSERVER_SITE4, "SITE user@host port"
+ IDS_PROXYSERVER_OPEN, "OPEN host:port"
+ IDS_PROXYSERVER_TRANSPAR, "Прозрачный"
+ IDS_PROXYSERVER_USER1, "USER user@host:port"
+ IDS_PROXYSERVER_USER2, "USER user@host port"
+ IDS_PROXYSERVER_USER3, "USER proxy-user@host:port"
+ IDS_PROXYSERVER_USER4, "USER user@host:port proxy-user"
+ IDS_PROXYSERVER_USER5, "USER user@proxy-user@host:port"
+
+ IDS_PRXSCRERR_INVSTART, "Сценарий должен начинаться с ""Connect to:""."
+ IDS_PRXSCRERR_HOSTEMPTY, "Следует указать хост."
+ IDS_PRXSCRERR_INVHOSTORPORT, "Указан неправильный хост или порт (вводите в формате ""хост"" или ""хост:порт"")."
+ IDS_PRXSCRERR_UNKNOWNVAR, "Сценарий содержит неизвестную переменную."
+ IDS_PRXSCRERR_HOSTVARSONLY, "Здесь можно использовать только переменные $(ProxyHost) или $(Host)."
+ IDS_PRXSCRERR_INVPORT, "Порт можно вводить только в виде числа или переменной $(ProxyPort) либо $(Port)."
+ IDS_PRXSCRERR_3XXONFIRSTLINE, "Нельзя использовать условие ""3xx:"" для первой команды, необходима какая-нибудь предшествующая ей команда (обычно, ""USER"")."
+ IDS_PRXSCRERR_NONECMDS, "Сценарий прокси должен содержать хотя бы одну команду."
+ IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
+ IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+
+ IDS_EDITPROXYSRVTITLE, "Настройка прокси-сервера"
+ IDS_PORTISUSHORT, "Номер порта должен находиться в диапазоне от 1 до 65535."
+ IDS_INVPROXYNAME, "Не указано имя прокси, или оно уже используется для другого прокси-сервера. Пожалуйста, введите другое имя."
+ IDS_INVPROXYADDRESS, "Адрес прокси не может содержать двоеточие (совет: вводите номер порта в соседнее поле ввода)."
+ IDS_EMPTYPROXYADDRESS, "Следует указать адрес прокси."
+ IDS_EMPTYUSERFORTRANSPRX, "Прозрачный прокси с неуказанным именем пользователя не имеет смысла. Введите имя пользователя, либо подключайтесь без прокси-сервера."
+
+ IDS_WANTDELPRXSRV, "Вы действительно хотите удалить прокси-сервер ""%s""?"
+
+ IDS_ENTERPRXHOSTTITLE, "Введите адрес прокси-сервера"
+ IDS_ENTERPRXHOSTTEXT, "&Адрес прокси-сервера (укажите номер порта после двоеточия, если необходимо):"
+ IDS_ENTERPRXPASSTITLE, "Введите пароль прокси-сервера"
+ IDS_ENTERPRXPASSTEXT, "&Пароль прокси-сервера:"
+
+ IDS_INCOMPLETEPRXSCR, "Вероятно, сценарий прокси введен не полностью. Подробности указаны в ответе сервера на последнюю команду сценария.\r\n\r\nОтвет сервера: %s"
+ IDS_INCOMPLETEPRXSCR2, "Вероятно, сценарий прокси введен не полностью. Все команды сценария были пропущены."
+ IDS_INCOMPLETEPRXSCR3, "Вероятно, сценарий прокси введен не полностью. Подробности указаны в ответе сервера на последнюю команду сценария: %s"
+
+ IDS_PROXYERRREJORFAIL, "В соединении отказано, либо произошла ошибка."
+ IDS_PROXYERRNEEDIDENTD, "Не удается соединиться с пользовательским identd (вероятно, необходимо установить службу identd)."
+ IDS_PROXYERRDIFFUSERS, "В соединении отказано, так как имя пользователя прокси и имя пользователя, возвращенное identd, не совпадают."
+ IDS_PROXYERRINVHOST, "Соединения с неизвестных IP-адресов не могут быть приняты."
+
+ IDS_PROXYERRGETIP, "Ошибка получения IP-адреса ""%s"": %s"
+ IDS_PROXYERRSENDREQ, "Ошибка отправки запроса прокси-серверу: %s"
+ IDS_PROXYERRRECVREP, "Ошибка получения ответа от прокси-сервера: %s"
+ IDS_PROXYERROPENCON, "Прокси-сервер не может установить соединение с FTP-сервером ""%s"" (порт: %d), ошибка: %s"
+ IDS_PROXYERRUNABLETOCON, "Не удается соединиться с прокси-сервером."
+ IDS_PROXYERROPENACTDATA, "Не удается соединиться с прокси-сервером, либо он отвергает попытку соединения для передачи данных."
+ IDS_PROXYERRUNABLETOCON2, "Не удается соединиться с прокси-сервером, ошибка: %s"
+ IDS_PROXYERRNOAUTHUNSUP, "Анонимные пользователи запрещены прокси-сервером. Пожалуйста, укажите ваши имя пользователя и пароль в настройках прокси-сервера."
+ IDS_PROXYERRUSERPASSAUTHUNSUP, "Прокси-сервер не поддерживает аутентификацию с использованием имени пользователя и пароля, попробуйте подключиться анонимно (очистите значения имени пользователя/пароля в настройках прокси-сервера)."
+ IDS_PROXYERRUSERPASSFAIL, "Прокси-сервер отверг ваши имя пользователя и пароль."
+ IDS_PROXYERRLISTENUNSUP, "Прокси-сервер не поддерживает установление соединения для передачи данных."
+
+ IDS_LOGMSGDELETEFILE, "Удаление файла ""%s""...\r\n"
+ IDS_LOGMSGDELETELINK, "Удаление ссылки ""%s""...\r\n"
+ IDS_LOGMSGDELETEDIR, "Удаление папки ""%s""...\r\n"
+ IDS_LOGMSGDELETEDIRLINK, "Удаление ссылки на папку ""%s""...\r\n"
+ IDS_LOGMSGCHATTRSFILE, "Изменение атрибутов файла ""%s""...\r\n"
+ IDS_LOGMSGCHATTRSDIR, "Изменение атрибутов папки ""%s""...\r\n"
+ IDS_LOGMSGEXPLORINGDIR, "Просмотр папки ""%s"" по пути ""%s""...\r\n"
+
+ IDS_PROXYERRGENFAIL, "Общая ошибка SOCKS-сервера."
+ IDS_PROXYERRRULESET, "Соединение запрещено набором правил."
+ IDS_PROXYERRNETUNR, "Сеть недоступна."
+ IDS_PROXYERRHOSTUNR, "Хост недоступен."
+ IDS_PROXYERRCONREF, "В соединении отказано."
+ IDS_PROXYERRTTLEXP, "TTL превышено."
+ IDS_PROXYERRCMDNOTSUP, "Команда не поддерживается."
+ IDS_PROXYERRADRTYPEUNSUP, "Тип адреса не поддерживается."
+
+ IDS_HTTPNEEDPASSIVETRMODE, "Вы используете прокси-сервер HTTP 1.1 по умолчанию. Он поддерживает только пассивный режим передачи. Пожалуйста, установите пассивный режим передачи (или измените прокси-сервер по умолчанию)."
+ IDS_HTTPNEEDPASSIVETRMODE2, "Вы подключаетесь к FTP-серверу с использованием прокси-сервера типа HTTP 1.1. Он поддерживает только пассивный режим передачи. Пожалуйста, установите пассивный режим передачи (см. ""Дополнительно - Пассивный режим передачи"")."
+ 
+ IDS_HINTLISTHIDDENFILES, "Если хотите всегда выводить перечень скрытых файлов и папок этого FTP-сервера, зайдите в меню ""Модули - FTP-клиент - Соединиться с FTP-сервером"", выберите подключение, нажмите кнопку ""Дополнительно"" и смените команду листинга на ""LIST -a""."
+ IDS_DONOTSHOWHINTLISTHF, "&Больше не показывать это сообщение\tвключить\tВы можете изменить этот параметр на странице подтверждений в настройках FTP"
+ 
+ IDS_LOGMSGUNABLETORESUME, "Не удается докачать файл, ошибка проверки его конца (файл изменился).\r\n"
+ IDS_LOGMSGOVERWRTGTFILE, "Попытка перезаписать конечный файл (чтобы скопировать/переместить весь файл заново).\r\n"
+ IDS_LOGMSGRESUMEUSELESS, "Файл слишком мал для возобновления, конечный файл будет перезаписан.\r\n"
+ IDS_LOGMSGRESUMEFROMBEG, "Возобновление: загрузка файла с начала, чтобы определить уже скачанную часть.\r\n"
+ IDS_LOGMSGRESUMENOTSUP, "Не удается докачать файл (возобновление не поддерживается сервером).\r\n"
+ IDS_LOGMSGUNABLETORESUME2, "Не удается докачать файл, так как он меньше уже скопированной/перемещенной части (файл изменился).\r\n"
+ IDS_LOGMSGUPLRESUMENOTSUP, "Не удается докачать файл (возобновление не поддерживается сервером, или установлен режим передачи ASCII).\r\n"
+ IDS_LOGMSGUPLUNABLETOGETSIZE, "Не удается определить размер (в байтах) уже скопированной/перемещенной части конечного файла.\r\n"
+ IDS_LOGMSGUPLRESUMEERR, "Не удается докачать файл (непредвиденная ошибка).\r\n"
+ IDS_LOGMSGUPLNOTCONFIRMED, "Файл был загружен целиком, но сервер не подтвердил его получение.\r\nПопытка определить размер файла (в байтах), чтобы проверить, был ли он успешно скопирован/перемещен.\r\n"
+
+ IDS_SSL_ERR_OPENSSLNOTFOUND "Не удалось обнаружить или загрузить библиотеки OpenSSL, необходимые для шифрования.\r\nТребуются файлы: ""ssleay32.dll"" и ""libeay32.dll"".\r\nОни входят в состав дистрибутива Sally."
+ IDS_SSL_ERR_NEW "Не удается сформировать управляющую структуру OpenSSL. Недостаточно памяти."
+ IDS_SSL_ERR_NEW_LOG "ОШИБКА SSL: не удается сформировать управляющую структуру OpenSSL. Недостаточно памяти.\r\n"
+ IDS_SSL_ERR_CONNECT "Не удается установить шифрованное соединение (SSL).\n\nОшибка: %s"
+ IDS_SSL_ERR_CONNECT_ERR "SSL_connect вернула %d: %s"
+ IDS_SSL_ERR_CONNECT_LOG "ОШИБКА SSL: не удается установить зашифрованное соединение, SSL_connect вернула %d: %s\r\n"
+ IDS_SSL_ERR_CONTRENCUNSUP "Сервер не поддерживает шифрование управляющего подключения.\nКоманда AUTH TLS не была распознана сервером."
+ IDS_SSL_ERR_DATAENCUNSUP "Сервер не поддерживает шифрование соединений для передачи данных."
+ IDS_SSL_ERR_NOTYETVALID "Сертификат сервера пока недействителен."
+ IDS_SSL_ERR_EXPIRED "Сертификат сервера просрочен."
+
+ IDS_SSL_SECURITY_OK "Соединение зашифровано, подлинность сервера проверена"
+ IDS_SSL_SECURITY_UNVERIFIED "Соединение зашифровано, но подлинность сервера не проверена"
+
+ IDS_SSL_LOG_ALGO "SSL INFO: %s %s %d бит\r\n"
+ IDS_SSL_LOG_OSSL_CERT_VERIFY "SSL INFO: результат проверки сертификата OpenSSL: %d\r\n"
+ IDS_SSL_LOG_ISSUER "SSL INFO: сертификат выдал %s\r\n"
+ IDS_SSL_LOG_SUBJECT "SSL INFO: сертификат выдан %s\r\n"
+
+ IDS_SSL_LOG_CERTVERIFIED "Сертификат сервера был проверен.\r\n"
+ IDS_SSL_LOG_CERTNOTVERIFIED, "Ошибка проверки сертификата сервера.\r\n"
+ IDS_SSL_LOG_CERTACCEPTED "Пользователь принял сертификат сервера (но подлинность сервера не проверена).\r\n"
+ IDS_SSL_LOG_CERTREJECTED "Пользователь не принял сертификат сервера, соединение закрывается.\r\n"
+ IDS_SSL_LOG_CERTCHANGED, "Сертификат сервера был изменен.\r\n"
+
+ IDS_MODEZ_LOG_UNSUPBYSERVER "INFO: сервер не поддерживает MODE Z -> сжатие выключено\r\n"
+ 
+ IDS_LISTCOMMANDERROR, "Не удается считать перечень файлов и папок с сервера.\n\nОшибка: %s"
+ IDS_DOWNLOADONEFILEERROR, "Не удается загрузить файл с сервера.\n\nОшибка: %s"
+ IDS_SSLNEWUNVERIFIEDCERT, "Сертификат сервера был изменен и его проверка не выполнена."
+
+ IDS_SAVEPASSWORD_PROTECTED, "защищено мастер-паролем"
+ IDS_PASSWORD_UNSECURED, "Некоторые пароли FTP не защищены. Пожалуйста, введите мастер-пароль в следующее диалоговое окно.\n\nПримечание: при нажатии на кнопку ""Отмена"", пароли будут сохранены в незащищенном виде."
+ IDS_CANNOT_DECRYPT_SOMEPASSWORDS, "Не удается расшифровать некоторые пароли FTP.\n\nВероятно, они зашифрованы с использованием другого мастер-пароля.\nПопробуйте изменить мастер-пароль, чтобы расшифровать пароли."
+ IDS_CANNOT_DECRYPT_PASSWORD_DELETE, "Не удалось расшифровывать пароль.\n\nВероятно, он был зашифрован с использованием другого мастер-пароля.\nДля его расшифровки, попробуйте изменить мастер-пароль.\nТакже возможно его сбросить.\n\nХотите сбросить этот пароль?"
+ IDS_CLEARPASSWORD_CONFIRMATION, "Вы действительно хотите сбросить этот пароль?"
+ IDS_SHOWPASSWORD_CONFIRMATION, "Вы действительно хотите показать этот пароль?"
+ IDS_PASSWORDIS, "Пароль: %s\n\nСкопировать его в буфер обмена?"
+ IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
+ IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
+ IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
+ IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
+ IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
+ IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+}

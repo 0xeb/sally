@@ -3082,10 +3082,7 @@ public:
     // can be called from any thread, but concurrent calls with OpenHtmlHelp() must be avoided
     virtual void WINAPI SetHelpFileName(const wchar_t* chmName) = 0;
 
-    // opens the plugin's HTML help, selects the help language (directory with .chm files) as follows:
-    // -directory obtained from current Salamander .slg file (see SLGHelpDir in shared\versinfo.rc)
-    // -HELP\ENGLISH\*.chm
-    // -first found subdirectory in the HELP subdirectory
+    // opens the plugin's help (the manual's page on the Sally website);
     // plugin must call SetHelpFileName() before using OpenHtmlHelp(); 'parent' is the parent
     // of the error message box; 'command' is the HTML help command, see HHCDisplayXXX; 'dwData' is the parameter
     // of the HTML help command, see HHCDisplayXXX
@@ -3301,11 +3298,8 @@ public:
     //   Method can be called from main thread only.
     virtual CSalamanderPasswordManagerAbstract* WINAPI GetSalamanderPasswordManager() = 0;
 
-    // opens HTML help for Salamander itself (instead of plugin help, which opens via OpenHtmlHelp()),
-    // selects the help language (directory with .chm files) as follows:
-    // -directory obtained from current Salamander .slg file (see SLGHelpDir in shared\versinfo.rc)
-    // -HELP\ENGLISH\*.chm
-    // -first found subdirectory in the HELP subdirectory
+    // opens help for Salamander itself (instead of plugin help, which opens via OpenHtmlHelp()):
+    // the manual's page on the Sally website;
     // 'parent' is the parent of the error message box; 'command' is the HTML help command, see HHCDisplayXXX;
     // 'dwData' is the parameter of the HTML help command, see HHCDisplayXXX; if command==HHCDisplayContext,
     // the 'dwData' value must be from the HTMLHELP_SALID_XXX family of constants

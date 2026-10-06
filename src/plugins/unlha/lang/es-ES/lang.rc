@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for unlha. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Hojear y extraer archivos LHA."
+ IDS_ABOUT, "Acerca del Plugin"
+ IDS_FILECORRUPT, "Fichero LZH incorrecto o formato desconocido de fichero."
+ IDS_CHECKSUMERROR, "Error en suma de comprobación de cabecera.\nArchivo corrupto - no todos los ficheros pueden listarse."
+ IDS_LOWMEM, "Fuera de memoria."
+ IDS_WRITEERROR, "Error de escritura"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "Error abriendo el archivo."
+ IDS_LIST, "Imposible añadir entrada de archivo a la lista de ficheros."
+ IDS_SYMLINK, "El archivo contiene uno o más enlaces simbólicos UNIX, que no serán mostrados."
+ IDS_UNPACKERROR, "Imposible desempaquetar el fichero."
+ IDS_CRCERROR, "Error en datos comprimidos. EL CRC no concuerda."
+ IDS_READERROR, "Error leyendo el archivo."
+ IDS_EXTRPROGTITLE, "Desempaquetando archivo LHA - %s"
+ IDS_PREPAREDATA, "preparando datos y creando directorios..."
+ IDS_UNPACKING, "desempaquetando: "
+ IDS_EXTRACTFILES, "desempaquetando..."
+ IDS_TOOLONGNAME, "No es posible terminar la operación por nombre de ruta muy largo."
+ IDS_TOOLONGMASK, "No es posible terminar la operación por plantilla muy larga."
+ IDS_METHOD, "Método de compresión desconocido. El fichero no puede ser desempaquetado."
+ IDS_METHOD2, "método desconocido saltado..."
+}

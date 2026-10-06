@@ -1,0 +1,48 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for unchm. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unchm/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unchm.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "Nu pot deschide fisier."
+    IDS_UNKNOW_ERROR            "Eroare nespecificata."
+    IDS_UNPACKING_ARCHIVE       "Dezarhivez Arhiva CHM"
+    IDS_ERROR_UNPACKING         "Eroare dezarhivare fisier."
+    IDS_CANT_HANDLE_FILE        "Nu pot deschide acest fisier."
+    IDS_INSUFFICIENT_MEMORY     "Memorie insuficienta."
+    IDS_ABOUT                   "Despre Plugin"
+    IDS_PLUGIN_DESCRIPTION      "Rasfoieste si extrage fisierele CHM."
+    IDS_CANT_CREATE_TEMP        "Nu pot crea director temporar."
+    IDS_CANT_DELETE_TEMP_FILE   "Nu pot sterge fisier temporar."
+    IDS_UNKNOWN_FILE_FORMAT     "Format fisier necunoscut sau imagine CHM invalida.\n\nDaca esti sigur ca este o imagine CHM valida, va rugam sa deschideti un issue la https://github.com/0xeb/sally/issues si sa ne ajutati sa suportam acest format."
+    IDS_CANT_OPEN_FILE          "Nu pot deschide acest fisier."
+    IDS_ERR_TMP                 "Crearea fisierului temporar a esuat."
+    IDS_CANT_SET_ATTRS          "Nu pot seta atribute fisier."
+    IDS_CANT_CREATE_DIR         "Nu pot crea director '%s'."
+    IDS_YES                     "Da"
+    IDS_NO                      "Nu"
+    IDS_ERROR                   "Eroare"
+    IDS_WARNING                 "Atentie"
+    IDS_READERROR               "Eroare citire"
+    IDS_WRITEERROR              "Eroare scriere"
+    IDS_INTERNAL_PLUGIN_ERROR   "Eroare interna plugin."
+    IDS_INVALIDNUMBER           "Numar invalid."
+    IDS_CANCELOPER              "anulez operatiunea, va rugam asteaptati..."
+    IDS_CHMLIBCOPYRIGHT         "CHMLIB Library Copyright © 2001-2010 Jed Wing"
+}

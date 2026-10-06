@@ -1,0 +1,325 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for regedt. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/regedt/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\regedt.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CREATEKEY DIALOGEX 10, 24, 227, 75
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Crear clave"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nombre de &clave:",IDS_TEXT,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "&Enviar ruta directamente al plugin",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    DEFPUSHBUTTON   "Aceptar",IDOK,58,53,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,118,53,50,14
+END
+
+IDD_RENAME DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "Aceptar",IDOK,58,43,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,118,43,50,14
+END
+
+IDD_COPY DIALOGEX 10, 24, 227, 76
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    COMBOBOX        IDE_NAME,10,20,208,106,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_TABSTOP
+    CONTROL         "&Enviar ruta directamente al plugin",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,35,189,12
+    DEFPUSHBUTTON   "Aceptar",IDOK,58,54,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,118,54,50,14
+END
+
+IDD_NEWVALUE DIALOGEX 14, 22, 227, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nuevo valor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Nombre del valor:",IDC_STATIC_1,10,10,63,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "&Enviar ruta directamente al plugin",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    LTEXT           "&Tipo de valor:",IDC_STATIC_2,10,53,56,8
+    COMBOBOX        IDC_TYPE,10,63,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "Aceptar",IDOK,58,87,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,118,87,50,14
+END
+
+IDD_EDITVAL DIALOGEX 14, 22, 227, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Editar valor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_DATA,10,79,208,12,ES_AUTOHSCROLL
+    LTEXT           "Base:",IDS_BASE,124,69,60,8
+    CONTROL         "&Hexadecimal",IDR_HEX,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,78,81,12
+    CONTROL         "De&cimal",IDR_DEC,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,90,73,12
+    DEFPUSHBUTTON   "Aceptar",IDOK,58,112,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,118,112,50,14
+    LTEXT           "Nombre de valor:",IDC_STATIC_1,10,10,61,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "&Tipo de valor:",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Datos del valor:",IDC_STATIC_3,10,69,60,8
+END
+
+IDD_RAWEDITVAL DIALOGEX 14, 22, 227, 145
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Editar valor en bruto"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nombre del valor:",IDC_STATIC_1,10,10,63,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "&Tipo de valor:",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Lanzar editor",IDB_EDIT,10,69,75,14
+    LTEXT           "Cuando haya terminado de editar y grabado sus cambios al disco, pulse Aceptar para guardar los cambios al registro o elija Cancelar para salir sin guardar.",IDS_MESSAGE,10,89,206,24,NOT WS_VISIBLE
+    DEFPUSHBUTTON   "Aceptar",IDOK,58,123,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,118,123,50,14
+END
+
+IDD_SEARCH DIALOGEX 9, 20, 333, 240
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Buscar en el registro de Windows"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Buscar:",IDC_STATIC_1,6,10,36,8
+    COMBOBOX        IDC_PATTERN,56,8,197,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "B&uscar ahora",IDOK,258,7,60,14,WS_GROUP
+    LTEXT           "&Mirar en:",IDC_STATIC_2,6,27,36,8
+    COMBOBOX        IDC_LOOKIN,56,25,197,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Ayuda",IDHELP,258,24,60,14,WS_GROUP
+    CONTROL         "Ver &opciones",IDC_OPTIONS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,262,42,56,12
+    CONTROL         "&Incluir subclaves",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,56,42,86,12
+    LTEXT           "Mirar en:",IDS_LOOKAT,6,60,36,8
+    CONTROL         "&Claves",IDC_KEYS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,56,58,55,12
+    CONTROL         "&Valores",IDC_VALUES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,58,55,12
+    CONTROL         "&Datos",IDC_DATA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,230,58,55,12
+    LTEXT           "Opciones:",IDS_OPTIONS,6,76,36,8
+    CONTROL         "Modo HE&X",IDC_HEX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,56,74,60,12
+    CONTROL         "Di&stinguir M/minúsculas",IDC_CASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,74,93,12
+    CONTROL         "&Palabras completas",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,56,87,78,12
+    CONTROL         "Expresión re&gular",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,87,75,12
+    LTEXT           "Más &reciente o igual a:",IDS_NEWER,56,105,79,8
+    EDITTEXT        IDC_MINTIME,139,103,82,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.aaaa",IDS_FORMAT1,226,105,81,8
+    LTEXT           "Más a&ntiguo o igual a:",IDS_OLDER,56,121,76,8
+    EDITTEXT        IDC_MAXTIME,139,119,82,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.aaaa",IDS_FORMAT2,226,121,81,8
+    LTEXT           "&Elementos encontrados:",IDC_FOUND_FILES,6,132,109,8
+    CONTROL         "",IDC_RESULTS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,6,142,309,57
+END
+
+IDD_CONFIG DIALOGEX 86, 38, 275, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuración del editor del registro"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ajuste del editor externo. Este editor se usa para editar valores del registro.",IDC_STATIC_1,10,10,256,8
+    LTEXT           "&Comando:",IDC_STATIC_2,20,27,55,8
+    EDITTEXT        IDE_COMMAND,79,25,169,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_BROWSE,252,25,13,12
+    LTEXT           "&Argumentos:",IDC_STATIC_3,20,43,55,8
+    EDITTEXT        IDE_ARGUMENTS,79,41,169,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_ARGHELP,252,41,13,12
+    LTEXT           "&Directorio inicial:",IDC_STATIC_4,20,59,58,8
+    EDITTEXT        IDE_INITDIR,79,57,169,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_INITDIRHELP,252,57,13,12
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,10,79,255,1
+    DEFPUSHBUTTON   "Aceptar",IDOK,161,84,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,215,84,50,14
+END
+
+IDD_EXPORT DIALOGEX 14, 22, 227, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Exportar"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ruta de &exportación:",IDC_STATIC_1,10,10,83,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    LTEXT           "&Hacia fichero:",IDC_STATIC_2,10,39,56,8
+    EDITTEXT        IDE_FILE,10,49,191,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDB_BROWSE,205,49,13,12
+    DEFPUSHBUTTON   "Aceptar",IDOK,58,72,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,118,72,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Editor del registro"
+  IDS_DESCRIPTION, "Hojear, ver y modificar el registro de Windows."
+  IDS_ABOUT, "Acerca del Plugin"
+  IDS_REGEDTERR, "Editor del registro - Error"
+  IDS_LOWMEM, "Memoria insuficiente."
+  IDS_DRIVEMENUTEXT, "\tRegistro de Windows"
+  IDS_DEFAULTVALUE, "(Por defecto)"
+  IDS_TYPE, "Tipo/Fecha"
+  IDS_DATA, "Datos/Hora"
+  IDS_SIZE, "Tamaño"
+  IDS_KEY, "CLAVE"
+  IDS_EMPTY, "No se permiten cadenas vacías aquí."
+  IDS_ERROR, "Error"
+  IDS_NEWKEYINROOT, "No es posible crear nuevas claves en la raíz del registro."
+  IDS_LONGNAME, "Imposible terminar la operación por un nombre de ruta muy largo."
+  IDS_NEWKEY, "Imposible crear nueva clave: "
+  IDS_KEYEXISTS, "La clave ya existe."
+  IDS_DELVAL, "Error borrando valor del registro"
+  IDS_DELKEY, "Error borrando clave del registro"
+  IDS_CONFIRNNONEMPTYDELETE, "La clave ""%s"" no está vacía.\n¿Desea borrarla?"
+  IDS_QUESTION, "Pregunta"
+  IDS_DELKEYINROOT, "No es posible borrar claves en la raiz del registro."
+  IDS_MENUNEWKEY, "Nueva &clave..."
+  IDS_MENUNEWVAL, "Nuevo &valor..."
+  //IDS_MENUOPEN, "&Open\tEnter"
+  IDS_EDIT, "&Editar..."
+  IDS_RAWEDIT, "E&dición en bruto..."
+  //IDS_MENUDELETE, "&Delete\tF8"
+  //IDS_MENURENAME, "&Rename\tF2"
+  IDS_NEWVAL, "Imposible crear nuevo valor: "
+  IDS_REPLACEVAL, "El valor ""%s"" ya existe.\n¿Desea sustituirlo?"
+  IDS_INVALIDHEXVALUE, "Valor hexadecimal incorrecto."
+  IDS_INVALIDDECVALUE, "Valor decimal incorrecto."
+  IDS_QUERYVAL, "Imposible preguntar el valor: "
+  IDS_SETVAL, "Imposible ajustar valor: "
+  IDS_BADPATH, "Nombre de ruta incorrecto. "
+  IDS_NOTREGEDTPATH, "No se admiten aquí rutas hacia otros sistemas de ficheros."
+  IDS_OPENKEY, "Imposible abrir la clave del registro ""%ls"". "
+  IDS_OPENKEY2, "Imposible abrir la clave de registro ""%ls\\%ls"". "
+  IDS_ENUMKEY, "No pudieron listarse una o más subclaves o valores - %s\n¿Continuar listado?"
+  IDS_EXPORT, "&Exportar..."
+  IDS_SEARCH, "&Buscar..."
+  IDS_QUICKRENAMEKEY, "Cambiar nombre de clave ""%s"" a"
+  IDS_QUICKRENAMEVAL, "Cambiar nombre de valor ""%s"" a"
+  IDS_QUICKRENAME, "Cambio rápido de nombre"
+  IDS_COPY, "Copiar"
+  IDS_MOVE, "Trasladar"
+  IDS_COPYORMOVE1, "%s valor ""%s"" a"
+  IDS_COPYORMOVE2, "%s clave ""%s"" a"
+  IDS_COPYORMOVE3, "{!}%s %d valores{} a"
+  IDS_COPYORMOVE4, "{!}%s %d claves{} a"
+  IDS_COPYORMOVE5, "{!}%s %d valor{|1|es} y %d clave{|1|s} a"
+  IDS_MOVERENAME, "Trasladar/cambiar nombre"
+  IDS_SAMETARGET, "Esta operación no tiene sentido. Todos los ficheros y directorios seleccionados tienen el misno nombre destino (se solaparán unos a otros)."
+  IDS_ACCESS, "Imposible acceder a la clave de registro ""%ls\\%ls"". "
+  IDS_CANTCOPYTOITSELF, "No se puede copiar clave o valor a sí mismo."
+  IDS_CANTMOVETOITSELF, "No se puede trasladar una clave o valor a sí mismo."
+  IDS_CREATE, "Imposible crear una clave de registro. "
+  IDS_OPEN, "Imposible abrir una clave de registro. "
+  IDS_ACCESS2, "Imposible acceder a una clave de registro. "
+  IDS_DELETE, "Imposible borrar una clave de registro. "
+  IDS_COPYKEY, "Error copiando clave de registro"
+  IDS_MOVEKEY, "Error trasladando clave de registro"
+  IDS_SETVAL2, "Imposible disponer un valor de clave de registro. "
+  IDS_REMOVESOURCE, "Imposible retirar la clave de registro original. "
+  IDS_COPYVALUE, "Error al copiar valor de clave de registro"
+  IDS_MOVEVALUE, "Error al trasladar valor de clave de registro"
+  IDS_REMOVESOURCE2, "Imposible eliminar valor de la clave origen. "
+  IDS_CANTCOPYTOITSELF2, "Nombre:\t%ls\n\nError:\tNo se puede copiar un fichero a sí mismo."
+  IDS_CANTMOVETOITSELF2, "Nombre:\t%ls\n\nError:\tNo se puede trasladar una clave a sí misma."
+  IDS_COPYCLASSNAME, "El nombre de clase de la clave no puede copiarse a la clave destino.\n¿Desea continuar?"
+  IDS_WARNING, "Aviso"
+  IDS_CANNOTRENAME, "No se puede cambiar el nombre de la clave. El nombre especificado ya existe."
+  IDS_RENAMEKEY, "Error cambiando nombre de clave del registro"
+  IDS_RENAMEVAL, "Error cambiando nombre de clave del registro"
+  IDS_SAMECASEKEY, "No se puede cambiar el nombre de la clave. Original y nuevo difieren sólo en M/minúsculas."
+  IDS_SAMECASEVAL, "No se puede cambiar el nombre del valor. Original y nuevo difieren sólo en M/minúsculas."
+  IDS_SYNTAX, "Sintaxis incorrecta del nombre de la clave."
+  IDS_CREATETARGET, "La clave destino ""%ls\\%ls"" no existe. ¿Desea crearla?"
+  IDS_COPYPROGRESS, "Copiando entradas del registro, espere (pulse ESC para cancelar)..."
+  IDS_MOVEPROGRESS, "Trasladando entradas del registro, espere (pulse ESC para cancelar)..."
+  IDS_DELETEPROGRESS, "Borrando entradas del registro, espere (pulse ESC para cancelar)..."
+  IDS_CANCEL, "¿Desea cancelar esta operación?"
+  IDS_COPYTOTROOT, "No es posible copiar claves a la raíz del registro."
+  //IDS_WINDOWSREGISTRY, "Windows Registry"
+  IDS_STOP, "&Parar"
+  IDS_START, "&Buscar ahora"
+  IDS_FOUNDITEMS1, "&Elementos encontrados:"
+  IDS_FOUNDITEMS2, "&Elementos encontrados: (%d):"
+  IDS_NOFILESFOUND, "No se encontraron ficheros"
+  IDS_STOPPED, "Búsqueda detenida"
+  IDS_NAME_COLUMN, "Nombre"
+  IDS_TYPE_COLUMN, "Tipo"
+  IDS_DATA_COLUMN, "Datos"
+  IDS_PATH_COLUMN, "Ruta"
+  IDS_SIZE_COLUMN, "Tamaño"
+  IDS_DATE_COLUMN, "Fecha"
+  IDS_TIME_COLUMN, "Hora"
+  IDS_FIND, "&Buscar en el registro de Windows..."
+  IDS_SEARCHERROR, "Error buscando en el registro de Windows"
+  IDS_BADHEXSTRING, "La cadena no tiene pauta hexadecimal válida."
+  IDS_REGEXPERR, "Error de clase en expresión regular: %s"
+  IDS_SEARCHING, "Buscando: %s\\"
+  IDS_SUBSTRINGHELP, "Escriba cadena, número decimao o hexadecimal precedido por 0x. La cadena vacía concordará con todas las entradas."
+  IDS_HEXHELP, "Escriba pauta hexadecimal en formato: 1a 2b ""foo"" 3c. Use "" para patrones de cadenas unicode y ' para ASCII."
+  IDS_REGEXPHELP, "Escriba la expresión regular. Para detalles sobre expresiones regulares vea la documentación de Sally."
+  IDS_LONGDATA, "Imposible terminar la operación por datos demasiado largos."
+  IDS_BADTIMEFORMAT, "Formato de fecha/hora incorrecto. Escriba la fecha en formato dd.mm.aaaa o fecha y hora en formato hh:mm:ss dd.mm.aaaa."
+  IDS_CREATETEMP, "Imposible crear un fichero temporal. "
+  IDS_WRITETEMP, "Imposible escribir al fichero temporal. "
+  IDS_EXP_FULLNAME, "Nombre completo"
+  IDS_EXP_DRIVE, "Unidad"
+  IDS_EXP_PATH, "Ruta"
+  IDS_EXP_NAME, "Nombre"
+  IDS_EXP_NAMEPART, "Parte de nombre"
+  IDS_EXP_EXTPART, "Parte de extensión"
+  IDS_EXP_FULLPATH, "Ruta completa"
+  IDS_EXP_WINDIR, "Directorio Windows"
+  IDS_EXP_SYSDIR, "Directorio System"
+  IDS_EXP_BROWSE, "Hojear..."
+  IDS_EXP_SALDIR, "Directorio de Sally"
+  IDS_EXP_DOSFULLNAME, "Nombre completo DOS"
+  IDS_EXP_DOSDRIVE, "Unidad DOS"
+  IDS_EXP_DOSPATH, "Ruta DOS"
+  IDS_EXP_DOSNAME, "Nombre DOS"
+  IDS_EXP_DOSNAMEPART, "Parte de nombre DOS"
+  IDS_EXP_DOSEXTPART, "Parte de extensión DOS"
+  IDS_EXP_DOSFULLPATH, "Ruta completa DOS"
+  IDS_EXP_DOSWINDIR, "Directorio Windows DOS"
+  IDS_EXP_DOSSYSDIR, "Directorio System DOS"
+  IDS_EXP_ENVVAR, "Variable de entorno"
+  IDS_EXEFILES, "Ejecutables (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tTodos los ficheros (*.*)\t*.*\t\t"
+  IDS_OPENTEMP, "Imposible abrir el fichero temporal. "
+  IDS_SIZEOFTEMP, "Imposible obtener tamaño del fichero temporal. "
+  IDS_READTEMP, "Imposible leer desde el fichero temporal. "
+  IDS_PROCESS, "Imposible iniciar el editor externo. Compruebe la configuración del editor externo para los ajustes.\n"
+  IDS_NOTDWORD, "Número demasiado grande para almacenarse como DWORD."
+  IDS_REGFILES, "Ficheros del registro (*.reg)\t*.reg\tTodos los ficheros (*.*)\t*.*\t\t"
+  IDS_FILENAMEISDIR, "El nombre del fichero destino ya está en uso para un directorio."
+  IDS_OVERWRITE, "El fichero destino ya existe. ¿Desea reemplazar el fichero existente?"
+  IDS_OVERWRITETITLE, "Confirmar sustitución de fichero"
+  IDS_REPLACEERROR, "No se puede reemplazar el fichero existente."
+  IDS_PROCESS2, "Imposible iniciar %s."
+  IDS_BADEXPORT, "Hubo un error al exportar datos del registro."
+  IDS_EXPORTING, "Exportando datos del registro, espere..."
+  IDS_SELECTED1, "{!}%d valor{|1|es} seleccionado{1:|1|s}"
+  IDS_SELECTED2, "{!}%d clave{|1|s} seleccionada{1:|1|s}"
+  IDS_SELECTED3, "{!}%d valor{|1|es} seleccionados y %d clave{|1|s} seleccionadas"
+  IDS_SELECTEDSIZE, "{!}<%d> byte{s|0||1|s} en "
+  IDS_CANNOTRENAMEDEFVAL, "No se puede cambiar de nombre al valor por omisión. El valor no está definido."
+  IDS_COPYNAME, "Copiar nombre como texto"
+  IDS_COPYFULLNAME, "Copiar nombre completo como texto"
+  IDS_COPYPATH, "Copiar ruta completa como texto"
+  IDS_BUSY, "Sally está ocupado. El comando pedido no puede ser ejecutado, inténtelo más tarde."
+}

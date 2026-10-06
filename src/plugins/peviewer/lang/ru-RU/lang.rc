@@ -1,0 +1,50 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for peviewer. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/peviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\peviewer.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 0, 0, 353, 154
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка модуля"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "До&ступные секции:",IDC_STATIC_1,7,7,70,8
+    LISTBOX         IDC_AVAILABLELB,7,17,105,130,LBS_SORT | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Добавить ->",IDC_ADD,119,17,57,14,WS_GROUP
+    PUSHBUTTON      "<- &Удалить",IDC_REMOVE,119,35,57,14
+    LTEXT           "&Отображаемые секции:",IDC_STATIC_2,183,7,85,8
+    LISTBOX         IDC_SELECTEDLB,183,17,105,130,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Вверх",IDC_UP,296,17,50,14,WS_GROUP
+    PUSHBUTTON      "В&низ",IDC_DOWN,296,35,50,14
+    DEFPUSHBUTTON   "ОК",IDOK,296,97,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,296,115,50,14
+    PUSHBUTTON      "С&брос",IDC_RESET,296,133,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_NAME, "Средство просмотра исполняемых файлов (PE)"
+ IDS_PLUGIN_DESCRIPTION, "Показывает информацию об исполняемых файлах (PE), таких как EXE, DLL и проч."
+ IDS_ABOUT, "О модуле"
+ IDS_ERR_OPEN_FILE, "Не удалось открыть файл %s."
+ IDS_ERR_TMP, "Ошибка создания временного файла."
+ IDS_EXCEPTION, "Произошла ошибка.\n\nФайл: %s\n\nЕсли вы уверены, что файл не поврежден, пожалуйста, создайте issue на https://github.com/0xeb/sally/issues и приложите этот файл.\nМы примем меры к устранению ошибки. Спасибо за содействие!"
+ IDS_HIDDEN_SECTIONS, "В настройках модуля просмотра исполняемых файлов не выбраны секции для отображения.\nВоспользуйтесь меню ""Параметры - Настройка модуля - Средство просмотра исполняемых файлов (PE)""\nв главном окне Sally для выбора отображаемых секций."
+}

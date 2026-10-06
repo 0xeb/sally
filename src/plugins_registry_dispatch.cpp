@@ -1299,7 +1299,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
         wchar_t buf[30];
         int i = 1;
         wcscpy_s(buf, L"1");
-        BOOL view, edit, pack, unpack, config, loadsave, viewer, fs, loadOnStart, dynMenuExt, legacyCompatApproved;
+        BOOL view, edit, pack, unpack, config, loadsave, viewer, fs, loadOnStart, dynMenuExt;
         std::wstring name;
         std::wstring dllName;
         std::wstring version;
@@ -1309,7 +1309,6 @@ void CPlugins::Load(HWND parent, HKEY regKey)
         std::wstring regKeyName;
         std::vector<std::wstring> fsNames;
         std::wstring fsCmdName;
-        std::wstring lastSLGName;
         std::wstring pluginHomePageURL;
         std::wstring thumbnailMasks;
         CIconList* pluginIcons;
@@ -1321,9 +1320,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
             BOOL err = TRUE;
             BOOL ok = FALSE;
             loadOnStart = FALSE;
-            legacyCompatApproved = FALSE;
             thumbnailMasks.clear();
-            lastSLGName.clear();
             pluginHomePageURL.clear();
             pluginIcons = NULL;
             pluginIconIndex = -1;
@@ -1378,14 +1375,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                     loadOnStart = loadOnStartDWORD != 0;
                 }
 
-                DWORD legacyCompatApprovedDWORD;
-                if (GetValueW(itemKey, SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED, REG_DWORD, &legacyCompatApprovedDWORD, sizeof(DWORD)))
-                {
-                    legacyCompatApproved = legacyCompatApprovedDWORD != 0;
-                }
-
                 // these values don't have to be loaded (they may be missing in the configuration)
-                GetStringValueW(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, lastSLGName);
                 GetStringValueW(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, pluginHomePageURL);
                 GetStringValueW(itemKey, SALAMANDER_PLUGINS_THUMBMASKS, thumbnailMasks);
                 GetValueW(itemKey, SALAMANDER_PLUGINS_PLGICONINDEX, REG_DWORD, &pluginIconIndex, sizeof(DWORD));
@@ -1414,7 +1404,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                 {
                     if (AddPlugin(name.c_str(), normalizedDLLName.c_str(), view, edit, pack, unpack, config, loadsave, viewer, fs,
                                   dynMenuExt, version.c_str(), copyright.c_str(), description.c_str(), regKeyName.c_str(), extensions.c_str(), &fsNames,
-                                  loadOnStart, lastSLGName.c_str(), pluginHomePageURL.empty() ? NULL : pluginHomePageURL.c_str()))
+                                  loadOnStart, pluginHomePageURL.empty() ? NULL : pluginHomePageURL.c_str()))
                     {
                         err = FALSE;
                         CPluginData* p = Get(Data.Count - 1);
@@ -1444,7 +1434,6 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                         p->PluginIconIndex = pluginIconIndex;
                         p->PluginSubmenuIconIndex = pluginSubmenuIconIndex;
                         p->ShowSubmenuInPluginsBar = showSubmenuPluginsBar;
-                        p->LegacyCompatApproved = legacyCompatApproved;
 
                         if (!thumbnailMasks.empty())
                         {
@@ -1568,22 +1557,22 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                        TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, L"1.32",
                        L"Copyright \u00A9 2000-2023 Open Salamander Authors",
                        L"ZIP archives support for Open Salamander.",
-                       L"ZIP", L"zip;pk3;jar", NULL, FALSE, NULL, NULL) ||
+                       L"ZIP", L"zip;pk3;jar", NULL, FALSE, NULL) ||
             !AddPlugin(L"TAR", L"tar\\tar.dll",
                        TRUE, FALSE, FALSE, TRUE, FALSE, TRUE, TRUE, FALSE, FALSE, L"3.3",
                        L"Copyright \u00A9 1999-2023 Open Salamander Authors",
                        L"Unix archives readonly support for Open Salamander.",
-                       L"TAR", L"tar;tgz;taz;tbz;gz;bz;bz2;z;rpm;cpio", NULL, FALSE, NULL, NULL) ||
+                       L"TAR", L"tar;tgz;taz;tbz;gz;bz;bz2;z;rpm;cpio", NULL, FALSE, NULL) ||
             !AddPlugin(L"PAK", L"pak\\pak.dll",
                        TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, L"1.68",
                        L"Copyright \u00A9 1999-2023 Open Salamander Authors",
                        L"This plug-ing adds support for Quake PAK archives.",
-                       L"PAK", L"pak", NULL, FALSE, NULL, NULL) ||
+                       L"PAK", L"pak", NULL, FALSE, NULL) ||
             !AddPlugin(L"Web Viewer", L"webviewer\\webviewer.dll",
                        FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE, FALSE,
                        L"1.1", L"Copyright \u00A9 1999-2023 Open Salamander Authors",
                        L"Web Viewer for Open Salamander.",
-                       L"WEBVIEWER", L"", NULL, FALSE, NULL, NULL))
+                       L"WEBVIEWER", L"", NULL, FALSE, NULL))
         {
             HANDLES(EnterCriticalSection(&DataCS));
             Data.DestroyMembers();
@@ -1662,11 +1651,6 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                     SetValueW(itemKey, SALAMANDER_PLUGINS_LOADONSTART, REG_DWORD, &loadOnStartDWORD, sizeof(DWORD));
                 }
 
-                if (p->LegacyCompatApproved) // store only TRUE to save space in the registry
-                {
-                    SetValueW(itemKey, SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED, REG_DWORD, &p->LegacyCompatApproved, sizeof(DWORD));
-                }
-
                 if (!p->ChDrvMenuFSItemName.empty()) // we have an FS command for the change-drive menu
                 {
                     SetValueW(itemKey, SALAMANDER_PLUGINS_FSCMDNAME, REG_SZ, p->ChDrvMenuFSItemName.c_str(), -1);
@@ -1688,10 +1672,6 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                 if (p->PluginUsesPasswordManager)
                     SetValueW(itemKey, SALAMANDER_PLUGINS_USESPASSWDMAN, REG_DWORD, &p->PluginUsesPasswordManager, sizeof(DWORD));
 
-                if (!p->LastSLGName.empty() && p->LastSLGName.c_str()[0] != 0) // store it if it is not an empty string
-                {
-                    SetValueW(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, REG_SZ, p->LastSLGName.c_str(), -1);
-                }
                 if (!p->PluginHomePageURL.empty() && p->PluginHomePageURL.c_str()[0] != 0) // store it if is not an empty string
                 {
                     SetValueW(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, REG_SZ, p->PluginHomePageURL.c_str(), -1);
@@ -2239,7 +2219,7 @@ BOOL CPlugins::AddPlugin(HWND parent, const wchar_t* fileName)
     CALL_STACK_MESSAGE2("CPlugins::AddPlugin(, %ls)", fileName);
     static wchar_t emptyBuffer[] = L"";
     if (AddPlugin(emptyBuffer, fileName, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
-                  emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer, NULL, FALSE, emptyBuffer, NULL))
+                  emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer, NULL, FALSE, NULL))
     {
         LoadInfoBase |= LOADINFO_INSTALL;
         BOOL ret = Data[Data.Count - 1]->InitDLL(parent);
@@ -2380,15 +2360,15 @@ BOOL CPlugins::AddPlugin(const wchar_t* name, const wchar_t* dllName, BOOL suppo
                          BOOL supportFS, BOOL supportDynMenuExt, const wchar_t* version,
                          const wchar_t* copyright, const wchar_t* description, const wchar_t* regKeyName,
                          const wchar_t* extensions, std::vector<std::wstring>* fsNames, BOOL loadOnStart,
-                         const wchar_t* lastSLGName, const wchar_t* pluginHomePageURL)
+                         const wchar_t* pluginHomePageURL)
 {
     // %ls, not %s: CALL_STACK_MESSAGE's format is narrow by design (callstk is floor),
     // so a widened argument on %s is runtime garbage with no diagnostic. [P1.5c]
-    CALL_STACK_MESSAGE20("CPlugins::AddPlugin(%ls, %ls, %d, %d, %d, %d, %d, %d, %d, %d, %d, %ls, %ls, %ls, %ls, %ls, , %d, %ls, %ls)",
+    CALL_STACK_MESSAGE19("CPlugins::AddPlugin(%ls, %ls, %d, %d, %d, %d, %d, %d, %d, %d, %d, %ls, %ls, %ls, %ls, %ls, , %d, %ls)",
                          name, dllName, supportPanelView, supportPanelEdit, supportCustomPack,
                          supportCustomUnpack, supportConfiguration, supportLoadSave, supportViewer,
                          supportFS, supportDynMenuExt, version, copyright, description, regKeyName, extensions,
-                         loadOnStart, lastSLGName, pluginHomePageURL);
+                         loadOnStart, pluginHomePageURL);
     BOOL ret = FALSE;
 
     const std::wstring uniqueKeyName = supportLoadSave ? GetUniqueRegKeyName(regKeyName) : L"";
@@ -2415,7 +2395,7 @@ BOOL CPlugins::AddPlugin(const wchar_t* name, const wchar_t* dllName, BOOL suppo
                                             supportConfiguration, supportLoadSave, supportViewer, supportFS,
                                             supportDynMenuExt, version, copyright, description,
                                             uniqueKeyName.c_str(), extensions, uniqueFSNames, loadOnStart,
-                                            lastSLGName, pluginHomePageURL);
+                                            pluginHomePageURL);
         if (item != NULL)
         {
             HANDLES(EnterCriticalSection(&DataCS));
@@ -3483,13 +3463,6 @@ int CPlugins::GetPluginSaveCount()
                 loadedCount++;
     }
     return loadedCount;
-}
-
-void CPlugins::ClearLastSLGNames()
-{
-    int i;
-    for (i = 0; i < Data.Count; i++)
-        Data[i]->LastSLGName.clear();
 }
 
 BOOL CPlugins::GetFirstNethoodPluginFSName(std::wstring* fsName, CPluginData** nethoodPlugin)

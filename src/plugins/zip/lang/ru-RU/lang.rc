@@ -1,0 +1,660 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for zip. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\zip.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_EXPACKOPTIONS DIALOGEX 41, 41, 310, 201
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Дополнительные параметры архивации"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Архив:",IDC_STATIC_1,17,9,26,8
+    CONTROL         "",IDC_ARCHIVE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,48,9,254,8
+    LTEXT           "",IDC_STATIC_2,8,24,293,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Создать &многотомный архив",IDC_MULTIVOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,31,113,12
+    LTEXT           "&Размер тома:",IDC_STATIC_3,168,33,49,8,NOT WS_GROUP
+    COMBOBOX        IDC_VOLSIZE,219,31,49,110,CBS_DROPDOWN | WS_DISABLED | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_UNITS,273,31,28,34,CBS_DROPDOWNLIST | WS_DISABLED | WS_TABSTOP
+    CONTROL         "&Нумерация томов",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,17,45,90,12
+    LTEXT           "",IDC_STATIC_4,8,63,293,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Создать &самораспаковывающийся архив",IDC_SELFEXTR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,71,154,12
+    PUSHBUTTON      "&Дополнительно...",IDC_ADVANCED,226,70,75,14,WS_DISABLED
+    LTEXT           "",IDC_STATIC_5,8,90,293,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Шифрование файлов",IDC_ENCRYPT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,97,88,12
+    LTEXT           "&Пароль:",IDC_STATIC_6,28,113,60,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD1,95,111,96,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    LTEXT           "П&ароль повторно:",IDC_STATIC_7,28,129,66,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD2,95,127,96,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    GROUPBOX        " Метод шифрования ",IDC_STATIC_8,202,97,99,50
+    CONTROL         "ZIP 2.&0 (слабый)",IDC_ENC_ZIP20,"Button",BS_AUTORADIOBUTTON | WS_DISABLED | WS_GROUP,207,108,71,12
+    CONTROL         "AES &128 бит",IDC_ENC_AES128,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,207,120,55,12
+    CONTROL         "AES &256 бит",IDC_ENC_AES256,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,207,132,55,12
+    LTEXT           "",IDC_STATIC_9,8,154,293,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Больше не показывать это окно (см. настройки)",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,161,280,12
+    DEFPUSHBUTTON   "ОК",IDOK,33,180,55,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,96,180,55,14
+    PUSHBUTTON      "Нас&тройка...",IDC_CONFIG,159,180,55,14
+    PUSHBUTTON      "Справка",IDHELP,222,180,55,14
+END
+
+IDD_CONFIG DIALOGEX 50, 37, 308, 277
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Распаковка",IDC_STATIC_1,7,6,42,8
+    LTEXT           "",IDC_STATIC_2,51,10,251,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Автоматически распаковывать многотомные архивы на локальных дисках",IDC_AUTOEXPANDMV,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,17,274,12
+    LTEXT           "Упаковка",IDC_STATIC_3,7,35,35,8
+    LTEXT           "",IDC_STATIC_4,44,39,258,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Вносить изменения во временную &копию архива (рекомендуется, безопасно)",IDC_BACKUP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,46,286,12
+    CONTROL         "&Не хранить пустые папки в архивах ZIP",IDC_NOEMPTYDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,58,155,12
+    CONTROL         "Устанавливать &время изменения архива равным времени новейшего файла",IDC_SETFILETIME,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,70,282,12
+    CONTROL         "Использовать совместимые с WinZip имена файлов многотомных архивов",IDC_WINZIPNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,82,279,12
+    LTEXT           "(кроме самораспаковывающихся архивов)",IDC_STATIC_5,26,94,258,8
+    LTEXT           "&Уровень сжатия (0...9, 9 - сильное сжатие, медленно):",IDC_STATIC_6,14,107,197,8
+    EDITTEXT        IDC_LEVEL,212,105,16,12
+    LTEXT           "&Язык по умолчанию для самораспаковывающихся архивов:",IDC_STATIC_7,14,120,212,8
+    COMBOBOX        IDC_LANGUAGE,227,118,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Подтверждения",IDC_STATIC_8,7,136,58,8
+    LTEXT           "",IDC_STATIC_9,66,140,236,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "При изменении языка интерфейса самораспаковывающихся архивов",IDC_STATIC_10,14,148,259,49
+    CONTROL         "&Запрашивать подтверждение перед сменой текстов",IDC_ASK,"Button",BS_AUTORADIOBUTTON | WS_GROUP,20,158,197,12
+    CONTROL         "За&менить тексты значениями по умолчанию",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,20,170,212,12
+    CONTROL         "Н&е запрашивать подтверждение и не изменять тексты",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,20,182,207,12
+    CONTROL         "&Открывать дополнительные параметры архивации перед упаковкой",IDC_SHOWEXOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,200,255,12
+    LTEXT           "Панель",IDC_STATIC_11,7,217,27,8
+    LTEXT           "",IDC_STATIC_12,36,221,266,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Отображать столбец ""&Сжатый"" в оглавлении архива",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,228,220,12
+    LTEXT           "",IDC_STATIC_13,6,247,296,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,35,256,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,94,256,50,14
+    PUSHBUTTON      "&По умолчанию",IDC_DEFAULT,153,256,60,14
+    PUSHBUTTON      "Справка",IDHELP,222,256,50,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 316, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Введите пароль архива ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK,21,10,18,20
+    LTEXT           "Архив зашифрован. Пожалуйста, введите пароль для расшифровки.",IDC_STATIC_1,57,10,246,8
+    LTEXT           "Файл:",IDC_STATIC_2,57,23,24,8
+    CONTROL         "",IDC_FILE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,82,23,222,8
+    LTEXT           "&Пароль:",IDC_STATIC_3,57,36,31,8
+    EDITTEXT        IDC_PASSWORD,90,34,214,12,ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "ОК",IDOK,32,55,50,14,WS_GROUP
+    PUSHBUTTON      "П&ропустить",IDC_SKIP,92,55,57,14
+    PUSHBUTTON      "Пр&опустить все",IDC_SKIPALL,159,55,65,14
+    PUSHBUTTON      "Отмена",IDCANCEL,234,55,50,14
+END
+
+IDD_LOWFREESPACE DIALOGEX 13, 54, 409, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Недостаточно свободного пространства на диске"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Внимание! Объем свободного пространства на диске меньше требуемого размера тома архива.",IDC_TEXT,60,9,341,8
+    RTEXT           "Путь:",IDC_STATIC_1,6,26,49,8
+    LTEXT           "",IDC_PATH,60,26,339,8
+    RTEXT           "Свободно:",IDC_STATIC_2,6,39,49,8
+    LTEXT           "",IDC_FREESPACE,60,39,339,8
+    RTEXT           "Размер тома:",IDC_STATIC_3,6,52,49,8
+    LTEXT           "",IDC_VOLUMESIZE,60,52,339,8
+    DEFPUSHBUTTON   "П&ропустить",IDC_IGNORE,74,73,57,14
+    PUSHBUTTON      "Пр&опустить все",IDC_ALL,144,73,65,14
+    PUSHBUTTON      "&Повторить",IDC_RETRY,222,73,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,285,73,50,14
+END
+
+IDD_CHANGEDISK DIALOGEX 24, 40, 194, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Смена диска"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,168,24
+    LTEXT           "Нажмите ""OK"" для продолжения.",IDC_STATIC_1,13,39,168,8
+    DEFPUSHBUTTON   "ОК",IDOK,42,57,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,102,57,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 6, 15, 350, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Подтверждение замены файла"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Заменить файл:",IDC_STATIC_1,6,14,59,8
+    LTEXT           "",IDC_FILE,70,14,269,8
+    LTEXT           "",IDC_FILEATTR,70,24,269,8
+    LTEXT           "Файл уже существует. Заменить его?",IDC_STATIC_2,70,39,174,8
+    DEFPUSHBUTTON   "&Да",IDC_YES,63,56,50,14
+    PUSHBUTTON      "&Все",IDC_ALL,121,56,50,14
+    PUSHBUTTON      "&Повторить",IDC_RETRY,179,56,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,237,56,50,14
+END
+
+IDD_CHANGEDISK2 DIALOGEX 24, 40, 280, 108
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Этот файл либо является частью многотомного архива, либо файл поврежден.",IDC_STATIC_1,13,8,254,16
+    LTEXT           "Если вы уверены, что файл является многотомным архивом, пожалуйста, вставьте диск, содержащий завершающую часть архива или найдите ее на локальном диске. Нажмите ""OK"" для продолжения.",IDC_STATIC_2,13,31,254,24
+    LTEXT           "&Завершающая часть архива:",IDC_STATIC_3,13,61,103,8
+    EDITTEXT        IDC_FILENAME,13,71,238,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,255,71,13,12
+    DEFPUSHBUTTON   "ОК",IDOK,85,89,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,145,89,50,14
+END
+
+IDD_CHANGEDISK3 DIALOGEX 24, 40, 260, 140
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Смена диска"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,234,24
+    LTEXT           "Нажмите ""OK"" для продолжения.",IDC_STATIC_1,13,39,234,8
+    CONTROL         "&Нумерация имен файлов",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,51,135,12
+    CONTROL         "Номера дисков в &расширениях имен файлов",IDC_WINZIP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,63,170,12
+    CONTROL         "Не &запрашивать подтверждение при записи остальных томов",IDC_PROCEEDALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,75,233,12
+    LTEXT           "&Файл:",IDC_STATIC_2,13,92,60,8
+    EDITTEXT        IDC_FILENAME,13,102,218,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,235,102,13,12
+    DEFPUSHBUTTON   "ОК",IDOK,74,120,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,136,120,50,14
+END
+
+IDD_ADVANCEDSE DIALOGEX 37, 14, 393, 303
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройки самораспаковывающегося архива"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_STATIC_1,0,0,393,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Папка для извлечения файлов",IDC_STATIC_2,7,7,380,89,WS_GROUP
+    LTEXT           "&Папка:",IDC_STATIC_3,20,19,38,8,NOT WS_GROUP
+    EDITTEXT        IDC_TARGETDIR,20,29,339,12,ES_AUTOHSCROLL | ES_NOHIDESEL
+    PUSHBUTTON      ">",IDC_SPECDIR,362,29,12,12
+    LTEXT           "Примечание: Вы можете указать относительный путь (относительно текущей папки, в которой будет открыт архив) либо указать абсолютный путь. Для распаковки в текущую папку оставьте это поле пустым.",IDC_STATIC_4,20,47,357,24,NOT WS_GROUP
+    CONTROL         "Пользователь может &изменить папку",IDC_ALLOWUSER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,77,146,12
+    LTEXT           "&Выполнить команду или открыть документ:",IDC_STATIC_5,20,113,156,8,NOT WS_GROUP
+    EDITTEXT        IDC_EXECUTE,20,123,354,12,ES_AUTOHSCROLL
+    CONTROL         "&Удалить извлеченные файлы",IDC_REMOVE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,139,131,12
+    PUSHBUTTON      "О&жидать...",IDC_WAITFOR,324,138,50,14
+    GROUPBOX        "Интерфейс",IDC_STATIC_6,7,163,380,53,WS_GROUP
+    PUSHBUTTON      "&Текст сообщений...",IDC_TEXTS,20,177,79,14
+    LTEXT           "&Язык:",IDC_STATIC_7,20,198,22,8,NOT WS_GROUP
+    COMBOBOX        IDC_LANGUAGE,45,196,110,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Значок:",IDC_STATIC_8,237,198,28,8,NOT WS_GROUP
+    LTEXT           "",IDC_EXEICON,268,194,19,18,NOT WS_GROUP
+    PUSHBUTTON      "Сменить &значок...",IDC_CHANGEICON,295,196,79,14
+    GROUPBOX        "Параметры",IDC_STATIC_9,7,221,380,57
+    CONTROL         "&Автоматически начать распаковку",IDC_AUTO,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,20,234,133,12
+    CONTROL         "Скрыть &окно распаковки",IDC_HIDEMAINDLG,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,246,129,12
+    CONTROL         "Автоматически создать папку &для извлечения",IDC_AUTODIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,258,176,12
+    CONTROL         "Отобразить &результаты выполнения",IDC_SUMDLG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,206,234,141,12
+    CONTROL         "За&менять файлы без запроса подтверждения",IDC_OVEWRITE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,206,246,174,12
+    CONTROL         "Тр&ебуются административные привилегии ",IDC_REQSADMIN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,206,258,166,12
+    DEFPUSHBUTTON   "ОК",IDOK,110,283,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,171,283,50,14
+    PUSHBUTTON      "Справка",IDHELP,232,283,50,14
+    GROUPBOX        "По завершении распаковки",IDC_STATIC_10,7,101,380,57,WS_GROUP
+END
+
+IDD_OVERWRITE2 DIALOGEX 6, 15, 350, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Подтверждение замены файла"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Заменить файл:",IDC_STATIC_1,5,14,59,8
+    LTEXT           "",IDC_FILE,68,14,269,8
+    LTEXT           "",IDC_FILEATTR,68,24,269,8
+    LTEXT           "Файл уже существует. Заменить его?",IDC_STATIC_2,68,39,174,8
+    DEFPUSHBUTTON   "&Да",IDC_YES,89,56,50,14
+    PUSHBUTTON      "&Нет",IDC_NO_,150,56,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,211,56,50,14
+END
+
+IDD_RENAMEFAVSET DIALOGEX 100, 37, 194, 107
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Новый профиль"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Имя:",IDC_STATIC_1,14,8,60,8
+    EDITTEXT        IDC_NAME,14,18,164,12,ES_AUTOHSCROLL
+    LTEXT           "Примечание: для определения комбинации клавиш в меню для этого профиля введите амперсанд (&&) перед тем символом, который будет использоваться в комбинации клавиш.",IDC_STATIC_2,14,41,163,32
+    LTEXT           "",IDC_STATIC_3,7,82,180,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,39,88,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,99,88,50,14
+END
+
+IDD_CREATESFX DIALOGEX 6, 15, 224, 113
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Создать самораспаковывающийся архив"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Создать самораспаковывающийся архив из архива:",IDC_SOURCE,16,11,185,8
+    EDITTEXT        IDC_ARCHIVE,16,21,192,12,ES_AUTOHSCROLL
+    LTEXT           "&Имя файла самораспаковывающегося архива:",IDC_TARGET,16,39,165,8
+    EDITTEXT        IDC_NEWARCHIVE,16,49,192,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Дополнительно...",IDC_ADVANCED,133,68,75,14
+    LTEXT           "",IDC_STATIC_1,7,87,210,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,28,94,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,87,94,50,14
+    PUSHBUTTON      "Справка",IDHELP,146,94,50,14
+END
+
+IDD_COMMENT DIALOGEX 9, 34, 340, 180
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Комментарий архива ZIP"
+MENU IDM_COMMENTMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_COMMENT,0,0,340,180,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+END
+
+IDD_SFXTEXTS DIALOGEX 94, 18, 260, 352
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Текст сообщений"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Окно сообщений ",IDC_STATIC_1,8,5,245,158
+    LTEXT           "Окно сообщений отображается перед отображением главного окна и началом распаковки.",IDC_STATIC_2,20,18,221,16,NOT WS_GROUP
+    LTEXT           "Не заполняйте поля ""Заголовок"" и ""Сообщение"", чтобы не отображать окно сообщений.",IDC_STATIC_3,20,38,221,16,NOT WS_GROUP
+    LTEXT           "&Кнопки:",IDC_STATIC_4,20,61,30,8
+    COMBOBOX        IDC_MBOXBUTTONS,53,59,115,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Тип:",IDC_STATIC_5,20,77,22,8,NOT WS_GROUP
+    COMBOBOX        IDC_MBOXICON,53,75,115,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Заголовок:",IDC_STATIC_6,20,92,145,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTITLE,20,102,221,12,ES_AUTOHSCROLL
+    LTEXT           "С&ообщение:",IDC_STATIC_7,20,117,45,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTEXT,20,127,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    GROUPBOX        "Главное окно",IDC_STATIC_8,8,169,245,158
+    LTEXT           "З&аголовок:",IDC_STATIC_9,20,179,41,8
+    EDITTEXT        IDC_TITLE,20,189,221,12,ES_AUTOHSCROLL
+    LTEXT           "Т&екст в главном окне:",IDC_STATIC_10,20,205,110,8,NOT WS_GROUP
+    EDITTEXT        IDC_TEXT,20,215,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Текст кнопки ""&Извлечь"":",IDC_STATIC_11,20,247,90,8,NOT WS_GROUP
+    EDITTEXT        IDC_BUTTONTEXT,20,257,68,12,ES_AUTOHSCROLL
+    LTEXT           "&Наименование поставщика:",IDS_VENDOR,20,272,219,8
+    EDITTEXT        IDE_VENDOR,20,282,184,12,ES_AUTOHSCROLL
+    LTEXT           "Адрес &веб-сайта:",IDS_WWW,20,297,174,8
+    EDITTEXT        IDE_WWW,20,307,108,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "ОК",IDOK,24,333,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,78,333,50,14
+    PUSHBUTTON      "&Сброс",IDC_RESET,132,333,50,14
+    PUSHBUTTON      "Справка",IDHELP,186,333,50,14
+END
+
+IDD_MANFAVS DIALOGEX 59, 61, 236, 123
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Управление профилями"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Профили:",IDC_STATIC_1,9,4,60,8
+    LISTBOX         IDC_FAVORITIES,9,14,142,100,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Пере&именовать",IDC_RENAME,161,13,66,14,WS_GROUP
+    PUSHBUTTON      "&Удалить",IDC_REMOVE,161,32,66,14
+    PUSHBUTTON      "Удалить &все",IDC_REMOVEALL,161,51,66,14
+    DEFPUSHBUTTON   "Закрыть",IDOK,161,100,66,14
+END
+
+IDD_WAITFOR DIALOGEX 15, 24, 257, 155
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ожидание процесса"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Эта настройка позволяет ожидать завершения другого процесса, кроме указанного в поле команды. После завершения ожидаемого процесса удаляются все временные файлы, работа самораспаковывающегося архива завершается.",IDC_STATIC_1,12,9,233,32
+    LTEXT           "",IDC_STATIC_2,12,49,233,40
+    LTEXT           "&Имя исполняемого файла:",IDC_STATIC_3,12,97,103,8
+    EDITTEXT        IDC_FILENAME,12,107,233,12,ES_AUTOHSCROLL
+    LTEXT           "",IDC_STATIC_4,3,129,250,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,43,136,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,103,136,50,14
+    PUSHBUTTON      "Справка",IDHELP,163,136,50,14
+END
+
+IDD_CHANGELANG DIALOGEX 6, 15, 280, 106
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Изменение языка интерфейса"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Вы изменили язык интерфейса самораспаковывающегося архива. Вы хотите заменить текстовые подписи, введенные в окне ""Текст сообщений"", значениями по умолчанию для выбранного языка?",IDC_STATIC_1,11,8,258,24
+    DEFPUSHBUTTON   "Да",IDOK,55,40,50,14
+    PUSHBUTTON      "Нет",IDCANCEL,114,40,50,14
+    PUSHBUTTON      "Справка",IDHELP,173,40,50,14
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,3,62,274,1
+    CONTROL         "Всегда &запрашивать подтверждение перед сменой текстов",IDC_ASK,"Button",BS_AUTORADIOBUTTON,11,66,223,12
+    CONTROL         "За&менять тексты значениями по умолчанию в дальнейшем",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,11,78,221,12
+    CONTROL         "Н&е запрашивать подтверждение и не изменять тексты в дальнейшем",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,11,90,260,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SFXMENU MENU 
+BEGIN
+    POPUP "&Файл"
+    BEGIN
+        MENUITEM "&Экспорт настроек...\tCtrl+E", CM_SFX_EXPORT
+        MENUITEM "&Импорт настроек...\tCtrl+I", CM_SFX_IMPORT
+    END
+    POPUP "&Вид"
+    BEGIN
+        MENUITEM "&Предпросмотр окна самораспаковывающегося архива...\tCtr+V", CM_SFX_PREVIEW
+    END
+    POPUP "&Настройки"
+    BEGIN
+        MENUITEM "&Очистить все\tCtrl+Shift+R",    CM_SFX_RESETALL
+        MENUITEM "Очистить &значения\tCtrl+R",       CM_SFX_RESETVALUES
+        MENUITEM "Очистить &тексты\tCtrl+T",        CM_SFX_RESETTEXTS
+        MENUITEM SEPARATOR
+        MENUITEM "&Сохранить профиль...\tCtrl+A", CM_SFX_ADD
+        MENUITEM "&Профили\tCtrl+F",          CM_SFX_FAVORITIES
+        MENUITEM SEPARATOR
+        MENUITEM "Последний &использованный\tCtrl+L",          CM_SFX_LASTUSED
+    END
+END
+
+IDM_FAVMANMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Пере&именовать",                     CM_FAVRENAME
+        MENUITEM "&Удалить",                     CM_FAVDELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Удалить &все",                 CM_FAVREMOVEALL
+    END
+END
+
+IDM_COMMENTMENU MENU 
+BEGIN
+    POPUP "&Файл"
+    BEGIN
+        MENUITEM "&Сохранить",                       CM_SAVE
+        MENUITEM SEPARATOR
+        MENUITEM "&Закрыть\tAlt+F4",              CM_CLOSE
+    END
+END
+
+IDM_SPECDIR MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Временная папка",        CM_TEMP
+        MENUITEM "&Папка Program Files",              CM_PROGFILES
+        MENUITEM "П&апка Windows",          CM_WINDIR
+        MENUITEM "Пап&ка System",           CM_SYSDIR
+        MENUITEM SEPARATOR
+        MENUITEM "П&еременная окружения",       CM_ENVVAR
+        MENUITEM "Па&раметр системного реестра",             CM_REGENTRY
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_ABOUTPLUGINTITLE, "О модуле"
+  IDS_PLUGIN_DESCRIPTION, "Создание, просмотр и извлечение архивов ZIP."
+  IDS_ERROPEN, "Невозможно открыть файл."
+  IDS_ERRFORMAT, "Некорректный формат данных."
+  IDS_ERREOCENTRDIR, "Не найден конец сигнатуры центрального каталога. Возможно, архив поврежден."
+  IDS_LOWMEM, "Недостаточно памяти."
+  IDS_ERRADDFILE, "Невозможно включить файл в перечень."
+  IDS_ERRADDFILE_TOOLONG, "Невозможно включить 1 или несколько файлов в перечень. Полный путь слишком длинный.\nНекоторые папки или файлы могут быть потеряны при чтении оглавления архива."
+  IDS_ERRADDDIR, "Невозможно включить папку в перечень."
+  IDS_ERRADDDIR_TOOLONG, "Невозможно включить 1 или несколько папок в перечень. Полный путь слишком длинный.\nНекоторые папки или файлы могут быть потеряны при чтении оглавления архива."
+  IDS_PLUGINNAME, "ZIP"
+  IDS_TOOBIG, "Файлы с размером более 4ГБ не поддерживаются."
+  IDS_ERRACCESS, "Невозможно получить доступ к файлу."
+  IDS_ERRREAD, "Невозможно прочесть файл."
+  IDS_EOF, "Неожиданно достигнут конец файла."
+  IDS_NODISPLAY, "Сообщение об ошибке уже было отображено. Это сообщение не должно быть показано."
+  IDS_ERRCREATE, "Невозможно открыть или создать файл."
+  IDS_MULDISK, "К сожалению, настоящая версия модуля ZIP не поддерживает многодисковые архивы."
+  IDS_TOOLONGNAME, "Файл имеет слишком длинный путь и не может быть обработан."
+  IDS_TOOLONGNAME2, "Файл имеет слишком длинный путь и не будет отображен на панели."
+  IDS_PREPAREDATA, "подготовка данных..."
+  IDS_EXTRPROGTITLE, "Распаковка архива ZIP - %s"
+  IDS_ERRTEMPDIR, "Невозможно создать временную папку в папке назначения."
+  IDS_EXTRACTING, "извлечение: "
+  IDS_TOOLONGNAME3, "Невозможно извлечь файл, слишком длинный путь."
+  IDS_ERRCOMPDATA, "Ошибка в сжатых данных."
+  IDS_BADMETHOD, "Файл сжат методом, который не поддерживается настоящей версией модуля ZIP."
+  IDS_ERRCRC, "Ошибка в сжатых данных. Контрольная сумма CRC не совпадает."
+  IDS_ERRWRITE, "Невозможно записать файл."
+  IDS_TOOLONGMASK, "Длина маски превышает предел."
+  IDS_EXTRACTFILES, "извлечение..."
+  IDS_BADPACKLEVEL, "Недопустимый уровень сжатия."
+  IDS_BLOCKVANISHED, "Возникла непредусмотренная ошибка при сжатии данных: блок пропал."
+  IDS_DELPROGTITLE, "Удаление из архива ZIP - %s"
+  IDS_DELETEFILES, "удаление..."
+  IDS_DELETING, "удаление: "
+  IDS_CANCELING, "отмена операции, пожалуйста, подождите..."
+  IDS_ERRTEMP, "Невозможно создать временную резервную копию файла."
+  IDS_READONLY, "Архив предназначен только для чтения. Пожалуйста, снимите атрибут ""только для чтения""."
+  IDS_USERBREAK, "Операция отменена пользователем. Это сообщение не должно быть показано."
+  IDS_REMOVEFILES, "удаление лишних файлов из архива..."
+  IDS_ADDFILES, "упаковка..."
+  IDS_ADDING, "упаковка: "
+  IDS_BACKUPING, "создание резервной копии архива..."
+  IDS_SKIP, "Файл пропущен. Это сообщение не должно быть показано."
+  IDS_ERRACCESDIR, "Невозможно получить доступ к папке."
+  IDS_REMOVING, "удаление: "
+  IDS_ERRRESTORE, "Невозможно заменить исходный архив временной копией. Архив не был изменен."
+  IDS_AUTO, "авто"
+  IDS_BADLEVEL, "Уровень сжатия должен быть указан в диапазоне от 0 до 9."
+  IDS_ERROR, "Ошибка"
+  IDS_BADVOLSIZE, "Недопустимый размер тома. Размер указывается с использованием цифр и десятичного разделителя.\n\nРазмер тома должен составлять от 1КБ до 4ГБ."
+  IDS_PWDDONTMATCH, "Введенные пароли не совпадают."
+  IDS_PWDTOOSHORT, "Пароль должен содержать минимум 1 символ."
+  IDS_BADPWD, "Неправильный пароль. Пожалуйста, введите пароль повторно. Пароль вводится с учетом регистра. Убедитесь, что случайно не включен режим CapsLock."
+  IDS_BADPWDTITLE, "Неправильный пароль"
+  IDS_ADDPROGTITLE, "Упаковка архива ZIP - %s"
+  IDS_ERRRECOVER, "Не удалось восстановить архив ZIP. Данные могут быть повреждены."
+  IDS_ECRYPTSTORED, "Невозможно выполнить шифрование при архивации без сжатия (уровень сжатия 0)."
+  IDS_ECRYPTSFX, "Шифрование методом AES не поддерживается в самораспаковывающихся архивах."
+  IDS_ERRCREATEDIR, "Невозможно создать папку."
+  IDS_CANTMULTIVOL, "Уже существует архив с указанным именем файла.\nДля создания многотомного архива воспользуйтесь командой создания нового архива."
+  IDS_FILEEXIST, "Указанный файл уже существует. Вы хотите заменить файл?"
+  IDS_CHDISKTEXT, "Завершена упаковка тома №%d.\nПожалуйста, вставьте новый диск для упаковки и записи тома №%d."
+  IDS_BYTES, "байт"
+  IDS_TOOLOWSPACE, "Недостаточно свободного пространства на диске. Этот диск не может быть использован для архивации."
+  IDS_LOWSPACE, "Внимание! Объем свободного пространства на диске меньше требуемого размера тома архива."
+  IDS_LOWSPACE2, "Внимание! Недостаточно свободного пространства на диске."
+  IDS_MULTISTORED, "Невозможно создать многотомный архив при архивации без сжатия (уровень сжатия 0)."
+  IDS_CHDISKTEXT2, "Пожалуйста, вставьте диск, содержащий том №%d, или выберите соответствующий файл на диске."
+  IDS_ZIPARCHIVES, "Архивы ZIP (*.zip; *.z*; *.pk3; *.jar)"
+  IDS_BROWSEARCHIVETITLE, "Выберите архивный файл"
+  IDS_ZIPARCHIVESEXTS, "*.zip;*.z*;*.pk3;*.jar"
+  IDS_ERRMULTIVOL, "Операция не поддерживается при обработке многотомных архивов. Возможно только просматривать и распаковывать многотомные архивы.\n\nВнимание! Если этот архив не является многотомным, то файл архива либо имеет неизвестный формат, либо поврежден."
+  IDS_MISSLHSIG, "Некорректный формат данных. Отсутствует сигнатура локального заголовка файла."
+  IDS_ERRGETDISKFREESP, "Невозможно определить объем свободного пространства на диске."
+  IDS_MISSCHSIG, "Некорректный формат данных. Отсутствует сигнатура заголовка центрального каталога."
+  IDS_WRITINGEXE, "запись модуля самораспаковки..."
+  IDS_TOOLONGZIPNAME, "Невозможно продолжить выполнение операции. Архив ZIP имеет слишком длинный путь."
+  IDS_ERRGETMODULENAME, "Не удалось определить имя файла модуля."
+  IDS_DEFAULTTEXT, "Эта программа выполнит распаковку архива ZIP."
+  IDS_CREAETARCH, "Создать новый архив"
+  IDS_ADDTOARCHIVE, "Добавить файлы в архив"
+  IDS_DEFSFXTITLE, "Самораспаковывающийся архив ZIP"
+  IDS_ERRBADTITLE, "Не указан заголовок главного окна. Пожалуйста, введите минимум 1 символ."
+  IDS_ERRBADMBOXTITLE, "Не указан заголовок окна сообщений. Пожалуйста, введите минимум 1 символ."
+  IDS_ERRLAODSHELLDLL, "Не удалось загрузить библиотеку ""shell32.dll"". "
+  IDS_ERRGETPROCADDRESS, "Не удалось определить адрес процедуры. "
+  IDS_ERRADDICON, "Не удалось установить значок самораспаковывающегося архива."
+  IDS_ERRLOADICON, "Не удалось загрузить значок из файла. "
+  IDS_ERRLOADLIB, "Не удалось загрузить файл значков. Файл не является приложением Win32 или поврежден. "
+  IDS_ERRLOADLIB2, "Не удалось загрузить файл значков. "
+  IDS_ERRLOADSFXICON, "Не удалось загрузить значок для самораспаковывающегося архива."
+  IDS_EXPIRE, "Срок действия модуля истек. Пожалуйста, посетите наш сайт для обновления модуля."
+  IDS_UNDERCOSTRUCT, "Функция не поддерживается."
+  IDS_NOSFXINSTALLED, "Не удалось найти файлы Self-Extractor.\n\nДля создания самораспаковывающихся архивов, пожалуйста, выполните переустановку модуля ZIP."
+  IDS_UNABLEREADSFXDIR, "Не удалось прочитать папку файлов самораспаковки: "
+  IDS_UNABLEREADALLSFX, "Файлы самораспаковки не могут быть загружены."
+  IDS_UNABLEREADSFX, "Не удалось загрузить файл самораспаковки: %s\n\nНажмите кнопку ""ОК"" для продолжения или кнопку ""Отмена"" для отмены."
+  IDS_UNABLEREADSFX2, "Не удалось загрузить файл самораспаковки по умолчанию: %s"
+  IDS_CORRUPTSFX, "Файл самораспаковки поврежден."
+  IDS_CORRUPTSFX2, "Файл самораспаковки ""%s"" поврежден.\n\nНажмите кнопку ""ОК"" для продолжения или кнопку ""Отмена"" для отмены."
+  IDS_ERRLOADMENU, "Не удалось загрузить меню."
+  IDS_ERRLOADACCELS, "Не удалось загрузить таблицу комбинаций клавиш."
+  IDS_NODEFSFX, "Файл самораспаковки по умолчанию не загружен."
+  IDS_ERRLOADCONFIG, "Не удалось загрузить настройки, недостаточно памяти."
+  IDS_EMPTY, "пусто"
+  IDS_RENAMEFAVSET, "Переименовать профиль."
+  IDS_USEDNAME, "Указанное имя уже используется."
+  IDS_NOLANGFILE, "Не удалось загрузить профиль: не установлены языковые файлы (%s) для модуля самораспаковки."
+  IDS_SETTINGSFILE, "Файлы настроек (*.set)"
+  IDS_DEFEXTRBUTTON, "&извлечь"
+  IDS_EXPORTOVEWRITE, "Файл уже существует. Заменить его?"
+  IDS_ERRGETTEMP, "Невозможно создать временный файл."
+  IDS_SFXABOUTBTN1, "&Сведения >>"
+  IDS_SFXABOUTBTN2, "<< &Сведения"
+  IDS_MENUCREATESFX, "&Создать самораспаковывающийся архив (.exe)..."
+  IDS_MENUTEST, "Про&тестировать архив"
+  IDS_MENUREPAIR, "&Восстановить поврежденный архив"
+  IDS_CONTINUE, "Последняя операция не была успешно завершена. Продолжить обработку следующего файла?"
+  IDS_NOARCHIVETYPED, "Отсутствует имя файла архива."
+  IDS_NOEXETYPED, "Отсутствует имя файла создаваемого самораспаковывающегося архива."
+  IDS_SFXPROGTITLE, "Создание самораспаковывающегося архива ZIP - %s"
+  IDS_COPYDATA, "копирование данных архива..."
+  IDS_EMPTYARCHIVE, "Архив не содержит файлов."
+  IDS_BADMETHODSFX, "Архив содержит файлы, сжатые методом, который не поддерживается Self-Extractor.\n\nПожалуйста, выполните повторную упаковку файлов в архив с использованием модуля ZIP."
+  IDS_TESTPROGTITLE, "Тестирование архива ZIP - %s"
+  IDS_TESTFILES, "тестирование файлов..."
+  IDS_TESTING, "тестирование: "
+  IDS_TESTOK, "В архиве ""%s"" ошибок не обнаружено."
+  IDS_TESTKO, "Некоторые файлы в архиве ""%s"" повреждены или зашифрованы неизвестным паролем."
+  IDS_MENUCOMMENT, "&Комментарий архива..."
+  IDS_COMMENTMODIFIED, "Изменен комментарий архива.\n\nСохранить эти изменения?"
+  IDS_COMMENTDLGTITLE, "Комментарий архива ZIP - %s"
+  IDS_ERRREADCOMMENT, "Произошла ошибка чтения комментария архива ZIP, файл поврежден или имеет неизвестный формат.\n\nНажмите ""ОК"", чтобы пропустить чтение комментария и продолжить чтение архива."
+  IDS_COMMENTMV, "Комментарий многотомного архива доступен только для чтения и не может быть сохранен."
+  IDS_RECOVERARCHIVETITLE, "Восстановление архива ZIP"
+  IDS_SOURCEHEADING, "&Восстановить архив:"
+  IDS_TARGETHEADING, "&Сохранить восстановленный архив:"
+  IDS_REPAIRPROGTITLE, "Восстановление архива ZIP - %s"
+  IDS_SAVING, "сохранение: "
+  IDS_REPAIRING, "восстановление архива..."
+  IDS_ERROPENICO, "Не удалось открыть файл, содержащий значки."
+  IDS_BADBUTTONTEXT, "Не указан заголовок главного окна. Пожалуйста, введите минимум 1 символ."
+  IDS_BADTEMP, "Не допускается указание символов после $(Temp). Пожалуйста, введите только $(Temp) для извлечения во временную папку."
+  IDS_MISBAR, "Не закрыта последовательность $()."
+  IDS_BADVAR, "Неизвестная переменная $()."
+  IDS_MBOK, "ОК"
+  IDS_MBOKCANCEL, "ОК + Отмена"
+  IDS_MBYESNO, "Да + Нет"
+  IDS_MBAGREEDISAGREE, "Я согласен + Я не согласен"
+  IDS_MBNOICON, "Простое"
+  IDS_MBEXCLAMATION, "Предупреждение"
+  IDS_MBINFORMATION, "Информация"
+  IDS_MBQUESTION, "Вопрос"
+  IDS_LONGMESSAGE, "Длинное сообщение"
+  IDS_BADKEY, "Некорректный параметр."
+  IDS_MANAGE, "&Управление..."
+  IDS_REMOVEWARNTITLE, "Удалить профиль"
+  IDS_REMOVEWARN, "Вы действительно хотите удалить профиль ""%s"" ?\n\nВосстановление удаленного профиля невозможно."
+  IDS_REMOVEALLWARN, "Вы действительно хотите удалить все профили?\n\nВосстановление удаленных профилей невозможно."
+  IDS_MISSINGVERSION, "Не удалось загрузить файл настроек: отсутствует номер версии."
+  IDS_BADVERSION, "Не удалось загрузить файл настроек: версия не поддерживается."
+  IDS_BADTEMP2, "Не удалось загрузить файл настроек, некорректное значение ""target_dir"": не допускается указание символов после $(Temp)."
+  IDS_MISBAR2, "Не удалось загрузить файл настроек, некорректное значение ""target_dir"": не закрыта последовательность $()."
+  IDS_BADVAR2, "Не удалось загрузить файл настроек, некорректное значение ""target_dir"": неизвестная переменная $()."
+  IDS_BADKEY2, "Не удалось загрузить файл настроек, некорректное значение ""target_dir"": некорректный параметр."
+  IDS_CHDISKTEXT3, "Пожалуйста, вставьте диск, содержащий том №%d."
+  IDS_NONTEXT, "Пожалуйста, введите минимум 1 символ."
+  IDS_BADSFXVER, "Неподдерживаемая версия пакета самораспаковки (%s). Пожалуйста, установите новейшую версию модуля ZIP с соответствующей версией пакета самораспаковки."
+  IDS_BADSFXVER2, "Неподдерживаемая версия пакета самораспаковки. Пожалуйста, установите новейшую версию модуля ZIP с соответствующей версией пакета самораспаковки."
+  IDS_TOOBIG2, "Не удалось завершить операцию, так как был превышен предел размера архива в 4ГБ.\n\nСоздайте многотомный архив для сжатия более 4ГБ данных в архиве ZIP. Архив ZIP может включать до 65536 томов. Каждый том может иметь размер до 4ГБ."
+  IDS_FILENOTFOUND, "Файл не найден."
+  IDS_ALLFILES, "Все файлы (*.*)"
+  IDS_NOTFOUND, "Файл не найден."
+  IDS_BADMSGBOXTYPE, "Кнопки ""Я согласен + Я не согласен"" могут использоваться только в окне длинных сообщений."
+  IDS_LOTFILES, "Вы хотите создать архив ZIP, содержащий более 65535 файлов. Такой архив несовместим со стандартным форматом архивов ZIP и его будет невозможно распаковать некоторыми архиваторами.\n\nПродолжить?"
+  IDS_LOTFILESSFX, "Невозможно создать самораспаковывающийся архив ZIP, содержащий более 65535 файлов."
+  IDS_BADAES, "Файл зашифрован методом AES неизвестной версии."
+  IDS_PWDTOOLONG, "Слишком длинный пароль.\nДлина пароля шифрования методом AES ограничена 128 символами."
+  IDS_AESERROR, "Ошибка AES."
+  IDS_MACERROR, "Код аутентификации не совпадает. Файл поврежден или введен неправильный пароль."
+  IDS_ERRZIP64, "Операция не поддерживается при обработке архивов ZIP64. Возможно только просматривать и распаковывать архивы ZIP64."
+  IDS_ONLYFULLVERSION, " (доступно в полной версии)"
+  IDS_ERRBZIP2 "Обнаружена ошибка в потоке BZIP2. Возможно, архив поврежден."
+  IDS_UNSUP_CD_ENCRYPTION "Центральный каталог архива, содержащий перечень файлов, зашифрован или сжат.\nОбработка таких архивов не поддерживается."
+  IDS_LISTINFO_PAKEDSIZE      "Сжатый"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Размер сжатого файла"
+  IDS_SIZE_KB, "КБ"
+  IDS_SIZE_MB, "МБ"
+  IDS_MODIFICATION_NOT_SUPPORTED, "Архивный файл ZIP использует такой формат данных, что текущая версия модуля ZIP не поддерживает изменение файлов в этом архиве"
+  IDS_WAITFOR_INFO, "Запуск дополнительных процессов зачастую используется программами инсталляции, которые запускают другие программы инсталляции, которые продолжают выполняться после завершения первоначального процесса.\nТаким способом работают, например, многие версии InstallShield."
+}
+
+STRINGTABLE
+{
+  IDS_SFX_COMMENT_HEAD1, ";Настройки Self-Extractor\r\n\r\n;Это файл настроек Self-Extractor.\r\n;\r\n;Синтаксис формата файла:\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD2, ";Строки, начинающиеся с точки с запятой (;) являются комментариями и\r\n;игнорируются при обработке файла.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD3, ";Все переменные, кроме номера версии, не являются обязательными. Если переменная не\r\n;определена в файле настроек, используется ее значение по умолчанию.\r\n;Значения по умолчанию для зависимых от языка переменных (dlg_text, dlg_title,\r\n;button_text) берутся из пакета самораспаковки.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD4, ";Все текстовые значения, включая пустые строки, должны заключаться в двойные кавычки.\r\n;Для указания двойных кавычек в текстовом значении введите символ двойных кавычек\r\n;дважды.\r\n;\r\n;Числа не заключаются в кавычки.\r\n\r\n"
+  IDS_SFX_COMMENT_VERSION, "\r\n;версия файла настроек, текущая версия 2\r\n;это единственная обязательная переменная\r\n\r\n"
+  IDS_SFX_COMMENT_TARGDIR1, "\r\n;указывает папку извлечения, возможно указать абсолютный или относительный путь;\r\n;относительный путь определяется относительно текущей папки в которой открыт\r\n;самораспаковывающийся архив\r\n"
+  IDS_SFX_COMMENT_TARGDIR2, ";также возможно указать предопределенные переменные в начале (!) значения\r\n;поля ""target_dir"":\r\n;\r\n"
+  IDS_SFX_COMMENT_TARGDIR3, ";  $(Temp)      временная папка, должна указываться в поле ""target_dir"" без каких\r\n;               либо дополнительных путей\r\n"
+  IDS_SFX_COMMENT_TARGDIR4, ";  $(ProgFiles) папка ""Program Files"" пользователя\r\n;  $(WinDir)    папка ""Windows""\r\n;  $(SysDir)    папка ""System""\r\n"
+  IDS_SFX_COMMENT_TARGDIR5, ";  $[переменная] значение переменной окружения ""переменная""\r\n;  $<параметр>  значение параметра реестра ""параметр""\r\n;  например SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ProgramFilesDir\r\n\r\n"
+  IDS_SFX_COMMENT_ALLOWCHANGE, "\r\n;указывает возможность изменения папки для извлечения пользователем при распаковке\r\n;установите значение 1 для включения возможности изменения\r\n\r\n"
+  IDS_SFX_COMMENT_REMOVE1, "\r\n;указывает необходимость удаления извлеченных файлов по завершении выполнения\r\n;команды, указанной в переменной ""command""\r\n"
+  IDS_SFX_COMMENT_REMOVE2, ";введите значение 1 для удаления временных файлов\r\n;использование этой переменной имеет смысл только, если переменная ""target_dir""\r\n;имеет значение ""$(Temp)"", иначе данная переменная не используется\r\n\r\n"
+  IDS_SFX_COMMENT_AUTO, "\r\n;указывает режим автоматической распаковки при открытии самораспаковывающегося\r\n;архива пользователем\r\n;введите значение 1 для автоматической распаковки\r\n\r\n"
+  IDS_SFX_COMMENT_SUMMARY, "\r\n;указывает необходимость отображения сообщения об успешном выполнении извлечения\r\n;введите значение 1 для отображения результатов извлечения\r\n\r\n"
+  IDS_SFX_COMMENT_HIDE, "\r\n;указывает необходимость отображения главного окна распаковки\r\n;введите значение 1 для отображения главного окна\r\n;использование этой переменной имеет смысл только, если переменая ""autostart""\r\n;равна 1, иначе переменная не используется\r\n\r\n"
+  IDS_SFX_COMMENT_OVERWRITE, "\r\n;указывает режим замены файлов в папке извлечения без запроса подтверждения\r\n;введите значение 1 для замены файлов без запроса продтверждения\r\n\r\n"
+  IDS_SFX_COMMENT_AUTODIR, "\r\n;указывает режим создания папки извлечения без запроса подтверждения\r\n;введите значение 1 для создания папки извлечения без запроса подтверждения\r\n\r\n"
+  IDS_SFX_COMMENT_COMMAND, "\r\n;программа, ссылка или документ, который необходимо открыть по завершении извлечения\r\n;файлов, путь указывается относительно папки извлечения, возможно указание\r\n;аргументов командной строки для программы\r\n\r\n"
+  IDS_SFX_COMMENT_PACKAGE, "\r\n;используемый пакет самораспаковки для создания самораспаковывающегося архива\r\n;путь относительно папки, содержащей файл zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_MBUT, "\r\n;кнопки окна сообщений\r\n;возможные значения: ""ok"", ""ok_cancel"", ""yes_no"", ""agree_disagree""\r\n\r\n"
+  IDS_SFX_COMMENT_MICO, "\r\n;вид окна сообщений\r\n;возможные значения: ""simple"", ""exclamation"", ""information"", ""question"",\r\n;""long_message""\r\n\r\n"
+  IDS_SFX_COMMENT_MBOX, "\r\n;текст и заголовок окна сообщений, которое отображается перед началом извлечения\r\n;для того, чтобы не отображать окно сообщение укажите в обоих полях\r\n;пустые значения ("""")\r\n\r\n"
+  IDS_SFX_COMMENT_TEXT, "\r\n;текст в главном окне распаковки\r\n\r\n"
+  IDS_SFX_COMMENT_TITLE, "\r\n;заголовок главного окна распаковки\r\n\r\n"
+  IDS_SFX_COMMENT_BUTTON, "\r\n;текст кнопки выполнения извлечения в главном окне распаковки\r\n\r\n"
+  IDS_SFX_COMMENT_VENDOR, "\r\n;наименование поставщика в нижнем левом углу главного окна\r\n\r\n"
+  IDS_SFX_COMMENT_WWW, "\r\n;адрес сайта в нижнем правом углу главного окна\r\n\r\n"
+  IDS_SFX_COMMENT_ICOFILE, "\r\n;файл, содержащий значок, возможно указание файла ICO или исполняемого файла PE\r\n;(Win32 EXE или DLL), содержащего значки, путь указывается относительно папки,\r\n;содержащей файл zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_ICOINDEX, "\r\n;индекс значка в исполняемом файле, указанном в переменной ""icon_file""\r\n;положительное число указывает порядковый номер\r\n;отрицательное число указывает ИД ресурса\r\n;для файлов ICO индекс всегда равен 0 и не используется\r\n\r\n"
+  IDS_SFX_COMMENT_WAITFOR1, "\r\n;Эта переменная позволяет ожидать завершения другого процесса, кроме указанного в\r\n;поле ""command"". После завершения ожидаемого процесса удаляются все временные\r\n;файлы, работа самораспаковывающегося архива завершается.\r\n"
+  IDS_SFX_COMMENT_WAITFOR2, ";Запуск дополнительных процессов зачастую используется программами инсталляции,\r\n;которые запускают другие программы инсталляции, которые продолжают выполняться\r\n;после завершения первоначального процесса.\r\n"
+  IDS_SFX_COMMENT_WAITFOR3, ";Таким способом работают, например, многие версии InstallShield.\r\n;Эта переменная не используется, если переменная ""remove_temp"" равна 1.\r\n\r\n"
+  IDS_SFX_COMMENT_REQUIRESADMIN, "\r\n;требуются административные привилегии при запуске под Windows Vista и выше\r\n\r\n"
+}

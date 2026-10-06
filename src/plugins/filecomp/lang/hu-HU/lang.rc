@@ -1,0 +1,375 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for filecomp. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/filecomp/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\filecomp.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_COMPAREFILES DIALOGEX 10, 24, 227, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fájlok összehasonlítása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Fájl összehasonlítása:",IDC_STATIC_1,10,9,207,8
+    COMBOBOX        IDE_PATH1,10,19,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE1,207,19,13,12
+    CONTROL         "&Ezzel a fájllal:",IDC_STATIC_2,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,37,207,8
+    COMBOBOX        IDE_PATH2,10,47,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE2,207,47,13,12
+    DEFPUSHBUTTON   "OK",IDOK,29,71,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,88,71,50,14
+    PUSHBUTTON      "H&aladó...",IDADVANCED,147,71,50,14
+END
+
+IDD_CFGCOLORS DIALOGEX 15, 24, 267, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Színek"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Elem",IDC_STATIC_1,6,6,20,8,NOT WS_GROUP
+    COMBOBOX        IDC_ITEMS,6,16,149,82,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Sorszámozás:",IDC_STATIC_2,177,38,49,8,NOT WS_GROUP
+    LTEXT           "Szöveg:",IDC_STATIC_3,229,38,28,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION1,11,51,158,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION2,11,67,158,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION3,11,83,158,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION4,11,99,158,8,NOT WS_GROUP
+    PUSHBUTTON      "text",IDB_LINENUM1,177,48,30,14
+    PUSHBUTTON      "text",IDB_TEXT1,229,48,30,14
+    PUSHBUTTON      "text",IDB_LINENUM2,177,64,30,14
+    PUSHBUTTON      "text",IDB_TEXT2,229,64,30,14
+    PUSHBUTTON      "text",IDB_LINENUM3,177,80,30,14
+    PUSHBUTTON      "text",IDB_TEXT3,229,80,30,14
+    PUSHBUTTON      "text",IDB_LINENUM4,177,96,30,14
+    PUSHBUTTON      "text",IDB_TEXT4,229,96,30,14
+    PUSHBUTTON      "&Visszaállítás",IDB_DEFAULT,199,202,60,14
+    LTEXT           "",IDS_PREVIEW2,133,129,126,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "",IDS_PREVIEW1,6,129,126,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "Előnézet",IDC_STATIC_4,6,120,60,8,NOT WS_GROUP
+END
+
+IDD_ADVANCEDOPTIONS DIALOGEX 70, 33, 222, 286
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Haladó beállítások"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Kihagyások",IDC_STATIC_1,5,6,40,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,47,10,171,1
+    CONTROL         "&Minden üres hely",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,11,16,160,12
+    CONTROL         "Módosítások az üres &helyekben",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,28,160,12
+    CONTROL         "B&etű",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,40,160,12
+    LTEXT           "Fájltípus",IDC_STATIC_3,5,60,30,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,37,64,181,1
+    CONTROL         "&Automatikus felismerés",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY | WS_GROUP | WS_TABSTOP,11,70,91,12
+    CONTROL         "&Bináris",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,82,60,12
+    CONTROL         "&Szöveg",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,94,60,12
+    LTEXT           "Szöveges fájlok kódolása:",IDC_STATIC_15,11,111,87,8
+    LTEXT           "Első fájl:",IDC_STATIC_5,11,126,31,8
+    LTEXT           "Második fájl:",IDC_STATIC_6,11,143,45,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,56,124,142,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,56,141,142,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,201,124,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,201,141,14,12
+    LTEXT           "Sorvégek",IDC_STATIC_7,5,163,33,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,39,167,179,1
+    LTEXT           "Első &fájl:",IDC_STATIC_9,11,175,31,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,59,173,35,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,98,173,35,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,137,173,35,12
+    CONTROL         "NULLA",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,176,173,35,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,59,185,35,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,98,185,35,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,137,185,35,12
+    CONTROL         "NULLA",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,176,185,35,12
+    LTEXT           "Második fájl:",IDC_STATIC_10,11,187,45,8
+    LTEXT           "Unicode beállítások",IDC_STATIC_11,5,205,66,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,73,209,145,1
+    CONTROL         "&Kiegészítő jelek (pl. ékezet) szétbontható karakterekhez",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,215,199,12
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,4,237,214,1
+    CONTROL         "E&zek használata a jövőbeni összehasonlításokhoz",IDC_USEINFUTURE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,242,176,12
+    CONTROL         "",IDC_STATIC_14,"Static",SS_ETCHEDHORZ | WS_GROUP,4,257,214,1
+    DEFPUSHBUTTON   "OK",IDOK,53,266,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,109,266,50,14
+    PUSHBUTTON      "Súgó",IDHELP,165,266,50,14
+END
+
+IDD_CFGGENERAL DIALOGEX 28, 34, 267, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Általános"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Fájlok kijelölése",IDC_STATIC_1,6,7,55,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,63,11,198,1
+    CONTROL         "Fájlkivála&sztások megerősítése a Fájl összehasonlító indulása előtt",IDC_CONFIRM,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,17,234,12
+    LTEXT           "Megjelenítési beállítások",IDC_STATIC_3,6,36,83,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,91,40,170,1
+    LTEXT           "&Ennyi összefüggő sor mutatása, ha csak különbség látható:",IDC_STATIC_5,12,48,200,8,NOT WS_GROUP
+    EDITTEXT        IDE_CONTEXT,213,46,16,12,ES_AUTOHSCROLL
+    LTEXT           "&Tabulátorméret:",IDC_STATIC_6,12,62,57,8,NOT WS_GROUP
+    EDITTEXT        IDE_TABSIZE,79,60,16,12
+    LTEXT           "&Üres hely karakter:",IDC_STATIC_7,12,76,66,8
+    COMBOBOX        IDC_WHITESPACE,79,74,55,98,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Részletes különbségek mutatása alapértelmezettként",IDC_DETAILDIFFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,91,190,12
+    CONTROL         "A fájlnézet vízszintes &felosztása",IDC_VIEW_HORIZONTAL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,103,119,12
+    LTEXT           "Megjelenő betűtípus",IDC_STATIC_8,6,121,70,8
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,78,125,183,1
+    PUSHBUTTON      "&Betűtípus",IDB_FONT,12,134,50,14
+    EDITTEXT        IDE_FONT,65,134,178,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    LTEXT           "Egyéb",IDC_STATIC_10,6,156,22,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,30,160,231,1
+    CONTROL         "A plugin betö&ltése az Sally indulásakor",IDC_LOADONSTART,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,166,184,12
+END
+
+IDD_CFGDEFOPTIONS DIALOGEX 31, 27, 267, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Alap összehasonlítási beállítások"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Kihagyások",IDC_STATIC_1,6,7,40,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,48,11,213,1
+    CONTROL         "&Minden üres hely",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,17,160,12
+    CONTROL         "Módosítások az üres &helyekben",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,29,160,12
+    CONTROL         "B&etű",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,41,160,12
+    LTEXT           "Fájltípus",IDC_STATIC_3,6,59,30,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,38,63,223,1
+    CONTROL         "&Automatikus felismerés",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,13,69,91,12
+    CONTROL         "&Bináris",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON,13,81,74,12
+    CONTROL         "&Szöveg",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON,13,93,74,12
+    LTEXT           "Szöveges fájlok kódolása:",IDC_STATIC_13,13,110,87,8
+    LTEXT           "Első fájl:",IDC_STATIC_5,13,125,30,8
+    LTEXT           "Második fájl:",IDC_STATIC_6,13,142,44,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,58,123,180,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,58,140,180,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,241,123,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,241,140,14,12
+    LTEXT           "Sorvégek",IDC_STATIC_7,6,158,33,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,41,162,220,1
+    LTEXT           "Első fájl:",IDC_STATIC_9,13,170,47,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,168,39,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,101,168,39,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,141,168,39,12
+    CONTROL         "NULLA",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,181,168,39,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,180,39,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,101,180,39,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,141,180,39,12
+    CONTROL         "NULLA",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,181,180,39,12
+    LTEXT           "Második fájl:",IDC_STATIC_10,13,182,47,8
+    LTEXT           "Unicode beállítások",IDC_STATIC_11,6,197,66,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,74,201,187,1
+    CONTROL         "&Kiegészítő jelek (pl. ékezet) szétbontható karakterekhez",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,207,199,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_MENU MENU 
+BEGIN
+    POPUP "&Fájl"
+    BEGIN
+        MENUITEM "Összehasonlítás...\tCtrl+O",          CM_COMPARE
+        MENUITEM "Újra-hasonlítás\tCtrl+R",           CM_RECOMPARE
+        MENUITEM SEPARATOR
+        MENUITEM "&Kilépés\tAlt+F4",               CM_EXIT
+    END
+    POPUP "Sz&erkesztés"
+    BEGIN
+        MENUITEM "Másolás\tCtrl+C",                CM_COPY
+    END
+    POPUP "&Nézet"
+    BEGIN
+        MENUITEM "Ü&res helyek mutatása\tCtrl+W",   CM_SHOWWHITESPACE
+        MENUITEM "&Csak a különbségek mutatása\tCtrl+D", CM_ONLYDIFFERENCES
+        MENUITEM "Részl&etes különbségek\tF4",   CM_DETAILDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "Első &különbség\tAlt+Home", CM_FIRSTDIFF
+        MENUITEM "Előző különbsé&g\tAlt+Fel nyíl", CM_PREVDIFF
+        MENUITEM "Következő külö&nbség\tAlt+Le nyíl", CM_NEXTDIFF
+        MENUITEM "Uto&lsó különbség\tAlt+End",   CM_LASTDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "Kurzor mutatá&sa\tF2",             CM_SHOWCARET
+        MENUITEM SEPARATOR
+        MENUITEM "&Bal fájlnéző maximalizálása\tCtrl+,", CM_MAXLEFTVIEW
+        MENUITEM "&Jobb fájlnéző maximalizálása\tCtrl+.", CM_MAXRIGHTVIEW
+        MENUITEM "Fájlnézők a&zonos mérettel\tCtrl+E", CM_SAMESIZEVIEW
+        MENUITEM "&Teljes képernyő kapcsoló\tF11",    CM_MAXIMIZE
+        MENUITEM "&Vízszintes nézet\tCtrl+H",    CM_VIEW_HORIZONTAL
+    END
+    POPUP "Beállítás&ok"
+    BEGIN
+        MENUITEM "Kijelölés &automatikus másolása vágólapra", CM_AUTOCOPY
+        MENUITEM SEPARATOR
+        MENUITEM "&Beállítás...",           CM_OPTIONS
+    END
+    POPUP "&Súgó"
+    BEGIN
+        MENUITEM "&Tartalomjegyzék\tF1",               CM_HELP
+        MENUITEM "Billentyűparancso&k",         CM_HELPKEYBOARD
+        MENUITEM SEPARATOR
+        MENUITEM "&Névjegy",                      CM_ABOUT
+    END
+END
+
+IDM_CTX_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "M&ind kijelöl",                 CM_SELECTALL
+        MENUITEM "&Másolás",                       CM_COPY
+    END
+END
+
+IDM_CTX_1COLOR_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Egyéni szín...",             CM_CUSTOMBACKGROUND
+        MENUITEM "Automatikus szín",             CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_2COLOR_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Egyéni szövegszín...",     CM_CUSTOMTEXT
+        MENUITEM "Automatikus szövegszín",     CM_AUTOTEXT
+        MENUITEM SEPARATOR
+        MENUITEM "Egyéni háttérszín...", CM_CUSTOMBACKGROUND
+        MENUITEM "Automatikus háttérszín", CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_FONT_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Egyéni betűtípus...",              CM_CUSTOMFONT
+        MENUITEM "Automatikus betűtípus",              CM_AUTOFONT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGIN_DESCRIPTION, "Két szöveges vagy bináris fájl vizuális összehasonlítása."
+  IDS_ABOUT, "Plugin névjegy"
+  IDS_SPLERROR, "Fájl összehasonlító - Hiba"
+  IDS_PLUGINNAME, "Fájl összehasonlító"
+  IDS_LOWMEM, "Kevés memória."
+  IDS_COMPAREFILES, "Fájlok összehasonlítása..."
+  IDS_CONFIGURATION, "Beállítás..."
+  //IDS_SOMEWINDOWSOPEN, "Some File Comparator windows are opened. Do you want to close them?"
+  IDS_READFILE, "Nem lehet olvasni a(z) '%s' fájlból. "
+  IDS_ACCESFILE, "Nem lehet elérni a(z) '%s' fájlt. "
+  IDS_ACCESFILE2, "Nem érhető el a fájl. "
+  IDS_INTERNALERROR, "Hiba az összehasonlító algoritmusban."
+  IDS_LARGEFILE, "Nem lehet a(z) '%s' fájlt szöveges összehasonlításra megnyitni, a fájl túl nagy.\nHasználjon bináris összehasonlítást."
+  IDS_OPEN, "Nem lehet megnyitni a(z) '%s' fájlt. "
+  IDS_NODIFFERRENCE, "A fájlok azonosak."
+  IDS_ALLDIFFSIGNORED, "A fájlok azonosnak tűnnek. A közöttük levő különbségek, a beállítások szerint, figyelmen kívül lettek hagyva."
+  IDS_BINARYDIFFER, "Bináris fájl különbség."
+  IDS_MAXLINES, "Maximális sorszámolás elérve"
+  IDS_MAINWNDHEADER, "{!}%s %s: %s %s- Fájl összehasonlító - %d különbség{|1|}"
+  IDS_MAINWNDHEADER_NODIF "%s %s: %s %s- Fájl összehasonlító - Nincs különbség"
+  IDS_MAINWNDHEADERCOMPUTING, "%s : %s - Fájl összehasonlító - Különbségek számítása (megszakításhoz ESC)"
+  IDS_MAINWNDHEADERCOMPUTING2, "%s %s: %s %s - Fájl összehasonlító - Különbségek számítása"
+  IDS_MAINWNDHEADERCOMPUTING_PROGRESS, "%s : %s - Fájl összehasonlító - Különbségek számítása (%d%% kész)"
+  IDS_MAINWNDHEADERCOMPUTING_PROGRESS_FOUND, "{!}%s : %s - Fájl összehasonlító - Különbségek számítása (%d%% kész, %d találat{})"
+  IDS_MAINWNDHEADERTOOMANY, "%s : %s - Fájl összehasonlító - Több, mint 32 768 különbség"
+  IDS_DIFFERENCES, "&Különbség"
+  IDS_MISSINGPATH, "Hiányzó fájlnév."
+  IDS_ERROR, "Hiba"
+  IDS_SELECTALL, "Minden kijelöl&"
+  IDS_RECOMPARE, "Újra-hasonlítás (Ctrl+R)"
+  IDS_COPY, "&Másolás"
+  IDS_COPYCLIP, "Másolás vágólapra (Ctr+C)"
+  IDS_FIRSTDIFF, "Első különbségre ugrás (Alt+Home)"
+  IDS_PREVDIFF, "Előző különbségre ugrás (Alt+Fel nyíl)"
+  IDS_NEXTDIFF, "Következő különbségre ugrás (Alt+Le nyíl)"
+  IDS_LASTDIFF, "Utolsó különbségre ugrás (Alt+End)"
+  IDS_CANCELED, "Művelet megszakítva."
+  IDS_CLOSEDIFF, "Be akarja zárni a Fájl összehasonlítót?"
+  IDS_COMMONTEXT, "Változatlan szöveg"
+  IDS_SELECTEDTEXT, "Kijelölt szöveg"
+  IDS_CHANGEDTEXT, "Módosított szöveg"
+  IDS_FOCUSEDCHANGE, "Módosított szöveg a fókuszált különbségben"
+  IDS_FOCUSEDFRAME, "Fókuszált különbség kerete"
+  IDS_FOCUSEDCHANGE2, "Fókuszált különbség"
+  IDS_COMMONFOCUSED, "Módosulatlan szöveg a fókuszált különbségben"
+  IDS_COMMONFOCUSED2, "Módosulatlan + fókuszált"
+  IDS_COMMONCOLORS, "Közös színek"
+  IDS_RIGHTCOLORS, "Jobb panel színei"
+  IDS_LEFTCOLORS, "Bal panel színei"
+  IDS_POSITIVEVALUE, "Pozitív értéket adjon meg"
+  IDS_SELECTFIRST, "Válasszon első fájlt"
+  IDS_SELECTSECOND, "Válasszon második fájlt"
+  IDS_FILEDOESNOTEXIST, "%s fájl nem létezik.\nAdjon meg egy érvényes fájlnevet."
+  IDS_ALLFILES, "Minden fájl (*.*)"
+  // font description in configuration dialog box   "10 pt. MS Shell Dlg"
+  IDS_FONTDESCRIPTION, "%d pont %s"
+  IDS_BINREPORT1, "{!}%d: %s bájt{|1|} módosult a(z) %s ofszet értéknél"
+  IDS_BINREPORT2, "{!}%s bájt{|1|} módosult a(z) %s ofszet értéknél"
+  IDS_ADD1, "%d: Beszúrt %d.sor a jobb fájlban (%s) a bal fájl %d.sora után (%s)"
+  IDS_ADD2, "%d: Beszúrt %d-%d.sorok a jobb fájlban (%s) a bal fájl %d.sora után (%s)"
+  IDS_DELETE1, "%d: Törölt  %d.sor a jobb fájlban (%s)"
+  IDS_DELETE2, "%d: Törölt %d-%d.sorok a bal fájlból (%s)"
+  IDS_CHANGEFROM1, "%d: Módosított %d.sor a bal fájlban (%s) a"
+  IDS_CHANGEFROM2, "%d: Módosított %d-%d.sorok a bal fájlban (%s) a"
+  IDS_CHANGETO1, "%s jobb fájl %d.sorához képest (%s)"
+  IDS_CHANGETO2, "%s jobb fájl %d-%d.soraihoz képest (%s)"
+  IDS_CONFIGURATIONTITLE, "Fájl összehasonlító beállításai"
+  IDS_OK, "OK"
+  IDS_CANCEL, "Mégse"
+  IDS_OPTIONSCHANGED, "Az alapértelmezett összehasonlítási beállítások megváltoztak.\nÚjra összehasonlítja a fájlokat az új beállításokkal?"
+  IDS_DETAILCANCEL, "Megszakította a részletes különbségek számolásának folyamatát. A részletes különbség analízis sok időbe telhet, különösen, ha sok a különböző blokk.\n\nKikapcsolja a részletes különbségeket és újraindítja az összehasonlítást?"
+  IDS_INVALIDNUMBER, "Érvénytelen szám!"
+  IDS_NOTVALIDFILE, "'%s' nem nyitható meg."
+  IDS_INVALIDARGS, "Érvénytelen paraméter. Használat:\n\tfilecomp.exe [beállítások] első második\nBeállítások:\n\t-w\tVárjon a Fájl összehasonlító bezárásáig.\n\t--wait\tVárjon a Fájl összehasonlító bezárásáig."
+  IDS_MSGERR, "Nem küldhető üzenet a Fájl összehasonlító plugin-nak."
+  IDS_LAUNCHSAL, "Az Sally nem indítható el."
+  IDS_MSGERR2, "Nem küldhető üzenet a Fájl összehasonlító plugin-nak. Nézze meg, hogy 'Az Sally-re indítás' be van-e kapcsolva a Fájl összehasonlító beállításaiban."
+  IDS_ERRORUNICODE, "Sikertelen Unicode-dá alakítás."
+  IDS_ENCMENU_AUTO, "Automatikus"
+  IDS_ENCMENU_ASCII8, "ASCII-8"
+  IDS_ENCMENU_ASCII8NOINPUTENC, "Nincs bemeneti átalakítás"
+  IDS_ENCMENU_ASCII8AUTOINPUTENC, "Automatikus bemeneti átalakítás"
+  IDS_ENCMENU_UNICODE, "Unicode"
+  IDS_ENCMENU_UTF8, "UTF-8"
+  IDS_ENCMENU_UTF16LE, "UTF-16"
+  IDS_ENCMENU_UTF16BE, "UTF-16 (Big Endian)"
+  IDS_ENCMENU_UTF32LE, "UTF-32"
+  IDS_ENCMENU_UTF32BE, "UTF-32 (Big Endian)"
+  IDS_AUTOINPUTENC ", automatikus bemeneti átalakítás"
+  IDS_NOINPUTENC ", nincs bemeneti átalakítás"
+  IDS_MAXLEFTVIEW   "&Bal fájlnézet maximalizálása\tCtrl+,"
+  IDS_MAXTOPVIEW    "&Felső fájlnézet maximalizálása\tCtrl+,"
+  IDS_MAXRIGHTVIEW  "&Jobb fájlnézet maximalizálása\tCtrl+."
+  IDS_MAXBOTTOMVIEW "alsó fájlnézet &maximalizálása\tCtrl+."
+  IDS_ERROR_COPY_LARGE_SELECTION "A kijelölés túl nagy, hogy vágólapra lehessen másolni."
+  IDS_ERROR_COPY_OOM  "Nincs elég memória a kijelölt szöveg vágólapra másolásához."
+  IDS_ERROR_COPY_FAILED "A kijelölt szöveg nem másolható a vágólapra."
+  IDS_LOWMEM_TRY_BINARY "A szöveges összehasonlítás nem sikerült, mivel nincs elég elérhető memória vagy a fájlok túl nagyok. Talán a bináris összehasonlítást kellene kipróbálni."
+}

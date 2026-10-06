@@ -55,7 +55,7 @@
 #define UNDELETE_WIDEN(value) UNDELETE_WIDEN_IMPL(value)
 
 HINSTANCE DLLInstance = NULL; // handle for SPL - language independent resources
-HINSTANCE HLanguage = NULL;   // handle for SLG - language dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 CPluginInterface PluginInterface;
 //CPluginInterfaceForMenuExt InterfaceForMenuExt;
@@ -200,8 +200,8 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
         initCtrls.dwICC = ICC_USEREX_CLASSES;
         if (!InitCommonControlsEx(&initCtrls))
         {
-            // wide: English-only diagnostic, no LoadStr involved (language module
-            // isn't even loaded yet at DllMain time).
+            // wide: English-only diagnostic, no LoadStr involved (HLanguage
+            // isn't set yet at DllMain time).
             MessageBoxW(NULL, L"InitCommonControlsEx failed!", L"Error", MB_OK | MB_ICONERROR);
             return FALSE; // DLL won't start
         }
@@ -232,10 +232,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // load language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Undelete" /* neprekladat! */);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // get Salamander interfaces
     SalamanderGeneral = salamander->GetSalamanderGeneral();

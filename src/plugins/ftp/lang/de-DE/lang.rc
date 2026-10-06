@@ -1,0 +1,2373 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for ftp. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/ftp/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\ftp.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CFGGENERAL DIALOGEX 37, 31, 406, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Allgemeine Einstellungen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Zeige das Fen&ster mit der Willkommensmeldung des Servers nach dem Verbinden",IDC_WELCOMEMESSAGE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,288,12
+    CONTROL         "Verbindun&gen im Dateifenster haben Priorität (schnellere Anzeige)",IDC_PRIORITYTOPANELCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,434,130,235,12
+    CONTROL         "Geschwindigkei&tsbeschränkung (gesamt) für den FTP-Client:",IDC_ENABLETOTSPEEDLIM,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,434,143,216,12
+    EDITTEXT        IDE_TOTALSPEEDLIMIT,651,143,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "A&kzeptiere Hex ESC-Sequenzen in Pfaden (bekannt vom Webbrowser, z.B. ""%20"" statt "" "")",IDC_ACCEPTHEXESCSEQ,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,317,12
+    CONTROL         "Schlie&ße den Vorgangsdialog automatisch wenn der Vorgang erfolgreich beendet wurde",IDC_CLOSEOPERDLGIFSUCCESS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,309,12
+    CONTROL         "Öff&ne automatisch das Fehlerdialogfeld, wenn vom Vorgang keine Rückmeldung erfolgt",IDC_OPENSOLVEERRIFIDLE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,306,12
+    LTEXT           "KB/s",IDC_STATIC_1,683,145,22,8,WS_DISABLED
+    LTEXT           "&Passwort für anonyme Verbindungen (Ihre E-Mail):",IDC_STATIC_2,5,69,174,8
+    EDITTEXT        IDE_ANONYMOUSPASSWD,180,67,221,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_CFGDEFAULTS DIALOGEX 37, 31, 406, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Standard"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,168,9,230,1
+    LTEXT           "Erweiterte Standardoptionen für Verbindungen",IDC_STATIC_2,5,5,161,8
+    LTEXT           "&Proxyserver:",IDC_STATIC_3,14,17,44,8
+    COMBOBOX        IDC_PROXYSERVER,60,15,271,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "Hinzu&fügen...",IDB_ADDPROXYSRV,338,14,60,14,WS_GROUP
+    CONTROL         "Benutze pa&ssiven Übertragungsmodus (kann hinter Firewall oder Proxyserver helfen)",IDC_PASSIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,29,296,12
+    CONTROL         "Ve&rbindungen aufrechterhalten (verhindert das Trennen vom Server bei Leerlauf)",IDC_KEEPALIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,42,287,12
+    CONTROL         "&Maximale Anzahl von gleichzeitigen Verbindungen zum Server:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,442,137,222,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,665,137,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "&Geschwindigkeitsbeschränkung (gesamt) für Server:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,442,151,191,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,665,151,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Benutz&e Cache für angesehene Dateien und Auflistungen (schnellere Anzeige)",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,55,275,12
+    CONTROL         "Benutze Kompression beim Dateitransfer, wenn der Server es unterstützt (MODE &Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,68,293,12
+    LTEXT           "KB/S",IDC_STATIC_4,697,153,21,8,WS_DISABLED
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,215,95,183,1
+    LTEXT           "Standardeinstellungen zum Aufrechterhalten der Verbindung",IDC_STATIC_6,5,91,208,8
+    LTEXT           "Se&nde:",IDC_STATIC_7,14,105,26,8
+    COMBOBOX        IDC_KEEPALIVESEND,41,103,125,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "A&lle:",IDC_STATIC_8,171,105,18,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,190,103,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Sekunden",IDC_STATIC_9,222,105,36,8
+    LTEXT           "Sen&den beenden nach:",IDC_STATIC_10,14,120,82,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,138,118,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Minuten",IDC_STATIC_11,171,120,30,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,111,145,287,1
+    LTEXT           "Standard-Übertragungsmodus",IDC_STATIC_13,5,141,104,8
+    CONTROL         "&Binär-Modus (keine Änderung während der Übertragung)",IDC_BINARYMODE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,151,206,12
+    CONTROL         "AS&CII-Modus (Dateien auf standardmäßig vom System benutzes Zeilenende konvertieren)",IDC_ASCIIMODE,
+                    "Button",BS_AUTORADIOBUTTON,14,164,314,12
+    CONTROL         "ASCII-Modus &automatisch für:",IDC_AUTODETECT,"Button",BS_AUTORADIOBUTTON,14,177,114,12
+    EDITTEXT        IDE_ASCIIMASKS,129,177,269,12,ES_AUTOHSCROLL
+    RTEXT           "Masken Hinweise",IDT_ASCIIMASKHINTS,337,191,60,8,WS_TABSTOP
+END
+
+IDD_CFGCONFIRMATIONS DIALOGEX 37, 31, 406, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Bestätigungen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Zeige Hinweis ""Sie verlassen den Server. Möchten Sie die Verbindung trennen oder halten?""",IDC_ALWAYSNOTCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,323,12
+    CONTROL         "Z&eige Hinweis ""Möchten Sie die Verbindung trennen?""",IDC_ALWAYSDISCONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,195,12
+    CONTROL         "Ze&ige Hinweis ""Die Verbindung wurde geschlossen. Möchten Sie erneut verbinden?""",IDC_ALWAYSRECONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,296,12
+    CONTROL         "Zei&ge Hinweis ""Der Zielname existiert bereits. Möchten Sie ihn überschreiben?"" beim Umbenennen",IDC_ALWAYSOVERWRITE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,344,12
+    CONTROL         "Zeige &Hinweis ""Verbindung zum FTP-Server ist verloren gegangen.""",IDC_WARNWHENCONLOST,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,57,240,12
+    CONTROL         "Zeige Hi&nweis ""Wenn Sie versteckte Dateien und Verzeichnisse auf diesem FTP-Server immer zeigen wollen ...""",IDC_HINTLISTHIDDENFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,70,385,12
+END
+
+IDD_CFGADVANCED DIALOGEX 37, 31, 406, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Erweitert"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Größenbe&schränkung des Caches im Speicher:",IDC_STATIC_1,5,7,159,8
+    EDITTEXT        IDE_MEMCACHESIZELIMIT,200,5,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "KB",IDC_STATIC_2,232,7,11,8
+    LTEXT           "&Zeitüberschreitung für Netzwerktätigkeit:",IDC_STATIC_3,5,21,140,8
+    EDITTEXT        IDE_SRVREPLIESTIMEOUT,200,19,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Sekunden",IDC_STATIC_4,232,21,36,8
+    LTEXT           "Verzögerung zwischen &den Verbindungswiederholungen:",IDC_STATIC_5,5,35,194,8
+    EDITTEXT        IDE_DELAYBETWCONRETR,200,33,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Sekunden",IDC_STATIC_6,232,35,36,8
+    LTEXT           "&Anzahl der Verbindungswiederholungen:",IDC_STATIC_7,5,49,140,8
+    EDITTEXT        IDE_CONNECTRETRIES,200,47,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Trennen der Verbindung bei Leerlauf na&ch:",IDC_STATIC_8,5,63,149,8
+    EDITTEXT        IDE_NODATATRTIMEOUT,200,61,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Sekunden",IDC_STATIC_9,232,63,36,8
+    LTEXT           "Versuche das Kopieren nur fortzusetzen, wenn der bereits kopierte &Teil mindestens:",IDC_STATIC_10,5,77,284,8
+    EDITTEXT        IDE_RESUMEMINFILESIZE,290,75,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Bytes groß ist",IDC_STATIC_11,329,77,48,8
+    LTEXT           "Zahl der zu prüfe&nden Bytes (am Dateiende), wenn das Kopieren fortgesetzt wird:",IDC_STATIC_12,5,91,279,8
+    EDITTEXT        IDE_RESUMEOVERLAP,290,89,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Bytes",IDC_STATIC_13,329,91,21,8
+END
+
+IDD_CFGLOGS DIALOGEX 23, 39, 406, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Logdateien"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "KB",IDC_STATIC_1,269,23,14,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,175,12,223,1
+    CONTROL         "Kommunikation mit d&en Servern protokollieren",IDC_ENABLELOGGING,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,7,168,12
+    CONTROL         "Größenbegrenzung der &Logdatei für einem Server auf:",IDC_LOGMAXSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,21,196,12
+    EDITTEXT        IDE_LOGMAXSIZE,237,21,28,12,ES_AUTOHSCROLL
+    CONTROL         "Maxi&male Anzahl von Logdateien für getrennte Verbindungen:",IDC_MAXCLOSEDCONLOGS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,35,222,12
+    EDITTEXT        IDE_MAXCLOSEDCONLOGS,237,35,28,12,ES_AUTOHSCROLL
+    CONTROL         "Protokollierung bei Verbindungen für &Dateivorgänge ausschalten",IDC_DISABLELOGWORKERS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,49,229,12
+END
+
+IDD_CONNECT DIALOGEX 23, 72, 435, 164
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Mit FTP-Server verbinden"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDL_BOOKMARKS,7,7,170,129,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Adresse:",IDT_HOSTADDRESS,191,9,35,8
+    COMBOBOX        IDE_HOSTADDRESS,229,7,199,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "S&tartpfad:",IDT_INITIALPATH,191,23,36,8
+    COMBOBOX        IDE_INITIALPATH,229,21,199,117,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,281,47,147,1
+    CONTROL         " Anony&me Verbindung",IDC_ANONYMOUSLOGIN,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,191,42,88,12
+    LTEXT           "&Benutzer:",IDT_USERNAME,201,58,39,8
+    EDITTEXT        IDE_USERNAME,242,56,186,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Pass&wort:",IDT_PASSWORD,201,72,37,8
+    EDITTEXT        IDE_PASSWORD,242,70,58,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    EDITTEXT        IDE_PASSWORD_LOCKED,305,70,58,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "Ent&sperren...",IDB_PASSWORD_CHANGE,366,69,62,14
+    CONTROL         "&Passwort speichern",IDC_SAVEPASSWORD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,201,84,78,12
+    LTEXT           "nicht sicher",IDC_SAVEPASSWORD_HINT,284,86,142,8,WS_TABSTOP
+    PUSHBUTTON      "E&rweitert...",IDB_ADVACED,191,107,50,14,WS_GROUP
+    EDITTEXT        IDE_ADVANCEDINFO,244,108,184,12,ES_AUTOHSCROLL | ES_READONLY | WS_GROUP
+    PUSHBUTTON      "&Neu...",IDB_NEWBOOKMARK,6,142,50,14,WS_GROUP
+    PUSHBUTTON      "&Umbenennen...",IDB_RENAMEBOOKMARK,60,142,62,14
+    PUSHBUTTON      "&Entfernen...",IDB_REMOVEBOOKMARK,126,142,50,14
+    DEFPUSHBUTTON   "Verbinden",IDOK,216,142,50,14,WS_GROUP
+    PUSHBUTTON      "S&chließen",IDB_CLOSE,270,142,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,324,142,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,378,142,50,14
+END
+
+IDD_CONNECTADVANCED DIALOGEX 22, 28, 360, 301
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Erweiterte Einstellungen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Proxyserver:",IDC_STATIC_1,7,10,44,8
+    COMBOBOX        IDC_PROXYSERVER,89,8,186,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "Hinzu&fügen...",IDB_ADDPROXYSRV,282,7,70,14,WS_GROUP
+    LTEXT           "Pfad im &Zielfenster:",IDC_STATIC_2,7,25,68,8
+    EDITTEXT        IDE_TARGETPATH,89,23,186,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "D&urchsuchen...",IDB_BROWSE,282,22,70,14,WS_GROUP
+    LTEXT           "Verbindung mit Po&rt:",IDC_STATIC_3,7,40,73,8
+    EDITTEXT        IDC_CONNECTTOPORT,89,38,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Server&typ:",IDC_STATIC_4,7,54,37,8
+    COMBOBOX        IDC_SERVERTYPE,89,52,265,61,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Dateitransfermodus:",IDC_STATIC_5,7,69,71,8
+    COMBOBOX        IDC_TRANSFERMODE,89,67,265,57,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Auflistungs-&Befehle:",IDC_STATIC_6,7,84,69,8
+    COMBOBOX        IDC_LISTCOMMAND,89,82,88,57,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Initialisierungs-Befehle:",IDC_STATIC_7,7,99,81,8
+    EDITTEXT        IDE_INITFTPCOMMANDS,89,97,264,12,ES_AUTOHSCROLL | WS_GROUP
+    RTEXT           "Kommandos durch Semikolon trennen (CWD [pathname]; HELP [command])",IDC_STATIC_8,91,111,261,8
+    GROUPBOX        "     ",IDC_STATIC_9,7,129,346,46
+    CONTROL         " Aufrechter&halten der Verbindung (verhindert Trennung vom Server bei Leerlauf)",IDC_USEKEEPALIVE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,15,127,286,12
+    LTEXT           "Se&nde:",IDC_STATIC_10,15,143,25,8
+    COMBOBOX        IDC_KEEPALIVESEND,41,141,125,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "A&lle:",IDC_STATIC_11,171,143,18,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,190,141,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Sekunden",IDC_STATIC_12,222,143,36,8
+    LTEXT           "Senden beenden na&ch:",IDC_STATIC_13,15,158,82,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,138,156,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Minuten",IDC_STATIC_14,171,158,34,8
+    CONTROL         "Benutze pa&ssiven Übertragungsmodus (kann hinter einer Firewall oder einem Proxyserver helfen)",IDC_USEPASSIVEMODE,
+                    "Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,7,186,338,12
+    CONTROL         "&Maximale Anzahl von gleichzeitigen Verbindungen zum Server:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,405,206,223,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,629,206,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "&Geschwindigkeitsbeschränkung für diesen Server:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,405,220,184,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,629,220,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Benutz&e Cache für angesehene Dateien und Auflistungen auf dem Server (schnellere Anzeige)",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,200,329,12
+    CONTROL         "&Verschlüssele Kontrollverbindung mit TLS/SSL",IDC_ENCRYPTCONTROLCONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,214,166,12
+    CONTROL         "Verschlüssele D&atenverbindung (Dateitransfers und Verzeichnisauflistungen) mit TLS/SSL",IDC_ENCRYPTDATACONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,228,311,12
+    CONTROL         "Benutze &Kompression bei der Datenübertragung wenn der Server es unterstützt (MODE Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,242,317,12
+    LTEXT           "Hinweis: dritte Möglichkeit = Standardwerte benutzen (siehe 'Standard' in der Konfiguration)",IDC_STATIC_15,7,258,318,8
+    LTEXT           "KB/s",IDC_STATIC_16,666,236,21,8,WS_DISABLED
+    DEFPUSHBUTTON   "OK",IDOK,94,279,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,155,279,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,216,279,50,14
+END
+
+IDD_RENAMEDLG DIALOGEX 10, 24, 227, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Favoriten umbenennen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,57,42,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,119,42,50,14
+END
+
+IDD_NEWBOOKMARKDLG DIALOGEX 10, 24, 227, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Neuer Favorit"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Name des Favoriten:",IDT_NEWNAME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    CONTROL         "",IDC_COPYFOCUSEDSRV,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,35,199,12
+    DEFPUSHBUTTON   "OK",IDOK,57,55,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,119,55,50,14
+END
+
+IDD_ENTERSTRDLG DIALOGEX 10, 24, 243, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Benutzer eingeben"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CONNECTINGTOAS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,9,8,227,8
+    LTEXT           "Ben&utzer:",IDT_STRING,9,23,223,8
+    EDITTEXT        IDE_STRING,9,33,225,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,65,60,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,127,60,50,14
+END
+
+IDD_LOGINERRORDLG DIALOGEX 10, 24, 264, 165
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fehler bei Verbindung zum FTP-Server"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ben&utzer:",IDC_STATIC_1,7,55,40,8
+    EDITTEXT        IDE_USERNAME,48,53,210,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Passwort:",IDC_STATIC_2,7,70,36,8
+    EDITTEXT        IDE_PASSWORD,48,68,210,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Konto:",IDC_STATIC_3,7,85,34,8
+    EDITTEXT        IDE_ACCOUNT,48,83,210,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Wiederholen",IDOK,73,110,55,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,136,110,55,14
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,7,132,251,1
+    CONTROL         "Wiede&rholen ohne nochmals nachzufragen (nur für diese Verbindung)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,137,250,12
+    CONTROL         "Be&i allen Verbindungen mit Fehlern jetzt anwenden",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,149,250,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,250,8
+    LTEXT           "Serverantwort:",IDT_ERRORTITLE,7,22,252,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,252,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_LOGINERRORDLGEX DIALOGEX 10, 24, 288, 195
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fehler beim Verbinden zum FTP-Server"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ben&utzer:",IDC_STATIC_1,7,55,34,8
+    EDITTEXT        IDE_USERNAME,61,53,221,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Passwort:",IDC_STATIC_2,7,70,34,8
+    EDITTEXT        IDE_PASSWORD,61,68,221,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "K&onto:",IDC_STATIC_3,7,85,24,8
+    EDITTEXT        IDE_ACCOUNT,61,83,221,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Proxybenu&tzer:",IDC_STATIC_4,7,100,52,8
+    EDITTEXT        IDE_PROXYUSER,61,98,221,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Proxypass&wort:",IDC_STATIC_5,7,115,53,8
+    EDITTEXT        IDE_PROXYPASSWD,61,113,221,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Wiederholen",IDOK,84,140,55,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,149,140,55,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,162,275,1
+    CONTROL         "Ohne &Nachfragen beim nächsten Mal wiederholen (nur für diese Verbindung)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,167,274,12
+    CONTROL         "Auswahl &merken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,179,261,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,274,8
+    LTEXT           "Serverantwort:",IDT_ERRORTITLE,7,22,276,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,276,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_WELCOMEMSGDLG DIALOGEX 10, 24, 396, 170
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Willkommensmeldung"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_WELCOMEMSG,5,5,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Schließen",IDOK,126,152,65,14,WS_GROUP
+    PUSHBUTTON      "&Speichern unter",IDB_SAVEMSGAS,204,152,65,14
+END
+
+IDD_LOGSDLG DIALOGEX 17, 51, 396, 165
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "FTP-Logdateien"
+MENU IDM_LOGSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_MENULINE,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,396,1
+    COMBOBOX        IDC_LISTOFLOGS,5,5,386,104,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDE_SERVERLOG,5,19,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+END
+
+IDD_SENDCOMMANDDLG DIALOGEX 10, 24, 307, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "FTP-Befehl senden"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Befehl:",IDC_STATIC_1,9,9,37,8
+    COMBOBOX        IDC_FTPCOMMAND,9,19,289,90,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDE_FTPCOMMAND_PASSWD,9,19,289,12,ES_PASSWORD | ES_AUTOHSCROLL | NOT WS_VISIBLE | WS_GROUP
+    CONTROL         "Ge&heimer Befehl (versteckte Eingabe, weder Verlauf noch Anzeige in Logdatei)",IDC_SECRETCOMMAND,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,34,277,12
+    CONTROL         "B&efehl kann den Arbeitspfad auf dem Server ändern (Pfad im Fenster ändern zu)",IDC_CHANGEPATHINPANEL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,46,285,12
+    CONTROL         "Be&fehl kann den Arbeitspfad ändern (Arbeitspfad aktualisieren)",IDC_REFRESHWORKINGPATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,58,224,12
+    DEFPUSHBUTTON   "OK",IDOK,68,79,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,128,79,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,188,79,50,14
+END
+
+IDD_LISTWAITDLG DIALOGEX 10, 24, 357, 91
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "FTP-Client"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDT_ACTION,9,9,341,16
+    LTEXT           "Pfad:",IDT_PATHONFTP1,9,27,20,8
+    LTEXT           "",IDT_PATHONFTP2,30,27,320,8
+    LTEXT           "Geschätzte Zeit:",IDT_ESTIMATEDTIME1,9,38,66,8
+    LTEXT           "",IDT_ESTIMATEDTIME2,76,38,274,8
+    LTEXT           "Verstrichende Zeit:",IDT_ELAPSEDTIME1,9,49,66,8
+    LTEXT           "",IDT_ELAPSEDTIME2,76,49,274,8
+    LTEXT           "Status:",IDT_OPERSTATUS1,9,60,26,8
+    LTEXT           "",IDT_OPERSTATUS2,36,60,314,8
+    CONTROL         "",IDC_OPERPROGRESS,"Static",0,9,71,340,12
+END
+
+IDD_CFGSERVERTYPES DIALOGEX 37, 31, 406, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Server"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Unterstütze Server&typen:",IDC_STATIC_1,5,5,92,8
+    LISTBOX         IDL_SUPPORTEDSERVERS,5,15,325,197,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Neu...",IDB_NEWSERVER,339,14,60,14,WS_GROUP
+    PUSHBUTTON      "&Bearbeiten...",IDB_EDITSERVER,339,32,60,14
+    PUSHBUTTON      "Nach &oben",IDB_MOVESERVERUP,339,50,60,14
+    PUSHBUTTON      "Nach &unten",IDB_MOVESERVERDOWN,339,68,60,14
+    PUSHBUTTON      "&Sonstiges",IDB_OTHERSERVERACT,339,86,60,14
+END
+
+IDD_EDITSERVERTYPE DIALOGEX 22, 28, 431, 241
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Servertyp bearbeiten"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Bedingung für die &automatische Ermittlung:",IDC_STATIC_1,7,7,150,8
+    EDITTEXT        IDE_AUTODETECTCOND,7,17,399,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ADCONDINSERT,411,17,13,12,WS_GROUP
+    RTEXT           "(leer = immer zutreffend)",IDC_STATIC_2,316,31,89,8
+    LTEXT           "S&palten im Fenster:",IDC_STATIC_3,7,39,91,8
+    CONTROL         "",IDL_SRVTYPECOLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,49,347,68
+    PUSHBUTTON      "&Neu...",IDB_NEWCOLUMN,364,49,60,14,WS_GROUP
+    PUSHBUTTON      "B&earbeiten...",IDB_EDITCOLUMN,364,67,60,14
+    PUSHBUTTON      "Ent&fernen...",IDB_REMOVECOLUMN,364,85,60,14
+    PUSHBUTTON      "&Verschieben",IDB_MOVECOLUMN,364,103,60,14
+    LTEXT           "&Regeln für die Analyse beim Auflisten:",IDC_STATIC_4,7,127,130,8
+    EDITTEXT        IDE_PARSINGRULES,7,137,417,76,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    PUSHBUTTON      "&Teste Regeln...",IDB_TESTPARSER,7,221,67,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,252,221,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,313,221,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,374,221,50,14
+END
+
+IDD_EDITSRVTYCOLUMN DIALOGEX 58, 53, 250, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Spalten bearbeiten"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Beze&ichnung:",IDC_STATIC_1,11,12,48,8
+    EDITTEXT        IDE_COL_ID,63,10,177,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Name:",IDC_STATIC_2,11,27,25,8
+    COMBOBOX        IDC_COL_NAME,63,25,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Typ:",IDC_STATIC_3,11,43,17,8
+    COMBOBOX        IDC_COL_TYPE,63,41,177,65,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "L&eerer Wert:",IDC_STATIC_4,11,59,44,8
+    EDITTEXT        IDE_COL_EMPTY,63,57,134,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "",IDT_COL_FORMHELP,201,59,43,8
+    LTEXT           "Beschrei&bung:",IDC_STATIC_5,11,74,51,8
+    COMBOBOX        IDC_COL_DESCR,63,72,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Ausrichtung:",IDC_STATIC_6,11,89,45,8
+    COMBOBOX        IDC_COL_ALIGNMENT,63,87,94,37,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,40,113,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,100,113,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,160,113,50,14
+END
+
+IDD_SRVTYPETESTPARSER DIALOGEX 30, 34, 420, 262
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Testen der Regeln"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Rohdatenliste:",IDC_STATIC_1,7,7,51,8
+    EDITTEXT        IDE_PARSER_RAWLIST,7,17,405,83,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    CONTROL         "Tue so, als &ob die Rohdatenliste unvollständig ist",IDC_PARSER_LISTINCOMPL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,175,12
+    PUSHBUTTON      "&Analysiere Rohdatenliste",IDB_PARSER_PARSELIST,195,107,95,14,WS_GROUP
+    PUSHBUTTON      "&Lese Rohdatenliste aus Datei...",IDB_PARSER_LOADLIST,297,107,115,14
+    LTEXT           "&Ergebnisse der Analyse:",IDC_STATIC_2,7,129,83,8
+    CONTROL         "",IDL_PARSER_COLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,405,94
+    DEFPUSHBUTTON   "Schließen",IDOK,302,241,50,14,WS_GROUP
+    PUSHBUTTON      "Hilfe",IDHELP,362,241,50,14
+END
+
+IDD_OPERATIONDLG DIALOGEX 25, 31, 416, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPSOURCETITLE,5,8,66,8
+    CONTROL         "",IDT_OPSOURCETEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,75,8,336,8
+    RTEXT           "",IDT_OPTARGETTITLE,5,19,66,8
+    CONTROL         "",IDT_OPTARGETTEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,75,19,336,8
+    RTEXT           "Geschätzte Zeit:",IDC_STATIC_1,5,30,66,8
+    CONTROL         "",IDT_OPTIMELEFT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,75,30,336,8
+    RTEXT           "Verstrichende Zeit:",IDC_STATIC_2,5,41,66,8
+    CONTROL         "",IDT_OPELAPSEDTIME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,75,41,336,8
+    RTEXT           "Status:",IDC_STATIC_3,5,52,66,8
+    CONTROL         "",IDT_OPSTATUS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,75,52,336,8
+    ICON            "",IDI_ERRORICON,327,51,18,20,WS_GROUP
+    CONTROL         "wenig Speicherplatz",IDT_ERRORMSG,"Static",SS_LEFTNOWORDWRAP | WS_GROUP | WS_TABSTOP,341,52,70,8
+    RTEXT           "Fortschritt:",IDC_STATIC_4,5,64,66,8
+    CONTROL         "",IDC_OPPROGRESS,"Static",WS_GROUP,75,63,334,12
+    PUSHBUTTON      "&Details >>",IDB_SHOWDETAILS,131,100,50,14,WS_GROUP
+    PUSHBUTTON      "F&ehler >>",IDB_SHOWERRORS,188,100,50,14
+    PUSHBUTTON      "Verstec&ken",IDB_HIDE,74,100,50,14,WS_DISABLED
+    PUSHBUTTON      "&Pause",IDB_PAUSERESUME,245,100,50,14
+    PUSHBUTTON      "",IDCANCEL,302,100,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,359,100,50,14
+    CONTROL         "",IDC_DLGSPLITBAR,"Static",SS_ETCHEDHORZ | WS_GROUP,7,122,402,1
+    LTEXT           "&Verbindungen:",IDT_CONNECTIONS,7,129,60,8
+    CONTROL         "",IDL_CONNECTIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,401,35
+    PUSHBUTTON      "Fe&hler beseitigen",IDB_OPCONSSOLVEERROR,168,181,70,14,WS_GROUP
+    PUSHBUTTON      "Hin&zufügen",IDB_OPCONSADD,245,181,50,14
+    PUSHBUTTON      "S&topp",IDB_OPCONSSTOP,302,181,50,14
+    PUSHBUTTON      "Pa&use",IDB_OPCONSPAUSERESUME,359,181,50,14
+    LTEXT           "V&orgänge:",IDT_OPERATIONSTEXT,7,195,399,8
+    CONTROL         "",IDL_OPERATIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,205,401,35
+    CONTROL         "Nu&r Fehler anzeigen",IDB_OPOPERSSHOWONLYERR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,247,80,12
+    PUSHBUTTON      "Fehler &beseitigen",IDB_OPOPERSSOLVEERROR,205,247,70,14,WS_GROUP
+    PUSHBUTTON      "Wiederho&len",IDB_OPOPERSRETRY,282,247,60,14
+    PUSHBUTTON      "Über&springen",IDB_OPOPERSSKIP,349,247,60,14
+    CONTROL         "Schließe diesen Dialo&g wenn der Vorgang beendet ist",IDC_OPCLOSEWINWHENDONE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,81,192,12
+END
+
+IDD_COPYMOVEDLG DIALOGEX 10, 24, 244, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_TGTPATHSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,226,8
+    COMBOBOX        IDC_TGTPATH,10,19,225,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "Nur zur &Warteschlange hinzufügen (nicht in der aktiven Verbindung verarbeiten)",IDC_ADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,292,47,197,12
+    DEFPUSHBUTTON   "OK",IDOK,37,42,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,97,42,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,157,42,50,14
+END
+
+IDD_CONFIRMDELETEDLG DIALOGEX 10, 24, 331, 61
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Löschen bestätigen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "&Ja",IDOK,112,39,50,14,WS_GROUP
+    PUSHBUTTON      "&Nein",IDCANCEL,169,39,50,14
+    ICON            "",IDC_DELICON,8,8,18,20,WS_GROUP
+    LTEXT           "",IDT_DELSUBJECT,41,12,284,16,SS_NOPREFIX
+    CONTROL         "Nur zur &Warteschlange hinzufügen (nicht in der aktiven Verbindung verarbeiten)",IDC_DELADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,352,40,197,12
+END
+
+IDD_CHANGEATTRSDLG DIALOGEX 10, 24, 278, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Attribute ändern"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CHATTRSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,7,10,264,8
+    GROUPBOX        " Besitzer ",IDC_STATIC_1,7,26,84,51,WS_GROUP
+    GROUPBOX        " Gruppe ",IDC_STATIC_2,97,26,84,51,WS_GROUP
+    GROUPBOX        " Andere ",IDC_STATIC_3,187,26,84,51,WS_GROUP
+    CONTROL         "&Lesen",IDC_READOWNER,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,36,71,12
+    CONTROL         "&Schreiben",IDC_WRITEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,48,71,12
+    CONTROL         "Aus&führen",IDC_EXECUTEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,60,71,12
+    CONTROL         "L&esen",IDC_READGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,106,36,71,12
+    CONTROL         "Schre&iben",IDC_WRITEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,106,48,71,12
+    CONTROL         "Ausfü&hren",IDC_EXECUTEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,106,60,71,12
+    CONTROL         "Lese&n",IDC_READOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,196,36,71,12
+    CONTROL         "Schrei&ben",IDC_WRITEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,196,48,71,12
+    CONTROL         "&Ausführen",IDC_EXECUTEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,196,60,71,12
+    LTEXT           "Hinweis: dritter Zustand = nicht ändern",IDC_STATIC_4,7,81,136,8
+    LTEXT           "Numerischer &Wert:",IDC_STATIC_5,7,101,66,8
+    EDITTEXT        IDE_NUMATTRVALUE,74,99,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = Ausführen, 2 = Schreiben, 4 = Lesen)",IDC_STATIC_6,106,101,148,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,40,126,231,1
+    LTEXT           "Optionen",IDC_STATIC_8,7,122,32,8
+    CONTROL         "Inklusive &Unterverzeichnisse",IDC_INCLUDESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,132,107,12
+    CONTROL         "Attribute der Dateien än&dern",IDC_CHATTRSETFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,144,109,12
+    CONTROL         "A&ttribute der Verzeichnisse ändern",IDC_CHATTRSETDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,156,128,12
+    CONTROL         "Nu&r zur Warteschlange hinzufügen (nicht in der aktiven Verbindung verarbeiten)",IDC_CHATTRADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,320,160,284,12
+    DEFPUSHBUTTON   "OK",IDOK,54,178,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,114,178,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,174,178,50,14
+END
+
+IDD_CFGOPERATIONS DIALOGEX 37, 31, 406, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Vorgänge 1"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,153,9,251,1
+    LTEXT           "Kopieren und Verschieben vom FTP-Server",IDC_STATIC_2,5,5,146,8
+    LTEXT           "Wenn die &Zieldatei bereits existiert:",IDC_STATIC_3,9,17,120,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,275,15,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn das Z&ielverzeichnis bereits existiert:",IDC_STATIC_4,9,31,142,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,275,29,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn der N&ame der Zieldatei nicht angelegt werden kann:",IDC_STATIC_5,9,45,201,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,275,43,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn der Name des Zie&lverzeichnisses nicht angelegt werden kann:",IDC_STATIC_6,9,59,232,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,275,57,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "We&nn die Übertragung fehlschlägt und die Zieldatei bereits erstellt wurde:",IDC_STATIC_7,9,73,252,8
+    COMBOBOX        IDC_RETRYONCREATED,275,71,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn die Über&tragung fehlschlägt und die Zieldatei bereits fortgesetzt wurde:",IDC_STATIC_8,9,87,265,8
+    COMBOBOX        IDC_RETRYONRESUMED,275,85,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn der A&SCII-Übertragungsmodus für eine Binärdatei benutzt wird:",IDC_STATIC_9,9,101,240,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,275,99,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,134,124,270,1
+    LTEXT           "Attribute ändern auf dem FTP-Server",IDC_STATIC_11,5,120,127,8
+    LTEXT           "Wenn e&xistierende Attribute nicht übernommen werden können (Unix-Mode):",IDC_STATIC_12,9,132,263,8
+    COMBOBOX        IDC_UNKNOWNATTRS,275,130,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,106,155,298,1
+    LTEXT           "Löschen auf dem FTP-Server",IDC_STATIC_14,5,151,99,8
+    LTEXT           "Wenn das &Verzeichnis nicht leer ist:",IDC_STATIC_15,9,163,122,8
+    COMBOBOX        IDC_NONEMPTYDIRDEL,275,161,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn die &Datei versteckt ist:",IDC_STATIC_16,9,177,98,8
+    COMBOBOX        IDC_HIDDENFILEDEL,275,175,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn das Verzei&chnis versteckt ist:",IDC_STATIC_17,9,191,120,8
+    COMBOBOX        IDC_HIDDENDIRDEL,275,189,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_CFGOPERATIONS2 DIALOGEX 37, 31, 406, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Vorgänge 2"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,153,9,251,1
+    LTEXT           "Kopieren und Verschieben zum FTP-Server",IDC_STATIC_2,5,5,146,8
+    LTEXT           "Wenn die &Zieldatei bereits existiert:",IDC_STATIC_3,9,17,120,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,275,15,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn das Z&ielverzeichnis bereits existiert:",IDC_STATIC_4,9,31,142,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,275,29,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn der Name der Zi&eldatei nicht angelegt werden kann:",IDC_STATIC_5,9,45,201,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,275,43,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn der Name des Zie&lverzeichnisses nicht angelegt werden kann:",IDC_STATIC_6,9,59,232,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,275,57,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn die &Übertragung fehlschlägt und die Zieldatei bereits erstellt wurde:",IDC_STATIC_7,9,73,252,8
+    COMBOBOX        IDC_RETRYONCREATED,275,71,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn die Ü&bertragung fehlschlägt und die Zieldatei bereits fortgesetzt wurde:",IDC_STATIC_8,9,87,265,8
+    COMBOBOX        IDC_RETRYONRESUMED,275,85,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wenn der A&SCII-Übertragungsmodus für eine Binärdatei benutzt wird:",IDC_STATIC_9,9,101,240,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,275,99,128,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_SOLVEITEMERRDETAILED DIALOGEX 10, 24, 319, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,35,88,57,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,99,88,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,163,88,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,227,88,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,304,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,290,12
+    LTEXT           "D&etails:",IDC_STATIC_3,7,9,41,8
+    EDITTEXT        IDE_SCRD_DETAILS,50,9,261,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Q&uellpfad:",IDC_STATIC_4,7,27,41,8
+    EDITTEXT        IDE_SCRD_SRCPATH,50,27,261,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Quellname:",IDC_STATIC_5,7,39,41,8
+    EDITTEXT        IDE_SCRD_SRCNAME,50,39,261,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zielpf&ad:",IDC_STATIC_6,7,51,41,8
+    EDITTEXT        IDE_SCRD_TGTPATH,50,51,261,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_7,7,65,41,8
+    EDITTEXT        IDE_SCRD_TGTNAME,50,63,262,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILEDEX DIALOGEX 10, 24, 372, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,5,88,57,14,WS_GROUP
+    PUSHBUTTON      "Wei&ter",CM_SIED_RESUME,66,88,57,14
+    PUSHBUTTON      "Ü&berschreiben",CM_SIED_OVERWRITE,127,88,57,14
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,188,88,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,249,88,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,310,88,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,5,111,362,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,261,12
+    LTEXT           "&Details:",IDC_STATIC_3,7,9,41,8
+    EDITTEXT        IDE_SCRD_DETAILS,50,9,315,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Q&uellpfad:",IDC_STATIC_4,7,27,41,8
+    EDITTEXT        IDE_SCRD_SRCPATH,50,27,315,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Qu&ellname:",IDC_STATIC_5,7,39,41,8
+    EDITTEXT        IDE_SCRD_SRCNAME,50,39,315,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zielpf&ad:",IDC_STATIC_6,7,51,41,8
+    EDITTEXT        IDE_SCRD_TGTPATH,50,51,315,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_7,7,65,41,8
+    EDITTEXT        IDE_SCRD_TGTNAME,50,63,315,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED2 DIALOGEX 10, 24, 319, 147
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,35,101,57,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,99,101,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,163,101,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,227,101,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,305,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,261,12
+    LTEXT           "F&ehlerbeschreibung:",IDC_STATIC_3,7,9,72,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,305,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Q&uellpfad:",IDC_STATIC_4,7,40,41,8
+    EDITTEXT        IDE_SCRD_SRCPATH,50,40,260,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Quellname:",IDC_STATIC_5,7,52,41,8
+    EDITTEXT        IDE_SCRD_SRCNAME,50,52,260,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zielpf&ad:",IDC_STATIC_6,7,64,41,8
+    EDITTEXT        IDE_SCRD_TGTPATH,50,64,260,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_7,7,78,41,8
+    EDITTEXT        IDE_SCRD_TGTNAME,50,76,260,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3 DIALOGEX 10, 24, 276, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fehler beim Erstellen des Zielverzeichnisses mit alternativen Namen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,13,101,57,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,77,101,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,141,101,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,205,101,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,262,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,261,12
+    LTEXT           "Fehler&beschreibung:",IDC_STATIC_2,7,9,72,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,262,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Q&uellpfad:",IDC_STATIC_3,7,40,41,8
+    EDITTEXT        IDE_SCRD_SRCPATH,50,40,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Qu&ellname:",IDC_STATIC_4,7,52,41,8
+    EDITTEXT        IDE_SCRD_SRCNAME,50,52,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zielpf&ad:",IDC_STATIC_5,7,64,41,8
+    EDITTEXT        IDE_SCRD_TGTPATH,50,64,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_6,7,78,41,8
+    EDITTEXT        IDE_SCRD_TGTNAME,50,76,219,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3EX DIALOGEX 10, 24, 372, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fehler beim Erstellen des Zielverzeichnis mit alternativen Namen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,5,101,57,14,WS_GROUP
+    PUSHBUTTON      "&Weiter",CM_SIED_RESUME,66,101,57,14
+    PUSHBUTTON      "Ü&berschreiben",CM_SIED_OVERWRITE,127,101,57,14
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,188,101,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,249,101,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,310,101,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,5,124,362,1
+    CONTROL         "Auswahl &merken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,261,12
+    LTEXT           "Fe&hlerbeschreibung:",IDC_STATIC_2,7,9,72,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,360,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Q&uellpfad:",IDC_STATIC_3,7,40,41,8
+    EDITTEXT        IDE_SCRD_SRCPATH,50,40,315,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Quellname:",IDC_STATIC_4,7,52,41,8
+    EDITTEXT        IDE_SCRD_SRCNAME,50,52,315,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zielpf&ad:",IDC_STATIC_5,7,64,41,8
+    EDITTEXT        IDE_SCRD_TGTPATH,50,64,315,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_6,7,78,41,8
+    EDITTEXT        IDE_SCRD_TGTNAME,50,76,315,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLE DIALOGEX 10, 24, 320, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,35,70,57,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,99,70,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,163,70,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,227,70,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,306,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,261,12
+    LTEXT           "Q&uellpfad:",IDC_STATIC_3,7,9,41,8
+    EDITTEXT        IDE_SCRD_SRCPATH,50,9,263,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Qu&ellname:",IDC_STATIC_4,7,21,41,8
+    EDITTEXT        IDE_SCRD_SRCNAME,50,21,263,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zielpf&ad:",IDC_STATIC_5,7,33,41,8
+    EDITTEXT        IDE_SCRD_TGTPATH,50,33,263,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_6,7,47,41,8
+    EDITTEXT        IDE_SCRD_TGTNAME,50,45,263,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLEEX DIALOGEX 10, 24, 386, 116
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,5,70,57,14,WS_GROUP
+    PUSHBUTTON      "Ü&berschreiben",CM_SIED_OVERWRITE,66,70,57,14
+    PUSHBUTTON      "&Alle überschreiben",CM_SIED_OVERWRITEALL,127,70,71,14
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,202,70,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,263,70,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,324,70,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,5,93,376,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,261,12
+    LTEXT           "Q&uellpfad:",IDC_STATIC_3,7,9,41,8
+    EDITTEXT        IDE_SCRD_SRCPATH,50,9,330,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Quellname:",IDC_STATIC_4,7,21,41,8
+    EDITTEXT        IDE_SCRD_SRCNAME,50,21,330,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ziel&pfad:",IDC_STATIC_5,7,33,41,8
+    EDITTEXT        IDE_SCRD_TGTPATH,50,33,330,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_6,7,47,41,8
+    EDITTEXT        IDE_SCRD_TGTNAME,50,45,328,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRASCIITR DIALOGEX 16, 27, 346, 118
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ASCII-Übertragungsmodus eingestellt für Binärdatei"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Binär-Modus benutzen",IDOK,10,70,90,14,WS_GROUP
+    PUSHBUTTON      "&Ignorieren",CM_SATR_IGNORE,104,70,55,14
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,163,70,55,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,222,70,55,14
+    PUSHBUTTON      "Hilfe",IDHELP,281,70,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,331,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,261,12
+    LTEXT           "Q&uellpfad:",IDC_STATIC_3,7,9,41,8
+    EDITTEXT        IDE_SCRD_SRCPATH,50,9,287,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Qu&ellname:",IDC_STATIC_4,7,21,41,8
+    EDITTEXT        IDE_SCRD_SRCNAME,50,21,287,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zielpf&ad:",IDC_STATIC_5,7,33,41,8
+    EDITTEXT        IDE_SCRD_TGTPATH,50,33,287,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_6,7,45,41,8
+    EDITTEXT        IDE_SCRD_TGTNAME,50,45,287,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMERRUNKATTR DIALOGEX 10, 24, 317, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Einige der existierenden Attribute können nicht übernommen werden"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ignorieren",IDOK,36,70,55,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,99,70,55,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,162,70,55,14
+    PUSHBUTTON      "Hilfe",IDHELP,225,70,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,304,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,261,12
+    LTEXT           "Pf&ad:",IDC_STATIC_3,7,9,63,8
+    EDITTEXT        IDE_SCRD_SRCPATH,71,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Name:",IDC_STATIC_4,7,21,63,8
+    EDITTEXT        IDE_SCRD_SRCNAME,71,21,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "A&ktuelle Attribute:",IDC_STATIC_5,7,33,63,8
+    EDITTEXT        IDE_SCRD_CURATTR,71,33,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "N&eue Attribute:",IDC_STATIC_6,7,45,63,8
+    EDITTEXT        IDE_SCRD_NEWATTR,71,45,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSETNEWATTR DIALOGEX 10, 24, 278, 190
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Neue Attribute setzen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Besitzer ",IDC_STATIC_1,7,56,84,51,WS_GROUP
+    GROUPBOX        " Gruppe ",IDC_STATIC_2,97,56,84,51,WS_GROUP
+    GROUPBOX        " Andere ",IDC_STATIC_3,187,56,84,51,WS_GROUP
+    CONTROL         "&Lesen",IDC_READOWNER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,66,71,12
+    CONTROL         "S&chreiben",IDC_WRITEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,78,71,12
+    CONTROL         "Aus&führen",IDC_EXECUTEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,90,71,12
+    CONTROL         "L&esen",IDC_READGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,66,71,12
+    CONTROL         "Schre&iben",IDC_WRITEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,78,71,12
+    CONTROL         "Ausfü&hren",IDC_EXECUTEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,90,71,12
+    CONTROL         "Le&sen",IDC_READOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,66,71,12
+    CONTROL         "Schrei&ben",IDC_WRITEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,78,71,12
+    CONTROL         "&Ausführen",IDC_EXECUTEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,90,71,12
+    LTEXT           "Nu&merischer Wert:",IDC_STATIC_4,7,117,66,8
+    EDITTEXT        IDE_NUMATTRVALUE,74,115,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = Ausführen, 2 = Schreiben, 4 = Lesen)",IDC_STATIC_5,106,117,148,8
+    DEFPUSHBUTTON   "Neue Attribute setzen",IDOK,34,144,90,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,134,144,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,194,144,50,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,165,263,1
+    CONTROL         "Benutze diese Attribute für alle &Vorgänge mit gleichem Fehler",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,172,219,12
+    LTEXT           "&Pfad:",IDC_STATIC_7,7,9,63,8
+    EDITTEXT        IDE_SCRD_SRCPATH,71,9,196,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Name:",IDC_STATIC_8,7,21,63,8
+    EDITTEXT        IDE_SCRD_SRCNAME,71,21,196,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "A&ktuelle Attribute:",IDC_STATIC_9,7,33,63,8
+    EDITTEXT        IDE_SCRD_CURATTR,71,33,196,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVELOWMEMORYERR DIALOGEX 10, 24, 279, 90
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nicht genügend Systemressourcen für den Vorgang"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,15,46,57,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SCRD_SKIP,79,46,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,143,46,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,207,46,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,265,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,261,12
+    LTEXT           "&Pfad:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SCRD_SRCPATH,32,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Name:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SCRD_SRCNAME,32,21,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSIMPLEERR DIALOGEX 10, 24, 317, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Löschen",IDOK,36,46,55,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SISE_SKIP,99,46,55,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,162,46,55,14
+    PUSHBUTTON      "Hilfe",IDHELP,225,46,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,303,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SISE_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,261,12
+    LTEXT           "&Pfad:",IDC_STATIC_3,7,9,27,8
+    EDITTEXT        IDE_SISE_PATH,37,9,272,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Name:",IDC_STATIC_4,7,21,27,8
+    EDITTEXT        IDE_SISE_NAME,37,21,272,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR DIALOGEX 10, 24, 279, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,15,82,57,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SSCD_SKIP,79,82,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,143,82,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,207,82,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,265,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,261,12
+    LTEXT           "&Pfad:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SSCD_PATH,32,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Name:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SSCD_NAME,32,21,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Fehlerbeschreibung:",IDC_STATIC_4,7,40,72,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,50,267,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2 DIALOGEX 10, 24, 276, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,13,106,57,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SSCD_SKIP,77,106,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,141,106,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,205,106,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,262,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,261,12
+    LTEXT           "Q&uellpfad:",IDC_STATIC_2,7,9,41,8
+    EDITTEXT        IDE_SSCD_SRCPATH,50,9,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Qu&ellname:",IDC_STATIC_3,7,21,41,8
+    EDITTEXT        IDE_SSCD_SRCNAME,50,21,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zielpf&ad:",IDC_STATIC_4,7,33,41,8
+    EDITTEXT        IDE_SSCD_TGTPATH,50,33,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_5,7,45,41,8
+    EDITTEXT        IDE_SSCD_TGTNAME,50,45,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Fehlerbeschreibung:",IDC_STATIC_6,7,64,72,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,264,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2EX DIALOGEX 10, 24, 372, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,5,106,57,14,WS_GROUP
+    PUSHBUTTON      "&Weiter",CM_SSCD_RESUME,66,106,57,14
+    PUSHBUTTON      "Ü&berschreiben",CM_SSCD_OVERWRITE,127,106,57,14
+    PUSHBUTTON      "Über&springen",IDB_SSCD_SKIP,188,106,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,249,106,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,310,106,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,5,127,362,1
+    CONTROL         "Auswahl &merken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,261,12
+    LTEXT           "Q&uellpfad:",IDC_STATIC_2,7,9,41,8
+    EDITTEXT        IDE_SSCD_SRCPATH,50,9,314,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Quellname:",IDC_STATIC_3,7,21,41,8
+    EDITTEXT        IDE_SSCD_SRCNAME,50,21,314,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zielpf&ad:",IDC_STATIC_4,7,33,41,8
+    EDITTEXT        IDE_SSCD_TGTPATH,50,33,314,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zielname:",IDC_STATIC_5,7,45,41,8
+    EDITTEXT        IDE_SSCD_TGTNAME,50,45,314,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Feh&lerbeschreibung:",IDC_STATIC_6,7,64,72,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,360,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR3 DIALOGEX 10, 24, 279, 112
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Wiederholen",IDOK,15,70,57,14,WS_GROUP
+    PUSHBUTTON      "Über&springen",IDB_SSCD_SKIP,79,70,57,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,143,70,57,14
+    PUSHBUTTON      "Hilfe",IDHELP,207,70,57,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,265,1
+    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,261,12
+    LTEXT           "&Pfad:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SSCD_PATH,32,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Fehlerbeschreibung:",IDC_STATIC_3,7,28,72,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,38,267,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_VIEWERRASCIITRFORBINFILE DIALOGEX 25, 38, 350, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "FTP-Client"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Binär-Modus benutzen",IDOK,73,57,90,14,WS_GROUP
+    PUSHBUTTON      "&Ignorieren",IDIGNORE,170,57,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,227,57,50,14
+    CONTROL         "Herunterladen der Binärdatei im ASCII-Transfermodus. Dieser Vorgang kann die Datei",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,7,305,8
+    CONTROL         "beschädigen, da das System die Zeilenenden falsch konvertieren könnte. Sie können",IDC_STATIC_2,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,16,305,8
+    CONTROL         "diese Datei im Binär-Modus herunterladen (ohne ungewollte Konvertierung). Außer die",IDC_STATIC_3,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,25,305,8
+    CONTROL         "Datei liegt im Klartext vor, dann drücken Sie zum ignorieren der Meldung auf 'Ignorieren'.",IDC_STATIC_4,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,34,305,8
+    ICON            "",IDI_INFOICON,7,7,18,20
+END
+
+IDD_PROXYSERVER DIALOGEX 10, 24, 239, 231
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Proxyserver hinzufügen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Name:",IDC_STATIC_1,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,10,24,8
+    EDITTEXT        IDE_PRXSRV_NAME,47,8,184,12,ES_AUTOHSCROLL
+    LTEXT           "&Typ:",IDC_STATIC_2,7,25,21,8
+    COMBOBOX        IDC_PRXSRV_TYPE,47,23,185,170,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Adresse:",IDC_STATIC_3,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,40,35,8
+    EDITTEXT        IDE_PRXSRV_ADDRESS,47,38,184,12,ES_AUTOHSCROLL
+    CONTROL         "&Port:",IDC_STATIC_4,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,55,18,8
+    EDITTEXT        IDE_PRXSRV_PORT,47,53,39,12,ES_AUTOHSCROLL
+    CONTROL         "Ben&utzer:",IDC_STATIC_5,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,70,39,8
+    EDITTEXT        IDE_PRXSRV_USER,47,68,184,12,ES_AUTOHSCROLL
+    CONTROL         "Pass&wort:",IDC_STATIC_6,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,85,36,8
+    EDITTEXT        IDE_PRXSRV_PASSWD,47,83,58,12,ES_PASSWORD | ES_AUTOHSCROLL
+    EDITTEXT        IDE_PRXSRV_PASSWD_LOCKED,110,83,58,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "Ent&sperren...",IDB_PRXSRV_PASSWD_CHANGE,171,82,60,14
+    CONTROL         "Passw&ort speichern",IDC_PRXSRV_SAVEPASSWD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,99,78,12
+    LTEXT           "nicht sicher",IDC_PRXSRV_SAVEPASSWD_HINT,90,101,131,8,WS_TABSTOP
+    LTEXT           "Anme&ldescript:",IDC_STATIC_7,7,120,52,8
+    EDITTEXT        IDE_PRXSRV_SCRIPT,7,130,224,68,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN
+    DEFPUSHBUTTON   "OK",IDOK,61,210,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,121,210,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,181,210,50,14
+END
+
+IDD_CERTIFICATE DIALOGEX 10, 24, 273, 120
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Problem mit der Serveridentität"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Der Server liefert ein Zertifikat mit dem/den folgenden Problem/en:",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,9,261,8
+    GROUPBOX        " Zusammenfassung der Zertifikatsverifizierung ",IDC_STATIC_2,9,21,255,54
+    LTEXT           "",IDT_CERTIFICATE_ERROR,16,32,241,40
+    LTEXT           "Das Akzeptieren dieses Zertifikates birgt Gefahren und wird nicht empfohlen.",IDC_STATIC_3,7,80,261,8,NOT WS_GROUP
+    LTEXT           "",IDC_STATIC_4,5,95,263,1,SS_ETCHEDHORZ | WS_GROUP
+    PUSHBUTTON      "&Zertifikat zeigen",IDB_CERTIFICATE_VIEW,11,100,80,14,WS_GROUP
+    PUSHBUTTON      "Zertifikat &akzeptieren",IDOK,96,100,80,14
+    DEFPUSHBUTTON   "Abbruch",IDCANCEL,181,100,80,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SRVCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Verbinden\tEnter",             IDOK
+        MENUITEM SEPARATOR
+        MENUITEM "&Neu...\tEinfg",             IDB_NEWBOOKMARK
+        MENUITEM "K&opieren nach...",                 CM_COPYSRVTO
+        MENUITEM "Um&benennen...\tF2",              IDB_RENAMEBOOKMARK
+        MENUITEM "&Entfernen...\tEntf",          IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "Nac&h oben\tAlt+Pfeil hoch",      CM_MOVEUPBOOKMARK
+        MENUITEM "Nach &unten\tAlt+Pfeil runter",  CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_SRVCONTEXTMENU2 MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Neu...\tEinfg",             IDB_NEWBOOKMARK
+        MENUITEM "K&opieren nach...",                 CM_COPYSRVTO
+        MENUITEM "Um&benennen...\tF2",              IDB_RENAMEBOOKMARK
+        MENUITEM "&Entfernen...\tEntf",          IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "Nac&h oben\tAlt+Pfeil hoch",      CM_MOVEUPBOOKMARK
+        MENUITEM "Nach &unten\tAlt+Pfeil runter",  CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_ACTPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Trennen...",              CM_DISCONNECTSRV
+        MENUITEM "Zertifi&kat zeigen...",        CM_SHOWCERT
+        POPUP "&Übertragungsmodus"
+        BEGIN
+            MENUITEM "&Automatisch",                  CM_TRMODEAUTO
+            MENUITEM "A&SCII",                      CM_TRMODEASCII
+            MENUITEM "&Binär",                     CM_TRMODEBINARY
+        END
+        MENUITEM "Aktualisie&ren",                    CM_REFRESHPATH
+        MENUITEM SEPARATOR
+        MENUITEM "F&avoriten hinzufügen...",            CM_ADDBOOKMARK
+        MENUITEM "&Logdateien zeigen...",                CM_SHOWLOG
+        MENUITEM "FTP-Befehl &senden...",        CM_SENDFTPCOMMAND
+        MENUITEM "Rohdatenliste &zeigen...",        CM_SHOWRAWLISTING
+        MENUITEM "Versteckte Date&ien und Verzeichnisse zeigen (Unix)", CM_LISTHIDDENFILES
+    END
+END
+
+IDM_CHNGDRVCONTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Mit FTP-Server &verbinden...",   CM_CONNECTSRV
+        MENUITEM "&Favoriten verwalten...",      CM_ORGBOOKMARKS
+        MENUITEM "&Logdateien zeigen...",               CM_SHOWLOGS
+    END
+END
+
+IDM_DETPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Im Fen&ster zeigen",              CM_OPENDETACHED
+        MENUITEM SEPARATOR
+        MENUITEM "&Trennen",                 CM_DISCONNECTSRV
+        MENUITEM SEPARATOR
+        MENUITEM "F&avoriten hinzufügen...",            CM_ADDBOOKMARK
+        MENUITEM "&Logdateien zeigen...",                CM_SHOWLOG
+    END
+END
+
+IDM_LOGSMENU MENU 
+BEGIN
+    POPUP "&Protokoll"
+    BEGIN
+        MENUITEM "K&opieren",                       CM_COPYLOG
+        MENUITEM "Alle ko&pieren",                   CM_COPYALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "&Speichern unter...",                 CM_SAVELOG
+        MENUITEM "&Alle speichern unter...",             CM_SAVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "Lösch&en...",                   CM_CLEARLOG
+        MENUITEM "Entfe&rnen...",                  CM_REMOVELOG
+        MENUITEM "Alle ent&fernen...",              CM_REMOVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "S&chließen\tAlt+F4",              IDCANCEL
+    END
+    POPUP "&Optionen"
+    BEGIN
+        MENUITEM "Logdatei für &aktives Fenster immer anzeigen", CM_SHOWLOGFORPANEL
+    END
+    POPUP "&Hilfe"
+    BEGIN
+        MENUITEM "&FTP Logs\tF1",               CM_HELPFORLOGSWND
+    END
+END
+
+IDM_SERVERSOTHERACT MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Kopieren nach...",                 CM_COPYSERVERTO
+        MENUITEM "Um&benennen...\tF2",              CM_RENAMESERVER
+        MENUITEM "Ent&fernen...\tEntf",          CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "Aus Datei &importieren...",        CM_IMPORTSERVER
+        MENUITEM "In Datei e&xportieren...",          CM_EXPORTSERVER
+    END
+END
+
+IDM_SERVERSACTIONS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Neu...\tEinfg",             IDB_NEWSERVER
+        MENUITEM "B&earbeiten...",                    IDB_EDITSERVER
+        MENUITEM "&Kopieren nach...",                 CM_COPYSERVERTO
+        MENUITEM "Um&benennen...\tF2",              CM_RENAMESERVER
+        MENUITEM "Ent&fernen...\tEntf",          CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "Nach &oben\tAlt+Pfeil hoch",      IDB_MOVESERVERUP
+        MENUITEM "Nach &unten\tAlt+Pfeil runter",  IDB_MOVESERVERDOWN
+        MENUITEM SEPARATOR
+        MENUITEM "Aus Datei &importieren...",        CM_IMPORTSERVER
+        MENUITEM "In Datei e&xportieren...",          CM_EXPORTSERVER
+    END
+END
+
+IDM_SRVTYPEMOVECOLUMN MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Nach &oben\tAlt+Pfeil hoch",           CM_MOVECOLUMNUP
+        MENUITEM "Nach &unten\tAlt+Pfeil runter",       CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_SRVTYPERULESMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "&Einfügen"
+        BEGIN
+            MENUITEM "&Beginn der Regel",              CM_STRM_RULESTART
+            MENUITEM "&Ende der Regel",                CM_STRM_RULEEND
+            MENUITEM "Zei&lenkommentar",               CM_STRM_COMMENT
+            MENUITEM SEPARATOR
+            POPUP "&Überspringen"
+            BEGIN
+                MENUITEM "Whitespaces (falls vorhanden)",       CM_STRM_SKIPWSIFANY
+                MENUITEM "Whitespaces (mindestens eins)", CM_STRM_SKIPWS
+                MENUITEM "Genaue Anzahl von Whitespaces", CM_STRM_SKIPNUMOFWS
+                MENUITEM "Whitespaces und Zeilenende (mindestens eins)", CM_STRM_SKIPWSENDEOLS
+                MENUITEM "Rest der Zeile (mindestens ein Zeichen)", CM_STRM_SKIPRESTOFLINE
+                MENUITEM "Wort",                        CM_STRM_SKIPWORD
+                MENUITEM "Genaue Anzahl von Zeichen",  CM_STRM_SKIPNUMOFLETTERS
+                MENUITEM "Alle Zeichen bis zum Ende des Suchstrings", CM_STRM_SKIPALLTO
+                MENUITEM "Alle Zeichen bis zur nächsten Zahl", CM_STRM_SKIPALLTONUMBER
+            END
+            POPUP "&Spalte zuweisen"
+            BEGIN
+                MENUITEM "Rest der Zeile (mindestens ein Zeichen)", CM_STRM_ASGNRESTOFLINE
+                MENUITEM "Wort",                        CM_STRM_ASGNWORD
+                MENUITEM "Zahl",                      CM_STRM_ASGNNUM
+                MENUITEM "Positive Zahl",             CM_STRM_ASGNPOSNUM
+                MENUITEM "Zahl mit Trennern",      CM_STRM_ASGNNUMWITHSEP
+                MENUITEM "Monat in drei Buchstaben (English, Deutsch)", CM_STRM_ASGN3LETTERMONTH
+                MENUITEM "Monat in drei Buchstaben (Benutzerdefiniert)", CM_STRM_ASGN3LETMONTHGEN
+                MENUITEM "Monatsbezeichnung (Deutsch)",         CM_STRM_ASGNTEXTMONTH
+                MENUITEM "Monatsbezeichnung (Benutzerdefiniert)",   CM_STRM_ASGNTEXTMONTHGEN
+                MENUITEM "Monat als Zahl",                CM_STRM_ASGNMONTH
+                MENUITEM "Tag als Zahl",                  CM_STRM_ASGNDAY
+                MENUITEM "Jahr als Zahl",                 CM_STRM_ASGNYEAR
+                MENUITEM "Zeit",                        CM_STRM_ASGNTIME
+                MENUITEM "Jahr oder Zeit",                CM_STRM_ASGNYEARORTIME
+                MENUITEM "Genaue Anzahl von Zeichen",  CM_STRM_ASGNNUMOFLETTERS
+                MENUITEM "Alle Zeichen bis zum Ende des Suchstrings", CM_STRM_ASGNALLTO
+                MENUITEM "Alle Zeichen bis zum Suchstring", CM_STRM_ASGNALLUPTO
+                MENUITEM "Unix Link (Linkname und Ziel aufteilen)", CM_STRM_ASGNUNIXLINK
+                MENUITEM "Unix Gerät",                 CM_STRM_ASGNUNIXDEV
+                MENUITEM "Ausdruck",                  CM_STRM_ASGNEXPR
+            END
+            POPUP "&Leerraum in Spalte entfernen"
+            BEGIN
+                MENUITEM "am Anfang",                     CM_STRM_CUTWSINIT
+                MENUITEM "am Ende",                    CM_STRM_CUTWSTRAIL
+                MENUITEM "am Anfang und am Ende",        CM_STRM_CUTWSBOTH
+            END
+            POPUP "Status&variablen und Operatoren für Ausdrücke"
+            BEGIN
+                MENUITEM "Ist die erste nicht leere Zeile", CM_STRM_STVARISFIRSTNELINE
+                MENUITEM "Ist die letzte nicht leere Zeile",  CM_STRM_STVARISLASTNELINE
+                MENUITEM "Nächstes Zeichen",              CM_STRM_STVARNEXTCHAR
+                MENUITEM "Nächstes Wort",                   CM_STRM_STVARNEXTWORD
+                MENUITEM "Rest der Zeile",                CM_STRM_STVARRESTOFLINE
+                MENUITEM SEPARATOR
+                MENUITEM "Gleich",                       CM_STRM_OPEREQUAL
+                MENUITEM "Ungleich",                   CM_STRM_OPERNOTEQUAL
+                MENUITEM "Zeichenkette gleich (Groß/Kleinschreibung ignorieren)", CM_STRM_OPERSTREQUAL
+                MENUITEM "Zeichenkette ungleich (Groß/Kleinschreibung ignorieren)", CM_STRM_OPERSTRNOTEQUAL
+                MENUITEM "Teilstring kommt in Zeichenkette vor",      CM_STRM_OPERISINSTR
+                MENUITEM "Teilstring kommt nicht in Zeichenkette vor",  CM_STRM_OPERISNOTINSTR
+                MENUITEM "Zeichenkette endet mit Zeichenkette",     CM_STRM_OPERENDWITH
+                MENUITEM "Zeichenkette endet nicht mit Zeichenkette", CM_STRM_OPERNOTENDWITH
+            END
+            POPUP "S&onstige"
+            BEGIN
+                MENUITEM "Nur weitermachen wenn",            CM_STRM_IF
+                MENUITEM "Zeichenkette zur Spalte hinzufügen",        CM_STRM_ADDSTRTOCOL
+                MENUITEM "Gehe eine Anzahl von Zeichen zurück", CM_STRM_BACK
+                MENUITEM "Ende der Zeichenkette in der Spalte ausschneiden", CM_STRM_CUTENDOFSTR
+            END
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "Rück&gängig",                       CM_STRM_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Ausschnei&den",                        CM_STRM_CUT
+        MENUITEM "&Kopieren",                       CM_STRM_COPY
+        MENUITEM "&Einfügen",                      CM_STRM_PASTE
+        MENUITEM "&Löschen",                     CM_STRM_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "&Alles auswählen",                 CM_STRM_SELECTALL
+    END
+END
+
+IDM_SRVTYPECOLUMNS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Neu...\tEinfg",             IDB_NEWCOLUMN
+        MENUITEM "B&earbeiten...",                    IDB_EDITCOLUMN
+        MENUITEM "Ent&fernen...\tEntf",          IDB_REMOVECOLUMN
+        MENUITEM SEPARATOR
+        MENUITEM "Nach &oben\tAlt+Pfeil hoch",      CM_MOVECOLUMNUP
+        MENUITEM "Nach &unten\tAlt+Pfeil runter",  CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_DIREXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Wiederholen",                      IDOK
+        MENUITEM "Benutze vorhandenes Verzeichni&s",     CM_SDEX_USEEXISTINGDIR
+        MENUITEM "Ben&utze alternativen Namen",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_FILEEXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Wiederholen",                      IDOK
+        MENUITEM "Wei&ter",                     CM_SIED_RESUME
+        MENUITEM "We&iter oder überschreiben",        CM_SIED_RESUMEOROVR
+        MENUITEM "Benutze &alternativen Namen",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_TRANSFERFAILEDERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Wiederholen",                      IDOK
+        MENUITEM "Ben&utze alternativen Namen",         CM_SCRD_USEALTNAME
+        MENUITEM "Wei&ter oder überschreiben",        CM_SIED_RESUMEOROVR
+    END
+END
+
+IDM_CANTCRFILEERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Wiederholen",                      IDOK
+        MENUITEM "Ben&utze alternativen Namen",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_UNKATTRSERRIGNORE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ignorieren",                     IDOK
+        MENUITEM "&Wiederholen",                      CM_SIEA_RETRY
+        MENUITEM "Neue Attribute &setzen...",      CM_SIEA_SETNEWATTRS
+    END
+END
+
+IDM_DELETEERRORRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Löschen",                     IDOK
+        MENUITEM "&Wiederholen",                      CM_SISE_RETRY
+    END
+END
+
+IDM_DELETEERRORONSRVRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Wieder&holen",                      IDOK
+        MENUITEM "Zum Löschen &markieren",            CM_SSCD_MARKASDELETED
+    END
+END
+
+IDM_RESUMEERRORONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Wiederholen",                      IDOK
+        MENUITEM "Benutze &alternativen Namen",         CM_SSCD_USEALTNAME
+        MENUITEM "Wei&ter oder überschreiben",        CM_SSCD_RESUMEOROVR
+    END
+END
+
+IDM_RESUMETESTFAILEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Wiederholen",                      IDOK
+        MENUITEM "Benutze &alternativen Namen",         CM_SSCD_USEALTNAME
+        MENUITEM "Wei&ter oder überschreiben",        CM_SSCD_RESUMEOROVR
+        MENUITEM "&Dateigröße reduzieren und nochmal versuchen", CM_SSCD_REDUCEFILESIZE
+    END
+END
+
+IDM_UPLTESTIFFINISHEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Wiederholen",                      IDOK
+        MENUITEM "Benutze &alternativen Namen",         CM_SSCD_USEALTNAME
+        MENUITEM "Wei&ter oder überschreiben",        CM_SSCD_RESUMEOROVR
+        MENUITEM "Mar&kiere Datei als erfolgreich hochgeladen", CM_SSCD_MARKASUPLOADED
+    END
+END
+
+IDM_ASCIITRFORBINFILE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Ben&utze Binär-Modus",            IDOK
+        MENUITEM "&Wiederholen",                      CM_SATR_RETRY
+    END
+END
+
+IDM_ADDPROXYSERVER MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Hin&zufügen...",                     IDB_ADDPROXYSRV
+        MENUITEM "B&earbeiten...",                    CM_EDITPROXYSRV
+        MENUITEM "&Löschen...",                  CM_DELETEPROXYSRV
+        MENUITEM SEPARATOR
+        MENUITEM "&Nach oben",                    CM_MOVEUPPROXYSRV
+        MENUITEM "N&ach unten",                  CM_MOVEDOWNPROXYSRV
+    END
+END
+
+IDM_PRXSRVSCRIPTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "E&infügen"
+        BEGIN
+            MENUITEM "&3xx: (nur für Server die ein Passwort/Konto erwarten)", CM_PSS_3XX
+            MENUITEM SEPARATOR
+            MENUITEM "&Proxyadresse",              CM_PSS_PROXYHOST
+            MENUITEM "P&roxyport",                 CM_PSS_PROXYPORT
+            MENUITEM "Pr&oxybenutzer",            CM_PSS_PROXYUSER
+            MENUITEM "Pro&xypasswort",             CM_PSS_PROXYPASSWD
+            MENUITEM "&Adresse",                    CM_PSS_HOST
+            MENUITEM "Por&t",                       CM_PSS_PORT
+            MENUITEM "Ben&utzer",                  CM_PSS_USER
+            MENUITEM "Pa&sswort",                   CM_PSS_PASSWD
+            MENUITEM "Ko&nto",                    CM_PSS_ACCOUNT
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "Rück&gängig",                       CM_PSS_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Ausschnei&den",                        CM_PSS_CUT
+        MENUITEM "&Kopieren",                       CM_PSS_COPY
+        MENUITEM "&Einfügen",                      CM_PSS_PASTE
+        MENUITEM "&Löschen",                     CM_PSS_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "&Alles auswählen",                 CM_PSS_SELECTALL
+    END
+END
+
+IDM_UNLOCKPASSWORD MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Passwort en&tsperren...",         CM_UNLOCKPASSWORD
+        MENUITEM "&Passwort löschen",             CM_CLEARPASSWORD
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_FTPPLUGINTITLE, "FTP-Client"
+ IDS_PLUGINNAME, "FTP-Client"
+ IDS_PLUGINDESCR, "Übertragung von Dateien und Verzeichnissen über FTP."
+ IDS_ABOUTPLUGINTITLE, "Über das Plugin"
+ IDS_FTPCHNGDRVITEM, "/\tFTP-Client"
+ IDS_FTPERRORTITLE, "FTP-Fehler"
+ IDS_TOOLONGPATH, "Kann den Vorgang nicht beenden, da der Pfadname zu lang ist."
+ IDS_HOSTNAMEMISSING, "Ein Hostname fehlt in der Pfadangabe."
+ IDS_INVALIDPORT, "Die Portnummer im angegebenen Pfad ist keine Nummer oder nicht im Bereich von 1 bis 65535."
+ IDS_INVALIDNUMBER, "Ungültige Zahl."
+ IDS_CONFIGTITLE, "FTP - Konfiguration"
+ IDS_INCORRECTSYNTAX, "Die Syntax der Dateimaske ist falsch."
+ IDS_MUSTBEPOSITIVE, "Die Zahl muss positiv sein."
+ IDS_MUSTBEGRTHANZERO, "Die Zahl muss größer als Null sein."
+ IDS_KAEVERYGRTHSTOP, "Die Stopzeit darf nicht kürzer als die Sendeperiode sein (um wenigstens eine Übertragung zu ermöglichen)."
+ IDS_KAEVERYTOOBIG, "Die Sendeperiode darf nicht mehr als 10000 Sekunden betragen."
+ IDS_KASTOPTOOBIG, "Die Stopzeit darf nicht mehr als 10000 Minuten betragen."
+ IDS_KEEPALIVECMDNOOP, "NOOP (keine Datenübertragung)"
+ IDS_KEEPALIVECMDPWD, "PWD (keine Datenübertragung)"
+ IDS_KEEPALIVECMDNLST, "NLST (Datenübertragung)"
+ IDS_KEEPALIVECMDLIST, "LIST (Datenübertragung)"
+ IDS_CONNECTFTPSERVER, "Mit FTP-Server &verbinden..."
+ IDS_DISCONNECT, "Verbindung &trennen...\tF12"
+ IDS_ADDBOOKMARK, "Fav&oriten hinzufügen..."
+ IDS_SHOWLOGS, "&Logdateien zeigen..."
+ IDS_SENDFTPCOMMAND, "FTP-Befehl &senden..."
+ IDS_ORGBOOKMARKSCMD, "&Favoriten verwalten..."
+ IDS_SHOWRAWLISTING, "Rohdatenliste &zeigen..."
+ IDS_REFRESHPATH, "&Aktualisieren"
+ IDS_LISTHIDDENFILES, "Versteckte Date&ien und Verzeichnisse zeigen (Unix)"
+ IDS_SHOWCERT, "Zertifi&kat zeigen..."
+
+ IDS_QUICKCONNECT, "Schnelles Verbinden"
+
+ IDS_ADVSTRNONE, "Keine erweiterten Einstellungen"
+ IDS_ADVSTRTARGETPATH, "Zielpfad: %s"
+ IDS_ADVSTRSERVERTYPE, "Servertyp: %s"
+ IDS_ADVSTRPORT, "Port: %d"
+ IDS_ADVSTRSERVERPASVYES, "Passivmodus"
+ IDS_ADVSTRSERVERPASVNO, "Kein Passivmodus"
+ IDS_ADVSTRKEEPALIVEYES, "Verbindung aufrechterhalten"
+ IDS_ADVSTRKEEPALIVENO, "Verbindung nicht aufrechterhalten"
+ IDS_ADVSTRMAXCONCURCON, "Max. Verbindungen: %d"
+ IDS_ADVSTRUNLIMITEDCON, "Unbegrenzte Verbindungen"
+ IDS_ADVSTRSPEEDLIM, "Geschwindigkeitsbeschränkung: %g KB/s"
+ IDS_ADVSTRUNLIMITEDSPEED, "Unbegrenzte Geschwindigkeit"
+ IDS_ADVSTRTRMODBINARY, "Übertragungsmodus: Binär"
+ IDS_ADVSTRTRMODASCII, "Übertragungsmodus: ASCII"
+ IDS_ADVSTRTRMODAUTO, "Übertragungsmodus: Automatisch"
+ IDS_ADVSTRUSECACHEYES, "Cache verwenden"
+ IDS_ADVSTRUSECACHENO, "Cache nicht verwenden"
+ IDS_ADVSTRINITFTPCMDS, "Initialisiere Befehle: %s"
+ IDS_ADVSTRLISTCOMMAND, "Befehle auflisten: %s"
+ IDS_ADVSTRPROXYSRV, "Proxy: %s"
+ IDS_ADVSTRPROXYNOTUSED, "Nicht verwendet"
+ IDS_ADVSTRSSLCONTRONLY, "Verschlüsselung"
+ IDS_ADVSTRSSLCONTRDATA, "Vollständige Verschlüsselung"
+ IDS_ADVSTRMODEZ, "MODE Z"
+ IDS_ADVSTRNOMODEZ, "Kein MODE Z"
+
+ IDS_SRVTYPEAUTODETECT, "Automatisch ermitteln"
+ IDS_TRANSFMODEDEFAULT, "Standard (siehe 'FTP-Konfiguration/Standard')"
+ IDS_TRANSFMODEBINARY, "Binär (Keine Veränderung während der Übertragung)"
+ IDS_TRANSFMODEASCII, "ASCII (Zeilenenden nach Standard konvertieren)"
+ IDS_TRANSFMODEAUTO, "Automatisch (siehe ASCII-Masken unter 'FTP-Konfiguration/Standard')"
+ IDS_SELECTTARGETDIR, "Wählen Sie das Verzeichnis für das Zielfenster."
+ IDS_RENAMESRVTO, "Umbenennen von ""%s"" in"
+ IDS_COPYDATAFROM, "&Kopiere die Daten aus dem Favoriten ""%s"""
+ IDS_MAYNOTBEEMPTY, "Leere Einträge sind hier nicht erlaubt."
+ IDS_REMOVECONFIRM, "Möchten Sie den Favoriten ""%s"" wirklich löschen?"
+ IDS_HOSTMAYNOTBEEMPTY, "Geben Sie bitte eine FTP-Serveradrese ein (Name, IP, oder URL), bevor Sie versuchen eine Verbindung herzustellen."
+ IDS_ORGANIZEBOOKMARKS, "Favoriten verwalten"
+ IDS_CLOSECONINPANEL, "Sie verlassen im Dateifenster den FTP-Server. Möchten Sie die Verbindung zum Server trennen oder halten?\n\nWenn Sie 'Halten' wählen, können Sie später auf diese Verbindung über das Laufwerksmenü zugreifen."
+ IDS_ALWAYSNOTCLOSE, "&Immer 'Halten' wählen\tWieder rückgängig machen\tSie können diese Einstellung später auf der Bestätigungsseite in der FTP-Konfiguration ändern"
+ IDS_DISCONNECTBUTTON, "&Verbindung trennen"
+ IDS_KEEPCONBUTTON, "&Halten"
+
+ IDS_ADDBOOKMARKTITLE, "Favoriten hinzufügen"
+ IDS_ADDBOOKMARKTEXT, "Name des neuen Favoriten:"
+
+ IDS_WINSOCKETSERROR, "Initialisierung der Windows Socketbibliothek nicht möglich.\n\nFehler: %s"
+
+ IDS_WANTDISCONNECT, "Möchten Sie die Verbindung zum FTP-Server trennen?"
+ IDS_ALWAYSCLOSE, "&Verbindung trennen, beim nächsten Mal nicht wieder fragen\tWieder rückgängig machen\tSie können diese Einstellung später auf der Bestätigungsseite in der FTP-Konfiguration ändern"
+
+ IDS_GETTINGIPOFSERVER, "Ermittle die IP-Adresse des Servers ""%s"", zum Abbrechen drücken Sie ESC..."
+ IDS_OPENINGCONTOSERVER, "Öffne Verbindung zum FTP-Server ""%s"" (IP: %s, Port: %d),\nzum Abbrechen drücken Sie ESC..."
+ IDS_WAITINGTORETRY, "Kann nicht zum Server ""%s"" (IP: %s, Port: %d) verbinden.\nFehler: %s"
+ IDS_WAITINGTORETRY2, "Kann nicht zum Server ""%s"" (Port: %d) verbinden.\nFehler: %s"
+ IDS_WAITINGTORETRYSUF, "%s\n\nWarte %d Sekunden zum erneuten Versuch einer Verbindung (Versuch Nr. %d von %d), zum Abbrechen drücken Sie ESC..."
+ IDS_WAITINGFORLOGIN, "Warte auf die Anmeldebestätigung, zum Abbrechen drücken Sie ESC..."
+ IDS_SENDINGLOGINCMD, "Sende Befehl ""%s"", zum Abbrechen drücken Sie ESC..."
+ IDS_CLOSINGCONNECTION, "Trenne Verbindung zu ""%s"", zum Abbrechen drücken Sie ESC..."
+ IDS_SENDINGCOMMAND, "Sende Befehl ""%s"", zum Abbrechen drücken Sie ESC..."
+ IDS_ABORTINGCOMMAND, "Breche FTP-Befehl ab, zum Abbrechen drücken Sie ESC..."
+ IDS_OPENINGCONTOSERVER2, "Öffne Verbindung zum FTP-Server ""%s"" (Port: %d),\nzum Abbrechen drücken Sie ESC..."
+ IDS_PREPARINGACTDATACON, "Bereite aktive Datenverbindung vor, zum Abbrechen drücken Sie ESC..."
+
+ IDS_GETIPESC, "Möchten Sie die Ermittlung der IP-Adresse des Servers abbrechen?"
+ IDS_GETIPTIMEOUT, "Zeitüberschreitung beim Ermitteln der IP-Adresse des Servers."
+ IDS_OPENCONESC, "Möchten Sie das Öffnen der Serverbindung abbrechen?"
+ IDS_OPENCONTIMEOUT, "Zeitüberschreitung beim Öffnen der Verbindung zum FTP-Server."
+ IDS_OPENPROXYSRVCONTIMEOUT, "Zeitüberschreitung beim Öffnen der Verbindung zum Proxyserver."
+ IDS_WAITRETRESC, "Drücken Sie 'Abbrechen' um alle weiteren Anmeldeversuche abzubrechen. Drücken Sie 'Wiederholen' um die Wartezeit bis zum nächsten Anmeldeversuch zu überspringen. Drücken Sie 'Warten' um weiter auf den nächsten Anmeldeversuch zu warten."
+ IDS_WAITRETRESCABORTBTN, "&Abbrechen"
+ IDS_WAITRETRESCRETRYBTN, "&Wiederholen"
+ IDS_WAITRETRESCWAITBTN, "Wa&rten"
+
+ IDS_WAITFORLOGESC, "Möchten Sie das Warten auf die Anmeldebestätigung abbrechen?"
+ IDS_WAITFORLOGTIMEOUT, "Zeitüberschreitung beim Warten auf die Anmeldebestätigung."
+ IDS_CLOSECONESC, "Möchten Sie die Verbindung sofort beenden?"
+ IDS_LOGMSGACTIONCANCELED, "Vorgang durch Benutzer abgebrochen.\r\n"
+ IDS_LOGMSGDISCONTIMEOUT, "Zeitüberschreitung beim Trennen der Serververbindung. Verbindung wurde beendet.\r\n"
+ IDS_SENDCOMMANDESC, "Möchten Sie den FTP-Befehl abbrechen?"
+ IDS_SENDCOMMANDESC2, "Möchten Sie den FTP-Befehl abbrechen? Die Verbindung zum FTP-Server wird beendet."
+ IDS_ABORTCOMMANDESC, "Möchten Sie den Abbruch des FTP-Befehls abbrechen? Verbindung zum FTP-Server wird beendet."
+ IDS_PREPACTDATACONESC, "Möchten Sie die Vorbereitung zur aktiven Datenverbindung abbrechen? Verbindung zum FTP-Server wird beendet."
+ IDS_SNDORABORCMDTIMEOUT, "Zeitüberschreitung beim Senden oder Abbrechen des FTP-Befehls."
+ IDS_LISTCMDTIMEOUT, "Zeitüberschreitung beim Senden oder Abbrechen des Auflistens. Hinweis: Wenn die Datenübertragung noch nicht gestartet wurde, versuchen Sie\nden Übertragungsmodus zu ändern (siehe Dialog: 'Mit FTP-Server verbinden'/'Erweitert'/'Benutze passiven Übertragungsmodus')"
+ IDS_PREPACTDATACONTIMEOUT, "Zeitüberschreitung bei der Vorbereitung zur aktiven Datenverbindung."
+ IDS_LOGMSGFATALERROR, "Schwerer Kommunikationsfehler mit dem Server aufgetreten. Verbindung wurde beendet.\r\n"
+ IDS_LOGMSGFATALERROR2, "Schwerer Fehler aufgetreten. Verbindung wurde beendet.\r\n"
+
+ IDS_UNKNOWNERROR, "Unbekannter Fehler (vielleicht nicht genügend Systemressourcen)."
+ IDS_GETIPERROR, "Kann die IP-Adresse des Servers ""%s"" nicht ermitteln.\n\nFehler: %%s"
+ IDS_OPENCONERROR, "Öffnen der Serververbindung ""%s"" (IP: %s, Port: %d) nicht möglich.\n\nFehler: %%s"
+ IDS_CONNECTIONLOSTERROR, "Serververbindung wurde unerwartet abgebrochen."
+ IDS_NOTFTPSERVERERROR, "Verbindung zum Server fehlgeschlagen. Höchstwahrscheinlich ist es weder ein FTP-Server noch ein FTP-Proxyserver.\n\nServerantwort: %s"
+ IDS_SENDCOMMANDERROR, "Senden des Befehls zum Server nicht möglich.\n\nFehler: %s"
+ IDS_LOGINERROR, "Anmeldung auf FTP-Server oder FTP-Proxyserver nicht möglich.\n\nFehler: %s"
+ IDS_ABORTCOMMANDERROR, "Abbrechen des Befehls nicht möglich.\n\nFehler: %s"
+ IDS_GETCURWORKPATHERROR, "Bestimmung des Arbeitspfades auf dem FTP-Server nicht möglich.\n\nServerantwort: %s"
+ IDS_CHANGEWORKPATHERROR, "Wechsel des Pfades auf dem FTP-Server nicht möglich.\n\nPfad: %s\nServerantwort: %s"
+ IDS_CREATEDIRERROR, "Erzeugen des Verzeichnisses auf dem FTP-Server nicht möglich.\n\nVerzeichniss: %s\nServerantwort: %s"
+ IDS_QUICKRENAMEERROR, "Umbenennen von Dateien oder Verzeichnissen auf dem FTP-Server nicht möglich.\n\nName: %s\nUmbenennen in: %s\nServerantwort: %s"
+ IDS_QUICKRENAMEFILEERR, "Umbenennung der Datei auf dem FTP-Server nicht möglich.\n\nName: %s\nUmbenennen in: %s\n"
+ IDS_QUICKRENAMEFILEERRSUF1, "Fehler: Quelldatei ist blockiert durch einen anderen Vorgang."
+ IDS_QUICKRENAMEFILEERRSUF2, "Fehler: Zieldatei ist blockiert durch einen anderen Vorgang."
+ IDS_ERRINPROXYSCRIPT, "Während der Verarbeitung des Proxyserverskripts ist ein Fehler aufgetreten.\n\nFehler: %s"
+ IDS_PROXYSRVADREMPTY, "Proxyserveradresse ist leer."
+ IDS_PROXYOPENCONERROR, "Proxyserver ist nicht in der Lage die Verbindung zum FTP-Server zu öffnen. ""%s"" (Port: %d).\n\nFehler: %%s"
+ IDS_PROXYSENDREQERROR, "Senden der Anfrage zum Proxyserver nicht möglich.\n\nFehler: %%s"
+ IDS_PROXYRECVREPERROR, "Erhalten einer Antwort vom Proxyserver nicht möglich.\n\nFehler: %%s"
+ IDS_PROXYUNEXPECTEDREPLY, "Unerwartete Rückmeldung vom Proxyserver erhalten. Sie haben wahrscheinlich einen falschen Proxyservertyp gewählt."
+
+ IDS_ENTERPASSTITLE, "Passwort eingeben"
+ IDS_ENTERPASSTEXT, "&Passwort:"
+ IDS_ENTERACCTTITLE, "Benutzerkonto eingeben"
+ IDS_ENTERACCTTEXT, "Benutzer&konto:"
+ IDS_CONNECTINGTOAS1, "Verbinde zu ""%s""."
+ IDS_CONNECTINGTOAS2, "Verbinde zu ""%s"" als ""%s""."
+
+ IDS_HIDDENPASSWORD, "Versteckt"
+
+ IDS_LCONLOSTFORMATERROR, "Verbindung zum FTP-Server im linken Fenster verloren.\n\nFehler: %s"
+ IDS_RCONLOSTFORMATERROR, "Verbindung zum FTP-Server im rechten Fenster verloren.\n\nFehler: %s"
+ IDS_DCONLOSTFORMATERROR, "Verbindung zum FTP-Server verloren.\n\nFehler: %s"
+ IDS_NONEREPLY, "(Nichts)"
+ IDS_WARNWHENCONLOST, "&Diese Meldung beim nächsten Mal nicht wieder zeigen.\tWieder rückgängig machen\tSie können diese Einstellung später auf der Bestätigungsseite in der FTP-Konfiguration ändern"
+
+ IDS_LOGHEADER, "Verbinde zu ""%s"" (%s) auf Port %d.\r\nLog UID ist %d, Zeit ist %s.\r\n\r\n"
+ IDS_RECONLOGHEADER, "\r\n-----\r\n\r\nErneut verbinden zu ""%s"" (%s) auf Port %d (Versuch Nr. %d).\r\nZeit ist %s.\r\n\r\n"
+ IDS_PRXSRVLOGHEADER, "FTP-Serveradresse: %s, Port: %d, Benutzer: %s\r\nProxyservername: %s, Typ: %s\r\nProxyserveradresse: %s, Port: %d, Benutzer: %s\r\nVerbinde zu ""%s"" (%s) auf Port %d.\r\nLog UID ist %d, Zeit ist %s.\r\n\r\n"
+ IDS_PRXSRVRECONLOGHEADER, "\r\n-----\r\n\r\nFTP-Serveradresse: %s, Port: %d, Benutzer: %s\r\nProxyservername: %s, Typ: %s\r\nProxyserveradresse: %s, Port: %d, Benutzer: %s\r\nErneut verbinden zu ""%s"" (%s) auf Port %d (Versuch Nr. %d).\r\nZeit ist %s.\r\n\r\n"
+
+ IDS_NOLOGS, "Keine Logdateien vorhanden."
+
+ IDS_FTPINLEFTPANEL, "linkes Fenster"
+ IDS_FTPINRIGHTPANEL, "rechtes Fenster"
+ IDS_FTPNOTINPANEL, "nicht im Fenster"
+ IDS_FTPOPERATION, "benutzt für einen Vorgang"
+ IDS_FTPDISCONNECTED, "getrennt"
+ IDS_OPERSTOPPED, "gestoppt"
+ IDS_FTPINACTIVE, "Verbindung nicht aktiv"
+
+ IDS_FSHAVENOLOG, "Die Verbindung zum FTP-Server hat keine Logdatei. Wahrscheinlich, wurde die Verbindung ohne Logaufzeichnung gestartet (siehe 'FTP-Konfiguration'/'Logdateien')."
+
+ IDS_CLEARLOGQUESTION, "Sind Sie sicher, dass Sie die Logdatei ""%s"" löschen möchten?"
+ IDS_REMOVELOGQUESTION, "Sind Sie sicher, dass Sie die Logdatei ""%s"" entfernen möchten?"
+ IDS_REMOVEALLLOGSQUESTION, "Sind Sie sicher, dass Sie alle Logdateien entfernen möchten?"
+ IDS_TEXTCOPIEDTOCLIPBOARD, "Text wurde erfolgreich in den Zwischenspeicher kopiert."
+ IDS_COPYTOCLIPBOARDERROR, "Text kann nicht in den Zwischenspeicher kopiert werden."
+ IDS_SAVELOGFILTER, "Logdateien (*.log)|*.log|Alle Dateien (*.*)|*.*|"
+ IDS_SAVEASTITLE, "Logdatei speichern unter"
+ IDS_SAVEALLASTITLE, "Alle Logdateien speichern unter"
+ IDS_SAVELOGERROR, "Speichern der Logdatei nicht möglich.\n\nFehler: %s"
+
+ IDS_CMDMAYNOTBEEMPTY, "Ein leerer Befehl ist hier nicht erlaubt."
+ IDS_SECRETFTPCOMMAND, "(geheimer Befehl)"
+ IDS_SERVERREPLYTITLE, "FTP-Serverantwort auf ""%s"""
+
+ IDS_RECONNECTTOSRV, "Verbindung zum FTP-Server wurde geschlossen. Möchten Sie erneut zum FTP-Server verbinden?"
+ IDS_ALWAYSRECONNECT, "&Erneut verbinden ohne nächstes Mal zu fragen\tWieder rückgängig machen\tSie können diese Einstellung später auf der Bestätigungsseite in der FTP-Konfiguration ändern"
+
+ IDS_LOGMSGLOGINSUCCESS, "Erfolgreich eingeloggt, hole Systeminformationen...\r\n"
+ IDS_LOGMSGCHANGINGPATH, "Wechsle den Pfad nach ""%s""...\r\n"
+ IDS_LOGMSGSENDINGUSRCMD, "Sende Benutzerbefehl ""%s""...\r\n"
+ IDS_LOGMSGREFRESHINGPATH, "Aktualisiere Pfad ""%s""...\r\n"
+ IDS_LOGMSGDETACHED, "Verbindung im linken Fenster...\r\n"
+ IDS_LOGMSGATTACHED, "Verbindung im Fenster wieder hergestellt...\r\n"
+ IDS_LOGMSGDISCONNECT, "Trenne Verbindung zum Server...\r\n"
+ IDS_LOGMSGLISTINGCACHEDPATH, "Liste Pfad ""%s"" aus dem Cache...\r\n"
+ IDS_LOGMSGLISTINGPATH, "Liste Pfad ""%s""...\r\n"
+ IDS_LOGMSGRESOLVINGLINK, "Löse Link ""%s"" auf...\r\n"
+ IDS_LOGMSGVIEWCACHEDFILE, "Betrachte Datei ""%s"" aus dem Cache...\r\n"
+ IDS_LOGMSGVIEWFILE, "Hole Datei ""%s"" für den Betrachter...\r\n"
+ IDS_LOGMSGCREATEDIR, "Erstelle Verzeichnis ""%s""...\r\n"
+ IDS_LOGMSGQUICKRENAME, "Nenne ""%s"" in ""%s"" um...\r\n"
+ IDS_LOGMSGDOWNLOADFILE, "Lade Datei ""%s"" herunter...\r\n"
+ IDS_LOGMSGUPLOADFILE, "Lade Datei ""%s"" hoch...\r\n"
+ IDS_LOGMSGPAUSE, "Benutzer möchte die Verbindung anhalten...\r\n"
+ IDS_LOGMSGRESUME, "Benutzer möchte die angehaltene Verbindung wieder aufnehmen...\r\n"
+ IDS_LOGMSGUPLOADISCOMPL, "Datei ""%s"" wurde vollständig hochgeladen (Dateigröße auf dem Server ist %s)...\r\n"
+ IDS_LOGMSGUPLOADISCOMPL2, "Textdatei ""%s"" wurde vollständig hochgeladen...\r\n"
+ IDS_LOGMSGUPLOADISNOTCOMPL, "Datei ""%s"" wurde  nicht vollständig hochgeladen (Dateigröße auf dem Server ist nicht %s)...\r\n"
+ IDS_LOGMSGUPLOADISNOTCOMPL2, "Textdatei ""%s"" wurde  nicht vollständig hochgeladen...\r\n"
+ IDS_LOGMSGDWNLOADFORCRESUM, "Erzwinge Wiederaufnahme für Datei ""%s"" (Dateiinhalt wurde vollständig empfangen aber der Server bestätigt die erfolgreiche Sendung dieser Datei nicht).\r\n"
+ IDS_LOGMSGUPLOADRENFILE, "Nenne Datei für das Hochladen um in ""%s""...\r\n"
+ IDS_LOGMSGDOWNLOADFILE2, "Herunterladen der Datei ""%s"" nach ""%s""...\r\n"
+
+ IDS_UNABLETOREADLIST, "Kann die Liste der Dateien und Verzeichnisse des Servers nicht vollständig ermitteln. Die im Fenster angezeigte Liste kann unvollständig sein."
+ IDS_UNABLETOREADLISTSUFFIX, "\n\nFehler: %s"
+ IDS_UNABLETOREADLISTSUFFIX2, "\n\nServerantwort: %s"
+ IDS_UNABLETOREADLISTSUFFIX3, "\n\nFehler: %s\nHinweis: Wenn die Datenübertragung noch nicht gestartet wurde, versuchen Sie den Übertragungsmodus zu ändern (siehe Dialog: 'Mit FTP-Server verbinden'/'Erweitert'/'Benutze passiven Übertragungsmodus')"
+ IDS_UNABLETOREADLISTSUFFIX4, "\n\nServerantwort: %s\nHinweis: Wenn die Datenübertragung noch nicht gestartet wurde, versuchen Sie den Übertragungsmodus zu ändern (siehe Dialog: 'Mit FTP-Server verbinden'/'Erweitert'/'Benutze passiven Übertragungsmodus')"
+ IDS_LOGMSGPASVNOTSUPPORTED, "Passiver Modus wird auf diesem Server nicht unterstützt, versuchen Sie den aktiven Modus...\r\n"
+ IDS_LISTPATHERROR, "Lesen der Datei- und Verzeichnisliste für den neuen Serverpfad nicht möglich.\nSoll der Pfad im Fenster weiter angezeigt werden?\n\nPfad: %s\nServerantwort: %s"
+ IDS_OPENACTDATACONERROR, "Die aktive Datenverbindung kann nicht vorbereitet werden.\n\nFehler: %s"
+
+ IDS_LOGMSGUNABLETOOPEN, "Die passive Datenverbindung kann nicht geöffnet werden (IP: %s, Port: %d)...\r\n"
+ IDS_LOGMSGUNABLETOOPEN2, "Die passive Datenverbindung kann nicht geöffnet werden  (IP: %s, Port: %d), Fehler: %s...\r\n"
+ IDS_LOGMSGDATACONTERMINATED, "Datenverbindung wurde auf Wunsch des Benutzers beendet...\r\n"
+ IDS_LOGMSGDATACONRECON, "Wiederherstellung der Datenverbindung...\r\n"
+ IDS_LOGMSGDATCONERROR, "Fehler bei Datenverbindung: %s\r\n"
+ IDS_LOGMSGUNEXPREPLY, "Unerwartete Antwort: "
+ IDS_LOGMSGNODATATRTIMEOUT, "Datenverbindung wurde wegen zu langem Leerlauf beendet...\r\n"
+ IDS_LOGMSGDATACONNOTOPENED, "Datenverbindung wurde nicht geöffnet...\r\n"
+ IDS_ERRDATACONNODATATRTIMEOUT, "Datenverbindung wurde wegen zu langem Leerlauf beendet."
+ IDS_ERRDATACONNOTOPENED, "Datenverbindung wurde nicht geöffnet."
+ IDS_LOGMSGUNABLETOCONPRX, "Öffnen der Verbindung zum Proxyserver nicht möglich (IP: %s, Port: %d)...\r\n"
+ IDS_LOGMSGUNABLETOCONPRX2, "Öffnen der Verbindung zum Proxyserver nicht möglich (IP: %s, Port: %d), Fehler: %s...\r\n"
+ IDS_ERRDATACONSSLCONNECTERROR, "Verschlüsselte Datenverbindung kann nicht hergestellt werden (SSL)."
+ IDS_ERRDATACONDECOMPRERROR, "Daten sind beschädigt oder unvollständig, sie können nicht richtig dekomprimiert werden (MODE Z)."
+ IDS_LOGMSGDECOMPRERROR, "Daten können nicht dekomprimiert werden (MODE Z), sie sind beschädigt.\r\n"
+
+ IDS_LINENUMCOLUMN, "Zeile"
+ IDS_LINENUMCOLUMNDESC, "Zeilennummern der einfachen FTP-Server Auflistung"
+ IDS_RAWLISTCOLUMN, "Auflistung"
+ IDS_RAWLISTCOLUMNDESC, "Einfache FTP-Server Auflistung"
+
+ IDS_LISTWNDDOWNLOADING, "Lade Datei- und Verzeichnisliste von %s herunter, zum Abbrechen drücken Sie ESC..."
+ IDS_LISTWNDDOWNLOADSPEED, "bei %s/s"
+ IDS_LISTWNDCONNECTIONIDLE, "Verbindungsleerlauf für %s"
+ IDS_LISTWNDSTATUS1, "%s von %s (%s)"
+ IDS_LISTWNDSTATUS2, "%s (%s)"
+ IDS_LISTWNDESTIMTIMEUNKNOWN, "(unbekannt)"
+ IDS_LISTWNDABORTINGCOMMAND, "Breche das Herunterladen der Datei- und Verzeichnisliste ab, zum Abbrechen drücken Sie ESC..."
+ IDS_LISTWNDSENDCOMMANDESC, "Möchten Sie das Herunterladen der Liste abbrechen? Die Datei- und Verzeichnisliste im Fenster könnte dann unvollständig sein.\n\nHinweis: Wenn die Datenübertragung noch nicht gestartet wurde, versuchen Sie den Übertragungsmodus zu ändern (siehe Dialog: 'Mit FTP-Server verbinden'/'Erweitert'/'Benutze passiven Übertragungsmodus')"
+ IDS_LISTWNDSENDCOMMANDESC2, "Möchten Sie das Herunterladen der Liste beenden? Verbindung zum Server wird getrennt. Die Datei- und Verzeichnisliste im Fenster könnte dann unvollständig sein.\n\nHinweis: Wenn die Datenübertragung noch nicht gestartet wurde, versuchen Sie den Übertragungsmodus zu ändern (siehe Dialog: 'Mit FTP-Server verbinden'/'Erweitert'/'Benutze passiven Übertragungsmodus')"
+ IDS_LISTWNDABORTCOMMANDESC, "Möchten Sie das Abbrechen beenden? Verbindung zum Server wird getrennt."
+
+ IDS_LISTWNDDOWNLFILEABORTING, "Breche das Herunterladen der Datei ab, zum Abbrechen drücken Sie ESC..."
+ IDS_LISTWNDDOWNLOADINGFILE, "Lade Datei %s von %s herunter, zum Abbrechen drücken Sie ESC..."
+ IDS_LISTWNDDOWNLFILESENDCMDESC, "Wollen Sie das Herunterladen abbrechen? Das könnte unvollständige Dateien zur Folge haben."
+ IDS_LISTWNDDOWNLFILESENDCMDESC2, "Wollen Sie das Herunterladen beenden? Verbindung zum Server wird getrennt. Das könnte unvollständige Dateien zur Folge haben."
+ IDS_LISTWNDDOWNLFILETIMEOUT, "Zeitüberschreitung beim Herunterladen."
+
+ IDS_RAWLISTINGTITLE, "Rohdatenliste"
+ IDS_RAWLISTINGFILTER, "Dateien auflisten (*.txt)|*.txt|Alle Dateien (*.*)|*.*|"
+ IDS_RAWLISTSAVEASTITLE, "Rohdatenliste speichern unter"
+ IDS_RAWLISTSAVEERROR, "Rohdatenliste kann nicht gespeichert werden.\nFehler: %s"
+
+ IDS_SRVTYPEREMOVECONF, "Sind Sie sicher, dass Sie die Unterstützung für Server des Typs ""%s"" entfernen wollen?"
+ IDS_SRVTYPENEWTITLE, "Neuer Servertyp"
+ IDS_SRVTYPENEWSUBJECT, "&Name des Servertyps:"
+ IDS_SRVTYPERENAMETITLE, "Servertyp umbenennen"
+ IDS_SRVTYPECOPYFROM, "&Kopiere Daten vom Servertyp ""%s"""
+ IDS_SRVTYPEUSERDEF, "(Benutzerdefiniert)"
+ IDS_SRVTYPENOTUNIQUE, "Servertyp ""%s"" existiert bereits, bitte wählen Sie einen anderen Namen."
+ IDS_SRVTYPEFILEFILTER, "Servertypdateien (*.str)|*.str|Alle Dateien (*.*)|*.*|"
+ IDS_SRVTYPESAVEASTITLE, "Exportiere Servertyp nach"
+ IDS_SRVTYPEEXPORTERROR, "Kann Servertyp nicht in Datei exportieren.\n\nFehler: %s"
+ IDS_SRVTYPEIMPORTERROR, "Kann Servertyp nicht aus Datei importieren.\n\nFehler: %s"
+ IDS_SRVTYPEIMPMOREDATA, "Datei enthält eine zu lange Zeile oder eine größere Datenmenge als erwartet."
+ IDS_SRVTYPEIMPNOTSTRFILE, "Datei ist beschädigt oder ist keine gültige Servertypdatei."
+ IDS_SRVTYPEIMPSYNERR, "Unerwartetes Dateiformat oder unzureichende Systemressourcen."
+ IDS_SRVTYPEOVERWRITE, "Der Servertyp ""%s"" existiert bereits. Wollen Sie den Typ ersetzen?"
+ IDS_SRVTYPEIMPERRINRULES, "Die Regeln für die Syntaxanalyse enthalten einen Fehler."
+ IDS_SRVTYPEIMPERRINACOND, "Die Bedingung für automatische Servertypbestimmung enthält Fehler."
+
+ IDS_ADCSTR_AND, "Und"
+ IDS_ADCSTR_OR, "Oder"
+ IDS_ADCSTR_NOT, "Nicht"
+ IDS_ADCSTR_LEFTPAR, "Start des Unterausdrucks"
+ IDS_ADCSTR_RIGHTPAR, "Ende des Unterausdrucks"
+ IDS_ADCSTR_SYSTCONTAINS, "SYST-Antwort enthält"
+ IDS_ADCSTR_WELMSGCONTAINS, "Willkommen-Antwort enthält"
+ IDS_ADCSTR_SYSTCONTAINSREG, "Regulären Ausdruck in SYST-Antwort gefunden"
+ IDS_ADCSTR_WELMSGCONTAINSREG, "Regulären Ausdruck in Willkommen-Antwort gefunden"
+
+ IDS_SRVTYPECOL_ID, "Bezeichnung"
+ IDS_SRVTYPECOL_NAME, "Name"
+ IDS_SRVTYPECOL_DESCR, "Beschreibung"
+ IDS_SRVTYPECOL_TYPE, "Typ"
+ IDS_SRVTYPECOL_EMPTYVAL, "Leerer Wert"
+ IDS_SRVTYPECOL_ALIGN, "Ausrichtung"
+
+ IDS_STC_STDNAME_NAME, "Name"
+ IDS_STC_STDNAME_EXT, "Erw"
+ IDS_STC_STDNAME_SIZE, "Größe"
+ IDS_STC_STDNAME_DATE, "Datum"
+ IDS_STC_STDNAME_TIME, "Zeit"
+ IDS_STC_STDNAME_TYPE, "Typ"
+ IDS_STC_STDNAME_RIGHTS, "Rechte"
+ IDS_STC_STDNAME_USER, "Benutzer"
+ IDS_STC_STDNAME_GROUP, "Gruppe"
+ IDS_STC_STDNAME_DEVICE, "Laufwerk"
+ IDS_STC_STDNAME_BLKSIZE, "Blöcke"
+ IDS_STC_STDNAME_ALLOCBLKS, "Zugewiesen"
+ IDS_STC_STDNAME_LINKTGT, "Ziel"
+ IDS_STC_STDNAME_FORMAT, "Format"
+ IDS_STC_STDNAME_LRECL, "LogSatzL"
+ IDS_STC_STDNAME_RECORDS, "Datensätze"
+ IDS_STC_STDNAME_FILEMODE, "Fm"
+ IDS_STC_STDNAME_VOLUME, "Partition"
+ IDS_STC_STDNAME_UNIT, "Einheit"
+ IDS_STC_STDNAME_EXTENTS, "Erw"
+ IDS_STC_STDNAME_USED, "Benutzt"
+ IDS_STC_STDNAME_RECFM, "Satzfm"
+ IDS_STC_STDNAME_BLKSZ, "BlkSz"
+ IDS_STC_STDNAME_DSORG, "Dsorg"
+ IDS_STC_STDNAME_VVMM, "VV.MM"
+ IDS_STC_STDNAME_CREATED, "Erzeugt"
+ IDS_STC_STDNAME_INIT, "Init"
+ IDS_STC_STDNAME_MOD, "Modus"
+ IDS_STC_STDNAME_ID, "Id"
+ IDS_STC_STDNAME_TTR, "TTR"
+ IDS_STC_STDNAME_ALIASOF, "Alias-von"
+ IDS_STC_STDNAME_AC, "AC"
+ IDS_STC_STDNAME_ATTR, "Attribute"
+ IDS_STC_STDNAME_AMODE, "Amodus"
+ IDS_STC_STDNAME_RMODE, "Rmodus"
+ IDS_STC_STDNAME_CODE, "Code"
+ IDS_STC_STDNAME_RWEP, "RWEP"
+
+ IDS_STC_STDDESCR_NAME, "Name"
+ IDS_STC_STDDESCR_EXT, "Erweiterung"
+ IDS_STC_STDDESCR_SIZE, "Größe"
+ IDS_STC_STDDESCR_DATE, "Geändert am"
+ IDS_STC_STDDESCR_TIME, "Geändert um"
+ IDS_STC_STDDESCR_TYPE, "Dateityp"
+ IDS_STC_STDDESCR_RIGHTS, "Zugriffsrechte"
+ IDS_STC_STDDESCR_USER, "Benutzer"
+ IDS_STC_STDDESCR_GROUP, "Gruppe"
+ IDS_STC_STDDESCR_DEVICE, "Höchste und niedrigste Gerätenummer"
+ IDS_STC_STDDESCR_BLKSIZE, "Größe in Blöcken"
+ IDS_STC_STDDESCR_ALLOCBLKS, "Zugewiesende Blöcke"
+ IDS_STC_STDDESCR_LINKTGT, "Link-Ziel"
+ IDS_STC_STDDESCR_FORMAT, "Format"
+ IDS_STC_STDDESCR_LRECL, "Logische Datensatzlänge"
+ IDS_STC_STDDESCR_RECORDS, "Anzahl der Datensätze"
+ IDS_STC_STDDESCR_FILEMODE, "Dateimodus"
+ IDS_STC_STDDESCR_VOLUME, "Partition"
+ IDS_STC_STDDESCR_UNIT, "Einheit"
+ IDS_STC_STDDESCR_EXTENTS, "Erweiterungen"
+ IDS_STC_STDDESCR_USED, "Benutzt"
+ IDS_STC_STDDESCR_RECFM, "Datensatzformat"
+ IDS_STC_STDDESCR_BLKSZ, "Physicalische Blocklänge"
+ IDS_STC_STDDESCR_DSORG, "Datensatzorganisation"
+ IDS_STC_STDDESCR_VVMM, "VV.MM"
+ IDS_STC_STDDESCR_CREATED, "Erstellt"
+ IDS_STC_STDDESCR_INIT, "Initiale Größe"
+ IDS_STC_STDDESCR_MOD, "Modus"
+ IDS_STC_STDDESCR_ID, "Id"
+ IDS_STC_STDDESCR_TTR, "TTR"
+ IDS_STC_STDDESCR_ALIASOF, "Alias-von"
+ IDS_STC_STDDESCR_AC, "AC"
+ IDS_STC_STDDESCR_ATTR, "Attribute"
+ IDS_STC_STDDESCR_AMODE, "Amodus"
+ IDS_STC_STDDESCR_RMODE, "Rmodus"
+ IDS_STC_STDDESCR_CODE, "Code"
+ IDS_STC_STDDESCR_RWEP, "RWEP"
+
+ IDS_STC_TYPE_NAME, "Name (benötigt)"
+ IDS_STC_TYPE_EXT, "Erweiterung (aus Dateinamen generiert)"
+ IDS_STC_TYPE_SIZE, "Dateigröße in Bytes"
+ IDS_STC_TYPE_DATE, "Geändert am"
+ IDS_STC_TYPE_TIME, "Geändert um"
+ IDS_STC_TYPE_TYPE, "Dateityp (aus Erweiterung ermittelt)"
+ IDS_STC_TYPE_ANYTEXT, "Beliebiger Text"
+ IDS_STC_TYPE_ANYDATE, "Beliebiges Datum"
+ IDS_STC_TYPE_ANYTIME, "Beliebige Zeit"
+ IDS_STC_TYPE_ANYNUM, "Beliebige Zahl"
+
+ IDS_STC_ERR_NAMEERR, "Im Servertyp muss die erste Spalte sichtbar sein und den Typ ""Name"" haben."
+ IDS_STC_ERR_EXTERR, "Im Servertyp muss die Spalte mit Typ ""Erweiterung"" dem Spaltentyp ""Name"" folgen und sichtbar sein."
+ IDS_STC_ERR_IDEMPTY, "Im Servertyp darf die Spaltenbezeichnung nicht leer sein."
+ IDS_STC_ERR_IDINVALID, "Das Format der Spaltenbezeichnung im Servertyp ist ungültig. Sie muss mit Buchstabe oder Unterstrich beginnen und darf nur Buchstaben, Zahlen, und Unterstriche enthalten."
+ IDS_STC_ERR_IDRESERVED, "Die Spaltenbezeichnung im Servertyp darf die reservierten Namen (""is_dir"", ""is_hidden"", und ""is_link"") nicht enthalten."
+ IDS_STC_ERR_IDNOTUNIQUE, "Die selbe Bezeichnung für zwei Spalten im Servertyp ist nicht gestattet."
+ IDS_STC_ERR_TYPEERR, "Falsche Nutzung von Spaltentypen (Wiederholung) im Servertyp."
+ IDS_STC_ERR_INVALEMPTY, "Ungültiger leerer Eintrag für eine Spalte im Servertyp."
+ IDS_STC_ERR_EMPTYNAME, "Der Spaltenname im Servertyp darf nicht leer sein."
+ IDS_STC_ERR_EMPTYDESCR, "Die Spaltenbeschreibung im Servertyp darf nicht leer sein."
+
+ IDS_SRVTYPECOL_REMOVECONF, "Möchten Sie die Spalte wirklich löschen ""%s""?"
+
+ IDS_SRVTYPE_EXITCONF, "Sie haben etwas geändert. Möchten Sie die Änderungen wirklich ignorieren und den Dialog schließen?"
+
+ IDS_SRVTYPECOL_NEWTITLE, "Neue Spalte"
+ IDS_SRVTYPECOL_FORMDATE, "dd.mm.yyyy"
+ IDS_SRVTYPECOL_FORMTIME, "hh:mm:ss"
+ IDS_SRVTYPECOL_FORMNUM, "(Zahl)"
+ IDS_SRVTYPECOL_FORMSTR, "(Text)"
+
+ IDS_SRVTYPECOL_ALIGNLEFT, "Links"
+ IDS_SRVTYPECOL_ALIGNRIGHT, "Rechts"
+
+ IDS_SRVTYPE_READRAWLISTERR, "Kann die Rohdatenliste nicht aus der Datei lesen.\n\nFehler: %s"
+ IDS_SRVTYPE_READRAWLISTLIMIT, "Warnung: Lese zuerst nur die ersten 1MB der Textdatei."
+ IDS_SRVTYPE_ONLYINPANEL, "(nur im Fenster)"
+ IDS_SRVTYPE_SIZEISDIR, "VERZ"
+ IDS_STPAR_UNABLECOMPPARSER, "Kann die Syntaxanalyse nicht kompilieren. Die Regeln für die Analyse enthalten Fehler.\n\nFehler: %s"
+ IDS_SRVTYPE_PARSEERROR, "Kann die Rohdatenliste nicht vollständig analysieren."
+
+ IDS_STPAR_ERR_UNEXPSYM, "Unerwartetes Zeichen wurde gefunden."
+ IDS_STPAR_ERR_MISSINGRULEEND, "Regelende (Zeichen ';') fehlt."
+ IDS_STPAR_ERR_INVALIDFUNCNAME, "Ungültiger Funktionsname."
+ IDS_STPAR_ERR_MISSINGFUNCPARS, "Funktionsparameter (Zeichen '(') fehlen."
+ IDS_STPAR_ERR_FUNCEXPECTED, "Funktionsname wurde nicht gefunden (vielleicht ein überflüssiges ',')."
+ IDS_STPAR_ERR_UNKNOWNFUNC, "Unbekannte Funktion wurde gefunden."
+ IDS_STPAR_ERR_MISSINGPAREND, "Ende der Funktionsparameter (Zeichen ')') fehlt."
+ IDS_STPAR_ERR_PAREXPECTED, "Funktionsparameter wurde nicht gefunden (vielleicht ein überflüssiges ',')."
+ IDS_STPAR_ERR_MISSINGCOLUMNID, "Spaltenbezeichnung fehlt."
+ IDS_STPAR_ERR_INVALIDCOLUMNID, "Spaltenbezeichnung ungültig."
+ IDS_STPAR_ERR_UNKNOWNCOLUMN, "Unbekannte Spaltenbezeichnung gefunden."
+ IDS_STPAR_ERR_GENERCOLUMN, "Spalte mit Typ ""Erweiterung"" oder ""Typ"" kann nicht für die Regeln der Syntaxanalyse verwendet werden."
+ IDS_STPAR_ERR_MISSINGCOLIDEND, "Ende der Spaltenbezeichnung (Zeichen '>') fehlt."
+ IDS_STPAR_ERR_MISSINGSTREND, "Ende der Zeichenkette (Zeichen '""') fehlt."
+ IDS_STPAR_ERR_STRUNKNESCSEQ, "Unbekannte Escapesequenz in Zeichenkette benutzt (benutze Escapesequenz ""\\\\"" für Backslashzeichen)."
+ IDS_STPAR_ERR_INVALIDNUMBER, "Ungültige Zahl."
+ IDS_STPAR_ERR_INVALVARORBOOL, "Unerwartetes Zeichen gefunden (vielleicht ungültige Zustandsvariable oder boolescher Wert)."
+ IDS_STPAR_ERR_UNKNOWNSTVAR, "Unbekannte Zustandsvariable gefunden."
+ IDS_STPAR_ERR_RIGHTPAREXPECT, "Rechter Operant nicht im Ausdruck gefunden."
+ IDS_STPAR_ERR_UNEXPSYORUNKNOP, "Unerwartetes Zeichen oder unbekannten Operator gefunden."
+ IDS_STPAR_ERR_UNSUPEXPRESSION, "Nicht unterstützter Ausdruck. Nur ein Operator ist gestattet."
+ IDS_STPAR_ERR_UNEXPTYPESINEXP, "Fehler bei Verwendung eines Operators. Operatortypen passen nicht zusammen oder haben unerwarteten Typ."
+ IDS_STPAR_ERR_BADPARINFUNC, "Fehler bei Verwendung einer Funktion. Unerwartete Anzahl oder Typen von Parametern."
+ IDS_STPAR_ERR_BADUSEOFCOLID, "Fehler bei Verwendung einer Spaltenbezeichnungen. Sie müssen einige Werte in die Spalte eintragen bevor Sie sie benutzen können."
+ IDS_STPAR_ERR_BADMONTH3STR, "Ungültige Zeichenkette bei Monat in 3 Buchstaben (Format: 12 Monate in 3 Buchstaben getrennt mit Leerzeichen)."
+ IDS_STPAR_ERR_MISSINGSTRPAR, "Zeichenkettenparameter (Zeichen '""') fehlt."
+ IDS_STPAR_ERR_MISSINGRIGHTPAR, "Ende des Unterausdrucks (Zeichen ')') fehlt."
+ IDS_STPAR_ERR_INVALREGEXP, "Ungültiger regulärer Ausdruck: %s"
+ IDS_STPAR_ERR_INVALREGEXP2, "Ungültiger regulärer Ausdruck"
+ IDS_STPAR_ERR_BADMONTHTXTSTR, "Ungültige Zeichenkette in ausgeschriebenen Monaten (Format: 12 Monate getrennt mit Leerzeichen)."
+
+ IDS_STPAR_UNABLECOMPAUTODCOND, "Bedingungen für die automatische Ermittlung enthalten Fehler.\n\nFehler: %s"
+
+ IDS_LOGMSGUNKNOWNSRVTYPE, "Unbekannter Servertyp, kann die Textauflistung nicht analysieren...\r\n"
+ IDS_UNKNOWNSRVTYPEINFO, "Kann die Liste der Dateien und Verzeichnisse des Servers nicht analysieren. Nur die eindeutige Textliste wird im Fenster angezeigt.\n\nBitte überprüfen Sie unsere Seite auf eine neuere Sally Version. Wenn Sie die aktuelle Version benutzen, erstellen Sie bitte ein Issue auf https://github.com/0xeb/sally/issues und hängen Sie die einfache Auflistung an (im Fenster rechts klicken > Einfache Liste zeigen > Speichern unter). Bitte helfen Sie uns möglichst viele Typen von Servern zu unterstützen."
+ IDS_LOGMSGUNKNOWNSRVTYPE2, "Kann die Textauflistung des gewählten Servertyps nicht analysieren...\r\n"
+ IDS_UNKNOWNSRVTYPEINFO2, "Kann die Liste von Dateien und Verzeichnissen des Servers nicht analysieren. Nur einfache Listen werden im Fenster angezeigt.\n\nTesten Sie verschiedene Servertypen oder lassen Sie ihn vom FTP-Client automatisch ermitteln (unter 'Erweitert' im Dialog 'Mit FTP-Server verbinden')."
+ IDS_LOGMSGPARSEDBYSRVTYPE, "Textliste wurde von ""%s""-Servertyp analysiert...\r\n"
+ IDS_WAITWNDPARSINGLST, "Analysiere Liste von Dateien und Verzeichnissen des Servers, bitte warten..."
+
+ IDS_PLSTR_BLOCKSINSELFILES, "{!}<%s> Bl{öcke|0|ock|1|öcke} in <%s> ausgewählten Datei{en|0||1|en}"
+
+ IDS_INVALIDMEMCACHESIZE, "Die Größenbegrenzung liegt bei wenigstens 100KB und maximal 1GB."
+ IDS_INVALIDRESUMEOVERLAP, "Die Anzahl überprüfter Bytes kann maximal 1GB betragen."
+
+// IDS_NOPATHACCESSINPANEL, "No path is accessible on this FTP server. Do you wish to disconnect from this server?"
+
+ IDS_LOGMSGKEEPALIVE, "Sende den Befehl zur Aufrechterhaltung der Verbindung...\r\n"
+ IDS_FINISHINGKEEPALIVECMD, "Beende das Senden des Befehls zur Aufrechterhaltung der Verbindung, zum Abbrechen drücken Sie ESC..."
+ IDS_KEEPALIVECMDESC, "Wollen Sie das Senden des Befehls zur Aufrechterhaltung der Verbindung beenden? Verbindung zum Server wird getrennt."
+ IDS_LOGMSGKEEPALIVECMDTIMEOUT, "Zeitüberschreitung bei Senden des Befehls zur Aufrechterhaltung der Verbindung.\r\n"
+ IDS_LOGMSGOPENACTDATACONERROR, "Vorbereitung der aktiven Datenverbindung nicht möglich.\r\n"
+ IDS_LOGMSGKAPASVNOTSUPPORTED, "Passiver Modus wird auf diesem Server nicht unterstützt.\r\n"
+ IDS_LOGMSGKASTOPPED, "Das Senden des Befehls zur Aufrechterhaltung der Verbindung wurde gestoppt...\r\n"
+ IDS_LOGMSGOPENACTDATACONERROR2, "Verbindung zum Proxyserver nicht möglich.\r\n"
+
+ IDS_COPYFROMFTP, "Kopiere %s vom FTP-Server nach"
+ IDS_MOVEFROMFTP, "Verschiebe %s vom FTP-Server nach"
+ IDS_COPYTITLE, "Kopieren"
+ IDS_MOVETITLE, "Verschieben"
+
+ IDS_DELETEFROMFTP, "Sind Sie sicher, dass Sie %s vom FTP-Server löschen wollen?"
+
+ IDS_CHATTRNOTUNIXSRV, "Das Ändern der Attribute wird auf diesem Server wahrscheinlich nicht funktionieren. Es funktioniert nur auf UNIX Servern mit traditionellem Berechtigungsmodell.\n\nWollen Sie den Befehl zum Ändern der Attributte trotzdem verwenden?"
+ IDS_CHANGEATTRSONFTP, "Ändere die Attribute von %s auf"
+ IDS_CHATTRNOTHINGTODO, "Nichts zu tun. Bitte wählen Sie die Attribute der Dateien und Verzeichnisse aus die Sie ändern wollen."
+ IDS_CHATTRNUMVAL3DIGITS, "Zahlenwerte müssen drei Stellen haben."
+ IDS_CHATTRNOTHINGTODO2, "Nichts zu tun. Bitte wählen Sie zu ändernde Attribute aus."
+
+ IDS_MENUTRANSFERMODE, "&Übertragungsmodus"
+ IDS_MENUTRMODEAUTO, "&Automatisch"
+ IDS_MENUTRMODEASCII, "A&SCII"
+ IDS_MENUTRMODEBINARY, "&Binär"
+
+ IDS_OPERATIONSUSERPROMPT, "Frage Benutzer"
+ IDS_OPERATIONSAUTORENAME, "Benutze alternativen Namen"
+ IDS_OPERATIONSRESUME, "Fortsetzen"
+ IDS_OPERATIONSRESUMEOROVERWR, "Fortsetzen oder überschreiben"
+ IDS_OPERATIONSOVERWRITE, "Überschreiben"
+ IDS_OPERATIONSSKIP, "Überspringen"
+ IDS_OPERATIONSUSEEXISTINGDIR, "Benutze vorhandenes Verzeichnis"
+ IDS_OPERATIONSIGNORE, "Ignorieren"
+ IDS_OPERATIONSINBINMODE, "Binär-Modus benutzen"
+ IDS_OPERATIONSDELETE, "Löschen"
+
+ IDS_MASKS_HINT, "'*' steht für eine beliebige Anzahl von Zeichen. '?' steht für ein beliebiges Zeichen.\nBeispiel: *.a? (.a1, irgendwas.ai, usw.)\nMasken werden durch Semikolon getrennt. Beispiel: *.txt;*.doc (a.txt, b.doc, usw.)\nAuszuschließende Masken werden hinter ein '|' gesetzt. Beispiel: |*.txt;*.doc (*.txt;*.doc Alles ausser *.txt oder *.doc)\nWenn Sie ein Semikolon innerhalb der Maske benötigen, schreiben Sie es zweimal. Beispiel: eine;;Maske"
+
+ IDS_OPERDLGDELETETITLE, "Lösche %s von %s"
+ IDS_OPERDLGCOPYDOWNLOADTITLE, "Kopiere %s von %s"
+ IDS_OPERDLGMOVEDOWNLOADTITLE, "Verschiebe %s von %s"
+ IDS_OPERDLGCOPYUPLOADTITLE, "Kopiere %s nach %s"
+ IDS_OPERDLGMOVEUPLOADTITLE, "Verschiebe %s nach %s"
+ IDS_OPERDLGCHATTRSTITLE, "Ändere Attribute von %s auf %s"
+
+ IDS_OPERDLGSRCPATH, "Quellpfad:"
+ IDS_OPERDLGTGTPATH, "Zielpfad:"
+ IDS_OPERDLGPATH, "Pfad:"
+ IDS_OPERDLGCONFIRMCANCEL, "Möchten Sie den Vorgang wirklich abbrechen?"
+ IDS_OPERDLGCLOSEBUTTON1, "Schließen"
+ IDS_OPERDLGCLOSEBUTTON2, "Abbrechen"
+ IDS_OPERDLGCONFIRMCLOSE, "Einige Teilvorgänge konnten nicht erfolgreich beendet werden.\n\nWollen Sie wirklich die nicht beendeten Vorgänge schließen?"
+
+ IDS_OPERDLGCONS_ID, "ID"
+ IDS_OPERDLGCONS_ACTION, "Aktion"
+ IDS_OPERDLGCONS_STATUS, "Status"
+
+ IDS_OPERDLGOPERS_DESCR, "Beschreibung"
+ IDS_OPERDLGOPERS_STATUS, "Status"
+
+ IDS_OPERDLGOPSTS_FINISHED, "Beendet"
+ IDS_OPERDLGOPSTS_SKIPPED, "Übersprungen: %s"
+ IDS_OPERDLGOPSTS_FAILED, "Fehler: %s"
+ IDS_OPERDLGOPSTS_WAITUSER, "Frage an den Benutzer: %s, was ist zu tun?"
+ IDS_OPERDLGOPSTS_WAITING, "Warte"
+ IDS_OPERDLGOPSTS_PROCESSING, "Verarbeite"
+ IDS_OPERDLGOPSTS_DELAYED, "Verschoben: Unterpunkte wurden noch nicht beendet"
+ IDS_OPERDLGOPSTS_FORCEDTOFAIL, "Fehler: Unterpunkte wurden nicht erfolgreich beendet"
+
+ IDS_OPERDOPDS_DELLINK, "Lösche Link %s von %s"
+ IDS_OPERDOPDS_DELFILE, "Lösche Datei %s von %s"
+ IDS_OPERDOPDS_DELDIR, "Lösche Verzeichnis %s von %s"
+ IDS_OPERDOPDS_CHATTREXPLDIR, "Untersuche Verzeichnis %s von %s für die Attributänderung"
+ IDS_OPERDOPDS_RESLINK, "Löse Link %s von %s auf"
+ IDS_OPERDOPDS_COPY1, "Kopiere %s%s von %s nach %s im %s-Übertragungsmodus"
+ IDS_OPERDOPDS_COPY2, "Kopiere %s%s von %s nach %s als %s im %s-Übertragungsmodus"
+ IDS_OPERDOPDS_MOVE1, "Verschiebe %s%s von %s nach %s im %s-Übertragungsmodus"
+ IDS_OPERDOPDS_MOVE2, "Verschiebe %s%s von %s nach %s als %s im %s-Übertragungsmodus"
+ IDS_OPERDOPDS_ASCIITRMODE, "ASCII"
+ IDS_OPERDOPDS_BINARYTRMODE, "Binär"
+ IDS_OPERDOPDS_SIZEINBLOCKS, "Blöcke"
+ IDS_OPERDOPDS_MOVEDELDIR, "Lösche Verzeichnis %s von %s nachdem der Inhalt daraus verschoben wurde"
+ IDS_OPERDOPDS_MOVEDELDIRLNK, "Lösche Verzeichnislink %s von %s nachdem der Inhalt daraus verschoben wurde"
+ IDS_OPERDOPDS_COPYEXPLDIR, "Untersuche Verzeichnis %s von %s um es nach %s als %s zu kopieren"
+ IDS_OPERDOPDS_MOVEEXPLDIR, "Untersuche Verzeichnis %s von %s um es nach %s als %s zu verschieben"
+ IDS_OPERDOPDS_MOVEEXPLDIRLNK, "Untersuche Verzeichnislink %s von %s um es nach %s als %s zu verschieben"
+ IDS_OPERDOPDS_CHATTRFILE, "Ändere die Attribute der Datei %s von %s nach %s"
+ IDS_OPERDOPDS_CHATTRDIR, "Ändere die Attribute des Verzeichnisses %s von %s nach %s"
+ IDS_OPERDOPDS_CHATTREXPLDIRLNK, "Untersuche Verzeichnislink %s von %s für die Attributänderungen"
+ IDS_OPERDOPDS_DELEXPLDIR, "Untersuche Verzeichnis %s von %s für das Löschen"
+
+ IDS_OPERDOPPR_OK, "Erfolgreich"
+ IDS_OPERDOPPR_LOWMEM, "Nicht genügend Systemressourcen"
+ IDS_OPERDOPPR_CANTCRTGTFILE, "Die Zieldatei kann nicht erstellt oder geöffnet werden, Systemfehler: %s"
+ IDS_OPERDOPPR_CANTCRTGTDIR, "Das Zielverzeichnis kann nicht erstellt werden, Systemfehler: %s"
+ IDS_OPERDOPPR_TGTFILEEXISTS, "Die Zieldatei ist bereits vorhanden"
+ IDS_OPERDOPPR_TGTDIREXISTS, "Dss Zielverzeichnis ist bereits vorhanden"
+ IDS_OPERDOPPR_TRANSFERFAILED, "Übertragung fehlgeschlagen"
+ IDS_OPERDOPPR_ASCIITRBINFILE, "Der ASCII-Übertragungsmodus ist für Binärdateien gesetzt worden"
+ IDS_OPERDOPPR_UNKNOWNATTRS, "Einige der vorhandenen Attribute (%s) können nicht erhalten werden"
+ IDS_OPERDOPPR_UNKEXISTATTR, "unbekannt"
+ IDS_OPERDOPPR_INVALIDPATHTODIR, "Der Pfad zum Verzeichnis ist zu lang oder ungültig"
+ IDS_OPERDOPPR_UNABLETOCWD, "Der Arbeitspfad kann nicht gewechselt werden, Serverantwort:"
+ IDS_OPERDOPPR_UNABLETOPWD, "Der Arbeitspfad kann nicht erreicht werden, Serverantwort:"
+ IDS_OPERDOPPR_DIREXPLENDLESSLOOP, "Untersuchung des Verzeichnisses würde eine Endlosschleife auslösen"
+ IDS_OPERDOPPR_LISTENFAILURE, "Kann aktive Datenverbindung nicht vorbereiten: %s"
+ IDS_OPERDOPPR_INCOMPLLISTING1, "Kann die Datei- und Verzeichnisliste des Servers nicht vollständig lesen, Fehler: %s"
+ IDS_OPERDOPPR_INCOMPLLISTING2, "Kann die Datei- und Verzeichnisliste des Servers nicht vollständig lesen, Serverantwort:"
+ IDS_OPERDOPPR_UNABLETOPARSELISTING, "Kann die Datei- und Verzeichnisliste des Servers nicht analysieren"
+ IDS_OPERDOPPR_DIRISHIDDEN, "Das Verzeichnis ist versteckt"
+ IDS_OPERDOPPR_DIRISNOTEMPTY, "Das Verzeichnis ist nicht leer"
+ IDS_OPERDOPPR_FILEISHIDDEN, "Die Datei ist versteckt"
+ IDS_OPERDOPPR_INVALIDPATHTOLINK, "Vollständiger Linkname ist zu lang oder ungültig"
+ IDS_OPERDOPPR_UNABLETORESOLVELNK, "Kann den Link auf das Verzeichnis oder die Datei nicht auflösen, Serverantwort:"
+ IDS_OPERDOPPR_UNABLETODELFILE, "Kann die Datei oder den Link nicht löschen, Serverantwort:"
+ IDS_OPERDOPPR_UNABLETODELDIR, "Kann das Verzeichnis nicht löschen, Serverantwort:"
+ IDS_OPERDOPPR_UNABLETOCHATTRS, "Kann die Attribute nicht ändern, Serverantwort:"
+ IDS_OPERDOPPR_UNABLETORESUME, "Kann die Dateiübertragung nicht fortsetzen (Server unterstützt keine Wiederaufnahme)"
+ IDS_OPERDOPPR_RESUMETESTFAILED, "Kann die Dateiübertragung nicht fortsetzen, unerwartetes Dateieende (Die Datei wurde geändert oder der Server beherrscht das Fortsetzen nicht ordnungsgemäß, wenn der ASCII-Übertragungsmodus verwendet wird.)"
+ IDS_OPERDOPPR_TGTFILEREADERROR, "Kann die Zieldatei nicht lesen, Systemfehler: %s"
+ IDS_OPERDOPPR_TGTFILEWRITEERROR, "Kann die Zieldatei nicht schreiben, Systemfehler: %s"
+ IDS_OPERDOPPR_INCOMPLDOWNLOAD1, "Kann die Datei nicht vom Server abrufen, Fehler: %s"
+ IDS_OPERDOPPR_INCOMPLDOWNLOAD2, "Kann die Datei nicht vom Server abrufen, Serverantwort:"
+ IDS_OPERDOPPR_UNABLETODELSRCFILE, "Kann die Quelldatei oder den Link nach erfolgreicher Übertragung nicht löschen, Serverantwort:"
+
+ IDS_OPERDLGCOACT_STOPPING, "Stoppe"
+ IDS_OPERDLGCOACT_LOOKFORWORK, "Ermittle anstehende Vorgänge"
+ IDS_OPERDLGCOACT_SLEEPING, "Leerlauf"
+ IDS_OPERDLGCOACT_WAITFORUSER, "Warte auf Benutzerunterstützung"
+ IDS_OPERDLGCOACT_DELLINK, "Lösche Link %s"
+ IDS_OPERDLGCOACT_DELFILE, "Lösche Datei %s"
+ IDS_OPERDLGCOACT_DELDIR, "Lösche Verzeichnis %s"
+ IDS_OPERDLGCOACT_EXPLDIR, "Untersuche Verzeichnis %s"
+ IDS_OPERDLGCOACT_RESLINK, "Löse Link %s auf"
+ IDS_OPERDLGCOACT_COPY, "Kopiere %s"
+ IDS_OPERDLGCOACT_MOVE, "Verschiebe %s"
+ IDS_OPERDLGCOACT_CHATTR, "Ändere die Attribute von %s"
+
+ IDS_OPERDLGCOACT_PREPARING, "Bereite Vorgang vor"
+ IDS_OPERDLGCOACT_CONNECTING, "Verbinde"
+ IDS_OPERDLGCOACT_WAITRECON, "Kann nicht verbinden, warte %d Sekunden bis zum erneuten Versuch  (Versuch Nr. %d von %d): %s"
+ IDS_OPERDLGCOACT_CONERROR, "Kann nicht zu %s verbinden"
+ IDS_OPERDLGCOACT_TIMELEFT, "Verbleibende Zeit:"
+ IDS_OPERDLGCOACT_WAITFORLIST, "Warte auf die Auflistung des Zielpfades"
+ IDS_OPERDLGCOACT_PAUSED, "Angehalten"
+
+ IDS_WORKERLOGHEADER, "Host: ""%s"", Port: %d.\r\nLog UID ist %d, Zeit ist %s.\r\n\r\n"
+ IDS_LOGMSGCONINWORKER, "\r\nVerbindung wurde für den Vorgang vom Dateifenster gelöst...\r\n"
+ IDS_LOGMSGCONFROMWORKER, "\r\nVerbindung wurde an das Dateifenster übergeben (wird für den Vorgang benötigt)...\r\n\r\n"
+ IDS_LOGMSGWORKERUSECON, "Benutze Verbindung des Dateifensters...\r\n\r\n"
+ IDS_LOGMSGWORKERRETCON, "Verbindung wurde an das Dateifenster zurückgegeben...\r\n"
+
+ IDS_CANCELEXISTINGOPER, "Die Warteschlange enthält noch unbeendete FTP-Vorgänge. Wollen Sie diese beenden?"
+
+ IDS_CLOSINGOPERCONS1, "Schließe die vom Vorgang verwendete Verbindung, drücken Sie ESC um den Vorgang zu beenden..."
+ IDS_CLOSINGOPERCONS2, "Schließe alle vom Vorgang verwendeteten Verbindungen, drücken Sie ESC um sie zu trennen..."
+ IDS_CLOSINGOPERCONS3, "Schließe alle von Vorgängen verwendeteten Verbindungen, drücken Sie ESC um sie zu trennen..."
+ IDS_TERMCONFOROPER1, "Möchten Sie die vom Vorgang verwendete Verbindung trennen?"
+ IDS_TERMCONFOROPER2, "Möchten Sie alle von diesem Vorgang verwendeten Verbindungen trennen?"
+ IDS_TERMCONFOROPER3, "Möchten Sie alle von Vorgängen verwendeten Verbindungen trennen?"
+
+ IDS_WANTTOSTOPCON, "Möchten Sie die Verbindung ""%d"" wirklich abbrechen?"
+
+ IDS_LOGMSGCMDTIMEOUT, "Zeitüberschreitung beim Senden des FTP-Befehls.\r\n"
+ IDS_WORKERCONLOGHDR, "Verbinde zu ""%s"" (%s) auf Port %d...\r\n\r\n"
+ IDS_WORKERWAITLOGTIM, "Zeitüberschreitung beim Warten auf die Anmeldeaufforderung.\r\n"
+ IDS_WORKERLOGPARCHANGED, "\r\n-----\r\n\r\nDie Anmeldeparameter haben sich geändert oder das Serverzertifikat (SSL) wurde akzeptiert oder beglaubigt.\r\n\r\n"
+ IDS_PRXSRVWORKERCONLOGHDR, "FTP-Serveradresse: %s, Port: %d, Benutzer: %s\r\nProxyservername: %s, Typ: %s\r\nProxyserveradresse: %s, Port: %d, Benutzer: %s\r\nVerbinde zu ""%s"" (%s) mit Port %d...\r\n\r\n"
+
+ IDS_WORKERGETIPERROR, "Fehler bei Ermittlung der IP-Adresse: %s"
+ IDS_WORKEROPENCONERR, "Fehler beim Öffnen der Verbindung: %s"
+ IDS_WORKERUNKNOWNPROXYHOST, "Eine Proxyserveradresse ist erforderlich, aber sie wurde noch nicht angegeben"
+ IDS_WORKERUNKNOWNPROXYPASSWORD, "Ein Proxyserverpasswort ist erforderlich, aber es wurde noch nicht angegeben"
+ IDS_WORKERUNKNOWNPASSWD, "Ein Passwort ist erforderlich, aber es wurde noch nicht angegeben"
+ IDS_WORKERUNKNOWNACCOUNT, "Ein Konto wird verlangt, aber es wurde noch nicht angegeben"
+ IDS_WORKERLOGINERR, "Anmeldefehler: %s"
+
+ IDS_SOLVEERRSUBJECT, "Alle für diesen Vorgang verwendeten Verbindungen, teilen sich folgende Parameter."
+ IDS_SOLVEERRRETRY, "Im&mer wieder versuchen die Verbindung aufzubauen (sogar wenn andauernd Anmeldefehler auftreten.)"
+ IDS_SOLVEERRREPLY, "Fehlerbeschreibung:"
+
+ IDS_CLOSINGDISKTHREAD, "Beende Datenträgervorgänge, zum Abbrechen drücken Sie ESC..."
+ IDS_CANCELDISKTHREAD, "Möchten Sie die Datenträgervorgänge wirklich beenden?\n\nWarnung: Einige Datenträgerdateien bleiben nach dem Beenden möglicherweise geöffnet."
+
+ IDS_SIED_TITLE1, "Fehler beim Erstellen des Zielverzeichnisses"
+ IDS_SIED_TITLE2, "Das Zielverzeichnis ist bereits vorhanden"
+ IDS_SIED_TITLE3, "Fehler beim Erstellen der Zieldatei"
+ IDS_SIED_TITLE4, "Die Zieldatei ist bereits vorhanden"
+ IDS_SIED_TITLE5, "Die Übertragung ist fehlgeschlagen"
+ IDS_SIED_TITLE6, "Das Zielverzeichnis oder der Link zum Verzeichnis ist bereits vorhanden"
+ IDS_SIED_TITLE7, "Fehler beim Erstellen der Zieldatei mit alternativem Namens"
+ IDS_SISE_TITLE1, "Bestätigen Sie das Löschen des versteckten Verzeichnis"
+ IDS_SISE_TITLE2, "Bestätigen Sie das Löschen der versteckten Datei"
+ IDS_SISE_TITLE3, "Bestätigen Sie das Löschen des nicht-leeren Verzeichnisses"
+ IDS_SSCD_TITLE1, "Fehler beim Wechsel des Arbeitspfades auf dem Server"
+ IDS_SSCD_TITLE2, "Fehler beim Ermitteln des Arbeitspfades auf dem Server"
+ IDS_SSCD_TITLE3, "Fehler beim Lesen der Datei- und Verzeichnisliste des Servers"
+ IDS_SSCD_TITLE4, "Fehler bei der Vorbereitung der aktiven Datenverbindung"
+ IDS_SSCD_TITLE5, "Fehler beim Auflösen des Links"
+ IDS_SSCD_TITLE6, "Fehler beim Ändern der Attribute"
+ IDS_SSCD_TITLE7, "Fehler beim Löschen der Datei oder des Links"
+ IDS_SSCD_TITLE8, "Fehler beim Löschen des Verzeichnisses"
+ IDS_SSCD_TITLE9, "Fehler beim Auflisten des Zielpfades"
+ IDS_SSCD_TITLE10, "Fehler beim Lesen der Datei- und Verzeichnisliste vom Datenträger"
+ IDS_SSCD_TITLE11, "Fehler beim Öffnen der Quelldatei"
+ IDS_SSCD_TITLE12, "Fehler beim Lesen der Quelldatei"
+ IDS_SCRD_TITLE1, "Fehler beim Analysieren der Datei- und Verzeichnisliste des Servers"
+ IDS_SCRD_TITLE2, "Die Zieldatei ist von einem anderen Vorgang blockiert"
+ IDS_SCRD_TITLE3, "Die Quelldatei ist von einem anderen Vorgang blockiert"
+ IDS_SSCD2_TITLE1, "Fehler beim Fortsetzen der Datei"
+ IDS_SSCD2_TITLE2, "Fehler beim Lesen der Zieldatei"
+ IDS_SSCD2_TITLE3, "Fehler beim Schreiben der Zieldatei"
+ IDS_SSCD2_TITLE4, "Fehler beim Abrufen der Datei vom Server"
+ IDS_SSCD2_TITLE5, "Fehler beim Löschen der Quelldatei nach erfolgreicher Übertragung"
+ IDS_SIED_TITLE8, "Fehler bei Speicherung der Datei auf dem Server"
+ IDS_SSCD2_TITLE7, "Fehler beim Testen der Datei"
+
+ IDS_SIED_DETAIL1, "Die Zieldatei wurde erstellt oder überschrieben."
+ IDS_SIED_DETAIL2, "Die Zieldatei wurde fortgesetzt."
+ IDS_SSCD2_UNABLETORESUME, "Der Server unterstützt die Wiederaufnahme abgebrochener Downloads wahrscheinlich nicht"
+ IDS_SSCD2_RESUMETESTFAILED, "Unerwartetes Dateiende. Die Datei wurde verändert oder der Server versagt\r\nbeim ordnungsgemäßen Fortsetzen der Datei, wenn Sie den ASCII-Übertragungsmodus verwenden."
+
+ IDS_DRAGDROP_TGTNOTEXIST, "Der Zielpfad existiert nicht und das Erstellen von Zielpfaden wird nicht unterstützt."
+ IDS_DRAGDROP_TGTARCORFS, "Das Kopieren und Verschieben in Archive oder Dateisystem-Plugins wird nicht unterstützt."
+
+ IDS_OPERDLGCONNECTIONSIDLE, "keine Datenübertragung für %s"
+ IDS_OPERDLGSTATUS1, "Gesamte Übertragungsrate: %s/s"
+ IDS_OPERDLGSTATUS2, "%s von %s"
+ IDS_OPERDLGSTATUS3, "{!}%d von %d Vor{|0|gang|1|gängen}"
+ IDS_OPERDLGSTATUS4, "{!}%d Vor{|0|gang|1|gänge} mit unbekannter Größe"
+ IDS_OPERDLGSTATUS5, "{!}%d Fehler{|1|n}"
+ IDS_OPERDLGTIMLEFTWAIT, "(warte auf Benutzer)"
+ IDS_OPERDLGTIMLEFTDONE, "(fertig)"
+ IDS_OPERDLGCONNECTIONSIDLE2, "Leerlauf für %s"
+
+ IDS_OPERDLGTITLE_DONE, "Fertig"
+ IDS_OPERDLGTITLE_ERRORS, "Fehler"
+ IDS_OPERDLGTITLE_STOPPED, "Gestoppt"
+ IDS_OPERDLGTITLE_PAUSED, "Angehalten"
+ IDS_OPERDLGTITLE_WAITING, "Warte"
+
+ IDS_LOWDISKSPACEONTGTPATH, "Es scheint nicht ausreichend Speicherplatz auf dem Zielpfad vorhanden zu sein.\nBenötigter Speicherplatz: %s\nVorhandener Speicherplatz: %s\nFehlender Speicherplatz auf dem Datenträger: %s"
+
+ IDS_NEEDPARSEDLISTING, "Dieser Vorgang ist nicht darauf vorbereitet ohne genau analysierte Datei- und Verzeichnislisten zu arbeiten."
+
+ IDS_DOWNLOADFILEERROR, "Kann die Datei nicht vom Server herunterladen.\n\nName: %s\nPfad: %s\n"
+ IDS_DOWNLOADFILEERRORSUFIX1, "Fehler: %s"
+ IDS_DOWNLOADFILEERRORSUFIX2, "Serverantwort: %s"
+ IDS_DOWNLOADFILEERRORSUFIX3, "Fehler beim Schreiben der Zieldatei: %s"
+ IDS_DOWNLOADFILEERRORSUFIX4, "Fehler: Die Datei ist durch einen anderen Vorgang blockiert."
+
+ IDS_HOMEDIRNOTDEFINED, "Sie haben das Home-Verzeichnis als Zielpfad angegeben, aber das Home-Verzeichnis ist für diese FTP-Server\nVerbindung nicht definiert. Bitte geben Sie einen anderen Zielpfad für den FTP-Server an."
+ IDS_INVALIDPATH, "Der angegebene Pfad ist ungültig."
+ IDS_COPYMOVE_NONSENSE, "Dieser Vorgang macht wahrscheinlich keinen Sinn. Alle gewählten Dateien und Verzeichnisse haben den selben Zielnamen (sie würden sich gegenseitig überschreiben.).\nWollen Sie mit diesem Vorgang fortfahren?"
+
+ IDS_OPERDOPPR_UPLCANTCRTGTDIRINV, "Kann das Zielverzeichnis nicht anlegen, der Name ist auf diesem Server nicht gültig"
+ IDS_OPERDOPPR_UPLCANTCRTGTDIRFILEEX, "Kann das Zielverzeichnis nicht anlegen, der Name wird bereits für eine Datei oder einen Dateilink benutzt"
+ IDS_OPERDOPPR_UPLCANTCRTGTDIR, "Kann das Zielverzeichnis nicht anlegen, Serverantwort:"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH, "Kann das Auflisten des Zielpfades zur Ermittlung von Dateinamenskollisionen nicht ausführen"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH2, "Kann das Auflisten des Zielpfades zur Ermittlung von Dateinamenskollisionen nicht ausführen, Serverantwort:"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH3, "Kann das Auflisten des Zielpfades zur Ermittlung von Dateinamenskollisionen nicht ausführen, Fehler: %s"
+ IDS_OPERDOPPR_UPLCANTLISTSRCPATH, "Kann das Zielverzeichnis nicht auflisten, Systemfehler: %s"
+ IDS_OPERDOPPR_UPLCRDIRAUTORENFAILED, "Kann das Zielverzeichnis mit alternativem Name nicht anlegen, Serverantwort:"
+ IDS_OPERDOPPR_UPLCANTDELSRCDISKDIR, "Kann das Zielverzeichnis nicht löschen, Systemfehler: %s"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILEINV, "Die Zieldatei kann nicht erzeugt oder geöffnet werden, der Name ist für diesen Server nicht gültig"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILEDIREX, "Die Zieldatei kann nicht erzeugt oder geöffnet werden, der Name wird bereits für ein Verzeichnis oder einen Verzeichnislink benutzt"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILE, "Die Zieldatei kann nicht erzeugt oder geöffnet werden, Serverantwort:"
+ IDS_OPERDOPPR_UPLCANNOTOPENSRCFILE, "Die Quelldatei kann nicht geöffnet werden, Systemfehler: %s"
+ IDS_OPERDOPPR_UPLTGTFILEEXISTS, "Die Zieldatei oder der Dateilink sind bereits vorhanden"
+ IDS_OPERDOPPR_UPLTGTDIREXISTS, "Das Zielverzeichnis oder der Verzeichnislink sind bereits vorhanden"
+ IDS_OPERDOPPR_SRCFILEINUSE, "Die Quelldatei oder der Dateilink wird von einem anderen Vorgang blockiert"
+ IDS_OPERDOPPR_TGTFILEINUSE, "Die Zieldatei oder der Dateilink wird von einem anderen Vorgang blockiert"
+ IDS_OPERDOPPR_SRCFILEREADERROR, "Lesen der Quelldatei nicht möglich, Systemfehler: %s"
+ IDS_OPERDOPPR_INCOMPLUPLOAD1, "Speichern der Datei auf dem Server nicht möglich, Fehler: %s"
+ IDS_OPERDOPPR_INCOMPLUPLOAD2, "Speichern der Datei auf dem Server nicht möglich, Serverantwort:"
+ IDS_OPERDOPPR_UPLCANTDELSRCDISKFILE, "Kann die Quelldatei nach erfolgreicher Übertragung nicht löschen, Systemfehler: %s"
+ IDS_OPERDOPPR_UPLASCIIRESNOTSUP, "Fortsetzen wird vom ASCII-Übertragungsmodus nicht unterstützt (Hinweis: Laden Sie die Datei im Binär-Modus hoch wenn sie das Fortsetzen benötigen)"
+ IDS_OPERDOPPR_UPUNABLERESUNKSIZ, "Kann die Datei nicht fortsetzen da die Größe der Zieldatei unbekannt ist"
+ IDS_OPERDOPPR_UPUNABLERESBIGTGT, "Kann die Datei nicht fortsetzen da die Zieldatei größer als die Quelldatei ist (Datei wurde geändert)"
+ IDS_OPERDOPPR_UPLFILEAUTORENFAILED, "Kann die Zieldatei nicht mit alternativem Namen anlegen. Serverantwort:"
+ IDS_OPERDOPPR_SKIPPEDBYUSER, "Vom Benutzer übersprungen"
+ IDS_OPERDOPPR_UPLTESTIFFINNOTSUP, "Kann die Dateigröße in Byte nicht ermitteln um das erfolgreiche Hochladen zu prüfen (die gesamte Datei wurde gesendet, der Server hat den Empfang aber nicht bestätigt)"
+
+ IDS_UPLERR_CANTCRTGTDIRINV, "Der Name des Zielverzeichnisses ist auf diesem Server nicht gültig."
+ IDS_UPLERR_CANTCRTGTDIRFILEEX, "Der Name des Zielverzeichnisses wird bereits für eine Datei oder einen Dateilink benutzt."
+ IDS_UPLERR_CANTCRTGTFILEINV, "Der Zielname ist für diesen Server nicht gültig."
+ IDS_UPLERR_CANTCRTGTFILEDIREX, "Der Zielname wird bereits für ein Verzeichnis oder einen Verzeichnislink benutzt."
+ IDS_UPLERR_UPLCANTRESUMINASC, "Fortsetzen wird vom ASCII-Übertragungsmodus nicht unterstützt\r\n(Hinweis: Laden Sie die Datei im Binär-Modus hoch wenn sie das Fortsetzen benötigen."
+ IDS_UPLERR_UPLCANTRESUMBIGTGT, "Kann die Datei nicht fortsetzen da die Zieldatei größer als die Quelldatei ist\r\n(Datei wurde geändert)."
+ IDS_UPLERR_UPLTESTIFFINNOTSUP, "Kann die Dateigröße in Byte nicht ermitteln um das erfolgreiche Hochladen zu prüfen\r\n(die gesamte Datei wurde gesendet, der Server hat den Empfang aber nicht bestätigt)."
+
+ IDS_RENAME_FILEEXISTS, "Der Zielname wird bereits für eine Datei benutzt. Möchten Sie sie überschreiben?"
+ IDS_RENAME_DIREXISTS, "Der Zielname wird bereits für ein Verzeichnis benutzt. Möchten Sie weitermachen?"
+ IDS_RENAME_UNABLETOGETLIST, "Kann nicht feststellen ob der Zielname bereits verwendet wird. Möchten Sie weitermachen?"
+ IDS_RENAME_FILEEXISTS2, "Der Zielname wird bereits für eine Datei benutzt. Möchten Sie weitermachen?"
+
+ IDS_OPERDLGRESUMEBUTTON, "Fortsetz&en"
+ IDS_OPERDLGRESUMECONBUTTON, "For&tsetzen"
+
+ IDS_PROXYSERVER_NOTUSED, "Nicht verwendet (direkte Verbindung)"
+ IDS_PROXYSERVER_DEFAULT, "Standard (siehe 'FTP-Konfiguration/Standard')"
+ IDS_PROXYSERVER_USERDEF, "Benutzerdefiniert"
+ IDS_PROXYSERVER_SOCKS4, "SOCKS 4"
+ IDS_PROXYSERVER_SOCKS4A, "SOCKS 4A"
+ IDS_PROXYSERVER_SOCKS5, "SOCKS 5"
+ IDS_PROXYSERVER_HTTP11, "HTTP 1.1"
+ IDS_PROXYSERVER_SITE1, "SITE Host:Port"
+ IDS_PROXYSERVER_SITE2, "SITE Host Port"
+ IDS_PROXYSERVER_SITE3, "SITE Benutzer@Host:Port"
+ IDS_PROXYSERVER_SITE4, "SITE Benutzer@Host Port"
+ IDS_PROXYSERVER_OPEN, "OPEN Host:Port"
+ IDS_PROXYSERVER_TRANSPAR, "Transparent"
+ IDS_PROXYSERVER_USER1, "USER Benutzer@Host:Port"
+ IDS_PROXYSERVER_USER2, "USER Benutzer@Host Port"
+ IDS_PROXYSERVER_USER3, "USER Proxybenutzer@Host:Port"
+ IDS_PROXYSERVER_USER4, "USER Benutzer@Host:Port Proxybenutzer"
+ IDS_PROXYSERVER_USER5, "USER Benutzer@Proxybenutzer@Host:Port"
+
+ IDS_PRXSCRERR_INVSTART, "Das Script muss mit ""Connect to:"" beginnen."
+ IDS_PRXSCRERR_HOSTEMPTY, "Host darf nicht leer sein."
+ IDS_PRXSCRERR_INVHOSTORPORT, "Der eingegebene Host oder Port ist falsch (Format: ""Host"" oder ""Host:Port"")."
+ IDS_PRXSCRERR_UNKNOWNVAR, "Das Script enthält eine unbekannte Variable."
+ IDS_PRXSCRERR_HOSTVARSONLY, "Sie können hier nur die Variablen $(ProxyHost) oder $(Host) benutzen."
+ IDS_PRXSCRERR_INVPORT, "Sie können den Port nur mit einer Nummer oder als Variable $(ProxyPort) oder $(Port) angeben."
+ IDS_PRXSCRERR_3XXONFIRSTLINE, "Sie können die ""3xx:""-Bedingung nicht im ersten Befehl benutzen, davor muss ein anderes Kommando stehen (typischerweise ""USER"")."
+ IDS_PRXSCRERR_NONECMDS, "Das Proxyscript muss mindestens einen Befehl beinhalten."
+ IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
+ IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+
+ IDS_EDITPROXYSRVTITLE, "Proxyserver bearbeiten"
+ IDS_PORTISUSHORT, "Die Portnummer muss zwischen 1 und 65535 liegen."
+ IDS_INVPROXYNAME, "Der eingegebene Proxyname ist entweder leer oder wird für einen anderen Proxyserver benutzt. Bitte ändern."
+ IDS_INVPROXYADDRESS, "Die Proxyadresse darf kein ':' Zeichen enthalten (Hinweis: Portnummer im nächsten Feld eingeben)."
+ IDS_EMPTYPROXYADDRESS, "Die Proxyadresse darf nicht leer sein."
+ IDS_EMPTYUSERFORTRANSPRX, "Ein transparenter Proxy mit leerem Benutzer macht keinen Sinn. Bitte geben Sie einen Benutzer an oder verbinden Sie ohne Proxyserver."
+
+ IDS_WANTDELPRXSRV, "Möchten Sie  den Proxyserver ""%s"" wirklich löschen?"
+
+ IDS_ENTERPRXHOSTTITLE, "Eingabe Proxyserveradresse"
+ IDS_ENTERPRXHOSTTEXT, "&Proxyserveraddrese (Portnummer hinter ':' falls erforderlich):"
+ IDS_ENTERPRXPASSTITLE, "Eingabe Proxyserverpasswort"
+ IDS_ENTERPRXPASSTEXT, "&Proxyserverpasswort:"
+
+ IDS_INCOMPLETEPRXSCR, "Das Proxyscript ist wahrscheinlich unvollständig. Siehe Serverantwort auf letzten Befehl für mehr Details.\r\n\r\nServerantwort: %s"
+ IDS_INCOMPLETEPRXSCR2, "Das Proxyscript ist wahrscheinlich unvollständig. Alle Befehle des Scriptes werden übersprungen."
+ IDS_INCOMPLETEPRXSCR3, "Das Proxyscript ist wahrscheinlich vollständig. Siehe Serverantwort auf letzten Befehl ""%s"" für mehr Details"
+
+ IDS_PROXYERRREJORFAIL, "Die Verbindung wurde abgewiesen oder ist fehlgeschlagen."
+ IDS_PROXYERRNEEDIDENTD, "Kann nicht zum identd-Dienst auf dem Client verbinden (wahrscheinlich müssen Sie einen identd-Dienst installieren)."
+ IDS_PROXYERRDIFFUSERS, "Verbindung abgewiesen, weil der Proxybenutzer und der vom identd-Dienst zurückgegebene Benutzer unterschiedlich sind."
+ IDS_PROXYERRINVHOST, "Eine Verbindung von einer unbekannten IP-Adresse wird nicht akzeptiert."
+
+ IDS_PROXYERRGETIP, "Fehler beim Ermitteln der IP-Adresse von ""%s"": %s"
+ IDS_PROXYERRSENDREQ, "Fehler beim Senden der Anforderung zum Proxyserver: %s"
+ IDS_PROXYERRRECVREP, "Fehler beim Empfangen der Antwort vom Proxyserver: %s"
+ IDS_PROXYERROPENCON, "Der Proxyserver kann nicht zum FTP-Server ""%s"" (Port: %d) verbinden, Fehler: %s"
+ IDS_PROXYERRUNABLETOCON, "Das Verbinden zum Proxyserver ist fehlgeschlagen."
+ IDS_PROXYERROPENACTDATA, "Verbindung zum Proxyserver nicht möglich oder der Proxyserver weist das Öffen von aktive Datenverbindungen ab."
+ IDS_PROXYERRUNABLETOCON2, "Verbindung zum Proxyserver nicht möglich, Fehler: %s"
+ IDS_PROXYERRNOAUTHUNSUP, "Der Proxyserver weist anonyme Benutzer ab, bitte geben Sie ihren Benutzer und das Passwort in den Proxyservereinstellungen an."
+ IDS_PROXYERRUSERPASSAUTHUNSUP, "Der Proxyserver unterstützt eine Benutzer+Passwort Authentifizierung nicht, bitte anonymen Zugriff benutzen (löschen Sie den Benutzer und das Passwort in den Proxyservereinstellungen)."
+ IDS_PROXYERRUSERPASSFAIL, "Der Proxyserver weist Benutzer und Passwort ab."
+ IDS_PROXYERRLISTENUNSUP, "Der Proxyserver unterstützt das Öffen von aktive Datenverbindungen nicht."
+
+ IDS_LOGMSGDELETEFILE, "Lösche Datei ""%s""...\r\n"
+ IDS_LOGMSGDELETELINK, "Lösche Link ""%s""...\r\n"
+ IDS_LOGMSGDELETEDIR, "Lösche Verzeichnis ""%s""...\r\n"
+ IDS_LOGMSGDELETEDIRLINK, "Lösche Verzeichnislink ""%s""...\r\n"
+ IDS_LOGMSGCHATTRSFILE, "Ändere Attribute der Datei ""%s""...\r\n"
+ IDS_LOGMSGCHATTRSDIR, "Ändere Attribute des Verzeichnisses ""%s""...\r\n"
+ IDS_LOGMSGEXPLORINGDIR, "Auflistung des Verzeichnisses ""%s"" vom Pfad ""%s""...\r\n"
+
+ IDS_PROXYERRGENFAIL, "Genereller SOCKS-Serverfehler."
+ IDS_PROXYERRRULESET, "Verbindung aufgrund des Regelwerks nicht erlaubt."
+ IDS_PROXYERRNETUNR, "Netzwerk nicht erreichbar."
+ IDS_PROXYERRHOSTUNR, "Host nicht erreichbar."
+ IDS_PROXYERRCONREF, "Verbindung abgewiesen."
+ IDS_PROXYERRTTLEXP, "TTL abgelaufen."
+ IDS_PROXYERRCMDNOTSUP, "Befehl wird nicht unterstützt."
+ IDS_PROXYERRADRTYPEUNSUP, "Adresstyp wird nicht unterstützt."
+
+ IDS_HTTPNEEDPASSIVETRMODE, "Ihr Standard-Proxyserver ist vom Typ HTTP 1.1. Er unterstützt nur den passiven Übertragungsmodus. Ändern Sie bitte den Übertragungsmodus auf Passiv (oder ändern Sie ihren Standard-Proxyserver)."
+ IDS_HTTPNEEDPASSIVETRMODE2, "Sie verbinden sich zum FTP-Server über einen Proxyserver. Dieser Proxyserver ist vom Typ HTTP 1.1 und unterstützt deshalb nur den passiven Übertragungsmodus. Ändern Sie den Übertragungsmodus auf Passiv (klicken Sie auf 'Erweitert...', kontrollieren Sie ob der passive Übertragungsmodus gesetzt ist)."
+ 
+ IDS_HINTLISTHIDDENFILES, "Wenn Sie versteckte Dateien und Verzeichnisse auf diesem Server immer zeigen wollen, gehen Sie zu 'Plugins'/'FTP-Client'/'Verbindung zum FTP-Server', suchen Sie den Server in den Favoriten, klicken auf 'Erweitert...', und setzen den Befehl für das Auflisten auf ""LIST -a""."
+ IDS_DONOTSHOWHINTLISTHF, "&Diesen Hinweis in Zukunft nicht mehr zeigen\tWieder rückgängig machen\tSie können diese Einstellung später auf der Bestätigungsseite in der FTP-Konfiguration ändern"
+ 
+ IDS_LOGMSGUNABLETORESUME, "Kann die Datei nicht fortsetzen weil die Prüfung des Dateiendes fehlgeschlagen ist (Datei wurde geändert).\r\n"
+ IDS_LOGMSGOVERWRTGTFILE, "Versuche die Zieldatei zu überschreiben (um die gesamte Datei erneut zu kopieren/verschieben).\r\n"
+ IDS_LOGMSGRESUMEUSELESS, "Zum Fortsetzen ist die Datei zu klein, die Zieldatei wird überschrieben.\r\n"
+ IDS_LOGMSGRESUMEFROMBEG, "Fortsetzen: Hole die Datei von Anfang an um den bereits heruntergeladenen Teil zu überprüfen.\r\n"
+ IDS_LOGMSGRESUMENOTSUP, "Kann die Datei nicht fortsetzen (Fortsetzen wird vom Server nicht unterstützt).\r\n"
+ IDS_LOGMSGUNABLETORESUME2, "Kann die Datei nicht fortsetzen da sie kleiner ist als der bereits kopierte/verschobene Teil (Datei wurde geändert).\r\n"
+ IDS_LOGMSGUPLRESUMENOTSUP, "Kann die Datei nicht fortsetzen (anhängen). Anhängen wird vom Server nicht unterstützt oder Sie laden im ASCII-Übertragungsmodus hoch.\r\n"
+ IDS_LOGMSGUPLUNABLETOGETSIZE, "Kann die Größe (in Bytes) des bereits kopierten/verschobenen Teils der Datei nicht ermitteln.\r\n"
+ IDS_LOGMSGUPLRESUMEERR, "Kann die Datei nicht fortsetzen (anhängen), unbekannter Fehler.\r\n"
+ IDS_LOGMSGUPLNOTCONFIRMED, "Die gesamte Datei wurde gesendet, aber der Server hat den Empfang nicht bestätigt.\r\nVersuche die Dateigröße (in Bytes) zu ermitteln um sicherzustellen das die Datei erfolgreich kopiert/verschoben wurde.\r\n"
+
+ IDS_SSL_ERR_OPENSSLNOTFOUND "Die für die Verschlüsselung nötigen OpenSSL Bibliotheken konnten nicht gefunden oder geladen werden.\r\nDie benötigten Dateien sind ssleay32.dll und libeay32.dll.\r\nSie sind Teil der Sally Installation."
+ IDS_SSL_ERR_NEW "OpenSSL-Kontrollstruktur kann nicht zugewiesen werden. Kein Speicher mehr verfügar."
+ IDS_SSL_ERR_NEW_LOG "SSL FEHLER: OpenSSL-Kontrollstruktur konnte nicht zugewiesen werden. Kein Speicher mehr verfügar.\r\n"
+ IDS_SSL_ERR_CONNECT "Kann keine verschlüsselte Verbindung aufbauen (SSL).\n\nFehler: %s"
+ IDS_SSL_ERR_CONNECT_ERR "SSL_connect gibt %d zurück: %s"
+ IDS_SSL_ERR_CONNECT_LOG "SSL FEHLER: Kann keine verschlüsselte Verbindung aufbauen, SSL_connect gibt %d: %s zurück\r\n"
+ IDS_SSL_ERR_CONTRENCUNSUP "Der Server unterstützt keine Verschlüsselung der Kontrollverbindung.\nDas AUTH TLS Kommando wurde vom Server nicht verstanden."
+ IDS_SSL_ERR_DATAENCUNSUP "Der Server unterstützt keine Verschlüsselung von Datenverbindungen."
+ IDS_SSL_ERR_NOTYETVALID "Das Serverzertifikat ist noch nicht gültig."
+ IDS_SSL_ERR_EXPIRED "Das Serverzertifikat ist abgelaufen."
+
+ IDS_SSL_SECURITY_OK "Die Kommunikation ist verschlüsselt und die Identität des Servers bestätigt"
+ IDS_SSL_SECURITY_UNVERIFIED "Die Kommunikation ist verschlüsselt aber die Identität des Servers nicht bestätigt"
+
+ IDS_SSL_LOG_ALGO "SSL INFO: %s %s %d Bits\r\n"
+ IDS_SSL_LOG_OSSL_CERT_VERIFY "SSL INFO: Ergebnis der OpenSSL Zertifikats-Verifizierung: %d\r\n"
+ IDS_SSL_LOG_ISSUER "SSL INFO: Zertifikat ausgegeben von %s\r\n"
+ IDS_SSL_LOG_SUBJECT "SSL INFO: Zertifikat ausgegeben für %s\r\n"
+
+ IDS_SSL_LOG_CERTVERIFIED "Das Serverzertifikat wurde verifiziert.\r\n"
+ IDS_SSL_LOG_CERTNOTVERIFIED, "Die Verifizierung des Serverzertifikates ist fehlgeschlagen.\r\n"
+ IDS_SSL_LOG_CERTACCEPTED "Das Serverzertifikat wurde vom Benutzer akzeptiert (allerdings ist die Serveridentität nicht bestätigt).\r\n"
+ IDS_SSL_LOG_CERTREJECTED "Das Serverzertifikat wurde vom Benutzer abgelehnt, Verbindung wird geschlossen.\r\n"
+ IDS_SSL_LOG_CERTCHANGED, "Das Serverzertifikat wurde geändert.\r\n"
+
+ IDS_MODEZ_LOG_UNSUPBYSERVER "INFO: Der Server unterstützt kein MODE Z -> Kompression abgeschaltet\r\n"
+ 
+ IDS_LISTCOMMANDERROR, "Kann die Liste von Dateien und Verzeichnissen des Servers nicht ermitteln.\n\nFehler: %s"
+ IDS_DOWNLOADONEFILEERROR, "Kann die Datei nicht vom Server herunterladen.\n\nFehler: %s"
+ IDS_SSLNEWUNVERIFIEDCERT, "Das Serverzertifikat wurde geändert und seine Verifizierung ist fehlgeschlagen."
+
+ IDS_SAVEPASSWORD_PROTECTED, "durch Master-Passwort gesichert"
+ IDS_PASSWORD_UNSECURED, "Einige FTP-Passwörter sind nicht gesichert. Bitte geben Sie im folgenden Dialog das Master-Passwort ein.\n\nHinweis: Wenn Sie auf 'Abbrechen' klicken werden die Passworte ungesichert gespeichert."
+ IDS_CANNOT_DECRYPT_SOMEPASSWORDS, "Kann einige FTP-Passwörter nicht entschlüsseln.\n\nSie wurden vielleicht mit einem anderen Master-Passwort verschlüsselt.\nVersuchen Sie das Master-Passwort zu ändern um sie zu entschlüsseln."
+ IDS_CANNOT_DECRYPT_PASSWORD_DELETE, "Das Passwort kann nicht entschlüsselt werden.\n\nEs wurden vielleicht mit einem anderen Master-Passwort verschlüsselt.\nVersuchen Sie das Master-Passwort zu ändern um es zu entschlüsseln.\nSie können es auch löschen.\n\nMöchten Sie dieses Passwort löschen?"
+ IDS_CLEARPASSWORD_CONFIRMATION, "Wollen Sie dieses Passwort wirklich löschen?"
+ IDS_SHOWPASSWORD_CONFIRMATION, "Wollen Sie dieses Passwort wirklich anzeigen?"
+ IDS_PASSWORDIS, "Das Passwort lautet: %s\n\nMöchten Sie das Passwort in die Zwischenablage kopieren?"
+ IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
+ IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
+ IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
+ IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
+ IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
+ IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+}

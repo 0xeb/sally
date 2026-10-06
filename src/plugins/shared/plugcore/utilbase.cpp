@@ -8,7 +8,7 @@
 // ****************************************************************************
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 BOOL WindowsVistaAndLater;    // Windows Vista or later in the NT line (6.0+)
 BOOL WindowsXP64AndLater;     // Windows XP 64, Vista or later (5.2+)
 
@@ -71,10 +71,8 @@ BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const char* pluginN
         return FALSE;
     }
 
-    // load language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), ToWideArg(pluginName).c_str());
-    if (HLanguage == NULL)
-        return FALSE;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // get Salamander interfaces
     SG = salamander->GetSalamanderGeneral();

@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for pak. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 221, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Оптимизация архива PAK"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Используемый объем:",IDC_STATIC_1,8,9,80,8
+    LTEXT           "",IDC_VALIDSIZE,91,9,118,8
+    LTEXT           "Общий размер файла:",IDC_STATIC_2,8,20,82,8
+    LTEXT           "",IDC_TOTALSIZE,91,20,118,8
+    LTEXT           "Избыточный объем:",IDC_STATIC_3,8,31,71,8
+    LTEXT           "",IDC_WASTEDSPACE,91,31,118,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,205,1
+    DEFPUSHBUTTON   "Оптимизировать",IDOK,45,53,70,14
+    PUSHBUTTON      "Отмена",IDCANCEL,125,53,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "Не удается открыть файл: %s"
+ IDS_PAK_ERRINIT, "Невозможно инициализировать интерфейс paklib. Один файл уже открыт."
+ IDS_PAK_ERROPEN2, "Не удается открыть файл. Один файл уже открыт."
+ IDS_PAK_ERRGETFILESIZE, "Не удается определить размер файла: %s"
+ IDS_PAK_INVLAIDDATA, "Некорректный формат данных."
+ IDS_PAK_LOWMEMORY, "Недостаточно памяти."
+ IDS_PAK_CENTRDIR, "индекс текущего архива PAK"
+ IDS_PAK_ERRSETFILEPTR, "Не удается установить текущую позицию в файле: %s"
+ IDS_PAK_ERRREADFILE, "Не удается прочитать файл: %s"
+ IDS_PAK_ERRGETFILEPTR, "Не удается получить текущую позицию в файле: %s"
+ IDS_PAK_ERRWRITEFILE, "Не удается записать файл: %s"
+ IDS_PAK_TOOLONGNAME, "Невозможно добавить файл, слишком длинное имя файла."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Просмотр и извлечение из архивов Quake PAK."
+ IDS_ABOUT, "О модуле"
+ IDS_LOWMEM, "Недостаточно памяти."
+ IDS_ERRLIST, "Не удается включить файл в список."
+ IDS_ERRLOADPAKLIB, "Не удается загрузить библиотеку ""paklib.dll"" или определить адрес функции: "
+ IDS_EXTRPROGTITLE, "Распаковка архива PAK - %s"
+ IDS_PREPAREDATA, "подготовка данных..."
+ IDS_EXTRACTFILES, "извлечение..."
+ IDS_EXTRACTING, "извлечение: "
+ IDS_TOOLONGNAME, "Невозможно завершить операцию, слишком длинный путь."
+ IDS_UNABLESEEK, "Не удается установить текущую позицию в файле: "
+ IDS_UNABLEGETFIELPOS, "Не удается получить текущую позицию в файле: "
+ IDS_UNABLEWRITE, "Не удается записать файл:"
+ IDS_ERROPEN, "Не удается открыть файл: "
+ IDS_TOOLONGMASK, "Невозможно завершить операцию, слишком длинная маска."
+ IDS_DELPROGTITLE, "Удаление из архива PAK - %s"
+ IDS_DELFILES, "удаление..."
+ IDS_DELETING, "удаление: "
+ IDS_CANCELING, "отмена операции, пожалуйста, подождите..."
+ IDS_ADDPROGTITLE, "Упаковка в архив PAK - %s"
+ IDS_TOOLARGE, "Невозможно добавить файл: файл имеет слишком большой размер."
+ IDS_ADDFILES, "упаковка..."
+ IDS_TOOLONGNAME2, "Невозможно добавить файл, слишком длинное имя."
+ IDS_PACKING, "упаковка: "
+ IDS_UNABLEREAD, "Не удается прочитать файл: "
+ IDS_ERRCONNECT, "Не удается подключить модуль к Sally."
+ IDS_OPTIMIZING, "оптимизация, пожалуйста, подождите..."
+ IDS_OPTPROGTITLE, "Оптимизация архива PAK - %s"
+ IDS_NEEDOPT, "Удаление файлов не было успешно завершено. Возможно, потребуется выполнить оптимизацию архива PAK (см. меню модуля PAK) для устранения избыточного использования дискового пространства."
+ IDS_MENUOPTIMIZE, "&Оптимизировать PAK"
+ IDS_EXPIRE, "Модуль устарел. Пожалуйста, проверьте наличие обновлений на нашем сайте."
+}

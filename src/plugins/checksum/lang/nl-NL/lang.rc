@@ -1,0 +1,126 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for checksum. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checksum/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checksum.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CALCULATE DIALOGEX 0, 0, 362, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+CAPTION "Berekenen controlesom"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Lijst1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,352,54
+    LTEXT           "Berekenen:",IDC_LABEL,5,68,41,8,WS_CLIPSIBLINGS
+    CONTROL         "Voortgang1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,49,68,106,8
+    PUSHBUTTON      "Con&figureren...",IDC_BUTTON_CONFIGURE,162,65,61,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Opslaan...",IDC_BUTTON_SAVE,229,65,61,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Stoppen",IDC_BUTTON_CLOSE,296,65,61,14,WS_CLIPSIBLINGS
+    LTEXT           "klembord hint",IDC_LABEL_HINT,5,68,49,8,WS_CLIPSIBLINGS
+END
+
+IDD_VERIFY DIALOGEX 0, 0, 260, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Lijst1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,250,54
+    LTEXT           "Controleren van:",IDC_LABEL,5,68,58,8,WS_CLIPSIBLINGS
+    CONTROL         "Voortgang1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,67,68,76,8
+    LTEXT           "",IDC_LABEL_RESULT,5,68,140,8,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Selectie",IDC_BUTTON_FOCUS,149,65,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "S&toppen",IDC_BUTTON_CLOSE,205,65,50,14,WS_CLIPSIBLINGS
+END
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 189, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Controlesom configuratie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Berekenen controllesommen ",IDC_STATIC_1,8,5,174,76,WS_GROUP
+    CONTROL         "&CRC/SFV",IDC_CFG_CRC,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,15,16,105,10
+    CONTROL         "&MD5",IDC_CFG_MD5,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,28,105,10
+    CONTROL         "SHA-&1",IDC_CFG_SHA1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,40,105,10
+    CONTROL         "SHA-&256",IDC_CFG_SHA256,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,52,105,10
+    CONTROL         "SHA-&512",IDC_CFG_SHA512,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,64,105,10
+    DEFPUSHBUTTON   "OK",IDOK,14,88,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,69,88,50,14
+    PUSHBUTTON      "Help",IDHELP,124,88,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "Controlesom"
+ IDS_ABOUTTITLE "Over plugin"
+ IDS_PLUGIN_DESCRIPTION "Bereken en controleren van SFV, MD5, SHA-1, SHA-256, en SHA-512 checksum."
+ IDS_OUTOFMEM "Onvoldoende geheugen"
+ IDS_ERROROPENING, "Fout bij openen van bestand"
+ IDS_READERROR "Lees fout"
+ IDS_WRITEERROR "Schrijf fout"
+ IDS_SKIPPED "Overgeslagen"
+ IDS_CALCULATING "Berekenen..."
+ IDS_CANCELED "Geannuleerd"
+ IDS_HINT "Klik met de rechtermuisknop op een item om de controlesom te kopiëren naar het klembord."
+ IDS_COPYTOCBOARD_CRC "Kopieer &CRC waarde naar klembord\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "Kopieer &MD5 controlesom naar klembord\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "Kopieer SHA-&1 controlesom naar klembord\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "Kopieer SHA-&256 controlesom naar klembord\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "Kopieer SHA-&512 controlesom naar klembord\tCtrl+5"
+ IDS_REMOVEITEM "&Verwijder item\tVerwijder"
+ IDS_SAVE_TITLE  "Controlesom bestand opslaan"
+ IDS_SAVE_FILTER_CRC  "SFV bestanden (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "MD5 bestanden (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "SHA-1 bestanden (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "SHA-256 bestanden (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "SHA-512 bestanden (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "Het bestand '%s' bestaat reeds.\nWilt u dit overschijven?"
+ IDS_ERRORCREATINGFILE "Fout bij het maken van bestand."
+ IDS_SKIPPEDFILES "Bestanden die tijdens de berekening zijn overgeslagen of geannuleerd zijn niet opgeslagen."
+ IDS_ERROROPENING2 "Fout bij openen van bestand '%s'."
+ IDS_MISSING "Ontbreekt"
+ IDS_BADEXT "Het geselecteerde bestand heeft geen SFV, MD5, SHA1, SHA256 als SHA512 extensie. Wilt u toch doorgaan?"
+ IDS_BADFILE "Het geselecteerde bestand is geen geldig SFV, MD5, SHA-1, SHA-256, of SHA-512 bestand."
+ IDS_VERIFYING "Controleren van..."
+ IDS_OK "OK"
+ IDS_CORRUPT "Beschadigd"
+ IDS_MENU_CALCULATE "&Berekenen controlesommen..."
+ IDS_MENU_VERIFY "&Controleren van controlesommen..."
+ IDS_CONFIG_CONFLICT "De configuratie is reeds geopend."
+ IDS_CONFIG_CHANGES_EFFECT "De wijzigingen zijn de eerst volgende keer van kracht wanneer u kiest voor 'Berekenen controllesommen'."
+ IDS_ALLOK "Alle bestanden zijn OK"
+ IDS_RESULT "%d beschadigd, %d vermist, %d overgeslagen"
+ IDS_BUSY "Sally is bezig. Het gevraagde commando kan niet worden uitgevoerd, gelieve probeert u het later opnieuw."
+ IDS_CLOSE "&Sluiten"
+ IDS_READINGTREE "Lezen van mapstructuur, een ongenblik geduld a.u.b..."
+ IDS_ERRORREADINGDIR "Fout bij het lezen van map"
+ IDS_NOFILES "Geen bestanden"
+ IDS_VERIFYTITLE "Controleren van controlesommen"
+ IDS_VERIFY_CRC "Controleren van CRC"
+ IDS_VERIFY_MD5 "Controleren van MD5"
+ IDS_VERIFY_SHA1 "Controleren van SHA-1"
+ IDS_VERIFY_SHA256 "Controleren van SHA-256"
+ IDS_VERIFY_SHA512 "Controleren van SHA-512"
+ IDS_COLUMN_FILE "Bestand"
+ IDS_COLUMN_SIZE "Grootte"
+ IDS_COLUMN_STATUS "Status"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "Kan bewerking niet afmaken omdat de naam te lang is."
+}

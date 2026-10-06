@@ -1,0 +1,50 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for peviewer. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/peviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\peviewer.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 0, 0, 346, 154
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Portable Executable Viewer 配置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "可用部分(&b):",IDC_STATIC_1,7,7,64,8
+    LISTBOX         IDC_AVAILABLELB,7,17,105,130,LBS_SORT | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "添加(&A) ->",IDC_ADD,119,17,50,14,WS_GROUP
+    PUSHBUTTON      "<- 移除(&R)",IDC_REMOVE,119,35,50,14
+    LTEXT           "可见部分(&V):",IDC_STATIC_2,176,7,58,8
+    LISTBOX         IDC_SELECTEDLB,176,17,105,130,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "上移(&U)",IDC_UP,289,17,50,14,WS_GROUP
+    PUSHBUTTON      "下移(&D)",IDC_DOWN,289,35,50,14
+    DEFPUSHBUTTON   "确定",IDOK,289,97,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,289,115,50,14
+    PUSHBUTTON      "重置(&e)",IDC_RESET,289,133,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_NAME, "Portable Executable Viewer"
+ IDS_PLUGIN_DESCRIPTION, "显示可移植的可执行文件，例如EXE，DLL等信息。"
+ IDS_ABOUT, "关于插件"
+ IDS_ERR_OPEN_FILE, "无法打开文件 %s."
+ IDS_ERR_TMP, "创建临时文件失败。"
+ IDS_EXCEPTION, "发生异常。\n\n查看的文件: %s\n\n如果你认为那个被查看的文件没有损坏，请在 https://github.com/0xeb/sally/issues 提交问题并附上这个文件。\n我们将重现并修复这个查看器缺陷。感谢您的合作！"
+ IDS_HIDDEN_SECTIONS, "在插件配置中没有找到选中的 Portable Executable 部分。\n 在 Sally 主窗口中使用菜单 选项> 插件配置 > Portable Executable Viewer \n来设置可见部分。"
+}

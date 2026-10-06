@@ -1,0 +1,140 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for unrar. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unrar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unrar.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 6, 15, 239, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nächstes Teilarchiv"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Legen Sie bitte den Datenträger mit dem nächsten Teilarchiv ein oder wählen Sie die entsprechende Datei auf der Festplatte.\n\nDrücken Sie OK, wenn Sie bereit sind.",IDS_NEXTDISK,12,9,216,32
+    LTEXT           "&Dateiname:",IDC_STATIC_1,12,48,42,8
+    EDITTEXT        IDC_FILENAME,12,58,200,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,215,58,13,12
+    DEFPUSHBUTTON   "OK",IDOK,63,76,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,126,76,50,14
+END
+
+IDD_ERROR DIALOGEX 15, 34, 350, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fehler"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Name:",IDC_STATIC_1,4,10,26,8
+    LTEXT           "",IDS_FILENAME,34,10,309,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Fehler:",IDC_STATIC_2,4,23,26,8,NOT WS_GROUP
+    LTEXT           "Die Datei kann nicht entpackt werden, da es sich um die Fortsetzung eines vorangehenden Teilarchivs handelt. Beginnen Sie mit dem ersten Teilarchiv, um die Datei zu entpacken.",IDC_STATIC_3,34,23,309,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&Diesen Hinweis in Zukunft nicht mehr anzeigen.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,34,44,183,12
+    DEFPUSHBUTTON   "OK",IDOK,120,63,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,180,63,50,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 232, 115
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnRAR - Konfiguration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Beim Entpacken Dateien automatisch überspringen, die",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,10,199,12
+    CONTROL         "Keinen &Warnhinweis zeigen, wenn der gesamte",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,189,12
+    LTEXT           "von einem vorangegangenen Teilarchiv fortgesetzt werden.",IDC_STATIC_1,23,22,202,8
+    LTEXT           "Archivinhalt nicht aufgelistet werden kann.",IDC_STATIC_2,23,44,146,8
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,220,1
+    CONTROL         "Beim Auflisten des Archivs die Spalte ""&Gepackt"" zeigen",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,70,200,12
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,6,90,220,1
+    DEFPUSHBUTTON   "OK",IDOK,63,96,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,118,96,50,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 359, 80
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Passwort eingeben"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,18,18,18,20
+    LTEXT           "Diese Datei ist verschlüsselt. Bitte geben Sie das Passwort ein.",IDC_STATIC_1,57,10,211,8
+    LTEXT           "Datei:",IDC_STATIC_2,57,25,22,8
+    CONTROL         "",IDS_FILENAME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,97,25,249,8
+    LTEXT           "&Passwort:",IDC_STATIC_3,57,38,35,8
+    EDITTEXT        IDC_PASSWORD,97,36,166,12,ES_PASSWORD | ES_AUTOHSCROLL
+    PUSHBUTTON      "&OK",IDOK,27,58,50,14,WS_GROUP
+    DEFPUSHBUTTON   "&Alle",IDALL,82,58,50,14
+    PUSHBUTTON      "&Überspringen",IDSKIP,137,58,67,14
+    PUSHBUTTON      "Alle üb&erspringen",IDSKIPALL,209,58,67,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,281,58,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 105
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnRAR - Achtung"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Es können nicht alle Dateien des mehrteiligen Archivs aufgelistet (und im Dateifenster gezeigt) werden, da einige Teilarchive nicht gefunden wurden.",IDC_STATIC_1,11,8,194,24
+    LTEXT           "Um den gesamten Archivinhalt aufzulisten, kopieren Sie bitte alle Teilarchive in dasselbe Verzeichnis.",IDC_STATIC_2,11,39,194,16
+    CONTROL         "&Diesen Hinweis in Zukunft nicht mehr anzeigen",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,64,171,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,81,202,1
+    DEFPUSHBUTTON   "OK",IDOK,155,87,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnRAR"
+  IDS_PLUGIN_DESCRIPTION, "Durchsucht und entpackt RAR-Archive."
+  IDS_ABOUT, "Über Plugin"
+  IDS_LOWMEM, "Nicht genügend Speicher."
+  IDS_ERRMODULEFN, "Kann den Modul-Dateinamen nicht ermitteln."
+  IDS_ERRLOADLIB, "Kann die Bibliothek '%s' nicht laden."
+  IDS_ERRGETPROCADDR, "Kann die Prozeduradresse nicht ermitteln."
+  IDS_BADDATA, "Das Archiv ist beschädigt. (Falsches Passwort?)"
+  IDS_BADPASSWORD, "Das Passwort ist falsch. Versuchen Sie es noch einmal und beachten Sie die korrekte Groß-/Kleinschreibung. Stellen Sie sicher das die Feststell-Taste nicht gedrückt ist."
+  IDS_BADARC, "Die Datei hat ein unbekanntes Format oder ist kein gültiges RAR-Archiv. (Falsches Passwort?)"
+  IDS_ERROPENARC, "Fehler beim Öffnen der Archivdatei."
+  IDS_UNKNOWN, "Unbekannter Fehler aufgetreten."
+  IDS_VOLUMEERR, "Fehler beim Öffnen des Teilarchivs."
+  IDS_ERRREADARC, "Fehler beim Lesen der Archivdatei."
+  IDS_RARARCHIVES, "RAR-Archivdateien (*.R*)"
+  IDS_BROWSEARCHIVETITLE, "Archivdatei auswählen"
+  IDS_CRC, "Fehler in den komprimierten Daten. CRC stimmt nicht überein. (Falsches Passwort?)"
+  IDS_LIST, "Kann den Archiveintrag nicht zur Dateiliste hinzufügen."
+  IDS_EXTRPROGTITLE, "Entpacke RAR-Archiv - %s"
+  IDS_PREPAREDATA, "Daten werden vorbereitet und Verzeichnisse erstellt..."
+  IDS_EXTRACTFILES, "Entpacke..."
+  IDS_EXTRACTING, "Entpacke: "
+  IDS_UNABLEGETFIELPOS, "Kann den Dateizeiger nicht ermitteln: "
+  IDS_UNABLEWRITE, "Fehler beim Schreiben der Datei:"
+  IDS_UNABLESEEK, "Kann den Dateizeiger nicht setzen: "
+  IDS_TOOLONGNAME, "Kann den Vorgang nicht beenden da der Pfadname zu lang ist."
+  IDS_TOOLONGMASK, "Kann den Vorgang nicht beenden da die Maske zu lang ist."
+  IDS_ENTERPWD, "Bitte mindestens ein Zeichen eingeben."
+  IDS_ALLFILES, "Alle Dateien (*.*)"
+  IDS_ERROR, "Fehler"
+  IDS_NOTFOUND, "Datei nicht gefunden"
+  IDS_BADDLL, "Falsche Version von unrar.dll. Bitte UnRAR-Plugin neu installieren."
+  IDS_SELECTFIRST, "Es scheint sich um ein mehrteiliges Archiv zu handeln. Bitte wählen Sie in diesem Fall das erste Teilarchiv und drücken Sie 'OK'.\n\nSollte kein mehrteiliges Archiv vorliegen, drücken Sie 'Abbrechen'."
+  IDS_SELECTFIRSTTITLE, "Wählen Sie das erste Teilarchiv"
+  IDS_FILENOTFOUND "Die Datei wurde in dem Archiv nicht gefunden."
+  IDS_LISTINFO_PAKEDSIZE      "Gepackt"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Packgröße der Datei"
+}

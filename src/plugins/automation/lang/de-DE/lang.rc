@@ -1,0 +1,110 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for automation. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/automation/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_INPUTBOX DIALOGEX 75, 140, 205, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Eingabefeld"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Abfrage:",IDC_PROMPT,8,8,189,8
+    EDITTEXT        IDC_INPUTBOX,8,18,189,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",1,48,42,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",2,107,42,50,14
+END
+
+IDD_CONFIG DIALOGEX 75, 140, 332, 143
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Automation Konfiguration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Skriptverzeichnisse:",IDC_DIRLISTHEADER,8,9,67,8
+    CONTROL         "",IDC_DIRLIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,8,19,316,73
+    CONTROL         "Skript&debuggen ermöglichen",IDC_ENABLEDBG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,102,110,10
+    DEFPUSHBUTTON   "OK",IDOK,75,121,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,141,121,50,14
+    PUSHBUTTON      "&Hilfe",IDHELP,207,121,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_BROWSE MENU
+BEGIN
+    POPUP "[POPUP]"
+    BEGIN
+        MENUITEM "Durchsuchen…",                     ID_BROWSE
+        MENUITEM SEPARATOR
+        MENUITEM "Sally Verzeichnis",        ID_SALDIR
+        MENUITEM "Umgebungsvariable",        ID_ENVVAR
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+BEGIN
+    IDS_SCRIPTERROR         "Automation Skriptfehler"
+    IDS_LINE                "Zeile:\t%u\r\n"
+    IDS_COLUMN              "Spalte:\t%u\r\n"
+    IDS_ERROR               "Fehler:\t%s"
+    IDS_RUNFOCUSED          "Ausgewähltes Skript starten"
+    IDS_PROGRESSTITLE       "Fortschritt des Vorgangs"
+    IDS_SOURCE              "Quelle:\t%s\r\n"
+    IDS_SCRIPTPOPUPMENU     "Skriptmenü öffnen"
+    IDS_MENUEMPTY           "(kein Skript)"
+    IDS_LOADERRFMT          "Skript '%s' konnte nicht ausgeführt werden.\r\n%s"
+    IDS_UNKERROR            "Unbekannter Fehler."
+    IDS_ABORT               "1\t&Abbrechen"
+    IDS_DEBUGABORT          "1\t&Debug\t2\t&Abbrechen"
+    IDS_ADDDIRTITLE         "Skriptverzeichnis"
+    IDS_ADDDIRDESCR         "Skriptablageverzeichnis wählen."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGINNAME          "Automation"
+    IDS_DESCRIPTION         "Automatisiert allgemeine Aufgaben mit Hilfe von Skripts."
+    IDS_ABOUT               "Über Plugin"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_E_INVALIDARCHIVE    "Ungültiges Archiv."
+    IDS_E_CANNOTCLOSEPATH   "Aktueller Pfad kann nicht geschlossen werden."
+    IDS_E_SHORTERPATH       "Der Pfad wurde abgeschnitten."
+    IDS_E_READONLYWHILEPROGRESSSHOWN 
+                            "Während das Fenster gezeigt wird, kann weder die Eigenschaft geändert noch die Methode %s aufgerufen werden."
+    IDS_E_READONLYWHILEPROGRESSHIDDEN 
+                            "Während das Fenster ausgeblendet ist, kann weder die Eigenschaft geändert noch die Methode %s aufgerufen werden."
+    IDS_E_PLUGLOADFAIL      "Das Plugin konnte nicht geladen werden."
+    IDS_E_PLUGERROR         "Plugin fehlerhaft."
+    IDS_E_CACHEERROR        "Das Verschieben der Datei in den Festplattencache ist fehlgeschlagen."
+    IDS_E_FILEMASKSYNTAX    "Syntaxfehler in Dateimaske."
+    IDS_E_NOTCOMPONENT      "Nur Komponenten können dem Container hinzugefügt werden."
+    IDS_E_FORMPUT           "Formulare können dem Container nicht hinzugefügt werden."
+    IDS_E_SCRIPTABORTED     "Die Skriptausführung wurde vom Benutzer abgebrochen."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABORTCAPTION        "Skript abbrechen"
+    IDS_ABORTTIP            "Laufendes Skript abbrechen\tStrg+Untbr"
+    IDS_MAINWINDOWLOCKED    "Das Fenster des Sally ist durch das Automation-Plugin blockiert. Bitte beenden Sie das laufende Skript."
+    IDS_ENGINECREATEFAIL    "Fehler bei der Initialisierung des Scriptmoduls."
+END

@@ -1,0 +1,122 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for uniso. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uniso/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uniso.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 230, 83
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configurare UnISO"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Sterge atributul de mod doar-citire cand copii din arhiva",IDC_CFG_READONLY,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,11,201,10
+    CONTROL         "&Arata sesiunea ca director (permite acces la toate sesiunile)",IDC_CFG_SESSIONASDIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,23,213,10
+    CONTROL         "A&rata imaginea disk boot ca fisier",IDC_CFG_BOOTIMAGEASFILE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,35,124,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,2,58,226,1
+    DEFPUSHBUTTON   "OK",IDOK,118,64,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,173,64,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "Nu pot deschide fisierul."
+    IDS_UNKNOW_ERROR            "Eroare nespecificata."
+    IDS_UNPACKING_ARCHIVE       "Dezarhivare Arhiva ISO"
+    IDS_ERROR_UNPACKING         "Eroare la dezarhivarea arhivei."
+    IDS_CANT_HANDLE_FILE        "Nu pot utiliza acest fisier."
+    IDS_INSUFFICIENT_MEMORY     "Memorie insuficienta."
+    IDS_ERR_TOO_LONG_NAME       "Nu pot termina operatiunea din cauza numelui prea lung."
+    IDS_ABOUT                   "Despre Plugin"
+    IDS_PLUGIN_DESCRIPTION      "Rasfoieste si extrage fisierele imagine CD/DVD ISO."
+    IDS_CANT_CREATE_TEMP        "Nu pot crea director temporar."
+    IDS_CANT_DELETE_TEMP_FILE   "Nu pot sterge fisierul temporar."
+    IDS_UNKNOWN_FILE_FORMAT     "Format de fisier necunoscut sau imagine invalida ISO.\n\nDaca sunteti sigur-a ca aceasta e o imagine valida ISO, va rugam deschideti un issue la https://github.com/0xeb/sally/issues si ajutati-ne sa suportam acest format."
+    IDS_CANT_OPEN_FILE          "Nu pot deschide fisierul '%s'."
+    IDS_ERR_TMP                 "Crearea fisierului temporar a esuat."
+    IDS_CANT_SET_ATTRS          "Nu pot seta atributele fisierului."
+    IDS_CANT_CREATE_DIR         "Nu pot crea directorul '%s'."
+    IDS_YES                     "Da"
+    IDS_NO                      "Nu"
+    IDS_ERROR                   "Eroare"
+    IDS_WARNING                 "Atentionare"
+    IDS_ERROR_OPENING_MULTISESSION  "Ceva erori au avut loc in timp ce citea imaginea multisesiune.\n\nArat doar sesiunile ce se pot citi corect."
+    IDS_UNKNOWN_TRACK_TYPE      "Track de tip necunoscut."
+    IDS_READERROR               "Eroare de citire"
+    IDS_WRITEERROR              "Eroare de scriere"
+    IDS_CCD_BAD_FORMAT          "Format prost de fisier .CCD.\n\nImaginea aratata poate fi incompleta."
+    IDS_CCD_MISSING             "Lipseste fisierul .CCD.\n\nImaginea aratata poate fi incompleta."
+    IDS_ERROR_READING_SECTOR    "Nu pot citi sectorul  #%08X."
+    IDS_ERROR_LISTING_IMAGE     "Eroare la citirea structurii directorului la sectorul #%08X.\n\nContinut incomplet al imaginii ISO."
+    IDS_INTERNAL_PLUGIN_ERROR   "Eroare interna plugin."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Strategie de alocare necunoscuta (%d).\n\nVa rugam deschideti un issue la https://github.com/0xeb/sally/issues si ajutati-ne sa rezolvam aceasta problema."
+    IDS_UDF_INVALID_TAG_ID      "Tag ID UDF invalid."
+    IDS_UDF_ERROR_READING_VAT   "Eroare la citirea tabelului de alocare virtuala la sectorul #%08X."
+    IDS_UDF_MISSING_VAT         "Tabelul de alocare virtuala lipseste."
+    IDS_UDF_BAD_ROOT_ICB        "Root rau ICB.\n\nNu [pot citi structura directoare."
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "Fisierul ""%s"" nu poate fi extras.\n\nNepotrivire intre marimea fisierului si blocurile ICB."
+    IDS_CANT_OPEN_TRACK         "Nu pot deschide track #%d."
+    IDS_BOOT_OR_MBR             "Acest fisier pare sa fie o unitate floppy sau un hard disk sau o imagine a partitiei unui hard disk.\nIncercati sa redenumiti fisierul in  .ima pentru a activa plugin UnFAT."
+    IDS_UNSUPPORTED_APFS        "Aceasta imagine de disc contine sistemul de fisiere APFS.\nAcest sistem de fisiere nu este suportat inca."
+
+    IDS_ERR_HFS_READ            "Nu pot citi inceputul partitiei. Fisier prea mic."
+    IDS_ERR_HFS_INVALID_PARTITION "Structuri Corupte ale Managerului de Partitie."
+    IDS_ERR_HFS_UNRECOGNIZED    "Aceasta imagine de disk nu contine o partitie HFS Plus."
+    IDS_ERR_HFS_ORIGINAL_HFS    "Aceasta imagine de disk contine HFS si nu contine fisier sistem HFS Plus.\nHFS nu e suportat."
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "Nu pot cauta pana la blocul #%08X.\nFisierul %s nu va fi extras."
+    IDS_ERR_HFS_SEEK            "Nu pot cauta pana la blocul #%08X."
+    IDS_ERR_HFS_BTREE_NODETYPE  "Tip nod root nesuportat BTree in fisierul Catalog."
+    IDS_ERR_HFS_BTREE_FRAGMENTED "Fisierul Catalog e fragmentat in mai mult de 8 fragmente care nu sunt suportate."
+    IDS_ERR_HFS_FILE_FRAGMENTED "Fisierul '%s' e fragmentat in mai mult de 8 fragmente care nu e suportat.\nFisierul nu va fi extras."
+
+    IDS_ERR_TOO_LONG_PATH       "Aceasta imagine de disk contine o cale prea lunga pe care Sally nu o poate rezolva."
+
+    IDS_ERR_DMG_READ_HDR        "Nu pot citi inceputul pachetului. Fisier prea mic."
+    IDS_ERR_DMG_ENCRYPTED       "Acest pachet e criptat.\nPachetele criptate nu sunt suportate."
+    IDS_ERR_DMG_NO_FOOTER       "Acest fisier nu pare sa fie un pachet DMG sau e incomplet.\nNu contine un footer valid DMG."
+    IDS_ERR_DMG_PLIST           "Acest fisier nu pare sa fie un pachet valid DMG sau e incomplet.\nNu contine o Lista Proprietate valida."
+    IDS_ERR_DMG_BLOCK_UNDEFINED "Acest pachet nu contine un bloc de date din partitia HFS Plus care incepe la %I64u.\nBlocul e necesar pentru procesarea corecta a pachetului."
+
+    IDS_ERR_BF_READ             "Nu pot citi datele din imaginea disk la pozitia %I64u."
+    IDS_ERR_BF_SEEK             "Nu pot cauta in imaginea disk la pozitia %I64u."
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "Eroare interna: Metoda de cautare nesuportata."
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "Aceasta imagine disk contine un bloc comprimat cu o metoda necunoscuta.\nasemenea imagini disk nu sunt suportate."
+    IDS_ERR_BF_ZLIB             "Dezarhivarea unui bloc comprimat ZLIB a esuat. Imaginea disk pare corupta."
+    IDS_ERR_BF_BZIP2            "Dezarhivarea unui bloc comprimat BZIP2 a esuat. Imaginea disk pare corupta."
+
+    IDS_ERR_ISZ_NO_HEADER       "Acest fisier nu pare sa fie o imagine comprimata ISZ sau e incomplet.\nNu contine un cap de fisier valid ISZ."
+    IDS_ERR_ISZ_READ_HDR        "Nu pot citi cap de imagine comprimat. Fisier prea mic."
+    IDS_ERR_ISZ_SEGMENTED       "Aceasta imagine e segmentata.\nImaginile segmentate nu sunt suportate."
+    IDS_ERR_ISZ_ENCRYPTED       "Aceasta imagine e criptata.\nImagini criptate nu sunt suportate."
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "Track-urile audio nu pot fi extrase."
+
+    IDS_CANCELING_OPERATION     "Anulez operatiunea, va rugam asteptati..."
+
+    IDS_INFO_LABEL              "Informatie despre imagine\n\n"
+    IDS_INFO_LABEL_LABEL        "Informatie despre imagine ""%s""\n\n"
+    IDS_INFO_CNT_SESSIONS       "Numar de sesiuni: %d"
+    IDS_INFO_SESSION_NUM        "\nSesiune %d\n"
+    IDS_INFO_CNT_TRACKS         "  Numar de track-uri: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  Track: %d, %s, Marime: %d KBytes\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  Track: %d, %s, Marime: %d KBytes - ""%s""\n"
+}

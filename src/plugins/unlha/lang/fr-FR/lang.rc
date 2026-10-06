@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for unlha. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Parcourt et extrait les archives LHA."
+ IDS_ABOUT, "A propos du module"
+ IDS_FILECORRUPT, "Fichier LZH invalide ou format de fichier inconnu."
+ IDS_CHECKSUMERROR, "Erreur de checksum d'en-tête.\nL'archive est abîmée - l'affichage de tous les fichiers n'est pas possible."
+ IDS_LOWMEM, "Mémoire insuffisante."
+ IDS_WRITEERROR, "Erreur en écriture"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "Erreur d'ouverture de l'archive."
+ IDS_LIST, "Impossible d'ajouter des entrées d'archive à la liste de fichiers."
+ IDS_SYMLINK, "L'archive contient un ou plusieurs liens symboliques UNIX, qui ne seront pas affichés."
+ IDS_UNPACKERROR, "Impossible de décompresser le fichier."
+ IDS_CRCERROR, "Erreur dans les données compressées. Les CRC ne correspondent pas."
+ IDS_READERROR, "Erreur de lecture de l'archive."
+ IDS_EXTRPROGTITLE, "Décompression de l'archive LHA - %s"
+ IDS_PREPAREDATA, "préparation des données et création des répertoires..."
+ IDS_UNPACKING, "décompression: "
+ IDS_EXTRACTFILES, "décompression..."
+ IDS_TOOLONGNAME, "Impossible de terminer l'opération à cause d'un nom de chemin trop long."
+ IDS_TOOLONGMASK, "Impossible de terminer l'opération à cause d'un masque trop long."
+ IDS_METHOD, "Méthode de compression inconnue.Le fichier ne peut être décompressé."
+ IDS_METHOD2, "méthode inconnue non traitée..."
+}

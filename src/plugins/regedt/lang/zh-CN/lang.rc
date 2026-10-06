@@ -1,0 +1,325 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for regedt. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/regedt/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\regedt.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CREATEKEY DIALOGEX 10, 24, 227, 75
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "创建键"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "键名称(&K):",IDS_TEXT,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "直接发送路径到插件(&S)",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    DEFPUSHBUTTON   "确定",IDOK,58,53,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,118,53,50,14
+END
+
+IDD_RENAME DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "确定",IDOK,58,43,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,118,43,50,14
+END
+
+IDD_COPY DIALOGEX 10, 24, 227, 76
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    COMBOBOX        IDE_NAME,10,20,208,106,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_TABSTOP
+    CONTROL         "直接发送路径到插件(&S)",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,35,189,12
+    DEFPUSHBUTTON   "确定",IDOK,58,54,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,118,54,50,14
+END
+
+IDD_NEWVALUE DIALOGEX 14, 22, 227, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "新值"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "值名称(&V):",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "直接发送路径到插件(&S)",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    LTEXT           "值类型(&T):",IDC_STATIC_2,10,53,56,8
+    COMBOBOX        IDC_TYPE,10,63,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "确定",IDOK,58,87,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,118,87,50,14
+END
+
+IDD_EDITVAL DIALOGEX 14, 22, 227, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "编辑值"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_DATA,10,79,208,12,ES_AUTOHSCROLL
+    LTEXT           "基本:",IDS_BASE,124,69,60,8
+    CONTROL         "十六进制(&H)",IDR_HEX,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,78,81,12
+    CONTROL         "十进制(&C)",IDR_DEC,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,90,73,12
+    DEFPUSHBUTTON   "确定",IDOK,58,112,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,118,112,50,14
+    LTEXT           "值名称:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "值类型(&T):",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "值数据(&D):",IDC_STATIC_3,10,69,60,8
+END
+
+IDD_RAWEDITVAL DIALOGEX 14, 22, 227, 145
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "原始编辑值"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "值名称:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "值类型(&T):",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "启动编辑器(&L)",IDB_EDIT,10,69,75,14
+    LTEXT           "当你在外部编辑器中完成编辑并保存更改后，点击""确定""以保存更改到注册表中，或选择""取消""退出但不保存。",IDS_MESSAGE,10,89,206,24,NOT WS_VISIBLE
+    DEFPUSHBUTTON   "确定",IDOK,58,123,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,118,123,50,14
+END
+
+IDD_SEARCH DIALOGEX 9, 20, 333, 240
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Windows 注册表搜索"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "搜索(&S):",IDC_STATIC_1,6,10,41,8
+    COMBOBOX        IDC_PATTERN,61,8,198,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "立即查找(&F)",IDOK,264,7,54,14,WS_GROUP
+    LTEXT           "搜索位置(&L):",IDC_STATIC_2,6,27,49,8
+    COMBOBOX        IDC_LOOKIN,61,25,198,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "帮助(&H)",IDHELP,264,24,54,14,WS_GROUP
+    CONTROL         "显示选项(&O)",IDC_OPTIONS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,258,42,60,12
+    CONTROL         "包括子键(&B)",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,42,86,12
+    LTEXT           "搜索项:",IDS_LOOKAT,6,60,41,8
+    CONTROL         "键(&K)",IDC_KEYS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,58,55,12
+    CONTROL         "值(&V)",IDC_VALUES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,58,55,12
+    CONTROL         "数据(&D)",IDC_DATA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,217,58,55,12
+    LTEXT           "选项:",IDS_OPTIONS,6,76,41,8
+    CONTROL         "HE&X-模式",IDC_HEX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,74,60,12
+    CONTROL         "区分大小写(&T)",IDC_CASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,74,84,12
+    CONTROL         "整个单词(&W)",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,87,60,12
+    CONTROL         "正则表达式(&G)",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,87,75,12
+    LTEXT           "较新或等于(&N):",IDS_NEWER,61,105,76,8
+    EDITTEXT        IDC_MINTIME,139,103,80,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.yyyy",IDS_FORMAT1,225,105,81,8
+    LTEXT           "较旧或等于(&R):",IDS_OLDER,61,121,76,8
+    EDITTEXT        IDC_MAXTIME,139,119,80,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.yyyy",IDS_FORMAT2,225,121,81,8
+    LTEXT           "找到的项目(&I):",IDC_FOUND_FILES,6,132,109,8
+    CONTROL         "",IDC_RESULTS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,6,142,309,57
+END
+
+IDD_CONFIG DIALOGEX 86, 38, 280, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "注册表编辑器配置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "外部编辑器设置。外部编辑器用来编辑原始注册表值。",IDC_STATIC_1,10,10,260,8
+    LTEXT           "命令(&C):",IDC_STATIC_2,20,27,48,8
+    EDITTEXT        IDE_COMMAND,69,25,184,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_BROWSE,257,25,13,12
+    LTEXT           "参数(&A):",IDC_STATIC_3,20,43,48,8
+    EDITTEXT        IDE_ARGUMENTS,69,41,184,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_ARGHELP,257,41,13,12
+    LTEXT           "初始目录(&I):",IDC_STATIC_4,20,59,48,8
+    EDITTEXT        IDE_INITDIR,69,57,184,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_INITDIRHELP,257,57,13,12
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,10,79,260,1
+    DEFPUSHBUTTON   "确定",IDOK,166,84,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,220,84,50,14
+END
+
+IDD_EXPORT DIALOGEX 14, 22, 227, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "导出"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "导出路径(&E):",IDC_STATIC_1,10,10,83,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    LTEXT           "到文件(&T):",IDC_STATIC_2,10,39,56,8
+    EDITTEXT        IDE_FILE,10,49,191,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDB_BROWSE,205,49,13,12
+    DEFPUSHBUTTON   "确定",IDOK,58,72,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,118,72,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "注册表编辑器"
+  IDS_DESCRIPTION, "浏览、查看和修改 Windows 注册表。"
+  IDS_ABOUT, "关于插件"
+  IDS_REGEDTERR, "注册表编辑器 - 错误"
+  IDS_LOWMEM, "内存不足。"
+  IDS_DRIVEMENUTEXT, "\tWindows 注册表"
+  IDS_DEFAULTVALUE, "(默认)"
+  IDS_TYPE, "类型/日期"
+  IDS_DATA, "数据/时间"
+  IDS_SIZE, "大小"
+  IDS_KEY, "键"
+  IDS_EMPTY, "此处不允许空字符串。"
+  IDS_ERROR, "错误"
+  IDS_NEWKEYINROOT, "在注册表根创建新键是不可能的。"
+  IDS_LONGNAME, "无法完成操作，因为路径名太长。"
+  IDS_NEWKEY, "无法创建新键: "
+  IDS_KEYEXISTS, "键已经存在。"
+  IDS_DELVAL, "删除注册表值错误"
+  IDS_DELKEY, "删除注册表键错误"
+  IDS_CONFIRNNONEMPTYDELETE, "键 ""%s"" 不是空的。\n你要删除它吗?"
+  IDS_QUESTION, "问题"
+  IDS_DELKEYINROOT, "删除注册表根的键是不可能的。"
+  IDS_MENUNEWKEY, "新建键(&K)..."
+  IDS_MENUNEWVAL, "新建值(&V)..."
+  //IDS_MENUOPEN, "&Open\tEnter"
+  IDS_EDIT, "编辑(&E)..."
+  IDS_RAWEDIT, "原始编辑(&W)..."
+  //IDS_MENUDELETE, "&Delete\tF8"
+  //IDS_MENURENAME, "&Rename\tF2"
+  IDS_NEWVAL, "无法创建新值: "
+  IDS_REPLACEVAL, "值 ""%s"" 已经存在。\n你要替换它吗？"
+  IDS_INVALIDHEXVALUE, "无效的十六进制值。"
+  IDS_INVALIDDECVALUE, "无效的十进制值。"
+  IDS_QUERYVAL, "无法查询值: "
+  IDS_SETVAL, "无法设置值: "
+  IDS_BADPATH, "无效的路径名。 "
+  IDS_NOTREGEDTPATH, "这里不支持到其他文件系统的路径。"
+  IDS_OPENKEY, "无法打开注册表键 ""%ls""。 "
+  IDS_OPENKEY2, "无法打开注册表键 ""%ls\\%ls""。 "
+  IDS_ENUMKEY, "一个或多个子键或值不能被列出 - %s\n是否继续列表？"
+  IDS_EXPORT, "导出(&E)..."
+  IDS_SEARCH, "搜索(&S)..."
+  IDS_QUICKRENAMEKEY, "重命名键 ""%s"" 为"
+  IDS_QUICKRENAMEVAL, "重命名值 ""%s"" 为"
+  IDS_QUICKRENAME, "快速重命名"
+  IDS_COPY, "复制"
+  IDS_MOVE, "移动"
+  IDS_COPYORMOVE1, "%s 值 ""%s"" 到"
+  IDS_COPYORMOVE2, "%s 键 ""%s"" 到"
+  IDS_COPYORMOVE3, "{!}%s %d 值{} 到"
+  IDS_COPYORMOVE4, "{!}%s %d 键{} 到"
+  IDS_COPYORMOVE5, "{!}%s %d 值{} 和 %d 键{} 到"
+  IDS_MOVERENAME, "移动/重命名"
+  IDS_SAMETARGET, "这个操作没有意义。所有选定的文件和目录拥有同样的目标名称(它们会相互覆盖)。"
+  IDS_ACCESS, "无法访问注册表键 ""%ls\\%ls""。 "
+  IDS_CANTCOPYTOITSELF, "不能复制键或值到它自己。"
+  IDS_CANTMOVETOITSELF, "不能移动键或值到它自己。"
+  IDS_CREATE, "无法创建一个注册表键。 "
+  IDS_OPEN, "无法打开一个注册表键。 "
+  IDS_ACCESS2, "无法访问一个注册表键。 "
+  IDS_DELETE, "无法删除一个注册表键。 "
+  IDS_COPYKEY, "复制注册表键错误"
+  IDS_MOVEKEY, "移动注册表键错误"
+  IDS_SETVAL2, "无法设置注册表键值。 "
+  IDS_REMOVESOURCE, "无法移除原始注册表键。 "
+  IDS_COPYVALUE, "复制注册表键值错误"
+  IDS_MOVEVALUE, "移动注册表键值错误"
+  IDS_REMOVESOURCE2, "无法从源键移除值。 "
+  IDS_CANTCOPYTOITSELF2, "名称:\t%ls\n\n错误:\t不能复制键到它自己。"
+  IDS_CANTMOVETOITSELF2, "名称:\t%ls\n\n错误:\t不能移动键到它自己。"
+  IDS_COPYCLASSNAME, "键的 Class 名称不能被复制到目标键。\n你要继续吗？"
+  IDS_WARNING, "警告"
+  IDS_CANNOTRENAME, "不能重命名键。指定的键名称已经被使用。"
+  IDS_RENAMEKEY, "重命名注册表键错误"
+  IDS_RENAMEVAL, "重命名注册表键错误"
+  IDS_SAMECASEKEY, "不能重命名键。原始和新的名称只是大小写不同。"
+  IDS_SAMECASEVAL, "不能重命名值。原始和新的名称只是大小写不同。"
+  IDS_SYNTAX, "键名称语法不正确。"
+  IDS_CREATETARGET, "目标键 ""%ls\\%ls"" 不存在。你要创建它吗？"
+  IDS_COPYPROGRESS, "正在复制注册表项，请等待 (按 ESC 取消)..."
+  IDS_MOVEPROGRESS, "正在移动注册表项，请等待 (按 ESC 取消)..."
+  IDS_DELETEPROGRESS, "正在删除注册表项，请等待 (按 ESC 取消)..."
+  IDS_CANCEL, "你要取消这个操作吗？"
+  IDS_COPYTOTROOT, "复制键到注册表根是不可能的。"
+  //IDS_WINDOWSREGISTRY, "Windows Registry"
+  IDS_STOP, "停止(&P)"
+  IDS_START, "立刻查找(&F)"
+  IDS_FOUNDITEMS1, "找到的项(&I):"
+  IDS_FOUNDITEMS2, "找到的项(%d)(&I):"
+  IDS_NOFILESFOUND, "未找到文件"
+  IDS_STOPPED, "搜索已停止"
+  IDS_NAME_COLUMN, "名称"
+  IDS_TYPE_COLUMN, "类型"
+  IDS_DATA_COLUMN, "数据"
+  IDS_PATH_COLUMN, "路径"
+  IDS_SIZE_COLUMN, "大小"
+  IDS_DATE_COLUMN, "日期"
+  IDS_TIME_COLUMN, "时间"
+  IDS_FIND, "在 Windows 注册表中搜索(&S)..."
+  IDS_SEARCHERROR, "搜索 Windows 注册表错误"
+  IDS_BADHEXSTRING, "字符串不是有效的十六进制模式。"
+  IDS_REGEXPERR, "正则表达式类错误: %s"
+  IDS_SEARCHING, "搜索: %s\\"
+  IDS_SUBSTRINGHELP, "输入字符串、十进制数字或以 0x 开头的十六进制数字。空字符串匹配所有项。"
+  IDS_HEXHELP, "输入十六进制模式按格式: 1a 2b ""foo"" 3c. 为 unicode 使用 ""，为 ASCII 字符串模式使用 '。"
+  IDS_REGEXPHELP, "输入正则表达式。关于正则表达式的详情，参见 Sally 文档。"
+  IDS_LONGDATA, "由于数据太长，无法完成操作。"
+  IDS_BADTIMEFORMAT, "无效的日期/时间格式。请输入 dd.mm.yyyy 格式的日期或 hh:mm:ss dd.mm.yyyy 格式的日期和时间。"
+  IDS_CREATETEMP, "无法创建临时文件。 "
+  IDS_WRITETEMP, "无法写到临时文件。 "
+  IDS_EXP_FULLNAME, "完整名称"
+  IDS_EXP_DRIVE, "驱动器"
+  IDS_EXP_PATH, "路径"
+  IDS_EXP_NAME, "名称"
+  IDS_EXP_NAMEPART, "名称部分"
+  IDS_EXP_EXTPART, "扩展名部分"
+  IDS_EXP_FULLPATH, "完整路径"
+  IDS_EXP_WINDIR, "Windows 注册表"
+  IDS_EXP_SYSDIR, "系统目录"
+  IDS_EXP_BROWSE, "浏览..."
+  IDS_EXP_SALDIR, "Sally 目录"
+  IDS_EXP_DOSFULLNAME, "DOS 完整名称"
+  IDS_EXP_DOSDRIVE, "DOS 驱动器"
+  IDS_EXP_DOSPATH, "DOS 路径"
+  IDS_EXP_DOSNAME, "DOS 名称"
+  IDS_EXP_DOSNAMEPART, "DOS 名称部分"
+  IDS_EXP_DOSEXTPART, "DOS 扩展名部分"
+  IDS_EXP_DOSFULLPATH, "DOS 完整路径"
+  IDS_EXP_DOSWINDIR, "DOS Windows 目录"
+  IDS_EXP_DOSSYSDIR, "DOS 系统目录"
+  IDS_EXP_ENVVAR, "环境变量"
+  IDS_EXEFILES, "可执行文件 (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tAll Files (*.*)\t*.*\t\t"
+  IDS_OPENTEMP, "无法打开临时文件。 "
+  IDS_SIZEOFTEMP, "无法获取临时文件的大小。 "
+  IDS_READTEMP, "无法从临时文件读取。 "
+  IDS_PROCESS, "无法启动外部编辑器。点击注册表编辑器配置来设置外部编辑器。\n"
+  IDS_NOTDWORD, "数字太大，不能作为 DWORD 存储。"
+  IDS_REGFILES, "注册表文件 (*.reg)\t*.reg\t所有文件 (*.*)\t*.*\t\t"
+  IDS_FILENAMEISDIR, "目标文件名已经被用于一个目录。"
+  IDS_OVERWRITE, "目标文件已经存在。你要替换存在的文件吗？"
+  IDS_OVERWRITETITLE, "确认文件覆盖"
+  IDS_REPLACEERROR, "不能替换存在的文件。"
+  IDS_PROCESS2, "无法启动 %s。"
+  IDS_BADEXPORT, "导出注册表数据时出现错误。"
+  IDS_EXPORTING, "正在导出注册表数据，请等待..."
+  IDS_SELECTED1, "{!}%d 选定的值{}"
+  IDS_SELECTED2, "{!}%d 个选定的键{}"
+  IDS_SELECTED3, "{!}%d 个选定的值{}和 %d 个选定的键{}"
+  IDS_SELECTEDSIZE, "{!}<%d> 字节{}于 "
+  IDS_CANNOTRENAMEDEFVAL, "不能重命名默认值。值未定义。"
+  IDS_COPYNAME, "复制名称为文本"
+  IDS_COPYFULLNAME, "复制完整名称为文本"
+  IDS_COPYPATH, "复制完整路径为文本"
+  IDS_BUSY, "Sally 正忙。无法完成请求的命令，请稍候重试。"
+}

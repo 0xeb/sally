@@ -1,0 +1,166 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for splitcbn. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/splitcbn/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\splitcbn.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 53, 55, 260, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка модуля"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Включать исходное расширение в имена выходных файлов",IDC_CHECK_INCLUDE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,6,223,10
+    CONTROL         "Создавать &командный файл для объединения",IDC_CHECK_CREATE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,19,175,10
+    CONTROL         "&Разделять на другую панель",IDC_CHECK_SPLITOTHER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,32,114,10
+    CONTROL         "Разделять в &папку с именем исходного файла",IDC_CHECK_SPLITSUB,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,45,175,10
+    CONTROL         "&Объединять на другую панель",IDC_CHECK_COMBINEOTHER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,58,120,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,4,76,252,1
+    DEFPUSHBUTTON   "ОК",IDOK,88,83,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,145,83,50,14
+    PUSHBUTTON      "Справка",IDHELP,202,83,50,14
+END
+
+IDD_SPLIT DIALOGEX 32, 33, 280, 125
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Разделить"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_SPLIT_ICON,6,7,20,20,WS_GROUP
+    CONTROL         "",IDC_STATIC_TITLE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,35,9,233,8
+    EDITTEXT        IDC_EDIT_DIR,35,19,220,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,259,19,14,14,WS_GROUP
+    CONTROL         "&Размер части:",IDC_RADIO_SIZE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,35,43,62,10
+    CONTROL         "&Количество частей:",IDC_RADIO_NUMBER,"Button",BS_AUTORADIOBUTTON,35,60,82,10
+    COMBOBOX        IDC_COMBO_SIZE,138,42,136,83,CBS_DROPDOWN | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDC_EDIT_NUMBER,138,59,64,14,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Размер последней части:",IDC_STATIC_1,47,79,92,8
+    EDITTEXT        IDC_EDIT_LASTPART,140,79,133,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,7,97,267,1
+    PUSHBUTTON      "&Настройка...",IDC_BUTTON_CONFIG,7,105,60,14,WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,109,105,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,166,105,50,14
+    PUSHBUTTON      "Справка",IDHELP,223,105,50,14
+END
+
+IDD_COMBINE DIALOGEX 30, 28, 284, 194
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Объединить"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Части файла:",IDC_STATIC_1,7,9,50,8
+    LISTBOX         IDC_LIST_FILES,7,19,207,108,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_WANTKEYBOARDINPUT | WS_VSCROLL | WS_HSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Вверх",IDC_BUTTON_UP,221,20,57,14,WS_GROUP
+    PUSHBUTTON      "В&низ",IDC_BUTTON_DOWN,221,43,57,14
+    PUSHBUTTON      "&Добавить...",IDC_BUTTON_ADD,221,66,57,14
+    PUSHBUTTON      "&Убрать",IDC_BUTTON_REMOVE,221,89,57,14
+    PUSHBUTTON      "&Тест CRC...",IDC_BUTTON_CRC,221,112,57,14
+    LTEXT           "&Объединить в:",IDC_STATIC_2,7,136,54,8
+    EDITTEXT        IDC_EDIT_TARGET,7,146,251,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE2,264,146,14,14,WS_GROUP
+    LTEXT           "",IDC_STATIC_3,7,166,272,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,114,176,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,171,176,50,14
+    PUSHBUTTON      "Справка",IDHELP,228,176,50,14
+END
+
+IDD_CRC DIALOGEX 39, 34, 162, 106
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Тест CRC"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Закрыть",IDCANCEL,105,85,50,14
+    LTEXT           "Вычисленная сумма CRC:",IDC_STATIC_1,7,7,91,8
+    EDITTEXT        IDC_EDIT_CRC1,21,23,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC2,86,23,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "Исходная сумма CRC:",IDC_STATIC_2,7,44,78,8
+    EDITTEXT        IDC_EDIT_CRC3,21,61,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC4,86,61,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,100,10,56,1
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,87,48,69,1
+    ICON            "",IDC_ICON_WARN,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+    ICON            "",IDC_ICON_OK,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "Разделить и объединить"
+ IDS_PLUGIN_DESCRIPTION, "Разделение и объединение файлов."
+ IDS_OPENERROR, "Ошибка открытия файла."
+ IDS_SELECTDIR, "Выберите папку назначения."
+ IDS_ZEROSIZE, "Размер файла слишком мал для разделения."
+ IDS_INSERTDISK, "Вставьте форматированный диск с достаточным объемом свободного пространства."
+ IDS_FIXEDNOSENSE, "Использование автовыбора на несъемном диске бессмысленно.\nПродолжить?"
+ IDS_OUTOFSPACE, "На диске назначения недостаточно свободного пространства."
+ IDS_OUTOFMEM, "Недостаточно памяти."
+ IDS_READERROR, "Ошибка чтения"
+ IDS_WRITEERROR, "Ошибка записи"
+ IDS_INSERTNEXT, "Вставьте следующий диск и нажмите ""OK""."
+ IDS_SPLIT, "Разделить"
+ IDS_COMBINE, "Объединить"
+ IDS_TOOMANYPARTS, "Количество частей более 100 шт.\nВы действительно хотите продолжить?"
+ IDS_WRITING, "Записывается"
+ IDS_TOOLONGNAME, "Исходное имя файла слишком длинное, поэтому командный файл может не работать на некоторых системах. Продолжить?"
+ IDS_ADDFILTER, "Все файлы (*.*)"
+ IDS_ADDTITLE, "Добавить части файла"
+ IDS_BROWSETITLE, "Выберите файл назначения"
+ IDS_CRCERROR, "Ошибка теста CRC.\n\nЧасти файла повреждены, неполные или были объединены\nв неправильном порядке. Выходной файл, вероятно, поврежден."
+ IDS_PROCESSING, "Обрабатывается"
+ IDS_ZEROFILES, "Нечего объединять."
+ IDS_CANCEL, "Хотите отменить текущую операцию?"
+ IDS_CRCTITLE, "Тест CRC"
+ IDS_CRCDEC, "%lu (dec)"
+ IDS_CRCHEX, "%X (hex)"
+ IDS_CRCNOTFOUND, "Не найдена"
+ IDS_CALCCRC, "Вычислить сумму CRC"
+ IDS_SPLITTITLE, "Разделить ""%%s"" (%s байт) на:"
+ IDS_144FLOPPY, "1.44 МБ (дискета 3,5)"
+ IDS_720FLOPPY, "720 КБ (дискета 3,5)"
+ IDS_12FLOPPY, "1.2 МБ (дискета 5,25)"
+ IDS_360FLOPPY, "360 КБ (дискета 5,25)"
+ IDS_AUTODETECT, "Автовыбор"
+ IDS_FILECRCTITLE, "CRC32 файла ""%s"":"
+ IDS_BATTOOLONG, "Ошибка создания командного файла."
+ IDS_BYTES, "байт"
+ IDS_BYTE, "байт"
+ IDS_PATHERROR, "Ошибка пути"
+ IDS_TARGETPATHEXIST, "Путь назначения не существует. Создать?"
+ IDS_WINPATH, "Невозможно объединить и сохранить файл, путь которого не совместим с Windows."
+ IDS_SPECIFYFILE, "Введенный путь не указывает на файл."
+ IDS_MENU1 "&Разделить файл..."
+ IDS_MENU2 "&Объединить файлы..."
+ IDS_ABOUTTITLE "О модуле"
+ IDS_BATFILE_GENBYSAL, "Создан программой Sally"
+ IDS_BATFILE_CTRL_C_TO_QUIT, "Нажмите Ctrl+C для выхода."
+ IDS_BATFILE_DESCR, "Этот командный файл воссоздаст файл ""%s""."
+ IDS_SIZE_B, "Б"
+ IDS_SIZE_KB, "КБ"
+ IDS_SIZE_K, "К"
+ IDS_SIZE_MB, "МБ"
+ IDS_SIZE_GB, "ГБ"
+ IDS_100MB_ZIP, "100 МБ (ZIP)"
+ IDS_250MB_ZIP, "250 МБ (ZIP)"
+ IDS_120MB_LS120, "120 МБ (LS-120)"
+ IDS_650MB_CDR, "650 МБ (CD-R)"
+ IDS_700MB_CDR, "700 МБ (CD-R)"
+ IDS_TOOLONGNAME2, "Невозможно завершить операцию. Слишком длинное имя файла."
+}

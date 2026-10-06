@@ -1,0 +1,110 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for automation. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/automation/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_INPUTBOX DIALOGEX 75, 140, 205, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Prompt:",IDC_PROMPT,8,8,189,8
+    EDITTEXT        IDC_INPUTBOX,8,18,189,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",1,48,42,50,14,WS_GROUP
+    PUSHBUTTON      "Anulez",2,107,42,50,14
+END
+
+IDD_CONFIG DIALOGEX 75, 140, 332, 143
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configurare Automata"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Directoarele de &Script:",IDC_DIRLISTHEADER,8,9,78,8
+    CONTROL         "",IDC_DIRLIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,8,19,316,73
+    CONTROL         "Activeaza script &debugging",IDC_ENABLEDBG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,102,105,10
+    DEFPUSHBUTTON   "OK",IDOK,75,121,50,14,WS_GROUP
+    PUSHBUTTON      "Anulez",IDCANCEL,141,121,50,14
+    PUSHBUTTON      "&Help",IDHELP,207,121,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_BROWSE MENU
+BEGIN
+    POPUP "[POPUP]"
+    BEGIN
+        MENUITEM "Rasfoieste…",                     ID_BROWSE
+        MENUITEM SEPARATOR
+        MENUITEM "Directorul Sally",        ID_SALDIR
+        MENUITEM "Variabila de Mediu",        ID_ENVVAR
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+BEGIN
+    IDS_SCRIPTERROR         "Eroare de Script Automat"
+    IDS_LINE                "Linie:\t%u\r\n"
+    IDS_COLUMN              "Coloana:\t%u\r\n"
+    IDS_ERROR               "Eroare:\t%s"
+    IDS_RUNFOCUSED          "Ruleaza Script Focused"
+    IDS_PROGRESSTITLE       "Progresul Operatiunei"
+    IDS_SOURCE              "Sursa:\t%s\r\n"
+    IDS_SCRIPTPOPUPMENU     "Deschide Meniul Scriptului"
+    IDS_MENUEMPTY           "(fara script)"
+    IDS_LOADERRFMT          "Eroare in a executa script '%s'.\r\n%s"
+    IDS_UNKERROR            "Eroare necunoscuta."
+    IDS_ABORT               "1\t&Renunta"
+    IDS_DEBUGABORT          "1\t&Debug\t2\t&Renunta"
+    IDS_ADDDIRTITLE         "Directorul scripturi"
+    IDS_ADDDIRDESCR         "Selectati directorul care detine scripturile."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGINNAME          "Automat"
+    IDS_DESCRIPTION         "Face in mod automat tasks folosind scripturi."
+    IDS_ABOUT               "Despre Plugin"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_E_INVALIDARCHIVE    "Arhiva invalida."
+    IDS_E_CANNOTCLOSEPATH   "Calea curenta nu poate fi inchisa."
+    IDS_E_SHORTERPATH       "Calea a fost trunchiata."
+    IDS_E_READONLYWHILEPROGRESSSHOWN 
+                            "Nu pot schimba proprietatea sau a activa metoda '%s' in timp ce fereastra e afisata."
+    IDS_E_READONLYWHILEPROGRESSHIDDEN 
+                            "Nu pot schimba proprietatea sau a activa metoda '%s' in timp ce fereastra e ascunsa."
+    IDS_E_PLUGLOADFAIL      "Nu am reusit sa incarc plugin."
+    IDS_E_PLUGERROR         "Eroare de plugin."
+    IDS_E_CACHEERROR        "Eroare in a muta fisierul in cache-ul disk-ului."
+    IDS_E_FILEMASKSYNTAX    "Eroare de sintaxa in masca fisierului."
+    IDS_E_NOTCOMPONENT      "Numai componentele pot fi adaugate container-ului."
+    IDS_E_FORMPUT           "Formele nu pot fi adaugate container-ului."
+    IDS_E_SCRIPTABORTED     "Executarea scriptului a fost anulata de utilizator."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABORTCAPTION        "Anuleaza script"
+    IDS_ABORTTIP            "Anuleaza script care ruleaza\tCtrl+Break"
+    IDS_MAINWINDOWLOCKED    "Fereastra Sally este blocata de plugin Automation. Va rugam terminati de rulat scriptul."
+    IDS_ENGINECREATEFAIL    "Esuare in initializarea motorului de script."
+END

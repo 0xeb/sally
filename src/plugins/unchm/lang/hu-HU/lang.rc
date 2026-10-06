@@ -1,0 +1,48 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for unchm. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unchm/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unchm.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "A fájl nem nyitható meg."
+    IDS_UNKNOW_ERROR            "Meghatározhatatlan hiba."
+    IDS_UNPACKING_ARCHIVE       "CHM archívum kibontása"
+    IDS_ERROR_UNPACKING         "Fájl kibontási hiba."
+    IDS_CANT_HANDLE_FILE        "A fájl nem kezelhető."
+    IDS_INSUFFICIENT_MEMORY     "Kevés a memória."
+    IDS_ABOUT                   "Plugin névjegy"
+    IDS_PLUGIN_DESCRIPTION      "CHM fájlok böngészése és kibontása."
+    IDS_CANT_CREATE_TEMP        "Ideiglenes mappa nem hozható létre."
+    IDS_CANT_DELETE_TEMP_FILE   "Ideiglenes fájl nem törölhető."
+    IDS_UNKNOWN_FILE_FORMAT     "Ismeretlen fájl formátum vagy nem érvényes CHM kép.\n\nHa biztos benne, hogy ez érvényes CHM kép, nyisson egy hibajegyet itt: https://github.com/0xeb/sally/issues és segítsen ezt a formátumot támogathatóvá tenni."
+    IDS_CANT_OPEN_FILE          "A fájl nem nyitható meg."
+    IDS_ERR_TMP                 "Ideiglenes fájlok létrehozása nem sikerült."
+    IDS_CANT_SET_ATTRS          "A fájl attribútuma nem állítható be."
+    IDS_CANT_CREATE_DIR         "A mappa nem hozható létre: '%s'."
+    IDS_YES                     "Igen"
+    IDS_NO                      "Nem"
+    IDS_ERROR                   "Hiba"
+    IDS_WARNING                 "Figyelem"
+    IDS_READERROR               "Olvasási hiba"
+    IDS_WRITEERROR              "Írási hiba"
+    IDS_INTERNAL_PLUGIN_ERROR   "Belső plugin hiba."
+    IDS_INVALIDNUMBER           "Érvénytelen szám."
+    IDS_CANCELOPER              "művelet megszakítása, kérem várjon..."
+    IDS_CHMLIBCOPYRIGHT         "CHMLIB Library Copyright © 2001-2010 Jed Wing"
+}

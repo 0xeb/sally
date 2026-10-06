@@ -13,9 +13,9 @@
 #pragma once
 
 // global data
-extern const wchar_t* PluginNameEN; // untranslated plugin name, used before loading the language module and for debugging
+extern const wchar_t* PluginNameEN; // untranslated plugin name, used before the translated resources are needed and for debugging
 extern HINSTANCE DLLInstance;    // handle to the SPL - language-independent resources
-extern HINSTANCE HLanguage;      // handle to the SLG - language-dependent resources
+extern HINSTANCE HLanguage;      // handle to the module with language-dependent resources (this DLL)
 
 // general Salamander interface - valid from startup until the plugin is unloaded
 extern CSalamanderGeneralAbstract* SalamanderGeneral;

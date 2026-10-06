@@ -1,0 +1,213 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for undelete. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/undelete/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\undelete.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Desborrado"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,12,12,323,8
+    LTEXT           "",IDC_PROGRESSBAR,35,32,292,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Cancelar",IDCANCEL,145,54,50,14
+    LTEXT           "Total:",IDC_STATIC_1,12,33,22,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Desborrado"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Seleccione &disco para analizar",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "&Imagen de disco",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,68,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,361,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Hojear...",IDC_BUTTON_BROWSE,379,178,50,14,WS_GROUP
+    CONTROL         "Explorar clusters &vacantes en particiones FAT",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,184,10
+    CONTROL         "Mostrar ficheros y directorios &existentes",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "Mostrar ficheros con tamaño &cero",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "M&ostrar directorios vacíos",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "Mostrar &metaficheros",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "Estimar daño a los &ficheros",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "Aceptar",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Desborrado"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Desborra",IDC_LABEL_UNDELETING,3,11,40,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,47,11,301,8
+    RTEXT           "hacia",IDC_STATIC_1,3,23,40,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,47,23,301,8
+    RTEXT           "Fichero:",IDC_STATIC_2,3,41,40,8
+    LTEXT           "",IDC_PROGRESS_FILE,47,40,293,12,NOT WS_GROUP
+    RTEXT           "Total:",IDC_STATIC_3,3,56,40,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,47,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Cancelar",IDCANCEL,151,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 213, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nombre de fichero dañado"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "La primera letra del siguiente nombre de fichero no pudo recuperarse. Escriba el caracter original.",IDC_STATIC_1,7,7,199,16
+    EDITTEXT        IDC_EDIT_FILENAME,7,27,199,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "Aceptar",IDOK,44,53,50,14
+    PUSHBUTTON      "&Todo",IDC_BUTTON_ALL,100,53,50,14
+    PUSHBUTTON      "Cancelar",IDCANCEL,156,53,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 267, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuración de Desborrado"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Directorio &temporal alternativo para ver ficheros:",IDC_STATIC_1,7,7,165,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,232,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,245,17,16,14,WS_GROUP
+    CONTROL         "&Volver a usar siempre información previa de clusters previa en FAT",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,236,10
+    CONTROL         "No avisar al desborrar al &mismo disco lógico",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,159,10
+    CONTROL         "No avisar antes de restaurar ficheros &encriptados a FAT o exFAT",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,230,10
+    DEFPUSHBUTTON   "Aceptar",IDOK,101,80,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,156,80,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,211,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 276, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Restaurar ficheros encriptados desde copia de seguridad"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Esta función restaurará ficheros encriptados previamente desborrados hacia una partición sin soporte para Sistema de Ficheros Encriptados (EFS), como es FAT. Los ficheros normales (distintos de *.bak) se copiarán sin alterar.",IDC_STATIC_1,7,7,262,24
+    LTEXT           "&Restaurar %s a:",IDC_LABEL_SOURCE,7,41,262,8
+    EDITTEXT        IDC_EDIT_TARGET,7,51,244,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,255,51,14,14,WS_GROUP
+    DEFPUSHBUTTON   "Aceptar",IDOK,57,74,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,113,74,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,169,74,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_LOWMEM, "Memoria insuficiente."
+  IDS_ERRORREADINGMFT, "Error leyendo clusters MFT."
+  IDS_MFTRECORDDAMAGED, "Error leyendo MFT: el primer registro está dañado."
+  IDS_ROOTNOTFOUND, "No se pudo encontrar el directorio raíz."
+  IDS_VDIRECTORY, "Directorio%06d"
+  IDS_ALLDELETEDFILES, "{Todos los ficheros borrados}"
+  IDS_ERRORNOTNTFS, "Error interno: el volumen no es NTFS."
+  IDS_ERRORNOTOPEN, "Error interno: el volumen no está abierto."
+  IDS_ERROROPENINGVOLUME, "Error al abrir volumen."
+  IDS_ERRORREADINGBOOT, "Error leyendo el sector de arranque."
+  IDS_ERRORVOLUMETYPE, "Tipo de volumen no reconocido; sólo se admiten volúmenes FAT 12, 16, 32 y NTFS."
+  IDS_READINGMFT, "Leyendo MFT..."
+  IDS_ERRORREADINGFAT, "Error leyendo FAT."
+  IDS_ERRORREADINGDIRCLUSTERS, "Error leyendo clusters de directorios."
+  IDS_ERRORNOTFAT, "Error interno: el volumen no es FAT."
+  IDS_LOADINGFAT, "Leyendo FAT..."
+  IDS_READINGDIRS, "Leyendo directorios..."
+  IDS_READINGEXISTINGDIRS, "Leyendo directorios existentes..."
+  IDS_READINGDELETEDDIRS, "Leyendo directorios borrados..."
+  IDS_SCANNINGVACANTCLUSTERS, "Explorando clusters vacantes..."
+  IDS_REUSESCANNEDINFO, "¿Desea vovler a usar información de la exploración de clusters previa?"
+  IDS_RELOADINGCLUSTERS, "Recargando clusters previamente encontrados..."
+  IDS_FLOPPY350, "Diskette 3.5"
+  IDS_FLOPPY525, "Diskette 5.25"
+  IDS_FLOPPY800, "Diskette 8.0"
+  IDS_COMPACT_DISK, "Disco compacto"
+  IDS_LOCAL_DISK, "Disco local"
+  IDS_REMOVABLE_DISK, "Disco removible"
+  IDS_ANALYZINGDIRS, "Analizando directorios..."
+  IDS_INCOMPLETEMFT, "Desborrado fue incapaz de explorar toda la Tabla Master de Ficheros (MFT). ¿Desea presentar resultados parciales?"
+  IDS_BITMAPNOTFOUND, "Fallo en localizar $Bitmap en este volumen. Cancelada la estimación de daño de ficheros."
+  IDS_BITMAPNOSTREAM, "Fallo al localizar corriente por defecto en el fichero $Bitmap. Cancelada la estimación de daño de ficheros."
+  IDS_LOWMEMBITMAP, "No hay memoria suficiente para cargar fichero bitmap de clusters. Se saltará la estimación de daño de ficheros."
+  IDS_ERRORREADINGBMP, "Error leyendo fichero $Bitmap. Cancelada la estimación de daño de ficheros."
+  IDS_BITMAPISEMPTY, "$Bitmap tiene tamaño cero. Se saltará la estimación de daño de ficheros."
+}
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "Desborrado"
+  IDS_DESCRIPTION, "Recupera ficheros borrados desde particiones FAT o NTFS."
+  IDS_ABOUTTITLE, "Acerca del Plugin"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{Metarchivos}"
+  IDS_PATHDISK, "La ruta debe contener un disco."
+  IDS_PATHFILE, "La ruta lleva hacia un fichero. No se puede abrir el fichero."
+  IDS_PATHNOTFOUND, "Ruta no encontrada."
+  IDS_IMAGENOTFOUND, "No se encontró´el fichero especificado."
+  IDS_ERROROPENINGPROGRESS, "Error abriendo diálogo de progreso."
+  IDS_VOLENUMERATE, "Error enumerando volúmenes de sistema."
+  IDS_OPENINGVOLUME, "Abriendo volumen..."
+  IDS_SCANNINGFOUND, "{!}Explorando clusters vacantes... (%d cluster{|1|s} de directorios encontrados{1:|1|s})"
+  IDS_ALWAYSCHOOSEYES, "Siempre escoger Sí (Si es necesario se puede modificar en el diálogo Configuración)"
+  IDS_PATHTOOLONG, "La ruta destino es muy larga"
+  IDS_QUESTION, "Pregunta"
+  IDS_WANTCANCEL, "¿Desea cancelar esta operación?"
+  IDS_BADPATH, "No se admite desborrar hacia archivos o sistemas de ficheros de plugin."
+  IDS_ERROR, "Error" // title of error messages
+  IDS_VIEW, "Ver" // the function "F3"
+  IDS_TEMPDIR, "Para ver ficheros en %c: necesita especificar un directorio temporal alternativo en un disco lógico diferente de %c:"
+  IDS_WAIT, "Desborrando fichero hacia un directorio temporal, espere"
+  IDS_ENCRYPTEDWARNING, "El volumen destino no admite Sistema de Ficheros Encriptados (EFS).\n\nLos ficheros encriptados serán desborrados en formato copia de seguridad, que puede usarse para restaurar más tarde los ficheros a una partición NTFS con el comando ""Plugins/Desborrado/Restaurar ficheros encriptados desde copia de seguridad""."
+  IDS_DONTSHOWAGAIN, "No mostrar esto de nuevo"
+  IDS_CHOOSETEMPDIR, "Escoja directorio temporal alternativo:"
+  IDS_SAMEPARTITION, "Parece que está desborrando al mismo disco lógico donde residen los ficheros borrados. Siempre debe desborrar a una partición distinta, si no, los ficheros que est´á´desborrando pueden ser sobreescritos por ellos mismos o puede perder otros ficheros borrados.\n\nAyuda: Si no tiene varias particiones, puede también desborrar hacia diskette o un disco USB."
+  IDS_UNDELETECMD, "&Recuperar ficheros y directorios borrados..."
+  IDS_ERRORENCRYPTED, "No se pudo desborrar el fichero encriptado: "
+  IDS_RESTORECMD, "Restaurar ficheros &encriptados desde copia de seguridad..."
+  IDS_CANNOTVIEW, "Imposible ver fichero - el directorio temporal no admite Sistema de FIcheros Encriptados (EFS)"
+  IDS_CHOOSETARGET, "Escoja directorio destino"
+  IDS_RESTORE, "Restaurar" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "Restaurando" // label inside the progress dialog
+  IDS_READINGTREE, "Leyendo árbol de directorio..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "El volumen destino no admite Sistema de Ficheros Encriptados (EFS)."
+  IDS_VOLUME_MOUNT, "Punto de montaje"
+  IDS_VOLUME_NAME, "Nombre"
+  IDS_VOLUME_FORMAT, "Formato"
+  IDS_VOLUME_SIZE, "Tamaño"
+  IDS_VOLUME_FREE, "Libre"
+  IDS_VOLUME_FREEPROC, "% Libre"
+  IDS_VOLUME_VOLID, "Ruta de acceso al GUID"
+  IDS_CONDITION, "Condición"
+  IDS_CONDITIONDESC, "Estimación de daño de ficheros"
+  IDS_CONDITION_GOOD, "Bueno"
+  IDS_CONDITION_FAIR, "Regular"
+  IDS_CONDITION_POOR, "Pobre"
+  IDS_CONDITION_LOST, "Perdido"
+  IDS_CONDITION_UNKNOWN, "Desconocido"
+  IDS_UNDELETEINCHDRVMENU, "\tDesborrado"
+  IDS_PARTIALRECOVER, "El siguiente fichero no pudo ser recuperado totalmente: %s\n\n¿Desea recuperar sólo parte del fichero?"
+  IDS_PARTIALRECOVER_DONTASK, "Elija la misma respuesta la próxima vez"
+  IDS_ERRORRECOVER, "Error al recuperar fichero %s"
+}

@@ -1,0 +1,2373 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for ftp. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/ftp/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\ftp.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CFGGENERAL DIALOGEX 37, 31, 348, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Hlavné"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Po pripojení k serveru zobraziť okno s &uvítacou správou",IDC_WELCOMEMESSAGE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,198,12
+    CONTROL         "&Dať prednosť pripojeniu používanému v paneloch (rýchlejšie prehliadanie)",IDC_PRIORITYTOPANELCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,380,130,262,12
+    CONTROL         "&Celková povolená rýchlosť pre FTP klienta:",IDC_ENABLETOTSPEEDLIM,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,380,143,154,12
+    EDITTEXT        IDE_TOTALSPEEDLIMIT,536,143,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "&Prijať hex núdzovú sekvenciu v cestách (známe z web prehliadačov, napr.: ""%20"" pre "" "")",IDC_ACCEPTHEXESCSEQ,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,316,12
+    CONTROL         "&Automaticky zatvoriť dialóg operácie, ak je operácia úspešne dokončená v nedotknutom dialógu",IDC_CLOSEOPERDLGIFSUCCESS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,334,12
+    CONTROL         "&Otvoriť chybové dialógy riešiace chyby nečinného dialógu automatickej operácie",IDC_OPENSOLVEERRIFIDLE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,280,12
+    LTEXT           "KB/s",IDC_STATIC_1,568,145,22,8,WS_DISABLED
+    LTEXT           "&Heslo pre anonymné pripojenie (váš e-mail):",IDC_STATIC_2,5,69,152,8
+    EDITTEXT        IDE_ANONYMOUSPASSWD,158,67,185,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_CFGDEFAULTS DIALOGEX 37, 31, 348, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Predvolené"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,165,9,175,1
+    LTEXT           "Predvolené pokročilé nastavenie pre pripojenie",IDC_STATIC_2,5,5,158,8
+    LTEXT           "Proxy &server:",IDC_STATIC_3,14,17,46,8
+    COMBOBOX        IDC_PROXYSERVER,61,15,222,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Pridať...",IDB_ADDPROXYSRV,290,14,50,14,WS_GROUP
+    CONTROL         "P&oužiť pasívny režim prenosu (môže pomôcť, ak ste za firewallom alebo proxy serverom)",IDC_PASSIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,29,309,12
+    CONTROL         "&Držať pripojenie v činnosti (zabráni odpojeniu zo servera kvôli žiadnej aktivite)",IDC_KEEPALIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,42,273,12
+    CONTROL         "&Maximálny počet súbežných spojení na server:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,387,137,168,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,557,137,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "&Celkový limit rýchlosti pre server:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,387,151,123,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,557,151,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Po&užiť cache na rýchlejšie prehliadanie súborov a zoznamov súborov a adresárov na serveri",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,55,319,12
+    CONTROL         "Komprimovať prenášané dáta, ak server podporuje komprimáciu (MODE &Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,68,265,12
+    LTEXT           "KB/s",IDC_STATIC_4,589,153,21,8,WS_DISABLED
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,191,95,149,1
+    LTEXT           "Predvolené nastavenie na držanie pripojenia v činnosti",IDC_STATIC_6,5,91,184,8
+    LTEXT           "Pos&lať:",IDC_STATIC_7,14,105,26,8
+    COMBOBOX        IDC_KEEPALIVESEND,41,103,111,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&každých:",IDC_STATIC_8,157,105,32,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,190,103,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekúnd",IDC_STATIC_9,222,105,26,8
+    LTEXT           "Uko&nčiť odosielanie po:",IDC_STATIC_10,14,120,81,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,124,118,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "minútach",IDC_STATIC_11,157,120,34,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,121,145,219,1
+    LTEXT           "Predvolený režim prenosu súboru",IDC_STATIC_13,5,141,114,8
+    CONTROL         "&Binárny režim (žiadne zmeny počas prenosu)",IDC_BINARYMODE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,151,163,12
+    CONTROL         "ASC&II režim (zmena súboru pre použitie systémových štandardných koncov riadkov)",IDC_ASCIIMODE,
+                    "Button",BS_AUTORADIOBUTTON,14,164,293,12
+    CONTROL         "&Automaticky - ASCII režim pre:",IDC_AUTODETECT,"Button",BS_AUTORADIOBUTTON,14,177,116,12
+    EDITTEXT        IDE_ASCIIMASKS,131,177,209,12,ES_AUTOHSCROLL
+    RTEXT           "príklad masky",IDT_ASCIIMASKHINTS,291,191,48,8,WS_TABSTOP
+END
+
+IDD_CFGCONFIRMATIONS DIALOGEX 37, 31, 348, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Potvrdenia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Zobraziť správu ""Opúšťate server. Chcete odpojiť alebo držať spojenie v činnosti?""",IDC_ALWAYSNOTCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,290,12
+    CONTROL         "Z&obraziť správu ""Chcete sa odpojiť?""",IDC_ALWAYSDISCONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,136,12
+    CONTROL         "Zo&braziť správu ""Spojenie je zatvorené. Chcete sa znova pripojiť?""",IDC_ALWAYSRECONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,235,12
+    CONTROL         "Zob&raziť správu ""Cieľový názov sa už používa. Chcete ho prepísať?"" v rýchlom premenovaní",IDC_ALWAYSOVERWRITE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,320,12
+    CONTROL         "Zobr&aziť správu ""Spojenie s FTP serverom bolo stratené""",IDC_WARNWHENCONLOST,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,57,202,12
+    CONTROL         "Zobraz&iť správu ""Chcete vždy prechádzať skryté súbory a adresáre na tomto FTP serveri, ...""",IDC_HINTLISTHIDDENFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,70,323,12
+END
+
+IDD_CFGADVANCED DIALOGEX 37, 31, 348, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Pokročilé"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Limit veľkosti pre pamäť cache:",IDC_STATIC_1,5,7,109,8
+    EDITTEXT        IDE_MEMCACHESIZELIMIT,134,5,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "KB",IDC_STATIC_2,166,7,11,8
+    LTEXT           "Časový limit pre sieťové &akcie:",IDC_STATIC_3,5,21,103,8
+    EDITTEXT        IDE_SRVREPLIESTIMEOUT,134,19,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekúnd",IDC_STATIC_4,166,21,26,8
+    LTEXT           "&Zdržanie medzi pokusmi o pripojenie:",IDC_STATIC_5,5,35,128,8
+    EDITTEXT        IDE_DELAYBETWCONRETR,134,33,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekúnd",IDC_STATIC_6,166,35,26,8
+    LTEXT           "Počet po&kusov o pripojenie:",IDC_STATIC_7,5,49,95,8
+    EDITTEXT        IDE_CONNECTRETRIES,134,47,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Z&rušiť nečinné dátové spojenie za:",IDC_STATIC_8,5,63,118,8
+    EDITTEXT        IDE_NODATATRTIMEOUT,134,61,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekúnd",IDC_STATIC_9,166,63,26,8
+    LTEXT           "Sk&úsiť pokračovať v kopírovaní len ak je kopírovaná časť súboru väčšia ako:",IDC_STATIC_10,5,77,257,8
+    EDITTEXT        IDE_RESUMEMINFILESIZE,263,75,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "bajtov",IDC_STATIC_11,302,77,23,8
+    LTEXT           "Poč&et bajtov na overenie súboru pri pokračovaní kopírovania zo servera:",IDC_STATIC_12,5,91,244,8
+    EDITTEXT        IDE_RESUMEOVERLAP,263,89,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "bajtov",IDC_STATIC_13,302,91,23,8
+END
+
+IDD_CFGLOGS DIALOGEX 23, 39, 348, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Logy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "KB",IDC_STATIC_1,248,23,11,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,177,12,163,1
+    CONTROL         "&Povoliť protokolovanie komunikácie so servermi",IDC_ENABLELOGGING,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,7,170,12
+    CONTROL         "&Limit veľkosti logu pre jeden server:",IDC_LOGMAXSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,21,133,12
+    EDITTEXT        IDE_LOGMAXSIZE,216,21,28,12,ES_AUTOHSCROLL
+    CONTROL         "&Maximálny počet držaných logov pre odpojené spojenia:",IDC_MAXCLOSEDCONLOGS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,35,201,12
+    EDITTEXT        IDE_MAXCLOSEDCONLOGS,216,35,28,12,ES_AUTOHSCROLL
+    CONTROL         "&Vypnúť protokolovanie pre spojenia používajúce súborové operácie",IDC_DISABLELOGWORKERS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,49,237,12
+END
+
+IDD_CONNECT DIALOGEX 23, 72, 433, 164
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Pripojenie na FTP server"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDL_BOOKMARKS,7,7,170,129,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Adresa:",IDT_HOSTADDRESS,191,9,28,8
+    COMBOBOX        IDE_HOSTADDRESS,229,7,197,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Cesta:",IDT_INITIALPATH,191,23,35,8
+    COMBOBOX        IDE_INITIALPATH,229,21,197,117,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,282,47,144,1
+    CONTROL         " Anony&mné prihlásenie",IDC_ANONYMOUSLOGIN,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,191,42,89,12
+    LTEXT           "&Užívateľ:",IDT_USERNAME,201,58,39,8
+    EDITTEXT        IDE_USERNAME,242,56,184,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Heslo:",IDT_PASSWORD,201,72,37,8
+    EDITTEXT        IDE_PASSWORD,242,70,58,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    EDITTEXT        IDE_PASSWORD_LOCKED,305,70,58,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "O&domknúť...",IDB_PASSWORD_CHANGE,366,69,60,14
+    CONTROL         "Uložiť he&slo",IDC_SAVEPASSWORD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,201,84,53,12
+    LTEXT           "nie je bezpečné",IDC_SAVEPASSWORD_HINT,256,86,168,8,WS_TABSTOP
+    PUSHBUTTON      "&Pokročilé...",IDB_ADVACED,191,107,50,14,WS_GROUP
+    EDITTEXT        IDE_ADVANCEDINFO,244,108,182,12,ES_AUTOHSCROLL | ES_READONLY | WS_GROUP
+    PUSHBUTTON      "&Nová...",IDB_NEWBOOKMARK,6,142,50,14,WS_GROUP
+    PUSHBUTTON      "Pr&emenovať...",IDB_RENAMEBOOKMARK,61,142,60,14
+    PUSHBUTTON      "&Odstrániť...",IDB_REMOVEBOOKMARK,126,142,50,14
+    DEFPUSHBUTTON   "Pripojiť",IDOK,211,142,50,14,WS_GROUP
+    PUSHBUTTON      "&Zatvoriť",IDB_CLOSE,266,142,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,321,142,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,376,142,50,14
+END
+
+IDD_CONNECTADVANCED DIALOGEX 22, 28, 355, 301
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Pokročilé nastavenie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Pro&xy server:",IDC_STATIC_1,7,10,46,8
+    COMBOBOX        IDC_PROXYSERVER,88,8,192,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Pridať...",IDB_ADDPROXYSRV,287,7,60,14,WS_GROUP
+    LTEXT           "&Cieľová cesta panelu:",IDC_STATIC_2,7,25,74,8
+    EDITTEXT        IDE_TARGETPATH,88,23,192,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "P&rechádzať...",IDB_BROWSE,287,22,60,14,WS_GROUP
+    LTEXT           "Prip&ojiť na port:",IDC_STATIC_3,7,40,56,8
+    EDITTEXT        IDC_CONNECTTOPORT,88,38,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Typ servera:",IDC_STATIC_4,7,54,45,8
+    COMBOBOX        IDC_SERVERTYPE,88,52,261,61,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Režim pr&enosu súboru:",IDC_STATIC_5,7,69,80,8
+    COMBOBOX        IDC_TRANSFERMODE,88,67,261,57,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Prík&az pre výpis:",IDC_STATIC_6,7,84,57,8
+    COMBOBOX        IDC_LISTCOMMAND,88,82,91,57,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Inicial. FTP príkazy:",IDC_STATIC_7,7,99,68,8
+    EDITTEXT        IDE_INITFTPCOMMANDS,88,97,260,12,ES_AUTOHSCROLL | WS_GROUP
+    RTEXT           "príkazy sú oddelené bodkočiarkou (CWD []; HELP)",IDC_STATIC_8,164,111,182,8
+    GROUPBOX        "     ",IDC_STATIC_9,7,129,341,46
+    CONTROL         " &Držať pripojenie v činnosti (zabráni odpojeniu zo servera kvôli žiadnej aktivite)",IDC_USEKEEPALIVE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,15,127,276,12
+    LTEXT           "Po&slať:",IDC_STATIC_10,15,143,26,8
+    COMBOBOX        IDC_KEEPALIVESEND,42,141,114,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&každých:",IDC_STATIC_11,161,143,32,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,194,141,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekúnd",IDC_STATIC_12,226,143,34,8
+    LTEXT           "Uko&nčiť odosielanie po:",IDC_STATIC_13,15,158,81,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,128,156,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "minútach",IDC_STATIC_14,161,158,34,8
+    CONTROL         "Po&užiť pasívny režim prenosu (môže pomôcť, ak ste za firewallom alebo proxy serverom)",IDC_USEPASSIVEMODE,
+                    "Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,7,186,309,12
+    CONTROL         "&Maximálny počet súbežných spojení na server:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,392,206,168,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,561,206,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Celkový &limit rýchlosti pre server:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,392,220,123,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,561,220,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Použiť cac&he na rýchlejšie prehliadanie súborov a zoznamov súborov a adresárov na serveri",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,200,319,12
+    CONTROL         "Ši&frovať riadenie spojenia cez TLS/SSL",IDC_ENCRYPTCONTROLCONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,214,142,12
+    CONTROL         "Šifro&vať dáta spojenia (prenos súborov a výpis adresárov) cez TLS/SSL",IDC_ENCRYPTDATACONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,228,249,12
+    CONTROL         "Komprimovať prenášané dáta, ak server podporuje komprimáciu (MODE &Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,242,265,12
+    LTEXT           "Poznámka: tretí stav = použitie predvolenej hodnoty (pozrite sa na stránku Predvolené v Konfigurácii)",IDC_STATIC_15,7,258,342,8
+    LTEXT           "KB/s",IDC_STATIC_16,598,236,21,8,WS_DISABLED
+    DEFPUSHBUTTON   "OK",IDOK,91,279,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,152,279,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,213,279,50,14
+END
+
+IDD_RENAMEDLG DIALOGEX 10, 24, 227, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Premenovanie záložky"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,57,42,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,119,42,50,14
+END
+
+IDD_NEWBOOKMARKDLG DIALOGEX 10, 24, 227, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nová záložka"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Názov záložky:",IDT_NEWNAME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    CONTROL         "",IDC_COPYFOCUSEDSRV,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,35,199,12
+    DEFPUSHBUTTON   "OK",IDOK,57,55,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,119,55,50,14
+END
+
+IDD_ENTERSTRDLG DIALOGEX 10, 24, 243, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zadanie užívateľského mena"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CONNECTINGTOAS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,9,8,227,8
+    LTEXT           "&Užívateľské meno:",IDT_STRING,9,23,223,8
+    EDITTEXT        IDE_STRING,9,33,225,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,65,60,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,127,60,50,14
+END
+
+IDD_LOGINERRORDLG DIALOGEX 10, 24, 264, 165
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Chyba pripojenia na FTP server"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Užívateľ:",IDC_STATIC_1,7,55,40,8
+    EDITTEXT        IDE_USERNAME,48,53,210,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Heslo:",IDC_STATIC_2,7,70,36,8
+    EDITTEXT        IDE_PASSWORD,48,68,210,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Úč&et:",IDC_STATIC_3,7,85,34,8
+    EDITTEXT        IDE_ACCOUNT,48,83,210,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Opakovať",IDOK,76,110,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,138,110,50,14
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,7,132,251,1
+    CONTROL         "&Nabudúce opakovať bez opýtania (len pre toto pripojenie)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,137,250,12
+    CONTROL         "&Teraz použiť na všetky pripojenia s chybou",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,149,250,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,250,8
+    LTEXT           "Odpoveď servera:",IDT_ERRORTITLE,7,22,252,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,252,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_LOGINERRORDLGEX DIALOGEX 10, 24, 264, 195
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Chyba pripojenia na FTP server"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Užívateľ:",IDC_STATIC_1,7,55,40,8
+    EDITTEXT        IDE_USERNAME,65,53,193,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Heslo:",IDC_STATIC_2,7,70,36,8
+    EDITTEXT        IDE_PASSWORD,65,68,193,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Úč&et:",IDC_STATIC_3,7,85,34,8
+    EDITTEXT        IDE_ACCOUNT,65,83,193,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Proxy už&ívateľ:",IDC_STATIC_4,7,100,58,8
+    EDITTEXT        IDE_PROXYUSER,65,98,193,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Proxy hes&lo:",IDC_STATIC_5,7,115,55,8
+    EDITTEXT        IDE_PROXYPASSWD,65,113,193,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Opakovať",IDOK,76,140,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,138,140,50,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,162,251,1
+    CONTROL         "&Nabudúce opakovať bez opýtania (len pre toto pripojenie)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,167,208,12
+    CONTROL         "&Teraz použiť na všetky pripojenia s chybou",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,179,156,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,250,8
+    LTEXT           "Odpoveď servera:",IDT_ERRORTITLE,7,22,252,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,252,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_WELCOMEMSGDLG DIALOGEX 10, 24, 396, 170
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Uvítacia správa"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_WELCOMEMSG,5,5,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Zatvoriť",IDOK,141,152,50,14,WS_GROUP
+    PUSHBUTTON      "&Uložiť ako",IDB_SAVEMSGAS,204,152,50,14
+END
+
+IDD_LOGSDLG DIALOGEX 17, 51, 396, 165
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "FTP Logy"
+MENU IDM_LOGSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_MENULINE,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,396,1
+    COMBOBOX        IDC_LISTOFLOGS,5,5,386,104,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDE_SERVERLOG,5,19,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+END
+
+IDD_SENDCOMMANDDLG DIALOGEX 10, 24, 282, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Poslať FTP príkaz"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Príkaz:",IDC_STATIC_1,9,9,37,8
+    COMBOBOX        IDC_FTPCOMMAND,9,19,264,90,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDE_FTPCOMMAND_PASSWD,9,19,264,12,ES_PASSWORD | ES_AUTOHSCROLL | NOT WS_VISIBLE | WS_GROUP
+    CONTROL         "&Utajený príkaz (skryť písanie a nezaznamenávať ani v zobrazovanom logu)",IDC_SECRETCOMMAND,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,34,262,12
+    CONTROL         "Prí&kaz môže zmeniť pracovnú cestu na serveri (zmeniť aj cestu v paneli)",IDC_CHANGEPATHINPANEL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,46,254,12
+    CONTROL         "Prík&az môže vykonať zmeny v pracovnej ceste (obnoviť pracovnú cestu)",IDC_REFRESHWORKINGPATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,58,253,12
+    DEFPUSHBUTTON   "OK",IDOK,56,79,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,116,79,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,176,79,50,14
+END
+
+IDD_LISTWAITDLG DIALOGEX 10, 24, 357, 91
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "FTP klient"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDT_ACTION,9,9,341,16
+    LTEXT           "Cesta:",IDT_PATHONFTP1,9,27,24,8
+    LTEXT           "",IDT_PATHONFTP2,34,27,316,8
+    LTEXT           "Zostávajúci čas:",IDT_ESTIMATEDTIME1,9,38,56,8
+    LTEXT           "",IDT_ESTIMATEDTIME2,66,38,284,8
+    LTEXT           "Uplynutý čas:",IDT_ELAPSEDTIME1,9,49,56,8
+    LTEXT           "",IDT_ELAPSEDTIME2,66,49,284,8
+    LTEXT           "Stav:",IDT_OPERSTATUS1,9,60,20,8
+    LTEXT           "",IDT_OPERSTATUS2,30,60,320,8
+    CONTROL         "",IDC_OPERPROGRESS,"Static",0,9,71,340,12
+END
+
+IDD_CFGSERVERTYPES DIALOGEX 37, 31, 348, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Servery"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Podporované typy serverov:",IDC_STATIC_1,5,5,95,8
+    LISTBOX         IDL_SUPPORTEDSERVERS,5,15,277,197,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Nový...",IDB_NEWSERVER,291,14,50,14,WS_GROUP
+    PUSHBUTTON      "&Upraviť...",IDB_EDITSERVER,291,32,50,14
+    PUSHBUTTON      "&Hore",IDB_MOVESERVERUP,291,50,50,14
+    PUSHBUTTON      "&Dolu",IDB_MOVESERVERDOWN,291,68,50,14
+    PUSHBUTTON      "&Ostatné",IDB_OTHERSERVERACT,291,86,50,14
+END
+
+IDD_EDITSERVERTYPE DIALOGEX 22, 28, 421, 241
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Úprava typu servera"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Autodetekcia stavu:",IDC_STATIC_1,7,7,80,8
+    EDITTEXT        IDE_AUTODETECTCOND,7,17,390,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ADCONDINSERT,402,17,12,12,WS_GROUP
+    RTEXT           "(prázdny = vždy true)",IDC_STATIC_2,320,31,76,8
+    LTEXT           "&Stĺpce v paneli:",IDC_STATIC_3,7,39,91,8
+    CONTROL         "",IDL_SRVTYPECOLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,49,347,68
+    PUSHBUTTON      "&Nový...",IDB_NEWCOLUMN,364,49,50,14,WS_GROUP
+    PUSHBUTTON      "&Upraviť...",IDB_EDITCOLUMN,364,67,50,14
+    PUSHBUTTON      "&Odstrániť...",IDB_REMOVECOLUMN,364,85,50,14
+    PUSHBUTTON      "&Presunúť",IDB_MOVECOLUMN,364,103,50,14
+    LTEXT           "P&ravidlá pre rozbor výpisu:",IDC_STATIC_4,7,127,92,8
+    EDITTEXT        IDE_PARSINGRULES,7,137,407,76,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    PUSHBUTTON      "&Test rozboru...",IDB_TESTPARSER,7,221,64,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,242,221,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,303,221,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,364,221,50,14
+END
+
+IDD_EDITSRVTYCOLUMN DIALOGEX 58, 53, 261, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Úprava stĺpca"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Identifikátor:",IDC_STATIC_1,11,12,46,8
+    EDITTEXT        IDE_COL_ID,74,10,177,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Názov:",IDC_STATIC_2,11,27,26,8
+    COMBOBOX        IDC_COL_NAME,74,25,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Typ:",IDC_STATIC_3,11,43,26,8
+    COMBOBOX        IDC_COL_TYPE,74,41,177,65,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Prázdna &hodnota:",IDC_STATIC_4,11,59,62,8
+    EDITTEXT        IDE_COL_EMPTY,74,57,135,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "",IDT_COL_FORMHELP,213,59,42,8
+    LTEXT           "&Popis:",IDC_STATIC_5,11,74,42,8
+    COMBOBOX        IDC_COL_DESCR,74,72,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Zoradenie:",IDC_STATIC_6,11,89,38,8
+    COMBOBOX        IDC_COL_ALIGNMENT,74,87,94,37,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,45,113,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,105,113,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,165,113,50,14
+END
+
+IDD_SRVTYPETESTPARSER DIALOGEX 30, 34, 420, 262
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Test syntaktickej analýzy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Základný výpis:",IDC_STATIC_1,7,7,54,8
+    EDITTEXT        IDE_PARSER_RAWLIST,7,17,405,83,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    CONTROL         "&Vykonať akoby bol neúplný základný výpis (ukončený)",IDC_PARSER_LISTINCOMPL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,194,12
+    PUSHBUTTON      "&Analyzovať Raw výpis",IDB_PARSER_PARSELIST,211,107,82,14,WS_GROUP
+    PUSHBUTTON      "&Načítať Raw výpis zo súboru...",IDB_PARSER_LOADLIST,300,107,112,14
+    LTEXT           "Vý&sledky syntaktickej analýzy:",IDC_STATIC_2,7,129,102,8
+    CONTROL         "",IDL_PARSER_COLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,405,94
+    DEFPUSHBUTTON   "Zatvoriť",IDOK,302,241,50,14,WS_GROUP
+    PUSHBUTTON      "Nápoveda",IDHELP,362,241,50,14
+END
+
+IDD_OPERATIONDLG DIALOGEX 25, 31, 400, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPSOURCETITLE,5,8,56,8
+    CONTROL         "",IDT_OPSOURCETEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,65,8,330,8
+    RTEXT           "",IDT_OPTARGETTITLE,5,19,56,8
+    CONTROL         "",IDT_OPTARGETTEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,65,19,330,8
+    RTEXT           "Zostávajúci čas:",IDC_STATIC_1,5,30,56,8
+    CONTROL         "",IDT_OPTIMELEFT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,65,30,330,8
+    RTEXT           "Uplynutý čas:",IDC_STATIC_2,5,41,56,8
+    CONTROL         "",IDT_OPELAPSEDTIME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,65,41,330,8
+    RTEXT           "Stav:",IDC_STATIC_3,5,52,56,8
+    CONTROL         "",IDT_OPSTATUS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,65,52,330,8
+    ICON            "",IDI_ERRORICON,308,51,18,20,WS_GROUP
+    CONTROL         "málo miesta na disku",IDT_ERRORMSG,"Static",SS_LEFTNOWORDWRAP | WS_GROUP | WS_TABSTOP,322,52,73,8
+    RTEXT           "Spracované:",IDC_STATIC_4,5,64,56,8
+    CONTROL         "",IDC_OPPROGRESS,"Static",WS_GROUP,65,63,328,12
+    PUSHBUTTON      "D&etaily >>",IDB_SHOWDETAILS,115,100,50,14,WS_GROUP
+    PUSHBUTTON      "&Chyby >>",IDB_SHOWERRORS,172,100,50,14
+    PUSHBUTTON      "Sk&ryť",IDB_HIDE,58,100,50,14,WS_DISABLED
+    PUSHBUTTON      "&Pauza",IDB_PAUSERESUME,229,100,50,14
+    PUSHBUTTON      "",IDCANCEL,286,100,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,343,100,50,14
+    CONTROL         "",IDC_DLGSPLITBAR,"Static",SS_ETCHEDHORZ | WS_GROUP,7,122,386,1
+    LTEXT           "&Spojenie:",IDT_CONNECTIONS,7,129,60,8
+    CONTROL         "",IDL_CONNECTIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,385,35
+    PUSHBUTTON      "Vyrieš&iť chybu",IDB_OPCONSSOLVEERROR,162,181,60,14,WS_GROUP
+    PUSHBUTTON      "Pri&dať",IDB_OPCONSADD,229,181,50,14
+    PUSHBUTTON      "&Zastaviť",IDB_OPCONSSTOP,286,181,50,14
+    PUSHBUTTON      "Pa&uza",IDB_OPCONSPAUSERESUME,343,181,50,14
+    LTEXT           "&Operácie:",IDT_OPERATIONSTEXT,7,195,383,8
+    CONTROL         "",IDL_OPERATIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,205,385,35
+    CONTROL         "Zo&braziť len chyby",IDB_OPOPERSSHOWONLYERR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,247,75,12
+    PUSHBUTTON      "Vyrieši&ť chybu",IDB_OPOPERSSOLVEERROR,219,247,60,14,WS_GROUP
+    PUSHBUTTON      "Op&akovať",IDB_OPOPERSRETRY,286,247,50,14
+    PUSHBUTTON      "Pres&kočiť",IDB_OPOPERSSKIP,343,247,50,14
+    CONTROL         "Po sko&nčení operácie zatvoriť toto okno",IDC_OPCLOSEWINWHENDONE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,81,150,12
+END
+
+IDD_COPYMOVEDLG DIALOGEX 10, 24, 244, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_TGTPATHSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,226,8
+    COMBOBOX        IDC_TGTPATH,10,19,225,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "&Len pridať do fronty (nespracovať v aktívnom spojení)",IDC_ADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,292,47,197,12
+    DEFPUSHBUTTON   "OK",IDOK,37,42,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,97,42,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,157,42,50,14
+END
+
+IDD_CONFIRMDELETEDLG DIALOGEX 10, 24, 331, 61
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Potvrdenie odstránenia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "&Áno",IDOK,112,39,50,14,WS_GROUP
+    PUSHBUTTON      "&Nie",IDCANCEL,169,39,50,14
+    ICON            "",IDC_DELICON,8,8,18,20,WS_GROUP
+    LTEXT           "",IDT_DELSUBJECT,41,12,284,16,SS_NOPREFIX
+    CONTROL         "&Len pridať do fronty (nespracovať v aktívnom spojení)",IDC_DELADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,352,40,197,12
+END
+
+IDD_CHANGEATTRSDLG DIALOGEX 10, 24, 308, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zmena atribútov"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CHATTRSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,7,10,294,8
+    GROUPBOX        " Držiteľ ",IDC_STATIC_1,7,26,94,51,WS_GROUP
+    GROUPBOX        " Skupina ",IDC_STATIC_2,107,26,94,51,WS_GROUP
+    GROUPBOX        " Ostatné ",IDC_STATIC_3,207,26,94,51,WS_GROUP
+    CONTROL         "Čí&tanie",IDC_READOWNER,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,36,71,12
+    CONTROL         "&Zápis",IDC_WRITEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,48,71,12
+    CONTROL         "&Spúšťanie (Prístup)",IDC_EXECUTEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,60,78,12
+    CONTROL         "Číta&nie",IDC_READGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,116,36,71,12
+    CONTROL         "Zá&pis",IDC_WRITEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,116,48,71,12
+    CONTROL         "Sp&úšťanie (Prístup)",IDC_EXECUTEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,116,60,78,12
+    CONTROL         "Čít&anie",IDC_READOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,216,36,71,12
+    CONTROL         "Záp&is",IDC_WRITEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,216,48,71,12
+    CONTROL         "Spúšťanie &(Prístup)",IDC_EXECUTEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,216,60,78,12
+    LTEXT           "Poznámka: tretí stav = bez zmeny",IDC_STATIC_4,7,81,119,8
+    LTEXT           "Číselná &hodnota:",IDC_STATIC_5,7,101,58,8
+    EDITTEXT        IDE_NUMATTRVALUE,66,99,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = Spúšťanie, 2 = Zápis, 4 = Čítanie)",IDC_STATIC_6,98,101,135,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,48,126,253,1
+    LTEXT           "Nastavenie",IDC_STATIC_8,7,122,39,8
+    CONTROL         "Zahrnúť po&dadresáre",IDC_INCLUDESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,132,87,12
+    CONTROL         "Z&meniť atribúty súborom",IDC_CHATTRSETFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,144,96,12
+    CONTROL         "Zmeniť at&ribúty adresárom",IDC_CHATTRSETDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,156,116,12
+    CONTROL         "&Len pridať do fronty (nespracovať v aktívnom spojení)",IDC_CHATTRADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,344,160,197,12
+    DEFPUSHBUTTON   "OK",IDOK,69,178,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,129,178,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,189,178,50,14
+END
+
+IDD_CFGOPERATIONS DIALOGEX 37, 31, 348, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Operácia 1"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,127,9,219,1
+    LTEXT           "Kopírovanie a presun z FTP servera",IDC_STATIC_2,5,5,120,8
+    LTEXT           "Ak &cieľový súbor už existuje:",IDC_STATIC_3,9,17,98,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,240,15,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak cie&ľový adresár už existuje:",IDC_STATIC_4,9,31,104,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,240,29,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak nie je možné vytvoriť cieľ&ový názov súboru:",IDC_STATIC_5,9,45,159,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,240,43,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak nie je možné vytvoriť cieľo&vý názov adresára:",IDC_STATIC_6,9,59,165,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,240,57,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak &zlyhá prenos, ako opakovať pri vytvorenom cieľovom súbore:",IDC_STATIC_7,9,73,218,8
+    COMBOBOX        IDC_RETRYONCREATED,240,71,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak z&lyhá prenos, ako opakovať pri opakovanom cieľovom súbore:",IDC_STATIC_8,9,87,221,8
+    COMBOBOX        IDC_RETRYONRESUMED,240,85,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak je &ASCII režim prenosu pre súbor s binárnym obsahom:",IDC_STATIC_9,9,101,200,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,240,99,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,115,124,231,1
+    LTEXT           "Zmena atribútov na FTP serveri",IDC_STATIC_11,5,120,108,8
+    LTEXT           "Ak e&xistujúce atribúty nie je možné zachovať (napr.: Unix 's' režim):",IDC_STATIC_12,9,132,230,8
+    COMBOBOX        IDC_UNKNOWNATTRS,240,130,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,100,155,246,1
+    LTEXT           "Odstránenie na FTP serveri",IDC_STATIC_14,5,151,93,8
+    LTEXT           "Ak a&dresár nie je prázdny:",IDC_STATIC_15,9,163,91,8
+    COMBOBOX        IDC_NONEMPTYDIRDEL,240,161,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak je sú&bor skrytý:",IDC_STATIC_16,9,177,64,8
+    COMBOBOX        IDC_HIDDENFILEDEL,240,175,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak je ad&resár skrytý:",IDC_STATIC_17,9,191,71,8
+    COMBOBOX        IDC_HIDDENDIRDEL,240,189,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_CFGOPERATIONS2 DIALOGEX 37, 31, 348, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Operácia 2"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,129,9,217,1
+    LTEXT           "Kopírovanie a presun na FTP server",IDC_STATIC_2,5,5,122,8
+    LTEXT           "Ak &cieľový súbor už existuje:",IDC_STATIC_3,9,17,98,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,240,15,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak cie&ľový adresár už existuje:",IDC_STATIC_4,9,31,104,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,240,29,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak nie je možné vytvoriť cieľ&ový názov súboru:",IDC_STATIC_5,9,45,159,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,240,43,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak nie je možné vytvoriť cieľo&vý názov adresára:",IDC_STATIC_6,9,59,165,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,240,57,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak &zlyhá prenos, ako opakovať pri vytvorenom cieľovom súbore:",IDC_STATIC_7,9,73,218,8
+    COMBOBOX        IDC_RETRYONCREATED,240,71,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak z&lyhá prenos, ako opakovať pri opakovanom cieľovom súbore:",IDC_STATIC_8,9,87,221,8
+    COMBOBOX        IDC_RETRYONRESUMED,240,85,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ak je &ASCII režim prenosu pre súbor s binárnym obsahom:",IDC_STATIC_9,9,101,200,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,240,99,105,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_SOLVEITEMERRDETAILED DIALOGEX 10, 24, 327, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,45,88,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,107,88,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,169,88,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,231,88,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,312,1
+    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,297,12
+    LTEXT           "&Detaily:",IDC_STATIC_3,7,9,55,8
+    EDITTEXT        IDE_SCRD_DETAILS,64,9,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_4,7,27,55,8
+    EDITTEXT        IDE_SCRD_SRCPATH,64,27,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_5,7,39,55,8
+    EDITTEXT        IDE_SCRD_SRCNAME,64,39,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_6,7,51,55,8
+    EDITTEXT        IDE_SCRD_TGTPATH,64,51,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ci&eľový názov:",IDC_STATIC_7,7,65,55,8
+    EDITTEXT        IDE_SCRD_TGTNAME,64,63,256,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILEDEX DIALOGEX 10, 24, 355, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,15,88,50,14,WS_GROUP
+    PUSHBUTTON      "&Pokračovať",CM_SIED_RESUME,70,88,50,14
+    PUSHBUTTON      "Pr&epísať",CM_SIED_OVERWRITE,125,88,50,14
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,180,88,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,235,88,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,290,88,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,340,1
+    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,297,12
+    LTEXT           "&Detaily:",IDC_STATIC_3,7,9,45,8
+    EDITTEXT        IDE_SCRD_DETAILS,64,9,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_4,7,27,53,8
+    EDITTEXT        IDE_SCRD_SRCPATH,64,27,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_5,7,39,55,8
+    EDITTEXT        IDE_SCRD_SRCNAME,64,39,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_6,7,51,49,8
+    EDITTEXT        IDE_SCRD_TGTPATH,64,51,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "C&ieľový názov:",IDC_STATIC_7,7,65,51,8
+    EDITTEXT        IDE_SCRD_TGTNAME,64,63,284,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED2 DIALOGEX 10, 24, 325, 147
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,44,101,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,106,101,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,168,101,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,230,101,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,311,1
+    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,297,12
+    LTEXT           "Popi&s chyby:",IDC_STATIC_3,7,9,66,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,311,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_4,7,40,53,8
+    EDITTEXT        IDE_SCRD_SRCPATH,64,40,252,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_5,7,52,55,8
+    EDITTEXT        IDE_SCRD_SRCNAME,64,52,252,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_6,7,64,49,8
+    EDITTEXT        IDE_SCRD_TGTPATH,64,64,252,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ci&eľový názov:",IDC_STATIC_7,7,78,51,8
+    EDITTEXT        IDE_SCRD_TGTNAME,64,76,252,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3 DIALOGEX 10, 24, 284, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Chyba vytvárania cieľového adresára s alternatívnym názvom"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,24,101,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,86,101,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,148,101,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,210,101,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,270,1
+    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,164,12
+    LTEXT           "Popi&s chyby:",IDC_STATIC_2,7,9,66,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,272,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,40,53,8
+    EDITTEXT        IDE_SCRD_SRCPATH,64,40,213,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_4,7,52,55,8
+    EDITTEXT        IDE_SCRD_SRCNAME,64,52,213,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_5,7,64,49,8
+    EDITTEXT        IDE_SCRD_TGTPATH,64,64,213,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Cie&ľový názov:",IDC_STATIC_6,7,78,51,8
+    EDITTEXT        IDE_SCRD_TGTNAME,64,76,213,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3EX DIALOGEX 10, 24, 355, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Chyba vytvárania cieľového adresára s alternatívnym názvom"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,15,101,50,14,WS_GROUP
+    PUSHBUTTON      "&Pokračovať",CM_SIED_RESUME,70,101,50,14
+    PUSHBUTTON      "Pr&epísať",CM_SIED_OVERWRITE,125,101,50,14
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,180,101,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,235,101,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,290,101,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,340,1
+    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,164,12
+    LTEXT           "Popi&s chyby:",IDC_STATIC_2,7,9,66,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,343,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,40,53,8
+    EDITTEXT        IDE_SCRD_SRCPATH,64,40,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_4,7,52,55,8
+    EDITTEXT        IDE_SCRD_SRCNAME,64,52,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_5,7,64,49,8
+    EDITTEXT        IDE_SCRD_TGTPATH,64,64,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "C&ieľový názov:",IDC_STATIC_6,7,78,51,8
+    EDITTEXT        IDE_SCRD_TGTNAME,64,76,284,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLE DIALOGEX 10, 24, 328, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,46,70,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,108,70,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,170,70,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,232,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,314,1
+    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,297,12
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,9,53,8
+    EDITTEXT        IDE_SCRD_SRCPATH,64,9,257,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_4,7,21,55,8
+    EDITTEXT        IDE_SCRD_SRCNAME,64,21,257,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_5,7,33,49,8
+    EDITTEXT        IDE_SCRD_TGTPATH,64,33,257,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "C&ieľový názov:",IDC_STATIC_6,7,47,51,8
+    EDITTEXT        IDE_SCRD_TGTNAME,64,45,257,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLEEX DIALOGEX 10, 24, 383, 116
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,19,70,50,14,WS_GROUP
+    PUSHBUTTON      "Pr&epísať",CM_SIED_OVERWRITE,75,70,50,14
+    PUSHBUTTON      "Prepísať &všetko",CM_SIED_OVERWRITEALL,131,70,65,14
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,202,70,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,258,70,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,314,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,369,1
+    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,297,12
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,9,53,8
+    EDITTEXT        IDE_SCRD_SRCPATH,64,9,313,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_4,7,21,55,8
+    EDITTEXT        IDE_SCRD_SRCNAME,64,21,313,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_5,7,33,49,8
+    EDITTEXT        IDE_SCRD_TGTPATH,64,33,313,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Cie&ľový názov:",IDC_STATIC_6,7,47,51,8
+    EDITTEXT        IDE_SCRD_TGTNAME,64,45,311,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRASCIITR DIALOGEX 16, 27, 353, 118
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ASCII režim prenosu je nastavený pre súbor s binárnym obsahom"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Použiť binárny režim",IDOK,14,70,84,14,WS_GROUP
+    PUSHBUTTON      "&Ignorovať",CM_SATR_IGNORE,108,70,50,14
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,168,70,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,228,70,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,288,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,338,1
+    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,297,12
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,9,53,8
+    EDITTEXT        IDE_SCRD_SRCPATH,64,9,281,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_4,7,21,55,8
+    EDITTEXT        IDE_SCRD_SRCNAME,64,21,281,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_5,7,33,49,8
+    EDITTEXT        IDE_SCRD_TGTPATH,64,33,281,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Cie&ľový názov:",IDC_STATIC_6,7,45,51,8
+    EDITTEXT        IDE_SCRD_TGTNAME,64,45,281,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMERRUNKATTR DIALOGEX 10, 24, 317, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Niektoré z existujúcich atribútov nemôžu byť zachované"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ignorovať",IDOK,40,70,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,102,70,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,164,70,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,226,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,304,1
+    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,297,12
+    LTEXT           "&Cesta:",IDC_STATIC_3,7,9,63,8
+    EDITTEXT        IDE_SCRD_SRCPATH,71,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ná&zov:",IDC_STATIC_4,7,21,63,8
+    EDITTEXT        IDE_SCRD_SRCNAME,71,21,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Akt&uálne atribúty:",IDC_STATIC_5,7,33,63,8
+    EDITTEXT        IDE_SCRD_CURATTR,71,33,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "N&ové atribúty:",IDC_STATIC_6,7,45,63,8
+    EDITTEXT        IDE_SCRD_NEWATTR,71,45,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSETNEWATTR DIALOGEX 10, 24, 308, 190
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nastavenie nových atribútov"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Držiteľ ",IDC_STATIC_1,7,56,94,51,WS_GROUP
+    GROUPBOX        " Skupina ",IDC_STATIC_2,107,56,94,51,WS_GROUP
+    GROUPBOX        " Ostatné ",IDC_STATIC_3,207,56,94,51,WS_GROUP
+    CONTROL         "Čí&tanie",IDC_READOWNER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,66,71,12
+    CONTROL         "&Zápis",IDC_WRITEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,78,71,12
+    CONTROL         "&Spúšťanie (Prístup)",IDC_EXECUTEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,90,78,12
+    CONTROL         "Číta&nie",IDC_READGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,116,66,71,12
+    CONTROL         "Zá&pis",IDC_WRITEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,116,78,71,12
+    CONTROL         "Sp&úšťanie (Prístup)",IDC_EXECUTEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,116,90,78,12
+    CONTROL         "Čít&anie",IDC_READOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,216,66,71,12
+    CONTROL         "Záp&is",IDC_WRITEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,216,78,71,12
+    CONTROL         "Spúšťanie (P&rístup)",IDC_EXECUTEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,216,90,78,12
+    LTEXT           "Číselná &hodnota:",IDC_STATIC_4,7,117,58,8
+    EDITTEXT        IDE_NUMATTRVALUE,66,115,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = Spúšťanie, 2 = Zápis, 4 = Čítanie)",IDC_STATIC_5,98,117,135,8
+    DEFPUSHBUTTON   "Nastaviť nové atribúty",IDOK,48,144,92,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,150,144,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,210,144,50,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,165,293,1
+    CONTROL         "T&eraz použiť tieto atribúty pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,172,209,12
+    LTEXT           "&Cesta:",IDC_STATIC_7,7,9,62,8
+    EDITTEXT        IDE_SCRD_SRCPATH,70,9,227,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Názo&v:",IDC_STATIC_8,7,21,62,8
+    EDITTEXT        IDE_SCRD_SRCNAME,70,21,227,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Aktuálne atri&búty:",IDC_STATIC_9,7,33,62,8
+    EDITTEXT        IDE_SCRD_CURATTR,70,33,227,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVELOWMEMORYERR DIALOGEX 10, 24, 274, 90
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nedostatok systémových prostriedkov na dokončenie operácie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,19,46,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SCRD_SKIP,81,46,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,143,46,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,205,46,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,260,1
+    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,164,12
+    LTEXT           "&Cesta:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SCRD_SRCPATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ná&zov:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SCRD_SRCNAME,32,21,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSIMPLEERR DIALOGEX 10, 24, 317, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Odstrániť",IDOK,40,46,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SISE_SKIP,102,46,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,164,46,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,226,46,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,303,1
+    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SISE_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,297,12
+    LTEXT           "&Cesta:",IDC_STATIC_3,7,9,27,8
+    EDITTEXT        IDE_SISE_PATH,37,9,272,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ná&zov:",IDC_STATIC_4,7,21,27,8
+    EDITTEXT        IDE_SISE_NAME,37,21,272,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR DIALOGEX 10, 24, 274, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,19,82,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SSCD_SKIP,81,82,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,143,82,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,205,82,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,260,1
+    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,164,12
+    LTEXT           "&Cesta:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ná&zov:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SSCD_NAME,32,21,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Popis chyby:",IDC_STATIC_4,7,40,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,50,262,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2 DIALOGEX 10, 24, 285, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,24,106,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SSCD_SKIP,86,106,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,148,106,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,210,106,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,271,1
+    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,164,12
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_2,7,9,53,8
+    EDITTEXT        IDE_SSCD_SRCPATH,64,9,214,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_3,7,21,55,8
+    EDITTEXT        IDE_SSCD_SRCNAME,64,21,214,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_4,7,33,49,8
+    EDITTEXT        IDE_SSCD_TGTPATH,64,33,214,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Cie&ľový názov:",IDC_STATIC_5,7,45,51,8
+    EDITTEXT        IDE_SSCD_TGTNAME,64,45,214,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Popis chyby:",IDC_STATIC_6,7,64,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,273,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2EX DIALOGEX 10, 24, 355, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,15,106,50,14,WS_GROUP
+    PUSHBUTTON      "&Pokračovať",CM_SSCD_RESUME,70,106,50,14
+    PUSHBUTTON      "Pr&epísať",CM_SSCD_OVERWRITE,125,106,50,14
+    PUSHBUTTON      "Pres&kočiť",IDB_SSCD_SKIP,180,106,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,235,106,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,290,106,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,340,1
+    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,164,12
+    LTEXT           "&Zdrojová cesta:",IDC_STATIC_2,7,9,53,8
+    EDITTEXT        IDE_SSCD_SRCPATH,64,9,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Zdr&ojový názov:",IDC_STATIC_3,7,21,55,8
+    EDITTEXT        IDE_SSCD_SRCNAME,64,21,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Cieľová cesta:",IDC_STATIC_4,7,33,49,8
+    EDITTEXT        IDE_SSCD_TGTPATH,64,33,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Cie&ľový názov:",IDC_STATIC_5,7,45,51,8
+    EDITTEXT        IDE_SSCD_TGTNAME,64,45,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Popi&s chyby:",IDC_STATIC_6,7,64,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,343,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR3 DIALOGEX 10, 24, 274, 112
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Opakovať",IDOK,19,70,50,14,WS_GROUP
+    PUSHBUTTON      "Pres&kočiť",IDB_SSCD_SKIP,81,70,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,143,70,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,205,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,260,1
+    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,164,12
+    LTEXT           "&Cesta:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Popis chyby:",IDC_STATIC_3,7,28,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,38,262,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_VIEWERRASCIITRFORBINFILE DIALOGEX 25, 38, 331, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "FTP klient"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Použiť binárny režim",IDOK,66,57,85,14,WS_GROUP
+    PUSHBUTTON      "&Ignorovať",IDIGNORE,158,57,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,215,57,50,14
+    CONTROL         "Sťahujem súbor s binárnym obsahom v ASCII režime. Toto môže vytvoriť poškodený",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,7,286,8
+    CONTROL         "súbor kvôli neočakávanej konverzii na štandardné systémové konce riakov. Môžete",IDC_STATIC_2,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,16,286,8
+    CONTROL         "súbor znova stiahnuť v binárnom režime (bez tejto neočakávanej konverzie). Alebo",IDC_STATIC_3,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,25,286,8
+    CONTROL         "ak viete, že súbor je čistý text, stlačte Ignorovať na ignorovanie tejto správy.",IDC_STATIC_4,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,34,286,8
+    ICON            "",IDI_INFOICON,7,7,18,20
+END
+
+IDD_PROXYSERVER DIALOGEX 10, 24, 239, 231
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Pridanie proxy servera"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Názov:",IDC_STATIC_1,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,10,24,8
+    EDITTEXT        IDE_PRXSRV_NAME,47,8,184,12,ES_AUTOHSCROLL
+    LTEXT           "&Typ:",IDC_STATIC_2,7,25,21,8
+    COMBOBOX        IDC_PRXSRV_TYPE,47,23,185,170,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Adresa:",IDC_STATIC_3,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,40,31,8
+    EDITTEXT        IDE_PRXSRV_ADDRESS,47,38,184,12,ES_AUTOHSCROLL
+    CONTROL         "&Port:",IDC_STATIC_4,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,55,18,8
+    EDITTEXT        IDE_PRXSRV_PORT,47,53,39,12,ES_AUTOHSCROLL
+    CONTROL         "&Užívateľ:",IDC_STATIC_5,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,70,39,8
+    EDITTEXT        IDE_PRXSRV_USER,47,68,184,12,ES_AUTOHSCROLL
+    CONTROL         "&Heslo:",IDC_STATIC_6,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,85,36,8
+    EDITTEXT        IDE_PRXSRV_PASSWD,47,83,58,12,ES_PASSWORD | ES_AUTOHSCROLL
+    EDITTEXT        IDE_PRXSRV_PASSWD_LOCKED,110,83,58,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "O&domknúť...",IDB_PRXSRV_PASSWD_CHANGE,171,82,60,14
+    CONTROL         "U&ložiť heslo",IDC_PRXSRV_SAVEPASSWD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,99,53,12
+    LTEXT           "nie je bezpečné",IDC_PRXSRV_SAVEPASSWD_HINT,65,101,161,8,WS_TABSTOP
+    LTEXT           "Prihlasovací &skript:",IDC_STATIC_7,7,120,64,8
+    EDITTEXT        IDE_PRXSRV_SCRIPT,7,130,224,68,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN
+    DEFPUSHBUTTON   "OK",IDOK,61,210,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,121,210,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,181,210,50,14
+END
+
+IDD_CERTIFICATE DIALOGEX 10, 24, 270, 120
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Problém identity servera"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "So serverom poskytnutým certifikátom je nasledovný problém(y):",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,9,258,8
+    GROUPBOX        " Súhrn overenia certifikátu ",IDC_STATIC_2,9,21,252,54
+    LTEXT           "",IDT_CERTIFICATE_ERROR,16,32,238,40
+    LTEXT           "Prijatie certifikátu je potenciálne nebezpečné a neodporúča sa.",IDC_STATIC_3,7,80,258,8,NOT WS_GROUP
+    LTEXT           "",IDC_STATIC_4,5,95,260,1,SS_ETCHEDHORZ | WS_GROUP
+    PUSHBUTTON      "&Zobraziť certifikát",IDB_CERTIFICATE_VIEW,10,100,80,14,WS_GROUP
+    PUSHBUTTON      "&Prijať certifikát",IDOK,95,100,80,14
+    DEFPUSHBUTTON   "Zrušiť",IDCANCEL,180,100,80,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SRVCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Pripojiť\tEnter",             IDOK
+        MENUITEM SEPARATOR
+        MENUITEM "&Nový...\tInsert",             IDB_NEWBOOKMARK
+        MENUITEM "&Kopírovať do...",                 CM_COPYSRVTO
+        MENUITEM "Pre&menovať...\tF2",              IDB_RENAMEBOOKMARK
+        MENUITEM "&Odstrániť...\tDelete",          IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "&Hore\tAlt+Up Arrow",      CM_MOVEUPBOOKMARK
+        MENUITEM "&Dolu\tAlt+Down Arrow",  CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_SRVCONTEXTMENU2 MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Nový...\tInsert",             IDB_NEWBOOKMARK
+        MENUITEM "&Kopírovať do...",                 CM_COPYSRVTO
+        MENUITEM "Pre&menovať...\tF2",              IDB_RENAMEBOOKMARK
+        MENUITEM "&Odstrániť...\tDelete",          IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "&Hore\tAlt+Up Arrow",      CM_MOVEUPBOOKMARK
+        MENUITEM "&Dolu\tAlt+Down Arrow",  CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_ACTPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Odpojiť...",              CM_DISCONNECTSRV
+        MENUITEM "Zobraziť &certifikát...",        CM_SHOWCERT
+        POPUP "&Režim prenosu"
+        BEGIN
+            MENUITEM "&Automatický",                  CM_TRMODEAUTO
+            MENUITEM "A&SCII",                      CM_TRMODEASCII
+            MENUITEM "&Binárny",                     CM_TRMODEBINARY
+        END
+        MENUITEM "Obno&viť",                    CM_REFRESHPATH
+        MENUITEM SEPARATOR
+        MENUITEM "&Pridať záložku...",            CM_ADDBOOKMARK
+        MENUITEM "Zobraziť &log...",                CM_SHOWLOG
+        MENUITEM "Poslať &FTP príkaz...",        CM_SENDFTPCOMMAND
+        MENUITEM "&Zobraziť RAW výpis...",        CM_SHOWRAWLISTING
+        MENUITEM "Prechádz&ať skryté súbory a adresáre (Unix)", CM_LISTHIDDENFILES
+    END
+END
+
+IDM_CHNGDRVCONTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Pripojiť na FTP server...",   CM_CONNECTSRV
+        MENUITEM "&Upraviť záložky...",      CM_ORGBOOKMARKS
+        MENUITEM "Zobraziť &log...",               CM_SHOWLOGS
+    END
+END
+
+IDM_DETPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Zobraziť v paneli",              CM_OPENDETACHED
+        MENUITEM SEPARATOR
+        MENUITEM "&Odpojiť",                 CM_DISCONNECTSRV
+        MENUITEM SEPARATOR
+        MENUITEM "&Pridať záložku...",            CM_ADDBOOKMARK
+        MENUITEM "Zobraziť &log...",                CM_SHOWLOG
+    END
+END
+
+IDM_LOGSMENU MENU 
+BEGIN
+    POPUP "&Protokol"
+    BEGIN
+        MENUITEM "&Kopírovať",                       CM_COPYLOG
+        MENUITEM "Kopírovať &všetko",                   CM_COPYALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "&Uložiť ako...",                 CM_SAVELOG
+        MENUITEM "U&ložiť všetko ako...",             CM_SAVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "Vyč&istiť...",                   CM_CLEARLOG
+        MENUITEM "&Odstrániť...",                  CM_REMOVELOG
+        MENUITEM "O&dstrániť všetko...",              CM_REMOVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "&Zatvoriť\tAlt+F4",              IDCANCEL
+    END
+    POPUP "&Možnosti"
+    BEGIN
+        MENUITEM "&Vždy zobraziť log pre aktívny panel", CM_SHOWLOGFORPANEL
+    END
+    POPUP "&Nápoveda"
+    BEGIN
+        MENUITEM "&FTP logy\tF1",               CM_HELPFORLOGSWND
+    END
+END
+
+IDM_SERVERSOTHERACT MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Kopírovať do...",                 CM_COPYSERVERTO
+        MENUITEM "Pre&menovať...\tF2",              CM_RENAMESERVER
+        MENUITEM "&Odstrániť...\tDelete",          CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "&Importovať zo súboru...",        CM_IMPORTSERVER
+        MENUITEM "E&xportovať do súboru...",          CM_EXPORTSERVER
+    END
+END
+
+IDM_SERVERSACTIONS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Nový...\tInsert",             IDB_NEWSERVER
+        MENUITEM "&Upraviť...",                    IDB_EDITSERVER
+        MENUITEM "&Kopírovať do...",                 CM_COPYSERVERTO
+        MENUITEM "Pre&menovať...\tF2",              CM_RENAMESERVER
+        MENUITEM "&Odstrániť...\tDelete",          CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "&Hore\tAlt+Up Arrow",      IDB_MOVESERVERUP
+        MENUITEM "&Dolu\tAlt+Down Arrow",  IDB_MOVESERVERDOWN
+        MENUITEM SEPARATOR
+        MENUITEM "&Importovať zo súboru...",        CM_IMPORTSERVER
+        MENUITEM "E&xportovať do súboru...",          CM_EXPORTSERVER
+    END
+END
+
+IDM_SRVTYPEMOVECOLUMN MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Hore\tAlt+Up Arrow",           CM_MOVECOLUMNUP
+        MENUITEM "&Dolu\tAlt+Down Arrow",       CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_SRVTYPERULESMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "&Vložiť"
+        BEGIN
+            MENUITEM "&Začiatok pravidla",              CM_STRM_RULESTART
+            MENUITEM "&Koniec pravidla",                CM_STRM_RULEEND
+            MENUITEM "Ria&dok komentára",               CM_STRM_COMMENT
+            MENUITEM SEPARATOR
+            POPUP "&Preskočiť"
+            BEGIN
+                MENUITEM "Medzery (ak sú)",       CM_STRM_SKIPWSIFANY
+                MENUITEM "Medzery (najmenej jedna)", CM_STRM_SKIPWS
+                MENUITEM "Presný počet medzier", CM_STRM_SKIPNUMOFWS
+                MENUITEM "Medzery a koniec riadku (najmenej jedna)", CM_STRM_SKIPWSENDEOLS
+                MENUITEM "Zvyšok riadku (najmenej jeden znak)", CM_STRM_SKIPRESTOFLINE
+                MENUITEM "Slovo",                        CM_STRM_SKIPWORD
+                MENUITEM "Presný počet znakov",  CM_STRM_SKIPNUMOFLETTERS
+                MENUITEM "Všetky znaky až do konca z hľadaného reťazca", CM_STRM_SKIPALLTO
+                MENUITEM "Všetky znaky až k najbližšiemu číslu", CM_STRM_SKIPALLTONUMBER
+            END
+            POPUP "Priradiť ku &stĺpcu"
+            BEGIN
+                MENUITEM "Zvyšku riadku (najmenej jeden znak)", CM_STRM_ASGNRESTOFLINE
+                MENUITEM "Slovu",                        CM_STRM_ASGNWORD
+                MENUITEM "Číslu",                      CM_STRM_ASGNNUM
+                MENUITEM "Kladnému číslu",             CM_STRM_ASGNPOSNUM
+                MENUITEM "Číslu s oddeľovačom",      CM_STRM_ASGNNUMWITHSEP
+                MENUITEM "Trojpísmenovému mesiacu (anglicky, nemecky)", CM_STRM_ASGN3LETTERMONTH
+                MENUITEM "Trojpísmenovému mesiacu (definovanému užívateľom)", CM_STRM_ASGN3LETMONTHGEN
+                MENUITEM "Textovému mesiacu (nemecky)",         CM_STRM_ASGNTEXTMONTH
+                MENUITEM "Textovému mesiacu (definovanému užívateľom)",   CM_STRM_ASGNTEXTMONTHGEN
+                MENUITEM "Číslu mesiaca",                CM_STRM_ASGNMONTH
+                MENUITEM "Číslu dňa",                  CM_STRM_ASGNDAY
+                MENUITEM "Číslu roka",                 CM_STRM_ASGNYEAR
+                MENUITEM "Času",                        CM_STRM_ASGNTIME
+                MENUITEM "Roku alebo času",                CM_STRM_ASGNYEARORTIME
+                MENUITEM "Presnému počtu znakov",  CM_STRM_ASGNNUMOFLETTERS
+                MENUITEM "Všetkým znakom až do konca z hľadaného reťazca", CM_STRM_ASGNALLTO
+                MENUITEM "Všetkým znakom až k hľadanému reťazcu", CM_STRM_ASGNALLUPTO
+                MENUITEM "Unix spojeniu (rozdeliť spojenie na názov a cieľ)", CM_STRM_ASGNUNIXLINK
+                MENUITEM "Unix zariadeniu",                 CM_STRM_ASGNUNIXDEV
+                MENUITEM "Výrazu",                  CM_STRM_ASGNEXPR
+            END
+            POPUP "Orezať &medzery v stĺpci"
+            BEGIN
+                MENUITEM "Počiatočné",                     CM_STRM_CUTWSINIT
+                MENUITEM "Koncové",                    CM_STRM_CUTWSTRAIL
+                MENUITEM "Počiatočné a koncové",        CM_STRM_CUTWSBOTH
+            END
+            POPUP "S&tavové premenné a operátory výrazov"
+            BEGIN
+                MENUITEM "Je prvý neprázdny riadok", CM_STRM_STVARISFIRSTNELINE
+                MENUITEM "Je posledný neprázdny riadok",  CM_STRM_STVARISLASTNELINE
+                MENUITEM "Ďalší znak",              CM_STRM_STVARNEXTCHAR
+                MENUITEM "Ďalšie slovo",                   CM_STRM_STVARNEXTWORD
+                MENUITEM "Zvyšok riadku",                CM_STRM_STVARRESTOFLINE
+                MENUITEM SEPARATOR
+                MENUITEM "Rovný",                       CM_STRM_OPEREQUAL
+                MENUITEM "Nerovný",                   CM_STRM_OPERNOTEQUAL
+                MENUITEM "Rovnaký reťazec (nevníma veľkosť písmen)", CM_STRM_OPERSTREQUAL
+                MENUITEM "Nerovnaký reťazec (nevníma veľkosť písmen)", CM_STRM_OPERSTRNOTEQUAL
+                MENUITEM "V reťazci je podreťazec",      CM_STRM_OPERISINSTR
+                MENUITEM "V reťazci nie je podreťazec",  CM_STRM_OPERISNOTINSTR
+                MENUITEM "Reťazec končí reťazcom",     CM_STRM_OPERENDWITH
+                MENUITEM "Reťazec nekončí reťazcom", CM_STRM_OPERNOTENDWITH
+            END
+            POPUP "&Ostatné"
+            BEGIN
+                MENUITEM "Pokračovať len ak",            CM_STRM_IF
+                MENUITEM "Pridať reťazec do stĺpca",        CM_STRM_ADDSTRTOCOL
+                MENUITEM "Ísť späť o počet znakov", CM_STRM_BACK
+                MENUITEM "Vyňať koniec reťazca zo stĺpca", CM_STRM_CUTENDOFSTR
+            END
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Späť",                       CM_STRM_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Vy&ňať",                        CM_STRM_CUT
+        MENUITEM "&Kopírovať",                       CM_STRM_COPY
+        MENUITEM "V&ložiť",                      CM_STRM_PASTE
+        MENUITEM "&Odstrániť",                     CM_STRM_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Vybrať vš&etko",                 CM_STRM_SELECTALL
+    END
+END
+
+IDM_SRVTYPECOLUMNS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Nový...\tInsert",             IDB_NEWCOLUMN
+        MENUITEM "&Upraviť...",                    IDB_EDITCOLUMN
+        MENUITEM "&Odstrániť...\tDelete",          IDB_REMOVECOLUMN
+        MENUITEM SEPARATOR
+        MENUITEM "&Hore\tAlt+Up Arrow",      CM_MOVECOLUMNUP
+        MENUITEM "&Dolu\tAlt+Down Arrow",  CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_DIREXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Opakovať",                      IDOK
+        MENUITEM "Po&užiť existujúci adresár",     CM_SDEX_USEEXISTINGDIR
+        MENUITEM "&Použiť alternatívny názov",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_FILEEXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Opakovať",                      IDOK
+        MENUITEM "&Pokračovať",                     CM_SIED_RESUME
+        MENUITEM "Po&kračovať alebo prepísať",        CM_SIED_RESUMEOROVR
+        MENUITEM "Použiť alternatívny &názov",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_TRANSFERFAILEDERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Opakovať",                      IDOK
+        MENUITEM "Použiť alternatívny &názov",         CM_SCRD_USEALTNAME
+        MENUITEM "Po&kračovať alebo prepísať",        CM_SIED_RESUMEOROVR
+    END
+END
+
+IDM_CANTCRFILEERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Opakovať",                      IDOK
+        MENUITEM "&Použiť alternatívny názov",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_UNKATTRSERRIGNORE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ignorovať",                     IDOK
+        MENUITEM "&Opakovať",                      CM_SIEA_RETRY
+        MENUITEM "&Nastaviť nové atribúty...",      CM_SIEA_SETNEWATTRS
+    END
+END
+
+IDM_DELETEERRORRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Odstrániť",                     IDOK
+        MENUITEM "Opa&kovať",                      CM_SISE_RETRY
+    END
+END
+
+IDM_DELETEERRORONSRVRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Opakovať",                      IDOK
+        MENUITEM "O&značiť ako odstránený",            CM_SSCD_MARKASDELETED
+    END
+END
+
+IDM_RESUMEERRORONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Opakovať",                      IDOK
+        MENUITEM "&Použiť alternatívny názov",         CM_SSCD_USEALTNAME
+        MENUITEM "Po&kračovať alebo prepísať",        CM_SSCD_RESUMEOROVR
+    END
+END
+
+IDM_RESUMETESTFAILEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Opakovať",                      IDOK
+        MENUITEM "&Použiť alternatívny názov",         CM_SSCD_USEALTNAME
+        MENUITEM "Po&kračovať alebo prepísať",        CM_SSCD_RESUMEOROVR
+        MENUITEM "&Znížiť veľkosť súboru a skúsiť znova", CM_SSCD_REDUCEFILESIZE
+    END
+END
+
+IDM_UPLTESTIFFINISHEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Opakovať",                      IDOK
+        MENUITEM "&Použiť alternatívny názov",         CM_SSCD_USEALTNAME
+        MENUITEM "Po&kračovať alebo prepísať",        CM_SSCD_RESUMEOROVR
+        MENUITEM "O&značiť súbor ako úspešne odoslaný", CM_SSCD_MARKASUPLOADED
+    END
+END
+
+IDM_ASCIITRFORBINFILE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Použiť binárny režim",            IDOK
+        MENUITEM "&Opakovať",                      CM_SATR_RETRY
+    END
+END
+
+IDM_ADDPROXYSERVER MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Pridať...",                     IDB_ADDPROXYSRV
+        MENUITEM "&Upraviť...",                    CM_EDITPROXYSRV
+        MENUITEM "&Odstrániť...",                  CM_DELETEPROXYSRV
+        MENUITEM SEPARATOR
+        MENUITEM "&Hore",                    CM_MOVEUPPROXYSRV
+        MENUITEM "&Dolu",                  CM_MOVEDOWNPROXYSRV
+    END
+END
+
+IDM_PRXSRVSCRIPTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "&Vložiť"
+        BEGIN
+            MENUITEM "&3xx: (odoslať len ak server vyžaduje heslo/účet)", CM_PSS_3XX
+            MENUITEM SEPARATOR
+            MENUITEM "&Proxy adresu",              CM_PSS_PROXYHOST
+            MENUITEM "P&roxy port",                 CM_PSS_PROXYPORT
+            MENUITEM "Pr&oxy užívateľské meno",            CM_PSS_PROXYUSER
+            MENUITEM "Pro&xy heslo",             CM_PSS_PROXYPASSWD
+            MENUITEM "&Adresu",                    CM_PSS_HOST
+            MENUITEM "Por&t",                       CM_PSS_PORT
+            MENUITEM "&Užívateľské meno",                  CM_PSS_USER
+            MENUITEM "&Heslo",                   CM_PSS_PASSWD
+            MENUITEM "Úč&et",                    CM_PSS_ACCOUNT
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Späť",                       CM_PSS_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Vyň&ať",                        CM_PSS_CUT
+        MENUITEM "&Kopírovať",                       CM_PSS_COPY
+        MENUITEM "V&ložiť",                      CM_PSS_PASTE
+        MENUITEM "&Odstrániť",                     CM_PSS_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Vybrať vš&etko",                 CM_PSS_SELECTALL
+    END
+END
+
+IDM_UNLOCKPASSWORD MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Odomknúť heslo...",         CM_UNLOCKPASSWORD
+        MENUITEM "O&dstrániť heslo",             CM_CLEARPASSWORD
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_FTPPLUGINTITLE, "FTP klient"
+ IDS_PLUGINNAME, "FTP klient"
+ IDS_PLUGINDESCR, "Prenáša súbory a adresáre cez FTP."
+ IDS_ABOUTPLUGINTITLE, "O plugine"
+ IDS_FTPCHNGDRVITEM, "/\tFTP klient"
+ IDS_FTPERRORTITLE, "FTP Chyba"
+ IDS_TOOLONGPATH, "Nie je možné dokončiť operáciu kvôli príliš dlhej ceste."
+ IDS_HOSTNAMEMISSING, "V zadanej ceste chýba meno hostiteľa."
+ IDS_INVALIDPORT, "V zadanej ceste port nie je číslo alebo nie je v rozsahu od 1 do 65535."
+ IDS_INVALIDNUMBER, "Neplatné číslo."
+ IDS_CONFIGTITLE, "FTP - Konfigurácia"
+ IDS_INCORRECTSYNTAX, "Maska súboru nie je syntakticky správna."
+ IDS_MUSTBEPOSITIVE, "Číslo musí byť kladné."
+ IDS_MUSTBEGRTHANZERO, "Číslo musí byť väčšie ako nula."
+ IDS_KAEVERYGRTHSTOP, "Čas zastavenia nesmie byť menší ako doba odosielania (na umožnenie aspoň jedného odoslania)."
+ IDS_KAEVERYTOOBIG, "Doba odosielanie nesmie byť väčšia ako 10000 sekúnd."
+ IDS_KASTOPTOOBIG, "Čas zastavenia nesmie byť väčšia ako 10000 minút."
+ IDS_KEEPALIVECMDNOOP, "NOOP (žiadny prenos dát)"
+ IDS_KEEPALIVECMDPWD, "PWD (žiadny prenos dát)"
+ IDS_KEEPALIVECMDNLST, "NLST (prenos dát)"
+ IDS_KEEPALIVECMDLIST, "LIST (prenos dát)"
+ IDS_CONNECTFTPSERVER, "&Pripojiť na FTP server..."
+ IDS_DISCONNECT, "&Odpojiť...\tF12"
+ IDS_ADDBOOKMARK, "Prid&ať záložku..."
+ IDS_SHOWLOGS, "Zobraziť &logy..."
+ IDS_SENDFTPCOMMAND, "O&doslať FTP príkaz..."
+ IDS_ORGBOOKMARKSCMD, "&Upraviť záložky..."
+ IDS_SHOWRAWLISTING, "&Zobraziť RAW výpis..."
+ IDS_REFRESHPATH, "O&bnoviť"
+ IDS_LISTHIDDENFILES, "Pr&echádzať skryté súbory a adresáre (Unix)"
+ IDS_SHOWCERT, "Zobraziť &certifikát..."
+
+ IDS_QUICKCONNECT, "Rýchle pripojenie"
+
+ IDS_ADVSTRNONE, "Žiadne pokročilé voľby"
+ IDS_ADVSTRTARGETPATH, "Cieľová cesta: %s"
+ IDS_ADVSTRSERVERTYPE, "Typ servera: %s"
+ IDS_ADVSTRPORT, "Port: %d"
+ IDS_ADVSTRSERVERPASVYES, "Pasívny režim"
+ IDS_ADVSTRSERVERPASVNO, "Žiadny pasívny režim"
+ IDS_ADVSTRKEEPALIVEYES, "Vlastné pridržanie v činnosti"
+ IDS_ADVSTRKEEPALIVENO, "Nedržať v činnosti"
+ IDS_ADVSTRMAXCONCURCON, "Max. pripojení: %d"
+ IDS_ADVSTRUNLIMITEDCON, "Neobmedzené pripojenia"
+ IDS_ADVSTRSPEEDLIM, "Limit rýchlosti: %g KB/s"
+ IDS_ADVSTRUNLIMITEDSPEED, "Neobmedzená rýchlosť"
+ IDS_ADVSTRTRMODBINARY, "Režim prenosu: Binárny"
+ IDS_ADVSTRTRMODASCII, "Režim prenosu: ASCII"
+ IDS_ADVSTRTRMODAUTO, "Režim prenosu: Automatický"
+ IDS_ADVSTRUSECACHEYES, "Používať Cache"
+ IDS_ADVSTRUSECACHENO, "Nepoužívať Cache"
+ IDS_ADVSTRINITFTPCMDS, "Počiatočný príkaz: %s"
+ IDS_ADVSTRLISTCOMMAND, "Zoznam príkazov: %s"
+ IDS_ADVSTRPROXYSRV, "Proxy: %s"
+ IDS_ADVSTRPROXYNOTUSED, "Nepoužívať"
+ IDS_ADVSTRSSLCONTRONLY, "Šifrovanie"
+ IDS_ADVSTRSSLCONTRDATA, "Plné šifrovanie"
+ IDS_ADVSTRMODEZ, "MODE Z"
+ IDS_ADVSTRNOMODEZ, "Žiadny MODE Z"
+
+ IDS_SRVTYPEAUTODETECT, "Autodetekcia"
+ IDS_TRANSFMODEDEFAULT, "Predvolené (pozrite sa na Konfigurácia/Predvolené)"
+ IDS_TRANSFMODEBINARY, "Binárny (žiadne zmeny počas prenosu)"
+ IDS_TRANSFMODEASCII, "ASCII (konverzia na štandardné konce riadkov)"
+ IDS_TRANSFMODEAUTO, "Automaticky (pozrite sa na ASCII masky v Konfigurácia/Predvolené)"
+ IDS_SELECTTARGETDIR, "Vyberte adresár pre cieľový panel."
+ IDS_RENAMESRVTO, "Premenovať ""%s"" na"
+ IDS_COPYDATAFROM, "&Kopírovať dáta zo záložky ""%s"""
+ IDS_MAYNOTBEEMPTY, "Prázdna hodnota tu nie je povolená."
+ IDS_REMOVECONFIRM, "Naozaj chcete odstrániť záložku ""%s""?"
+ IDS_HOSTMAYNOTBEEMPTY, "Prosím zadajte adresu FTP servera (názov, IP alebo URL) predtým ako sa pokúsite pripojiť."
+ IDS_ORGANIZEBOOKMARKS, "Úprava záložiek"
+ IDS_CLOSECONINPANEL, "Opúšťate FTP server v paneli. Chcete odpojiť alebo podržať spojenie s týmto serverom?\n\nAk zvolíte Podržať, môžete neskôr sprístupniť toto spojenie z ponuky zmena jednotky."
+ IDS_ALWAYSNOTCLOSE, "&Vždy zvoliť Podržať\tAko vrátiť späť\tTúto voľbu môžete neskôr zmeniť v FTP Konfigurácii na stránke Potvrdenia"
+ IDS_DISCONNECTBUTTON, "&Odpojiť"
+ IDS_KEEPCONBUTTON, "&Podržať"
+
+ IDS_ADDBOOKMARKTITLE, "Pridať záložku"
+ IDS_ADDBOOKMARKTEXT, "Názov novej záložky:"
+
+ IDS_WINSOCKETSERROR, "Nie je možné inicializovať knižnicu Windows Sockets.\n\nChyba: %s"
+
+ IDS_WANTDISCONNECT, "Naozaj sa chcete odpojiť z FTP servera?"
+ IDS_ALWAYSCLOSE, "&Nabudúce zatvoriť spojenie bez opýtania\tAko vrátiť späť\tTúto voľbu môžete neskôr zmeniť v FTP Konfigurácii na stránke Potvrdenia"
+
+ IDS_GETTINGIPOFSERVER, "Získavam IP adresu servera ""%s"", stlačte ESC na prerušenie..."
+ IDS_OPENINGCONTOSERVER, "Otváram spojenie s FTP serverom ""%s"" (IP: %s, port: %d),\nstlačte ESC na prerušenie..."
+ IDS_WAITINGTORETRY, "Nie je možné pripojiť sa k serveru ""%s"" (IP: %s, port: %d).\nChyba: %s"
+ IDS_WAITINGTORETRY2, "Nie je možné pripojiť sa k serveru ""%s"" (port: %d).\nChyba: %s"
+ IDS_WAITINGTORETRYSUF, "%s\n\nČakám %d sekúnd na opätovné pripojenie (pokus č.: %d z %d), stlačte ESC na prerušenie..."
+ IDS_WAITINGFORLOGIN, "Čakám na výzvu na prihlásenie, stlačte ESC na prerušenie..."
+ IDS_SENDINGLOGINCMD, "Odosielam príkaz ""%s"", stlačte ESC na prerušenie..."
+ IDS_CLOSINGCONNECTION, "Ukončujem spojenie s ""%s"", stlačte ESC na prerušenie..."
+ IDS_SENDINGCOMMAND, "Odosielam príkaz ""%s"", stlačte ESC na prerušenie..."
+ IDS_ABORTINGCOMMAND, "Zastavujem FTP príkaz, stlačte ESC na prerušenie..."
+ IDS_OPENINGCONTOSERVER2, "Otváram spojenie s FTP serverom ""%s"" (port: %d),\nstlačte ESC na prerušenie..."
+ IDS_PREPARINGACTDATACON, "Pripravujem aktívne dátové spojenie, stlačte ESC na prerušenie..."
+
+ IDS_GETIPESC, "Naozaj chcete prerušiť získavanie IP adresy zo servera?"
+ IDS_GETIPTIMEOUT, "Získanie IP adresy zo servera vypršalo."
+ IDS_OPENCONESC, "Naozaj chcete prerušiť otváranie spojenia so serverom?"
+ IDS_OPENCONTIMEOUT, "Otváranie spojenia s FTP serverom vypršalo."
+ IDS_OPENPROXYSRVCONTIMEOUT, "Otváranie spojenia s proxy serverom vypršalo."
+ IDS_WAITRETRESC, "Kliknite na tlačidlo Prerušiť na ukončenie všetkých ďalších pokusov o pripojenie. Kliknite na tlačidlo Opakovať na preskočenie čakania pred ďalším pokusom o pripojenie. Kliknite na tlačidlo Čakať na pokračovanie v čakaní pred ďalším pokusom o pripojenie."
+ IDS_WAITRETRESCABORTBTN, "&Prerušiť"
+ IDS_WAITRETRESCRETRYBTN, "&Opakovať"
+ IDS_WAITRETRESCWAITBTN, "Č&akať"
+
+ IDS_WAITFORLOGESC, "Naozaj chcete prerušiť čakanie na výzvu k prihláseniu?"
+ IDS_WAITFORLOGTIMEOUT, "Čakanie na výzvu k prihláseniu vypršalo."
+ IDS_CLOSECONESC, "Naozaj chcete ihneď ukončiť spojenie?"
+ IDS_LOGMSGACTIONCANCELED, "Operácia prerušená užívateľom.\r\n"
+ IDS_LOGMSGDISCONTIMEOUT, "Odpojenie zo servera vypršalo. Spojenie bolo ukončené.\r\n"
+ IDS_SENDCOMMANDESC, "Naozaj chcete prerušiť FTP príkaz?"
+ IDS_SENDCOMMANDESC2, "Naozaj chcete prerušiť FTP príkaz? Spojenie s FTP serverom bude ukončené."
+ IDS_ABORTCOMMANDESC, "Naozaj chcete prerušiť zastavenie FTP príkazu? Spojenie s FTP serverom bude ukončené."
+ IDS_PREPACTDATACONESC, "Naozaj chcete prerušiť prípravu aktívneho dátového spojenia? Spojenie s FTP serverom bude ukončené."
+ IDS_SNDORABORCMDTIMEOUT, "Odoslanie alebo zastavenie FTP príkazu vypršalo."
+ IDS_LISTCMDTIMEOUT, "Odoslanie alebo zastavenie príkazu výpis vypršalo. Poznámka: ak nezačal prenos dát, skúste\nzmeniť režim prenosu (pozrite sa na dialóg Pripojiť na FTP server > Pokročilé > Použiť pasívny režim prenosu)"
+ IDS_PREPACTDATACONTIMEOUT, "Príprava aktívneho dátového spojenia vypršala."
+ IDS_LOGMSGFATALERROR, "Závažná chyba v komunikácii so serverom. Spojenie bolo ukončené.\r\n"
+ IDS_LOGMSGFATALERROR2, "Vyskytla sa závažná chyba. Spojenie bolo ukončené.\r\n"
+
+ IDS_UNKNOWNERROR, "Neznáma chyba (možno nedostatok systémových prostriedkov)."
+ IDS_GETIPERROR, "Nie je možné získať IP adresu zo servera ""%s"".\n\nChyba: %%s"
+ IDS_OPENCONERROR, "Nie je možné otvoriť spojenie so serverom ""%s"" (IP: %s, port: %d).\n\nChyba: %%s"
+ IDS_CONNECTIONLOSTERROR, "Spojenie so serverom bolo neočakávane stratené."
+ IDS_NOTFTPSERVERERROR, "Pripojenie na server zlyhalo. Najskôr to nie je FTP server alebo FTP proxy server.\n\nOdpoveď servera: %s"
+ IDS_SENDCOMMANDERROR, "Nie je možné odoslať príkaz na server.\n\nChyba: %s"
+ IDS_LOGINERROR, "Nie je možné sa prihlásiť na FTP server alebo FTP proxy server.\n\nChyba: %s"
+ IDS_ABORTCOMMANDERROR, "Nie je možné prerušiť príkaz.\n\nChyba: %s"
+ IDS_GETCURWORKPATHERROR, "Nie je možné získať aktuálnu pracovnú cestu z FTP servera.\n\nOdpoveď servera: %s"
+ IDS_CHANGEWORKPATHERROR, "Nie je možné zmeniť cestu na FTP serveri.\n\nCesta: %s\nOdpoveď servera: %s"
+ IDS_CREATEDIRERROR, "Nie je možné vytvoriť adresár na FTP serveri.\n\nAdresár: %s\nOdpoveď servera: %s"
+ IDS_QUICKRENAMEERROR, "Nie je možné premenovať súbor alebo adresár na FTP serveri.\n\nNázov: %s\nPremenovať na: %s\nOdpoveď servera: %s"
+ IDS_QUICKRENAMEFILEERR, "Nie je možné premenovať súbor na FTP serveri.\n\nNázov: %s\nPremenovať na: %s\n"
+ IDS_QUICKRENAMEFILEERRSUF1, "Chyba: Zdrojový súbor je zamknutý pre ďalšie operácie."
+ IDS_QUICKRENAMEFILEERRSUF2, "Chyba: Cieľový súbor je zamknutý pre ďalšie operácie."
+ IDS_ERRINPROXYSCRIPT, "Nastala chyba pri spracovaní skriptu proxy servera.\n\nChyba: %s"
+ IDS_PROXYSRVADREMPTY, "Adresa proxy serveru je prázdna."
+ IDS_PROXYOPENCONERROR, "Proxy server nie je schopný otvoriť spojenie s FTP serverom ""%s"" (port: %d).\n\nChyba: %%s"
+ IDS_PROXYSENDREQERROR, "Nie je možné odoslať žiadosť na proxy server.\n\nChyba: %%s"
+ IDS_PROXYRECVREPERROR, "Nie je možné prijať odpoveď z proxy servera.\n\nChyba: %%s"
+ IDS_PROXYUNEXPECTEDREPLY, "Prijatá neočakávaná odpoveď z proxy servera. Pravdepodobne máte zadaný neplatný typ proxy servera."
+
+ IDS_ENTERPASSTITLE, "Zadajte heslo"
+ IDS_ENTERPASSTEXT, "&Heslo:"
+ IDS_ENTERACCTTITLE, "Zadajte účet"
+ IDS_ENTERACCTTEXT, "Úč&et:"
+ IDS_CONNECTINGTOAS1, "Pripájam na ""%s""."
+ IDS_CONNECTINGTOAS2, "Pripájam na ""%s"" ako ""%s""."
+
+ IDS_HIDDENPASSWORD, "skrytý"
+
+ IDS_LCONLOSTFORMATERROR, "Spojenie s FTP serverom v ľavom paneli bolo stratené.\n\nChyba: %s"
+ IDS_RCONLOSTFORMATERROR, "Spojenie s FTP serverom v pravom paneli bolo stratené.\n\nChyba: %s"
+ IDS_DCONLOSTFORMATERROR, "Spojenie s FTP serverom bolo stratené.\n\nChyba: %s"
+ IDS_NONEREPLY, "(nie je)"
+ IDS_WARNWHENCONLOST, "&Nabudúce nezobrazovať\tAko vrátiť späť\tTúto voľbu môžete neskôr zmeniť v FTP Konfigurácii na stránke Potvrdenia"
+
+ IDS_LOGHEADER, "Pripojené na ""%s"" (%s) port %d.\r\nLog UID: %d, čas: %s.\r\n\r\n"
+ IDS_RECONLOGHEADER, "\r\n-----\r\n\r\nOpätovné pripojenie na ""%s"" (%s) port %d (pokus č.: %d).\r\nČas: %s.\r\n\r\n"
+ IDS_PRXSRVLOGHEADER, "Adresa FTP servera: %s, port: %d, Užívateľ: %s\r\nNázov proxy servera: %s, typ: %s\r\nAdresa proxy servera: %s, port: %d, Užívateľ: %s\r\nPripojené na ""%s"" (%s) port %d.\r\nLog UID: %d, čas: %s.\r\n\r\n"
+ IDS_PRXSRVRECONLOGHEADER, "\r\n-----\r\n\r\nAdresa FTP servera: %s, port: %d, Užívateľ: %s\r\nNázov proxy servera: %s, typ: %s\r\nAdresa proxy servera: %s, port: %d, Užívateľ: %s\r\nOpätovné pripojenie na ""%s"" (%s) port %d (pokus č.: %d).\r\nČas: %s.\r\n\r\n"
+
+ IDS_NOLOGS, "Nie sú žiadne logy na zobrazenie."
+
+ IDS_FTPINLEFTPANEL, "ľavý panel"
+ IDS_FTPINRIGHTPANEL, "pravý panel"
+ IDS_FTPNOTINPANEL, "nie je v paneli"
+ IDS_FTPOPERATION, "používané pre operáciu"
+ IDS_FTPDISCONNECTED, "odpojený"
+ IDS_OPERSTOPPED, "zastavený"
+ IDS_FTPINACTIVE, "nečinné spojenie"
+
+ IDS_FSHAVENOLOG, "Toto spojenie s FTP serverom nemá žiadny log. Spojenie bolo zrejme spustené s vypnutým protokolovaním (pozrite sa na FTP Konfiguráciu - stránka Logy)."
+
+ IDS_CLEARLOGQUESTION, "Naozaj chcete vyčistiť log ""%s""?"
+ IDS_REMOVELOGQUESTION, "Naozaj chcete odstrániť log ""%s""?"
+ IDS_REMOVEALLLOGSQUESTION, "Naozaj chcete odstrániť všetky logy?"
+ IDS_TEXTCOPIEDTOCLIPBOARD, "Text bol úspešne skopírovaný do schránky."
+ IDS_COPYTOCLIPBOARDERROR, "Nie je možné skopírovať text do schránky."
+ IDS_SAVELOGFILTER, "Log súbory (*.log)|*.log|Všetky súbory (*.*)|*.*|"
+ IDS_SAVEASTITLE, "Uložiť log ako"
+ IDS_SAVEALLASTITLE, "Uložiť všetky logy ako"
+ IDS_SAVELOGERROR, "Nie je možné uložiť log do súboru.\n\nChyba: %s"
+
+ IDS_CMDMAYNOTBEEMPTY, "Prázdny príkaz nie je povolený."
+ IDS_SECRETFTPCOMMAND, "(tajný príkaz)"
+ IDS_SERVERREPLYTITLE, "FTP server odpovedá na ""%s"""
+
+ IDS_RECONNECTTOSRV, "Spojenie s FTP serverom je zatvorené. Chcete sa znovu pripojiť na FTP server?"
+ IDS_ALWAYSRECONNECT, "&Nabudúce znova pripojiť bez opýtania\tAko vrátiť späť\tTúto voľbu môžete neskôr zmeniť v FTP Konfigurácii na stránke Potvrdenia"
+
+ IDS_LOGMSGLOGINSUCCESS, "Úspešne nahrané, získavanie systémovej informácie...\r\n"
+ IDS_LOGMSGCHANGINGPATH, "Zmena cesty na ""%s""...\r\n"
+ IDS_LOGMSGSENDINGUSRCMD, "Odosielanie príkazu užívateľa ""%s""...\r\n"
+ IDS_LOGMSGREFRESHINGPATH, "Obnovenie cesty ""%s""...\r\n"
+ IDS_LOGMSGDETACHED, "Spojenie do ľavého panela...\r\n"
+ IDS_LOGMSGATTACHED, "Spojenie do vráteného panela...\r\n"
+ IDS_LOGMSGDISCONNECT, "Odpojenie zo servera...\r\n"
+ IDS_LOGMSGLISTINGCACHEDPATH, "Výpis cesty ""%s"" z cache...\r\n"
+ IDS_LOGMSGLISTINGPATH, "Výpis cesty ""%s""...\r\n"
+ IDS_LOGMSGRESOLVINGLINK, "Riešenie spojenia ""%s""...\r\n"
+ IDS_LOGMSGVIEWCACHEDFILE, "Zobrazenie súboru ""%s"" z cache...\r\n"
+ IDS_LOGMSGVIEWFILE, "Získavanie súboru ""%s"" pre zobrazenie...\r\n"
+ IDS_LOGMSGCREATEDIR, "Vytváranie adresára ""%s""...\r\n"
+ IDS_LOGMSGQUICKRENAME, "Premenovanie ""%s"" na ""%s""...\r\n"
+ IDS_LOGMSGDOWNLOADFILE, "Sťahovanie súboru ""%s""...\r\n"
+ IDS_LOGMSGUPLOADFILE, "Odosielanie súboru ""%s""...\r\n"
+ IDS_LOGMSGPAUSE, "Užívateľ chce pozastaviť toto spojenie...\r\n"
+ IDS_LOGMSGRESUME, "Užívateľ chce pokračovať v tomto pozastavenom spojení...\r\n"
+ IDS_LOGMSGUPLOADISCOMPL, "Súbor ""%s"" bol kompletne odoslaný (veľkosť súboru na serveri je %s)...\r\n"
+ IDS_LOGMSGUPLOADISCOMPL2, "Textový súbor ""%s"" bol kompletne odoslaný...\r\n"
+ IDS_LOGMSGUPLOADISNOTCOMPL, "Súbor ""%s"" nebol kompletne odoslaný (veľkosť súboru na serveri nie je %s)...\r\n"
+ IDS_LOGMSGUPLOADISNOTCOMPL2, "Textový súbor ""%s"" nebol kompletne odoslaný...\r\n"
+ IDS_LOGMSGDWNLOADFORCRESUM, "Rýchle zhrnutie pre súbor ""%s"" (obsah súboru bol úspešne prijatý, ale server nepotvrdil úspešné odoslanie tohto súboru).\r\n"
+ IDS_LOGMSGUPLOADRENFILE, "Premenovanie súboru pre odoslanie na ""%s""...\r\n"
+ IDS_LOGMSGDOWNLOADFILE2, "Sťahovanie súboru ""%s"" do ""%s""...\r\n"
+
+ IDS_UNABLETOREADLIST, "Nie je možné načítať celý výpis súborov a adresárov zo servera. Zobrazený výpis v paneli môže byť neúplný."
+ IDS_UNABLETOREADLISTSUFFIX, "\n\nChyba: %s"
+ IDS_UNABLETOREADLISTSUFFIX2, "\n\nOdpoveď servera: %s"
+ IDS_UNABLETOREADLISTSUFFIX3, "\n\nChyba: %s\nPoznámka: ak nezačal prenos dát, skúste zmeniť režim prenosu (pozrite sa na dialóg Pripojiť na FTP server > Pokročilé > Použiť pasívny režim prenosu)"
+ IDS_UNABLETOREADLISTSUFFIX4, "\n\nOdpoveď servera: %s\nPoznámka: ak nezačal prenos dát, skúste zmeniť režim prenosu (pozrite sa na dialóg Pripojiť na FTP server > Pokročilé > Použiť pasívny režim prenosu)"
+ IDS_LOGMSGPASVNOTSUPPORTED, "Pasívny režim nie je podporovaný touto sieťou, skúšam aktívny režim...\r\n"
+ IDS_LISTPATHERROR, "Nie je možné načítať výpis súborov a adresárov pre novú cestu na serveri.\nChcete zobraziť túto cestu v paneli?\n\nCesta: %s\nOdpoveď servera: %s"
+ IDS_OPENACTDATACONERROR, "Nie je možné pripraviť aktívne dátové spojenie.\n\nChyba: %s"
+
+ IDS_LOGMSGUNABLETOOPEN, "Nie je možné otvoriť pasívne dátové spojenie (IP: %s, port: %d)...\r\n"
+ IDS_LOGMSGUNABLETOOPEN2, "Nie je možné otvoriť pasívne dátové spojenie (IP: %s, port: %d), chyba: %s...\r\n"
+ IDS_LOGMSGDATACONTERMINATED, "Dátové spojenie bolo ukončené na žiadosť užívateľa...\r\n"
+ IDS_LOGMSGDATACONRECON, "Opätovné pripojenie dátového spojenia...\r\n"
+ IDS_LOGMSGDATCONERROR, "Chyba dátového spojenia: %s\r\n"
+ IDS_LOGMSGUNEXPREPLY, "Neočakávaná odpoveď: "
+ IDS_LOGMSGNODATATRTIMEOUT, "Dátové spojenie bolo ukončené pre príliš dlhú nečinnosť...\r\n"
+ IDS_LOGMSGDATACONNOTOPENED, "Dátové spojenie nebolo otvorené...\r\n"
+ IDS_ERRDATACONNODATATRTIMEOUT, "Dátové spojenie bolo ukončené pre príliš dlhú nečinnosť."
+ IDS_ERRDATACONNOTOPENED, "Dátové spojenie nebolo otvorené."
+ IDS_LOGMSGUNABLETOCONPRX, "Nie je možné otvoriť spojenie na proxy server (IP: %s, port: %d)...\r\n"
+ IDS_LOGMSGUNABLETOCONPRX2, "Nie je možné otvoriť spojenie na proxy server (IP: %s, port: %d), chyba: %s...\r\n"
+ IDS_ERRDATACONSSLCONNECTERROR, "Nie je možné zriadiť šifrované dátové spojenie (SSL)."
+ IDS_ERRDATACONDECOMPRERROR, "Dáta sú poškodené alebo nekompletné, preto nie je možné správne dekomprimovať (MODE Z)."
+ IDS_LOGMSGDECOMPRERROR, "Nie je možné dekomprimovať dáta (MODE Z), sú poškodené.\r\n"
+
+ IDS_LINENUMCOLUMN, "Riadok"
+ IDS_LINENUMCOLUMNDESC, "Počet riadkov Raw výpisu FTP servera"
+ IDS_RAWLISTCOLUMN, "Výpis"
+ IDS_RAWLISTCOLUMNDESC, "Raw výpis FTP servera"
+
+ IDS_LISTWNDDOWNLOADING, "Sťahujem výpis súborov a adresárov z %s, stlačte ESC na prerušenie..."
+ IDS_LISTWNDDOWNLOADSPEED, "za %s/s"
+ IDS_LISTWNDCONNECTIONIDLE, "spojenie nečinné pre %s"
+ IDS_LISTWNDSTATUS1, "%s z %s (%s)"
+ IDS_LISTWNDSTATUS2, "%s (%s)"
+ IDS_LISTWNDESTIMTIMEUNKNOWN, "(neznámy)"
+ IDS_LISTWNDABORTINGCOMMAND, "Zastavujem sťahovanie výpisu súborov a adresárov, stlačte ESC na prerušenie..."
+ IDS_LISTWNDSENDCOMMANDESC, "Naozaj chcete prerušiť sťahovanie výpisu? Toto môže spôsobiť, že výpis súborov a adresárov v paneli bude neúplný.\n\nPoznámka: ak nezačal prenos dát, skúste zmeniť režim prenosu (pozrite sa na dialóg Pripojiť na FTP server > Pokročilé > Použiť pasívny režim prenosu)"
+ IDS_LISTWNDSENDCOMMANDESC2, "Naozaj chcete prerušiť sťahovanie výpisu? Spojenie s FTP serverom bude ukončené. Toto môže spôsobiť, že výpis súborov a adresárov v paneli bude neúplný.\n\nPoznámka: ak nezačal prenos dát, skúste zmeniť režim prenosu (pozrite sa na dialóg Pripojiť na FTP server > Pokročilé > Použiť pasívny režim prenosu)"
+ IDS_LISTWNDABORTCOMMANDESC, "Naozaj chcete prerušiť zastavovanie? Spojenie s FTP serverom bude ukončené."
+
+ IDS_LISTWNDDOWNLFILEABORTING, "Zastavujem sťahovanie súboru, stlačte ESC na prerušenie..."
+ IDS_LISTWNDDOWNLOADINGFILE, "Sťahujem súbor %s z %s, stlačte ESC na prerušenie..."
+ IDS_LISTWNDDOWNLFILESENDCMDESC, "Naozaj chcete prerušiť sťahovanie? Toto môže spôsobiť zobrazenie neúplného súboru."
+ IDS_LISTWNDDOWNLFILESENDCMDESC2, "Naozaj chcete prerušiť sťahovanie? Spojenie s FTP serverom bude ukončené. Toto môže spôsobiť zobrazenie neúplného súboru."
+ IDS_LISTWNDDOWNLFILETIMEOUT, "Sťahovanie má časové zdržanie."
+
+ IDS_RAWLISTINGTITLE, "Raw výpis"
+ IDS_RAWLISTINGFILTER, "Súbory výpisu (*.txt)|*.txt|Všetky súbory (*.*)|*.*|"
+ IDS_RAWLISTSAVEASTITLE, "Uložiť Raw výpis ako"
+ IDS_RAWLISTSAVEERROR, "Nie je možné uložiť raw výpis do súboru.\nChyba: %s"
+
+ IDS_SRVTYPEREMOVECONF, "Naozaj chcete odstrániť podporu pre servery typu ""%s""?"
+ IDS_SRVTYPENEWTITLE, "Nový typ servera"
+ IDS_SRVTYPENEWSUBJECT, "&Názov typu servera:"
+ IDS_SRVTYPERENAMETITLE, "Premenovať typ servera"
+ IDS_SRVTYPECOPYFROM, "&Kopírovať dáta zo servera typu ""%s"""
+ IDS_SRVTYPEUSERDEF, "(definované užívateľom)"
+ IDS_SRVTYPENOTUNIQUE, "Typ servera ""%s"" už existuje, prosím vyberte iný názov."
+ IDS_SRVTYPEFILEFILTER, "Súbory typu servera (*.str)|*.str|Všetky súbory (*.*)|*.*|"
+ IDS_SRVTYPESAVEASTITLE, "Exportovať typ servera do"
+ IDS_SRVTYPEEXPORTERROR, "Nie je možné exportovať typ servera do súboru.\n\nChyba: %s"
+ IDS_SRVTYPEIMPORTERROR, "Nie je možné importovať typ servera zo súboru.\n\nChyba: %s"
+ IDS_SRVTYPEIMPMOREDATA, "Súbor obsahuje príliš dlhý riadok alebo viac dát, ako sa očakáva."
+ IDS_SRVTYPEIMPNOTSTRFILE, "Súbor je poškodený alebo nie je platný súbor typu servera."
+ IDS_SRVTYPEIMPSYNERR, "Neočakávaný formát súboru alebo nedostatok systémových prostriedkov."
+ IDS_SRVTYPEOVERWRITE, "Typ servera ""%s"" už existuje. Chcete ho nahradiť?"
+ IDS_SRVTYPEIMPERRINRULES, "Pravidlá pre syntaktickú analýzu obsahujú chybu."
+ IDS_SRVTYPEIMPERRINACOND, "Autodetekcia podmienky obsahuje chybu."
+
+ IDS_ADCSTR_AND, "a"
+ IDS_ADCSTR_OR, "alebo"
+ IDS_ADCSTR_NOT, "Nie"
+ IDS_ADCSTR_LEFTPAR, "Začiatok výrazu v zátvorkách"
+ IDS_ADCSTR_RIGHTPAR, "Koniec výrazu v zátvorkách"
+ IDS_ADCSTR_SYSTCONTAINS, "SYST odpoveď obsahuje"
+ IDS_ADCSTR_WELMSGCONTAINS, "Uvítacia odpoveď obsahuje"
+ IDS_ADCSTR_SYSTCONTAINSREG, "V SYST odpovedi nájdený regulárny výraz"
+ IDS_ADCSTR_WELMSGCONTAINSREG, "V uvítacej odpovedi nájdený regulárny výraz"
+
+ IDS_SRVTYPECOL_ID, "Identifikátor"
+ IDS_SRVTYPECOL_NAME, "Názov"
+ IDS_SRVTYPECOL_DESCR, "Popis"
+ IDS_SRVTYPECOL_TYPE, "Typ"
+ IDS_SRVTYPECOL_EMPTYVAL, "Prázdna hodnota"
+ IDS_SRVTYPECOL_ALIGN, "Zoskupenie"
+
+ IDS_STC_STDNAME_NAME, "Názov"
+ IDS_STC_STDNAME_EXT, "Prípona"
+ IDS_STC_STDNAME_SIZE, "Veľkosť"
+ IDS_STC_STDNAME_DATE, "Dátum"
+ IDS_STC_STDNAME_TIME, "Čas"
+ IDS_STC_STDNAME_TYPE, "Typ"
+ IDS_STC_STDNAME_RIGHTS, "Práva"
+ IDS_STC_STDNAME_USER, "Užívateľ"
+ IDS_STC_STDNAME_GROUP, "Skupina"
+ IDS_STC_STDNAME_DEVICE, "Zariadenie"
+ IDS_STC_STDNAME_BLKSIZE, "Bloky"
+ IDS_STC_STDNAME_ALLOCBLKS, "Pridelený"
+ IDS_STC_STDNAME_LINKTGT, "LinkTgt"
+ IDS_STC_STDNAME_FORMAT, "Formát"
+ IDS_STC_STDNAME_LRECL, "Lrecl"
+ IDS_STC_STDNAME_RECORDS, "Záznamy"
+ IDS_STC_STDNAME_FILEMODE, "Fm"
+ IDS_STC_STDNAME_VOLUME, "Zväzok"
+ IDS_STC_STDNAME_UNIT, "Jednotka"
+ IDS_STC_STDNAME_EXTENTS, "Ext"
+ IDS_STC_STDNAME_USED, "Používaný"
+ IDS_STC_STDNAME_RECFM, "Recfm"
+ IDS_STC_STDNAME_BLKSZ, "BlkSz"
+ IDS_STC_STDNAME_DSORG, "Dsorg"
+ IDS_STC_STDNAME_VVMM, "VV.MM"
+ IDS_STC_STDNAME_CREATED, "Vytvorený"
+ IDS_STC_STDNAME_INIT, "Init"
+ IDS_STC_STDNAME_MOD, "Režim"
+ IDS_STC_STDNAME_ID, "Id"
+ IDS_STC_STDNAME_TTR, "TTR"
+ IDS_STC_STDNAME_ALIASOF, "Alias-od"
+ IDS_STC_STDNAME_AC, "AC"
+ IDS_STC_STDNAME_ATTR, "Atribúty"
+ IDS_STC_STDNAME_AMODE, "Arežim"
+ IDS_STC_STDNAME_RMODE, "Rrežim"
+ IDS_STC_STDNAME_CODE, "Kód"
+ IDS_STC_STDNAME_RWEP, "RWEP"
+
+ IDS_STC_STDDESCR_NAME, "Názov"
+ IDS_STC_STDDESCR_EXT, "Prípona"
+ IDS_STC_STDDESCR_SIZE, "Veľkosť"
+ IDS_STC_STDDESCR_DATE, "Dátum posledného zápisu"
+ IDS_STC_STDDESCR_TIME, "Čas posledného zápisu"
+ IDS_STC_STDDESCR_TYPE, "Typ súboru"
+ IDS_STC_STDDESCR_RIGHTS, "Prístupové práva"
+ IDS_STC_STDDESCR_USER, "Užívateľ"
+ IDS_STC_STDDESCR_GROUP, "Skupina"
+ IDS_STC_STDDESCR_DEVICE, "Hlavne a vedľajšie čísla zariadení"
+ IDS_STC_STDDESCR_BLKSIZE, "Veľkosť v blokoch"
+ IDS_STC_STDDESCR_ALLOCBLKS, "Pridelené bloky"
+ IDS_STC_STDDESCR_LINKTGT, "Spojený cieľ"
+ IDS_STC_STDDESCR_FORMAT, "Formát"
+ IDS_STC_STDDESCR_LRECL, "Logická dĺžka záznamu"
+ IDS_STC_STDDESCR_RECORDS, "Počet záznamov"
+ IDS_STC_STDDESCR_FILEMODE, "Režim súboru"
+ IDS_STC_STDDESCR_VOLUME, "Zväzok"
+ IDS_STC_STDDESCR_UNIT, "Jednotka"
+ IDS_STC_STDDESCR_EXTENTS, "Rozsahy"
+ IDS_STC_STDDESCR_USED, "Používaný"
+ IDS_STC_STDDESCR_RECFM, "Formát záznamu"
+ IDS_STC_STDDESCR_BLKSZ, "Fyzická dĺžka bloku"
+ IDS_STC_STDDESCR_DSORG, "Organizačná sada dát"
+ IDS_STC_STDDESCR_VVMM, "VV.MM"
+ IDS_STC_STDDESCR_CREATED, "Vytvorený"
+ IDS_STC_STDDESCR_INIT, "Počiatočná veľkosť"
+ IDS_STC_STDDESCR_MOD, "Režim"
+ IDS_STC_STDDESCR_ID, "Id"
+ IDS_STC_STDDESCR_TTR, "TTR"
+ IDS_STC_STDDESCR_ALIASOF, "Alias-od"
+ IDS_STC_STDDESCR_AC, "AC"
+ IDS_STC_STDDESCR_ATTR, "Atribúty"
+ IDS_STC_STDDESCR_AMODE, "Arežim"
+ IDS_STC_STDDESCR_RMODE, "Rrežim"
+ IDS_STC_STDDESCR_CODE, "Kód"
+ IDS_STC_STDDESCR_RWEP, "RWEP"
+
+ IDS_STC_TYPE_NAME, "Názov (požadovaný)"
+ IDS_STC_TYPE_EXT, "Prípona (vygenerovaná z názvu súboru)"
+ IDS_STC_TYPE_SIZE, "Veľkosť súboru v bajtoch"
+ IDS_STC_TYPE_DATE, "Dátum posledného zápisu"
+ IDS_STC_TYPE_TIME, "Čas posledného zápisu"
+ IDS_STC_TYPE_TYPE, "Typ súboru (vygenerovaný z prípony)"
+ IDS_STC_TYPE_ANYTEXT, "Každý text"
+ IDS_STC_TYPE_ANYDATE, "Každý dátum"
+ IDS_STC_TYPE_ANYTIME, "Každý čas"
+ IDS_STC_TYPE_ANYNUM, "Každé číslo"
+
+ IDS_STC_ERR_NAMEERR, "Prvý stĺpec v type servera musí byť viditeľný a mať typ ""Názov""."
+ IDS_STC_ERR_EXTERR, "Stĺpec s typom ""Prípona"" v type servera musí nasledovať stĺpec s typom ""Názov"" a musí byť viditeľný."
+ IDS_STC_ERR_IDEMPTY, "Stĺpec identifikátora v type servera nesmie byť prázdny."
+ IDS_STC_ERR_IDINVALID, "Formát stĺpca identifikátora v type servera je neplatný. Musí začínať písmenom alebo podčiarkovníkom a obsahovať len písmená, číslice a podčiarkovníky."
+ IDS_STC_ERR_IDRESERVED, "Stĺpec identifikátora v type servera nemusí používať rezervované názvy (""is_dir"", ""is_hidden"", a ""is_link"")."
+ IDS_STC_ERR_IDNOTUNIQUE, "Rovnaký identifikátor pre dva stĺpce v type servera nie je povolený."
+ IDS_STC_ERR_TYPEERR, "Nesprávne (opakované) použitie typu stĺpca v type servera."
+ IDS_STC_ERR_INVALEMPTY, "Neplatná prázdna hodnota pre stĺpec v type servera."
+ IDS_STC_ERR_EMPTYNAME, "Názov stĺpca v type servera nesmie byť prázdny."
+ IDS_STC_ERR_EMPTYDESCR, "Popis stĺpca v type servera nesmie byť prázdny."
+
+ IDS_SRVTYPECOL_REMOVECONF, "Naozaj chcete odstrániť stĺpec ""%s""?"
+
+ IDS_SRVTYPE_EXITCONF, "Vykonali ste nejaké zmeny. Naozaj chcete ignorovať tieto zmeny a zatvoriť dialóg?"
+
+ IDS_SRVTYPECOL_NEWTITLE, "Nový stĺpec"
+ IDS_SRVTYPECOL_FORMDATE, "dd.mm.rrrr"
+ IDS_SRVTYPECOL_FORMTIME, "hh:mm:ss"
+ IDS_SRVTYPECOL_FORMNUM, "(číslo)"
+ IDS_SRVTYPECOL_FORMSTR, "(text)"
+
+ IDS_SRVTYPECOL_ALIGNLEFT, "Ľavý"
+ IDS_SRVTYPECOL_ALIGNRIGHT, "Pravý"
+
+ IDS_SRVTYPE_READRAWLISTERR, "Nie je možné načítať raw výpis zo súboru.\n\nChyba: %s"
+ IDS_SRVTYPE_READRAWLISTLIMIT, "Upozornenie: načítanie len prvého 1 MB textu zo súboru."
+ IDS_SRVTYPE_ONLYINPANEL, "(len v paneli)"
+ IDS_SRVTYPE_SIZEISDIR, "DIR"
+ IDS_STPAR_UNABLECOMPPARSER, "Nie je možné zostaviť analýzu. Pravidlá pre analýzu obsahujú chybu.\n\nChyba: %s"
+ IDS_SRVTYPE_PARSEERROR, "Nie je možné analyzovať celý raw výpis."
+
+ IDS_STPAR_ERR_UNEXPSYM, "Bol nájdený neočakávaný znak."
+ IDS_STPAR_ERR_MISSINGRULEEND, "Chýba ukončenie pravidla (znak ';')."
+ IDS_STPAR_ERR_INVALIDFUNCNAME, "Neplatný názov funkcie."
+ IDS_STPAR_ERR_MISSINGFUNCPARS, "Chýba parameter funkcie (znak '(')."
+ IDS_STPAR_ERR_FUNCEXPECTED, "Názov funkcie nebol nájdený (možno prebytočný znak ',')."
+ IDS_STPAR_ERR_UNKNOWNFUNC, "Bola nájdená neznáma funkcia."
+ IDS_STPAR_ERR_MISSINGPAREND, "Chýba ukončenie parametra funkcie (znak ')')."
+ IDS_STPAR_ERR_PAREXPECTED, "Parameter funkcie nebol nájdený (možno prebytočný znak ',')."
+ IDS_STPAR_ERR_MISSINGCOLUMNID, "Chýba identifikátor stĺpca."
+ IDS_STPAR_ERR_INVALIDCOLUMNID, "Neplatný identifikátor stĺpca."
+ IDS_STPAR_ERR_UNKNOWNCOLUMN, "Bol nájdený neznámy identifikátor stĺpca."
+ IDS_STPAR_ERR_GENERCOLUMN, "Stĺpec s typom ""Prípona"" alebo ""Typ"" nemôže byť použitý v pravidlách pre analýzu."
+ IDS_STPAR_ERR_MISSINGCOLIDEND, "Chýba ukončenie identifikátora stĺpca (znak '>')."
+ IDS_STPAR_ERR_MISSINGSTREND, "Chýba ukončenie reťazca (znak '""')."
+ IDS_STPAR_ERR_STRUNKNESCSEQ, "Neznáma postupnosť sekvencie použitá v reťazci (použitá postupnosť sekvencie ""\\\\"" pre znak opačná lomka)."
+ IDS_STPAR_ERR_INVALIDNUMBER, "Neplatné číslo."
+ IDS_STPAR_ERR_INVALVARORBOOL, "Bol nájdený neočakávaný znak (možno neplatný stav premennej alebo boolean hodnota)."
+ IDS_STPAR_ERR_UNKNOWNSTVAR, "Bol nájdený neznámy stav premennej."
+ IDS_STPAR_ERR_RIGHTPAREXPECT, "Operand práv nebol vo výraze nájdený."
+ IDS_STPAR_ERR_UNEXPSYORUNKNOP, "Bol nájdený neočakávaný znak alebo neznámy operátor."
+ IDS_STPAR_ERR_UNSUPEXPRESSION, "Nepodporovaný výraz. Je povolený len jeden operátor."
+ IDS_STPAR_ERR_UNEXPTYPESINEXP, "Nesprávne použitie operátora. Nezhoda v typoch operandov alebo neočakávané typy operandov."
+ IDS_STPAR_ERR_BADPARINFUNC, "Nesprávne použitie funkcie. Neočakávaný počet alebo typy parametrov."
+ IDS_STPAR_ERR_BADUSEOFCOLID, "Nesprávne použitie identifikátora stĺpca. Pred použitím musíte najskôr priradiť nejakú hodnotu stĺpcu."
+ IDS_STPAR_ERR_BADMONTH3STR, "Neplatný reťazec v trojznakovom mesiaci (formát: 12 trojznakových mesiacov sa oddeľuje medzerou)."
+ IDS_STPAR_ERR_MISSINGSTRPAR, "Chýba reťazec parametra (znak '""')."
+ IDS_STPAR_ERR_MISSINGRIGHTPAR, "Chýba ukončenie podvýrazu (znak ')')."
+ IDS_STPAR_ERR_INVALREGEXP, "Neplatný regulárny výraz: %s"
+ IDS_STPAR_ERR_INVALREGEXP2, "Neplatný regulárny výraz"
+ IDS_STPAR_ERR_BADMONTHTXTSTR, "Neplatný reťazec s textom mesiacov (formát: 12 mesiacov sa oddeľuje medzerou)."
+
+ IDS_STPAR_UNABLECOMPAUTODCOND, "Stav automatickej detekcie obsahuje chybu.\n\nChyba: %s"
+
+ IDS_LOGMSGUNKNOWNSRVTYPE, "Neznámy typ servera, nie je možné analyzovať text výpisu...\r\n"
+ IDS_UNKNOWNSRVTYPEINFO, "Nie je možné analyzovať výpis súborov a adresárov zo servera. V paneli bude zobrazený len čistý text výpisu.\n\nProsím skontrolujte naše web stránky pre novšiu verziu Sally. Ak používate poslednú verziu, založte prosím issue na https://github.com/0xeb/sally/issues a priložte raw výpis (ak nie je dôverný; pravý klik v paneli > Zobraziť Raw výpis > Uložiť ako). Prosím pomôžte nám s podporou ďalších typov serverov, ak je to možné."
+ IDS_LOGMSGUNKNOWNSRVTYPE2, "Nie je možné analyzovať text výpisu používajúci vybraný typ servera...\r\n"
+ IDS_UNKNOWNSRVTYPEINFO2, "Nie je možné analyzovať výpis súborov a adresárov zo servera. V paneli bude zobrazený len čistý text výpisu.\n\nSkúste vybrať iný typ servera alebo nechajte FTP klienta automaticky detegovať (použite tlačidlo Pokročilé v dialógu Pripojiť k FTP serveru)."
+ IDS_LOGMSGPARSEDBYSRVTYPE, "Text výpisu bol analyzovaný podľa ""%s"" typu servera...\r\n"
+ IDS_WAITWNDPARSINGLST, "Analýza výpisu súborov a adresárov zo servera, čakajte prosím..."
+
+ IDS_PLSTR_BLOCKSINSELFILES, "{!}<%s> blok{|1|y|4|ov} z <%s> vybran{ého súboru|1|ých súborov}"
+
+ IDS_INVALIDMEMCACHESIZE, "Limit veľkosti musí byť najmenej 100KB a najviac 1GB."
+ IDS_INVALIDRESUMEOVERLAP, "Počet overovaných bajtov môže byť najviac 1GB."
+
+// IDS_NOPATHACCESSINPANEL, "No path is accessible on this FTP server. Do you wish to disconnect from this server?"
+
+ IDS_LOGMSGKEEPALIVE, "Posielanie príkazu pre podržanie spojenia...\r\n"
+ IDS_FINISHINGKEEPALIVECMD, "Ukončovanie posielanie príkazu pre pridržanie spojenia, stlačte ESC na ukončenie..."
+ IDS_KEEPALIVECMDESC, "Chcete ukončiť posielanie príkazu pre podržanie spojenia? Spojenie s FTP serverom bude ukončené."
+ IDS_LOGMSGKEEPALIVECMDTIMEOUT, "Posielanie príkazu pre podržanie spojenia má časové zdržanie.\r\n"
+ IDS_LOGMSGOPENACTDATACONERROR, "Nie je možné pripraviť aktívne dátové spojenie.\r\n"
+ IDS_LOGMSGKAPASVNOTSUPPORTED, "Pasívny režim nie je podporovaný pre túto adresu.\r\n"
+ IDS_LOGMSGKASTOPPED, "Posielanie príkazov pre podržanie spojenia bolo zastavené...\r\n"
+ IDS_LOGMSGOPENACTDATACONERROR2, "Nie je možné pripojiť sa na proxy server.\r\n"
+
+ IDS_COPYFROMFTP, "Kopírovať %s z FTP servera do"
+ IDS_MOVEFROMFTP, "Presunúť %s z FTP servera do"
+ IDS_COPYTITLE, "Kopírovať"
+ IDS_MOVETITLE, "Presunúť"
+
+ IDS_DELETEFROMFTP, "Naozaj chcete odstrániť %s z FTP servera?"
+
+ IDS_CHATTRNOTUNIXSRV, "Príkaz zmeny atribútov na tomto serveri pravdepodobne nebude vykonaný. Toto funguje len na UNIX serveroch s tradičným povoľovacím modelom.\n\nNaozaj chcete použiť príkaz zmeny atribútov?"
+ IDS_CHANGEATTRSONFTP, "Zmeniť atribúty z %s na"
+ IDS_CHATTRNOTHINGTODO, "Nie je čo vykonať. Prosím vyberte zmenu atribútov pre súbory alebo adresáre."
+ IDS_CHATTRNUMVAL3DIGITS, "Číselná hodnota musí mať tri číslice."
+ IDS_CHATTRNOTHINGTODO2, "Nie je čo vykonať. Prosím vyberte zmenu niektorých atribútov."
+
+ IDS_MENUTRANSFERMODE, "&Režim prenosu"
+ IDS_MENUTRMODEAUTO, "&Automatický"
+ IDS_MENUTRMODEASCII, "A&SCII"
+ IDS_MENUTRMODEBINARY, "&Binárny"
+
+ IDS_OPERATIONSUSERPROMPT, "Spýtať sa užívateľa"
+ IDS_OPERATIONSAUTORENAME, "Použiť alternatívny názov"
+ IDS_OPERATIONSRESUME, "Pokračovať"
+ IDS_OPERATIONSRESUMEOROVERWR, "Pokračovať alebo prepísať"
+ IDS_OPERATIONSOVERWRITE, "Prepísať"
+ IDS_OPERATIONSSKIP, "Preskočiť"
+ IDS_OPERATIONSUSEEXISTINGDIR, "Použiť existujúci adresár"
+ IDS_OPERATIONSIGNORE, "Ignorovať"
+ IDS_OPERATIONSINBINMODE, "Použiť binárny režim"
+ IDS_OPERATIONSDELETE, "Odstrániť"
+
+ IDS_MASKS_HINT, "'*' použiť pre akýkoľvek počet znakov. '?' použiť pre akýkoľvek znak.\nPríklad: *.a? (.a1, anything.ai, atď)\nMasky sú oddelené bodkočiarkou. Príklad: *.txt;*.doc (a.txt, b.doc, atd)\nVyňaté masky sú umiestnené za '|'. Príklad: |*.txt;*.doc (čokoľvek okrem *.txt;*.doc)\nAk potrebujete bodkočiarku vnútri masky, zadajte ju dvakrát. Príklad: one;;mask"
+
+ IDS_OPERDLGDELETETITLE, "Odstránenie %s z %s"
+ IDS_OPERDLGCOPYDOWNLOADTITLE, "Kopírovanie %s z %s"
+ IDS_OPERDLGMOVEDOWNLOADTITLE, "Presun %s z %s"
+ IDS_OPERDLGCOPYUPLOADTITLE, "Kopírovanie %s do %s"
+ IDS_OPERDLGMOVEUPLOADTITLE, "Presun %s do %s"
+ IDS_OPERDLGCHATTRSTITLE, "Zmena atribútov %s na %s"
+
+ IDS_OPERDLGSRCPATH, "Zdrojová cesta:"
+ IDS_OPERDLGTGTPATH, "Cieľová cesta:"
+ IDS_OPERDLGPATH, "Cesta:"
+ IDS_OPERDLGCONFIRMCANCEL, "Naozaj chcete zrušiť operáciu?"
+ IDS_OPERDLGCLOSEBUTTON1, "Zatvoriť"
+ IDS_OPERDLGCLOSEBUTTON2, "Zrušiť"
+ IDS_OPERDLGCONFIRMCLOSE, "Niektoré časti operácie neboli úspešne dokončené.\n\nNaozaj chcete zatvoriť nedokončenú operáciu?"
+
+ IDS_OPERDLGCONS_ID, "ID"
+ IDS_OPERDLGCONS_ACTION, "Akcia"
+ IDS_OPERDLGCONS_STATUS, "Stav"
+
+ IDS_OPERDLGOPERS_DESCR, "Popis"
+ IDS_OPERDLGOPERS_STATUS, "Stav"
+
+ IDS_OPERDLGOPSTS_FINISHED, "Dokončené"
+ IDS_OPERDLGOPSTS_SKIPPED, "Preskočené: %s"
+ IDS_OPERDLGOPSTS_FAILED, "Chyba: %s"
+ IDS_OPERDLGOPSTS_WAITUSER, "Spýtať sa užívateľa: %s, čo vykonať?"
+ IDS_OPERDLGOPSTS_WAITING, "Čakám"
+ IDS_OPERDLGOPSTS_PROCESSING, "Spracúvam"
+ IDS_OPERDLGOPSTS_DELAYED, "Odložené: podpoložky ešte nie sú dokončené"
+ IDS_OPERDLGOPSTS_FORCEDTOFAIL, "Zlyhalo: podpoložky neboli úspešne dokončené"
+
+ IDS_OPERDOPDS_DELLINK, "Odstrániť spojenie %s z %s"
+ IDS_OPERDOPDS_DELFILE, "Odstrániť súbor %s z %s"
+ IDS_OPERDOPDS_DELDIR, "Odstrániť adresár %s z %s"
+ IDS_OPERDOPDS_CHATTREXPLDIR, "Prehľadať adresár %s z %s pre zmenu atribútov"
+ IDS_OPERDOPDS_RESLINK, "Vyriešiť spojenie %s z %s"
+ IDS_OPERDOPDS_COPY1, "Kopírovať %s%s z %s do %s v %s režime prenosu"
+ IDS_OPERDOPDS_COPY2, "Kopírovať %s%s z %s do %s ako %s v %s režime prenosu"
+ IDS_OPERDOPDS_MOVE1, "Presunúť %s%s z %s do %s v %s režime prenosu"
+ IDS_OPERDOPDS_MOVE2, "Presunúť %s%s z %s do %s ako %s v %s režime prenosu"
+ IDS_OPERDOPDS_ASCIITRMODE, "ASCII"
+ IDS_OPERDOPDS_BINARYTRMODE, "binárnom"
+ IDS_OPERDOPDS_SIZEINBLOCKS, "bloky"
+ IDS_OPERDOPDS_MOVEDELDIR, "Odstrániť adresár %s z %s po presunutí jeho obsahu"
+ IDS_OPERDOPDS_MOVEDELDIRLNK, "Odstrániť spojenie adresára %s z %s po presunutí jeho obsahu"
+ IDS_OPERDOPDS_COPYEXPLDIR, "Prehľadať adresár %s z %s na kopírovanie do %s ako %s"
+ IDS_OPERDOPDS_MOVEEXPLDIR, "Prehľadať adresár %s z %s na presunutie do %s ako %s"
+ IDS_OPERDOPDS_MOVEEXPLDIRLNK, "Prehľadať spojenie adresára %s z %s na presunutie do %s ako %s"
+ IDS_OPERDOPDS_CHATTRFILE, "Zmeniť atribúty súboru %s z %s na %s"
+ IDS_OPERDOPDS_CHATTRDIR, "Zmeniť atribúty adresára %s z %s na %s"
+ IDS_OPERDOPDS_CHATTREXPLDIRLNK, "Prehľadať spojenie adresára %s z %s na zmenu atribútov"
+ IDS_OPERDOPDS_DELEXPLDIR, "Prehľadať adresár %s z %s na odstránenie"
+
+ IDS_OPERDOPPR_OK, "Úspešné"
+ IDS_OPERDOPPR_LOWMEM, "Nedostatok systémových prostriedkov"
+ IDS_OPERDOPPR_CANTCRTGTFILE, "Cieľový súbor nie je možné vytvoriť alebo otvoriť, systémová chyba: %s"
+ IDS_OPERDOPPR_CANTCRTGTDIR, "Cieľový adresár nie je možné vytvoriť, systémová chyba: %s"
+ IDS_OPERDOPPR_TGTFILEEXISTS, "Cieľový súbor už existuje"
+ IDS_OPERDOPPR_TGTDIREXISTS, "Cieľový adresár už existuje"
+ IDS_OPERDOPPR_TRANSFERFAILED, "Prenos zlyhal"
+ IDS_OPERDOPPR_ASCIITRBINFILE, "ASCII režim prenosu je nastavený pre súbor s binárnym obsahom"
+ IDS_OPERDOPPR_UNKNOWNATTRS, "Niektoré z existujúcich atribútov (%s) nie je možné zachovať"
+ IDS_OPERDOPPR_UNKEXISTATTR, "neznámy"
+ IDS_OPERDOPPR_INVALIDPATHTODIR, "Cesta k adresáru je príliš dlhá alebo neplatná"
+ IDS_OPERDOPPR_UNABLETOCWD, "Nie je možné zmeniť pracovnú cestu, odpoveď servera:"
+ IDS_OPERDOPPR_UNABLETOPWD, "Nie je možné získať pracovnú cestu, odpoveď servera:"
+ IDS_OPERDOPPR_DIREXPLENDLESSLOOP, "Skúmanie tohto adresára, či nezačína slučkou"
+ IDS_OPERDOPPR_LISTENFAILURE, "Nie je možné pripraviť aktívne dátové spojenie: %s"
+ IDS_OPERDOPPR_INCOMPLLISTING1, "Nie je možné načítať celý zoznam súborov a adresárov zo servera, chyba: %s"
+ IDS_OPERDOPPR_INCOMPLLISTING2, "Nie je možné načítať celý zoznam súborov a adresárov zo servera, odpoveď servera:"
+ IDS_OPERDOPPR_UNABLETOPARSELISTING, "Nie je možné analyzovať zoznam súborov a adresárov zo servera"
+ IDS_OPERDOPPR_DIRISHIDDEN, "Adresár je skrytý"
+ IDS_OPERDOPPR_DIRISNOTEMPTY, "Adresár nie je prázdny"
+ IDS_OPERDOPPR_FILEISHIDDEN, "Súbor je skrytý"
+ IDS_OPERDOPPR_INVALIDPATHTOLINK, "Celý názov spojenia je príliš dlhý alebo neplatný"
+ IDS_OPERDOPPR_UNABLETORESOLVELNK, "Nie je možné zistiť, či je spojenie k adresáru alebo k súboru, odpoveď servera:"
+ IDS_OPERDOPPR_UNABLETODELFILE, "Nie je možné odstrániť súbor alebo spojenie, odpoveď servera:"
+ IDS_OPERDOPPR_UNABLETODELDIR, "Nie je možné odstrániť adresár, odpoveď servera:"
+ IDS_OPERDOPPR_UNABLETOCHATTRS, "Nie je možné zmeniť atribúty, odpoveď servera:"
+ IDS_OPERDOPPR_UNABLETORESUME, "Nie je možné pokračovať v prenose súboru (server nepodporuje nadviazanie prerušeného prenosu)"
+ IDS_OPERDOPPR_RESUMETESTFAILED, "Nie je možné pokračovať v prenose súboru, neočakávaný koniec súboru (súbor bol zmenený alebo server nemôže správne nadviazať, ak používate ASCII režim prenosu)"
+ IDS_OPERDOPPR_TGTFILEREADERROR, "Nie je možné čítať cieľový súbor, systémová chyba: %s"
+ IDS_OPERDOPPR_TGTFILEWRITEERROR, "Nie je možné zapísať cieľový súbor, systémová chyba: %s"
+ IDS_OPERDOPPR_INCOMPLDOWNLOAD1, "Nie je možné znovu získať súbor zo servera, chyba: %s"
+ IDS_OPERDOPPR_INCOMPLDOWNLOAD2, "Nie je možné znovu získať súbor zo servera, odpoveď servera:"
+ IDS_OPERDOPPR_UNABLETODELSRCFILE, "Nie je možné odstrániť zdrojový súbor alebo spojenie po úspešnom prenose, odpoveď servera:"
+
+ IDS_OPERDLGCOACT_STOPPING, "Zastavujem"
+ IDS_OPERDLGCOACT_LOOKFORWORK, "Hľadám operáciu na spracovanie"
+ IDS_OPERDLGCOACT_SLEEPING, "Nečinný"
+ IDS_OPERDLGCOACT_WAITFORUSER, "Čakám na pomoc užívateľa"
+ IDS_OPERDLGCOACT_DELLINK, "Odstraňujem spojenie %s"
+ IDS_OPERDLGCOACT_DELFILE, "Odstraňujem súbor %s"
+ IDS_OPERDLGCOACT_DELDIR, "Odstraňujem adresár %s"
+ IDS_OPERDLGCOACT_EXPLDIR, "Skúmam adresár %s"
+ IDS_OPERDLGCOACT_RESLINK, "Riešim spojenie %s"
+ IDS_OPERDLGCOACT_COPY, "Kopírujem %s"
+ IDS_OPERDLGCOACT_MOVE, "Presúvam %s"
+ IDS_OPERDLGCOACT_CHATTR, "Mením atribúty %s"
+
+ IDS_OPERDLGCOACT_PREPARING, "Pripravujem operáciu"
+ IDS_OPERDLGCOACT_CONNECTING, "Pripájam"
+ IDS_OPERDLGCOACT_WAITRECON, "Nie je možné pripojiť, čakám %d sekúnd na opakovanie (pokus č. %d z %d): %s"
+ IDS_OPERDLGCOACT_CONERROR, "Nie je možné pripojiť: %s"
+ IDS_OPERDLGCOACT_TIMELEFT, "zostávajúci čas:"
+ IDS_OPERDLGCOACT_WAITFORLIST, "Čakám na výpis cieľovej cesty"
+ IDS_OPERDLGCOACT_PAUSED, "Pozastavujem"
+
+ IDS_WORKERLOGHEADER, "Hostiteľ: ""%s"", port: %d.\r\nLog UID: %d, čas: %s.\r\n\r\n"
+ IDS_LOGMSGCONINWORKER, "\r\nSpojenie bolo oddelené z panelu na použitie pre operáciu...\r\n"
+ IDS_LOGMSGCONFROMWORKER, "\r\nSpojenie bolo vložené do panelu (bolo používané pre operáciu)...\r\n\r\n"
+ IDS_LOGMSGWORKERUSECON, "Použiť spojenie z panelu...\r\n\r\n"
+ IDS_LOGMSGWORKERRETCON, "Spojenie bolo vrátené do panelu...\r\n"
+
+ IDS_CANCELEXISTINGOPER, "Fronta ešte obsahuje nejaké nedokončené FTP operácie. Chcete operácie zrušiť?"
+
+ IDS_CLOSINGOPERCONS1, "Zatváranie spojenia používaného pre operáciu, stlačte ESC na ukončenie..."
+ IDS_CLOSINGOPERCONS2, "Zatváranie všetkých spojení používaných pre operáciu, stlačte ESC na ukončenie..."
+ IDS_CLOSINGOPERCONS3, "Zatváranie všetkých spojení používaných pre všetky operácie, stlačte ESC na ukončenie..."
+ IDS_TERMCONFOROPER1, "Chcete ukončiť spojenie používané pre operáciu?"
+ IDS_TERMCONFOROPER2, "Chcete ukončiť všetky spojenia používané pre operáciu?"
+ IDS_TERMCONFOROPER3, "Chcete ukončiť všetky spojenia používané pre všetky operácie?"
+
+ IDS_WANTTOSTOPCON, "Naozaj chcete zastaviť spojenie ""%d""?"
+
+ IDS_LOGMSGCMDTIMEOUT, "Odosielanie FTP príkazu má časové zdržanie.\r\n"
+ IDS_WORKERCONLOGHDR, "Pripojenie ""%s"" (%s) na port %d...\r\n\r\n"
+ IDS_WORKERWAITLOGTIM, "Čakanie na výzvu k prihláseniu má časové zdržanie.\r\n"
+ IDS_WORKERLOGPARCHANGED, "\r\n-----\r\n\r\nParametre prihlásenia sa zmenili alebo serverový certifikát (SSL) byl prijatý alebo overený.\r\n\r\n"
+ IDS_PRXSRVWORKERCONLOGHDR, "Adresa FTP servera: %s, port: %d, Užívateľ: %s\r\nNázov proxy servera: %s, typ: %s\r\nAdresa proxy servera: %s, port: %d, Užívateľ: %s\r\nPripojenie ""%s"" (%s) na port %d...\r\n\r\n"
+
+ IDS_WORKERGETIPERROR, "Chyba získavania IP adresy: %s"
+ IDS_WORKEROPENCONERR, "Chyba otvárania spojenia: %s"
+ IDS_WORKERUNKNOWNPROXYHOST, "Je vyžadovaná adresa proxy servera, ale nebola ešte určená"
+ IDS_WORKERUNKNOWNPROXYPASSWORD, "Je vyžadované heslo proxy servera, ale nebolo ešte určené"
+ IDS_WORKERUNKNOWNPASSWD, "Je vyžadované heslo, ale nebolo ešte určené"
+ IDS_WORKERUNKNOWNACCOUNT, "Je vyžadovaný účet, ale nebol ešte určený"
+ IDS_WORKERLOGINERR, "Chyba prihlásenia: %s"
+
+ IDS_SOLVEERRSUBJECT, "Všetky spojenia používané pre túto operáciu zdieľajú nasledujúce parametre."
+ IDS_SOLVEERRRETRY, "&Vždy skúsiť znova pripojenie (aj pri neustálej chybe prihlásenia)"
+ IDS_SOLVEERRREPLY, "Chyba popisu:"
+
+ IDS_CLOSINGDISKTHREAD, "Zatváram vlákna diskových operácií, stlačte ESC na ukončenie..."
+ IDS_CANCELDISKTHREAD, "Naozaj chcete ukončiť vlákna diskových operácií?\n\nUpozornenie: po ukončení tohto vlákna môžu na disku zostať nejaké súbory."
+
+ IDS_SIED_TITLE1, "Chyba vytvárania cieľového adresára"
+ IDS_SIED_TITLE2, "Cieľový adresár už existuje"
+ IDS_SIED_TITLE3, "Chyba vytvárania cieľového súboru"
+ IDS_SIED_TITLE4, "Cieľový súbor už existuje"
+ IDS_SIED_TITLE5, "Prenos zlyhal"
+ IDS_SIED_TITLE6, "Cieľový adresár alebo spojenie s adresárom už existuje"
+ IDS_SIED_TITLE7, "Chyba vytvárania cieľového súboru s alternatívnym názvom"
+ IDS_SISE_TITLE1, "Potvrdenie odstránenia skrytého adresára"
+ IDS_SISE_TITLE2, "Potvrdenie odstránenia skrytého súboru"
+ IDS_SISE_TITLE3, "Potvrdenie odstránenia neprázdneho adresára"
+ IDS_SSCD_TITLE1, "Chyba zmeny pracovnej cesty na serveri"
+ IDS_SSCD_TITLE2, "Chyba získania pracovnej cesty na serveri"
+ IDS_SSCD_TITLE3, "Chyba čítania zoznamu súborov a adresárov zo servera"
+ IDS_SSCD_TITLE4, "Chyba prípravy aktívneho dátového spojenia"
+ IDS_SSCD_TITLE5, "Chyba zisťovania spojenia"
+ IDS_SSCD_TITLE6, "Chyba zmeny atribútov"
+ IDS_SSCD_TITLE7, "Chyba odstránenia súboru alebo spojenia"
+ IDS_SSCD_TITLE8, "Chyba odstránenia adresára"
+ IDS_SSCD_TITLE9, "Chyba výpisu cieľovej cesty"
+ IDS_SSCD_TITLE10, "Chyba čítania zoznamu súborov a adresárov z disku"
+ IDS_SSCD_TITLE11, "Chyba otvárania zdrojového súboru"
+ IDS_SSCD_TITLE12, "Chyba čítania zdrojového súboru"
+ IDS_SCRD_TITLE1, "Chyba analýzy zoznamu súborov a adresárov zo servera"
+ IDS_SCRD_TITLE2, "Cieľový súbor je zamknutý inou operáciou"
+ IDS_SCRD_TITLE3, "Zdrojový súbor je zamknutý inou operáciou"
+ IDS_SSCD2_TITLE1, "Chyba pokračovania súboru"
+ IDS_SSCD2_TITLE2, "Chyba čítania cieľového súboru"
+ IDS_SSCD2_TITLE3, "Chyba zápisu cieľového súboru"
+ IDS_SSCD2_TITLE4, "Chyba získavania súboru zo servera"
+ IDS_SSCD2_TITLE5, "Chyba odstránenia zdrojového súboru po úspešnom prenose"
+ IDS_SIED_TITLE8, "Chyba ukladania súboru na server"
+ IDS_SSCD2_TITLE7, "Chyba testovania súboru"
+
+ IDS_SIED_DETAIL1, "Cieľový súbor bol vytvorený alebo prepísaný."
+ IDS_SIED_DETAIL2, "Cieľový súbor bol nadviazaný."
+ IDS_SSCD2_UNABLETORESUME, "Server pravdepodobne nepodporuje nadviazanie prerušeného prenosu"
+ IDS_SSCD2_RESUMETESTFAILED, "Neočakávaný koniec súboru. Súbor bol zmenený alebo server nemôže správne\r\nnadviazať, ak používate ASCII režim prenosu."
+
+ IDS_DRAGDROP_TGTNOTEXIST, "Cieľová cesta neexistuje a vytvorenie cieľovej cesty nie je podporované."
+ IDS_DRAGDROP_TGTARCORFS, "Kopírovanie a presun do archívov alebo pluginových súborových systémov nie je podporované."
+
+ IDS_OPERDLGCONNECTIONSIDLE, "žiadne prenos dát pre %s"
+ IDS_OPERDLGSTATUS1, "celková rýchlosť prenosu: %s/s"
+ IDS_OPERDLGSTATUS2, "%s z %s"
+ IDS_OPERDLGSTATUS3, "{!}%d z %d operác{ia|1|ií}"
+ IDS_OPERDLGSTATUS4, "{!}%d operác{ia|1|ie|4|ií} s neznámou veľkosťou"
+ IDS_OPERDLGSTATUS5, "{!}%d {chyba|1|chyby|4|chýb}"
+ IDS_OPERDLGTIMLEFTWAIT, "(čakám na užívateľa)"
+ IDS_OPERDLGTIMLEFTDONE, "(hotovo)"
+ IDS_OPERDLGCONNECTIONSIDLE2, "nečinný pre %s"
+
+ IDS_OPERDLGTITLE_DONE, "hotovo"
+ IDS_OPERDLGTITLE_ERRORS, "chyby"
+ IDS_OPERDLGTITLE_STOPPED, "zastavený"
+ IDS_OPERDLGTITLE_PAUSED, "pozastavený"
+ IDS_OPERDLGTITLE_WAITING, "čakanie"
+
+ IDS_LOWDISKSPACEONTGTPATH, "V cieľovej ceste nie je dostatok voľného miesta.\nVyžadované miesto: %s\nDostupné miesto: %s\nChýbajúce miesto na disku: %s"
+
+ IDS_NEEDPARSEDLISTING, "Táto operácia nie je pripravená, aby pracovala bez riadne analyzovaného zoznamu súborov a adresárov zo servera."
+
+ IDS_DOWNLOADFILEERROR, "Nie je možné stiahnuť súbor zo servera.\n\nNázov: %s\nCesta: %s\n"
+ IDS_DOWNLOADFILEERRORSUFIX1, "Chyba: %s"
+ IDS_DOWNLOADFILEERRORSUFIX2, "Odpoveď servera: %s"
+ IDS_DOWNLOADFILEERRORSUFIX3, "Chyba zápisu cieľového súboru: %s"
+ IDS_DOWNLOADFILEERRORSUFIX4, "Chyba: súbor je zamknutý inou operáciou."
+
+ IDS_HOMEDIRNOTDEFINED, "Máte zadaný domovský adresár ako cieľovú cestu, ale pre toto spojenie na FTP server\nnie je zadaný domovský adresár. Prosím zadajte nejakú inú cieľovú cestu na FTP server."
+ IDS_INVALIDPATH, "Zadaná cesta je neplatná."
+ IDS_COPYMOVE_NONSENSE, "Táto operácia pravdepodobne nemá žiadny zmysel. Všetky vybrané súbory a adresáre majú rovnaký cieľový názov (prepíšu samy seba).\nChcete pokračovať v tejto operácii?"
+
+ IDS_OPERDOPPR_UPLCANTCRTGTDIRINV, "Cieľový adresár nie je možné vytvoriť, jeho názov je neplatný na tomto serveri"
+ IDS_OPERDOPPR_UPLCANTCRTGTDIRFILEEX, "Cieľový adresár nie je možné vytvoriť, jeho názov sa už používa pre súbor alebo spojenie k súboru"
+ IDS_OPERDOPPR_UPLCANTCRTGTDIR, "Cieľový adresár nie je možné vytvoriť, odpoveď servera:"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH, "Nie je možné vypísať cieľovou cestu na server na zistenie kolízii v názve súboru"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH2, "Nie je možné vypísať cieľovú cestu na server na zistenie kolízií v názve súboru, odpoveď servera:"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH3, "Nie je možné vypísať cieľovú cestu na server na zistenie kolízií v názve súboru, chyba: %s"
+ IDS_OPERDOPPR_UPLCANTLISTSRCPATH, "Nie je možné vypísať cieľovú cestu, systémová chyba: %s"
+ IDS_OPERDOPPR_UPLCRDIRAUTORENFAILED, "Nie je možné vytvoriť cieľový adresár s alternatívnym názvom, odpoveď servera:"
+ IDS_OPERDOPPR_UPLCANTDELSRCDISKDIR, "Nie je možné odstrániť adresár, systémová chyba: %s"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILEINV, "Cieľový súbor nie je možné vytvoriť alebo otvoriť, jeho názov je neplatný na tomto serveri"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILEDIREX, "Cieľový súbor nie je možné vytvoriť alebo otvoriť, jeho názov sa už používa pre adresár alebo spojenie k adresáru"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILE, "Cieľový súbor nie je možné vytvoriť alebo otvoriť, odpoveď servera:"
+ IDS_OPERDOPPR_UPLCANNOTOPENSRCFILE, "Zdrojový súbor nie je možné otvoriť, systémová chyba: %s"
+ IDS_OPERDOPPR_UPLTGTFILEEXISTS, "Cieľový súbor alebo spojenie k súboru už existuje"
+ IDS_OPERDOPPR_UPLTGTDIREXISTS, "Cieľový adresár alebo spojenie k adresáru už existuje"
+ IDS_OPERDOPPR_SRCFILEINUSE, "Zdrojový súbor alebo spojenie je zamknuté inou operáciou"
+ IDS_OPERDOPPR_TGTFILEINUSE, "Cieľový súbor alebo spojenie je zamknuté inou operáciou"
+ IDS_OPERDOPPR_SRCFILEREADERROR, "Nie je možné čítať zdrojový súbor, systémová chyba: %s"
+ IDS_OPERDOPPR_INCOMPLUPLOAD1, "Nie je možné uložiť súbor na server, chyba: %s"
+ IDS_OPERDOPPR_INCOMPLUPLOAD2, "Nie je možné uložiť súbor na server, odpoveď servera:"
+ IDS_OPERDOPPR_UPLCANTDELSRCDISKFILE, "Nie je možné odstrániť zdrojový súbor po úspešnom prenose, systémová chyba: %s"
+ IDS_OPERDOPPR_UPLASCIIRESNOTSUP, "Pokračovanie nie je podporované v ASCII režime prenosu (rada: ak chcete pokračovať, odosielajte súbor v binárnom režime)"
+ IDS_OPERDOPPR_UPUNABLERESUNKSIZ, "Nie je možné pokračovať v prenose súboru, pretože veľkosť bajtu cieľového súboru je neznáma"
+ IDS_OPERDOPPR_UPUNABLERESBIGTGT, "Nie je možné pokračovať v prenose súboru, pretože cieľový súbor je väčší ako zdrojový súbor (súbor bol zmenený)"
+ IDS_OPERDOPPR_UPLFILEAUTORENFAILED, "Nie je možné vytvoriť súbor s alternatívnym názvom, odpoveď servera:"
+ IDS_OPERDOPPR_SKIPPEDBYUSER, "Preskočené užívateľom"
+ IDS_OPERDOPPR_UPLTESTIFFINNOTSUP, "Nie je možné získať veľkosť bajtu súboru, na otestovanie úspešného odoslania súboru (celý súbor bol odoslaný, ale server nepotvrdil prijatie tohto súboru)"
+
+ IDS_UPLERR_CANTCRTGTDIRINV, "Názov cieľového adresára je neplatný na tomto serveri."
+ IDS_UPLERR_CANTCRTGTDIRFILEEX, "Názov cieľového adresára sa už používa pre súbor alebo spojenie k súboru."
+ IDS_UPLERR_CANTCRTGTFILEINV, "Názov cieľového súboru je neplatný na tomto serveri."
+ IDS_UPLERR_CANTCRTGTFILEDIREX, "Názov cieľového súboru sa už používa pre adresár alebo spojenie k adresáru."
+ IDS_UPLERR_UPLCANTRESUMINASC, "Pokračovanie nie je podporované v ASCII režime prenosu.\r\nRada: ak chcete pokračovať, odošlite súbor znova v binárnom režime."
+ IDS_UPLERR_UPLCANTRESUMBIGTGT, "Nie je možné pokračovať v prenose súboru, pretože cieľový súbor je väčší ako zdrojový súbor\r\n(súbor bol zmenený)."
+ IDS_UPLERR_UPLTESTIFFINNOTSUP, "Nie je možné získať veľkosť bajtu súboru, pre test úspešného odoslania súboru\r\n(celý súbor bol odoslaný, ale server nepotvrdil prijatie tohto súboru)."
+
+ IDS_RENAME_FILEEXISTS, "Cieľový názov sa už používa pre súbor. Chcete ho prepísať?"
+ IDS_RENAME_DIREXISTS, "Cieľový názov sa už používa pre adresár. Chcete pokračovať?"
+ IDS_RENAME_UNABLETOGETLIST, "Nie je možné zistiť, či nie je cieľový názov už používaný. Chcete pokračovať?"
+ IDS_RENAME_FILEEXISTS2, "Cieľový názov sa už používa pre súbor. Chcete pokračovať?"
+
+ IDS_OPERDLGRESUMEBUTTON, "&Pokračovať"
+ IDS_OPERDLGRESUMECONBUTTON, "P&okračovať"
+
+ IDS_PROXYSERVER_NOTUSED, "Nepoužívaný (priame spojenie)"
+ IDS_PROXYSERVER_DEFAULT, "Predvolené (pozrite Konfigurácia/Predvolené)"
+ IDS_PROXYSERVER_USERDEF, "Užívateľom definovaný"
+ IDS_PROXYSERVER_SOCKS4, "SOCKS 4"
+ IDS_PROXYSERVER_SOCKS4A, "SOCKS 4A"
+ IDS_PROXYSERVER_SOCKS5, "SOCKS 5"
+ IDS_PROXYSERVER_HTTP11, "HTTP 1.1"
+ IDS_PROXYSERVER_SITE1, "SITE host:port"
+ IDS_PROXYSERVER_SITE2, "SITE host port"
+ IDS_PROXYSERVER_SITE3, "SITE user@host:port"
+ IDS_PROXYSERVER_SITE4, "SITE user@host port"
+ IDS_PROXYSERVER_OPEN, "OPEN host:port"
+ IDS_PROXYSERVER_TRANSPAR, "Transparentný"
+ IDS_PROXYSERVER_USER1, "USER user@host:port"
+ IDS_PROXYSERVER_USER2, "USER user@host port"
+ IDS_PROXYSERVER_USER3, "USER proxy-user@host:port"
+ IDS_PROXYSERVER_USER4, "USER user@host:port proxy-user"
+ IDS_PROXYSERVER_USER5, "USER user@proxy-user@host:port"
+
+ IDS_PRXSCRERR_INVSTART, "Skript musí začínať s ""Pripojiť na:""."
+ IDS_PRXSCRERR_HOSTEMPTY, "Hostiteľ nesmie byť prázdny."
+ IDS_PRXSCRERR_INVHOSTORPORT, "Zadaný neplatný hostiteľ alebo port (používajte formát ""host"" alebo ""host:port"")."
+ IDS_PRXSCRERR_UNKNOWNVAR, "Skript obsahuje neznámu premennú."
+ IDS_PRXSCRERR_HOSTVARSONLY, "Tu môžete použiť len $(ProxyHost) alebo $(Host) premenné."
+ IDS_PRXSCRERR_INVPORT, "Port môžete nastaviť len ako číslo alebo ako $(ProxyPort) alebo $(Port) premennú."
+ IDS_PRXSCRERR_3XXONFIRSTLINE, "Nemôžete používať ""3xx:"" podmienku pre prvý príkaz, je potrebný nejaký predošlý príkaz (typicky ""USER"")."
+ IDS_PRXSCRERR_NONECMDS, "Proxy skript musí obsahovať aspoň jeden príkaz."
+ IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
+ IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+
+ IDS_EDITPROXYSRVTITLE, "Úpravy proxy servera"
+ IDS_PORTISUSHORT, "Číslo portu musí byť v rozsahu 1 až 65535."
+ IDS_INVPROXYNAME, "Zadaný proxy názov je buď prázdny alebo používaný pre nejaký iný proxy server. Prosím zmeňte názov."
+ IDS_INVPROXYADDRESS, "Proxy adresa nemôže obsahovať znak ':' (rada: zadajte číslo portu do ďalšieho poľa)."
+ IDS_EMPTYPROXYADDRESS, "Proxy adresa nemôže byť prázdna."
+ IDS_EMPTYUSERFORTRANSPRX, "Transparentné proxy s prázdnym menom užívateľa nemá zmysel. Prosím zadajte užívateľské meno alebo pripojte bez nastavenia proxy servera."
+
+ IDS_WANTDELPRXSRV, "Naozaj chcete odstrániť ""%s"" proxy server?"
+
+ IDS_ENTERPRXHOSTTITLE, "Zadajte adresu proxy servera"
+ IDS_ENTERPRXHOSTTEXT, "&Adresa proxy servera (pridať číslo portu po ':' ak je potrebné):"
+ IDS_ENTERPRXPASSTITLE, "Zadajte heslo proxy servera"
+ IDS_ENTERPRXPASSTEXT, "&Heslo proxy servera:"
+
+ IDS_INCOMPLETEPRXSCR, "Proxy skript je pravdepodobne neúplný. Pozrite sa na odpoveď servera na posledný príkaz skriptu pre detaily.\r\n\r\nOdpoveď servera: %s"
+ IDS_INCOMPLETEPRXSCR2, "Proxy skript je pravdepodobne neúplný. Všetky príkazy zo skriptu boli preskočené."
+ IDS_INCOMPLETEPRXSCR3, "Proxy skript je pravdepodobne neúplný. Pozrite sa na odpoveď servera na posledný príkaz skriptu pre detaily: %s"
+
+ IDS_PROXYERRREJORFAIL, "Pripojenie bolo odmietnuté alebo zlyhalo."
+ IDS_PROXYERRNEEDIDENTD, "Nie je možné pripojiť identd na klienta (pravdepodobne potrebujete nainštalovať službu identd)."
+ IDS_PROXYERRDIFFUSERS, "Pripojenie bolo odmietnuté, pretože proxy užívateľské meno a užívateľské meno je vrátil identd ako rozdielne."
+ IDS_PROXYERRINVHOST, "Pripojenie z neznámej IP adresy nemôže byť prijaté."
+
+ IDS_PROXYERRGETIP, "Chyba získavania IP adresy z ""%s"": %s"
+ IDS_PROXYERRSENDREQ, "Chyba posielania žiadosti na proxy server: %s"
+ IDS_PROXYERRRECVREP, "Chyba prijímania odpovede z proxy servera: %s"
+ IDS_PROXYERROPENCON, "Proxy server nie je schopný otvoriť spojenie na FTP server ""%s"" (port: %d), chyba: %s"
+ IDS_PROXYERRUNABLETOCON, "Nie je možné pripojiť sa na proxy server."
+ IDS_PROXYERROPENACTDATA, "Nie je možné pripojiť sa na proxy server alebo proxy server odmietol otvorenie aktívneho dátového spojenia."
+ IDS_PROXYERRUNABLETOCON2, "Nie je možné pripojiť sa na proxy server, chyba: %s"
+ IDS_PROXYERRNOAUTHUNSUP, "Proxy server odmietol anonymného užívateľa, prosím pridajte Vaše užívateľské meno a heslo do definície proxy servera."
+ IDS_PROXYERRUSERPASSAUTHUNSUP, "Proxy server nepodporuje overenie mena užívateľa+hesla, prosím skúste anonymný prístup (odstráňte užívateľské meno a heslo z definície proxy servera)."
+ IDS_PROXYERRUSERPASSFAIL, "Proxy server odmietol Vaše užívateľské meno a heslo."
+ IDS_PROXYERRLISTENUNSUP, "Proxy server nepodporuje otvorenie aktívneho dátového spojenia."
+
+ IDS_LOGMSGDELETEFILE, "Odstránenie súboru ""%s""...\r\n"
+ IDS_LOGMSGDELETELINK, "Odstránenie spojenia ""%s""...\r\n"
+ IDS_LOGMSGDELETEDIR, "Odstránenie adresára ""%s""...\r\n"
+ IDS_LOGMSGDELETEDIRLINK, "Odstránenie adresárového spojenia ""%s""...\r\n"
+ IDS_LOGMSGCHATTRSFILE, "Zmena atribútov súboru ""%s""...\r\n"
+ IDS_LOGMSGCHATTRSDIR, "Zmena atribútov adresára ""%s""...\r\n"
+ IDS_LOGMSGEXPLORINGDIR, "Skúmanie adresára ""%s"" na ceste ""%s""...\r\n"
+
+ IDS_PROXYERRGENFAIL, "Verejný SOCKS server zlyhal."
+ IDS_PROXYERRRULESET, "Pripojenie nepovolené sadou pravidiel."
+ IDS_PROXYERRNETUNR, "Sieť nedostupná."
+ IDS_PROXYERRHOSTUNR, "Hostiteľ nedostupný."
+ IDS_PROXYERRCONREF, "Pripojenie odmietnuté."
+ IDS_PROXYERRTTLEXP, "TTL vypršalo."
+ IDS_PROXYERRCMDNOTSUP, "Nepodporovaný príkaz."
+ IDS_PROXYERRADRTYPEUNSUP, "Nepodporovaný typ adresy."
+
+ IDS_HTTPNEEDPASSIVETRMODE, "Typ Vášho predvoleného proxy servera je HTTP 1.1. Ten podporuje len pasívny režim prenosu. Prosím zmeňte Váš predvolený režim prenosu na pasívny (alebo zmeňte Váš predvolený proxy server)."
+ IDS_HTTPNEEDPASSIVETRMODE2, "Ste pripojení na FTP server cez proxy server. Typ tohto proxy servera je HTTP 1.1. Ten podporuje len pasívny režim prenosu. Prosím zmeňte Váš predvolený režim prenosu na pasívny (stlačte tlačidlo Pokročilé, pozrite sa na zaškrtávacie políčko pri Použiť pasívny režim prenosu)."
+ 
+ IDS_HINTLISTHIDDENFILES, "Ak si prajete vždy vypísať skryté súbory a adresáre na tomto FTP serveri, choďte do ponuky Pluginy/FTP klient/Pripojiť na FTP server, nájdite tento server v záložkách, stlačte tlačidlo Pokročilé a nastavte príkaz pre výpis na ""LIST -a""."
+ IDS_DONOTSHOWHINTLISTHF, "&Nabudúce nezobrazovať\tAko vrátiť späť\tTúto voľbu môžete neskôr zmeniť v FTP konfigurácii na stránke Potvrdenia"
+ 
+ IDS_LOGMSGUNABLETORESUME, "Nie je možné pokračovať v prenose súboru, pretože zlyhalo overovanie jeho konca (súbor bol zmenený).\r\n"
+ IDS_LOGMSGOVERWRTGTFILE, "Skúšam prepísať cieľový súbor (kopírovať/presunúť znova celý súbor).\r\n"
+ IDS_LOGMSGRESUMEUSELESS, "Príliš malý súbor pre pokračovanie, cieľový súbor bude prepísaný.\r\n"
+ IDS_LOGMSGRESUMEFROMBEG, "Pokračovanie: získavam súbor od začiatku pre overenie už stiahnutej časti.\r\n"
+ IDS_LOGMSGRESUMENOTSUP, "Nie je možné pokračovať v prenose súboru (server nepodporuje nadviazanie prerušeného prenosu).\r\n"
+ IDS_LOGMSGUNABLETORESUME2, "Nie je možné pokračovať v prenose súboru, pretože je menší ako už skopírovaná/presunutá časť súboru (súbor bol zmenený).\r\n"
+ IDS_LOGMSGUPLRESUMENOTSUP, "Nie je možné pokračovať v prenose súboru (server nepodporuje nadviazanie prerušeného prenosu alebo odosielate v ASCII režime prenosu).\r\n"
+ IDS_LOGMSGUPLUNABLETOGETSIZE, "Nie je možné získať veľkosť (v bajtoch) už skopírovanej/presunutej časti cieľového súboru.\r\n"
+ IDS_LOGMSGUPLRESUMEERR, "Nie je možné pokračovať v prenose súboru (neočakávaná chyba).\r\n"
+ IDS_LOGMSGUPLNOTCONFIRMED, "Bol odoslaný celý súbor, ale server nepotvrdil jeho prijatie.\r\nChystám sa získať veľkosť súboru (v bajtoch), pre test úspešného kopírovania/presunutia súboru.\r\n"
+
+ IDS_SSL_ERR_OPENSSLNOTFOUND "Nie je možné nájsť alebo zaviesť knižnice OpenSSL potrebné na šifrovanie.\r\nPotrebujete súbory ssleay32.dll a libeay32.dll.\r\nSú súčasťou inštalácie Sally."
+ IDS_SSL_ERR_NEW "Nie je možné priradiť OpenSSL riadiacu štruktúru. Nedostatok pamäti."
+ IDS_SSL_ERR_NEW_LOG "SSL CHYBA: Nie je možné priradiť OpenSSL riadiacu štruktúru. Nedostatok pamäti.\r\n"
+ IDS_SSL_ERR_CONNECT "Nie je možné nadviazať šifrované spojenie (SSL).\n\nChyba: %s"
+ IDS_SSL_ERR_CONNECT_ERR "SSL_connect vrátil %d: %s"
+ IDS_SSL_ERR_CONNECT_LOG "SSL CHYBA: Nie je možné nadviazať šifrované spojenie, SSL_connect vrátil %d: %s\r\n"
+ IDS_SSL_ERR_CONTRENCUNSUP "Server nepodporuje šifrovanie pre riadenie spojenia.\nAUTH TLS príkazu server nerozumel."
+ IDS_SSL_ERR_DATAENCUNSUP "Server nepodporuje šifrovanie pre dáta spojenia."
+ IDS_SSL_ERR_NOTYETVALID "Serverový certifikát nie je platný."
+ IDS_SSL_ERR_EXPIRED "Serverový certifikát vypršal."
+
+ IDS_SSL_SECURITY_OK "Komunikácia je šifrovaná a identita servera overená"
+ IDS_SSL_SECURITY_UNVERIFIED "Komunikácia je šifrovaná, ale identita servera nie je overená"
+
+ IDS_SSL_LOG_ALGO "SSL INFO: %s %s %d bitov\r\n"
+ IDS_SSL_LOG_OSSL_CERT_VERIFY "SSL INFO: OpenSSL cert overená s výsledkom: %d\r\n"
+ IDS_SSL_LOG_ISSUER "SSL INFO: certifikát vydaný pre %s\r\n"
+ IDS_SSL_LOG_SUBJECT "SSL INFO: certifikát vydal %s\r\n"
+
+ IDS_SSL_LOG_CERTVERIFIED "Serverový certifikát bol overený.\r\n"
+ IDS_SSL_LOG_CERTNOTVERIFIED, "Overenie serverového certifikátu zlyhalo.\r\n"
+ IDS_SSL_LOG_CERTACCEPTED "Serverový certifikát bol prijatý užívateľom (ale identita servera nie je overená).\r\n"
+ IDS_SSL_LOG_CERTREJECTED "Serverový certifikát nebol prijatý užívateľom, zatváram spojenie.\r\n"
+ IDS_SSL_LOG_CERTCHANGED, "Serverový certifikát bol zmenený.\r\n"
+
+ IDS_MODEZ_LOG_UNSUPBYSERVER "INFO: Server nepodporuje MODE Z -> komprimácia vypnutá\r\n"
+ 
+ IDS_LISTCOMMANDERROR, "Nie je možné načítať zoznam súborov a adresárov zo servera.\n\nChyba: %s"
+ IDS_DOWNLOADONEFILEERROR, "Nie je možné stiahnuť súbor zo servera.\n\nChyba: %s"
+ IDS_SSLNEWUNVERIFIEDCERT, "Serverový certifikát bol zmenený a jeho overenie zlyhalo."
+
+ IDS_SAVEPASSWORD_PROTECTED, "zabezpečené hlavným heslom"
+ IDS_PASSWORD_UNSECURED, "Niektoré FTP hesla nie sú zabezpečené. Prosím zadajte hlavné heslo do nasledujúceho dialógového okna.\n\nPoznámka: ak kliknete na tlačidlo Zrušiť, tieto heslá budú uložené bez zabezpečenia."
+ IDS_CANNOT_DECRYPT_SOMEPASSWORDS, "Niektoré FTP heslá nie je možné dešifrovať.\n\nHeslá boli pravdepodobne zašifrované použitím iného hlavného hesla.\nSkúste zmeniť hlavné heslo na dešifrovanie týchto hesiel."
+ IDS_CANNOT_DECRYPT_PASSWORD_DELETE, "Heslo nie je možné dešifrovať.\n\nHeslo bolo pravdepodobne zašifrované použitím iného hlavného hesla.\nSkúste zmeniť hlavné heslo na dešifrovanie tohto hesla.\nEventuálne môžete heslo odstrániť.\n\nChcete odstrániť toto heslo?"
+ IDS_CLEARPASSWORD_CONFIRMATION, "Naozaj chcete odstrániť toto heslo?"
+ IDS_SHOWPASSWORD_CONFIRMATION, "Naozaj chcete zobraziť toto heslo?"
+ IDS_PASSWORDIS, "Heslo je: %s\n\nChcete nakopírovať heslo do schránky?"
+ IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
+ IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
+ IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
+ IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
+ IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
+ IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+}

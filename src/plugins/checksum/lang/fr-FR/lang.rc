@@ -1,0 +1,126 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for checksum. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checksum/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checksum.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CALCULATE DIALOGEX 0, 0, 374, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+CAPTION "Calcul des checksums"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Liste1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,364,54
+    LTEXT           "Calcul en cours:",IDC_LABEL,5,68,56,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,64,68,91,8
+    PUSHBUTTON      "Con&figurer...",IDC_BUTTON_CONFIGURE,162,65,65,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Sauvegarder...",IDC_BUTTON_SAVE,233,65,65,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Arrêter",IDC_BUTTON_CLOSE,304,65,65,14,WS_CLIPSIBLINGS
+    LTEXT           "astuce presse-papier",IDC_LABEL_HINT,5,68,72,8,WS_CLIPSIBLINGS
+END
+
+IDD_VERIFY DIALOGEX 0, 0, 260, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,250,54
+    LTEXT           "Vérification:",IDC_LABEL,5,68,42,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,50,68,93,8
+    LTEXT           "",IDC_LABEL_RESULT,5,68,140,8,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Cibler",IDC_BUTTON_FOCUS,149,65,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Arrêt",IDC_BUTTON_CLOSE,205,65,50,14,WS_CLIPSIBLINGS
+END
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 189, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuration du Checksum"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Calcul des checksums ",IDC_STATIC_1,8,5,174,76,WS_GROUP
+    CONTROL         "&CRC/SFV",IDC_CFG_CRC,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,15,16,105,10
+    CONTROL         "&MD5",IDC_CFG_MD5,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,28,105,10
+    CONTROL         "SHA-&1",IDC_CFG_SHA1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,40,105,10
+    CONTROL         "SHA-&256",IDC_CFG_SHA256,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,52,105,10
+    CONTROL         "SHA-&512",IDC_CFG_SHA512,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,64,105,10
+    DEFPUSHBUTTON   "OK",IDOK,14,88,50,14,WS_GROUP
+    PUSHBUTTON      "Annuler",IDCANCEL,69,88,50,14
+    PUSHBUTTON      "Aide",IDHELP,124,88,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "Checksum"
+ IDS_ABOUTTITLE "A propos du module"
+ IDS_PLUGIN_DESCRIPTION "Vérification et calcul de checksums SFV, MD5, SHA-1, SHA-256, et SHA-512."
+ IDS_OUTOFMEM "Mémoire insuffisante"
+ IDS_ERROROPENING, "Erreur d'ouverture de fichier"
+ IDS_READERROR "Erreur de lecture"
+ IDS_WRITEERROR "Erreur d'écriture"
+ IDS_SKIPPED "Ignoré"
+ IDS_CALCULATING "Calcul en cours..."
+ IDS_CANCELED "Annulé"
+ IDS_HINT "Cliquez droit sur un élément pour copier un checksum dans le presse-papier."
+ IDS_COPYTOCBOARD_CRC "Copier la valeur &CRC dans le presse-papier\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "Copier la valeur du checksum &MD5 dans le presse-papier\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "Copier la valeur du checksum SHA-&1 dans le presse-papier\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "Copier la valeur du checksum SHA-&256 dans le presse-papier\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "Copier la valeur du checksum SHA-&512 dans le presse-papier\tCtrl+5"
+ IDS_REMOVEITEM "&Suppression de l'élément\tSupprimer"
+ IDS_SAVE_TITLE  "Enregistrer le fichier Checksum"
+ IDS_SAVE_FILTER_CRC  "Fichiers SFV (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "Fichiers MD5 (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "Fichiers SHA-1 (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "Fichiers SHA-256 (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "Fichiers SHA-512 (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "Le fichier '%s' existe déjà.\nVoulez-vous l'écraser?"
+ IDS_ERRORCREATINGFILE "Erreur de création de fichier."
+ IDS_SKIPPEDFILES "Les fichiers ignorés ou annulés pendant le calcul n'ont pas été enregistrés."
+ IDS_ERROROPENING2 "Erreur d'ouverture du fichier '%s'."
+ IDS_MISSING "Manquant"
+ IDS_BADEXT "Le fichier sélectionné n'a pas d'extension SFV, MD5, SHA1, SHA256 ou SHA512. Voulez-vous tout de même poursuivre?"
+ IDS_BADFILE "Le fichier sélectionné n'est pas un fichier SFV, MD5, SHA-1, SHA-256, ou SHA-512."
+ IDS_VERIFYING "Vérification en cours..."
+ IDS_OK "OK"
+ IDS_CORRUPT "Corrompu"
+ IDS_MENU_CALCULATE "&Calcul des Checksums en cours..."
+ IDS_MENU_VERIFY "&Vérification des Checksums en cours..."
+ IDS_CONFIG_CONFLICT "La configuration est déjà ouverte."
+ IDS_CONFIG_CHANGES_EFFECT "Les modifications seront prises en compte lors de la prochaine ouverture de la fenêtre 'Calcul des Checksums'."
+ IDS_ALLOK "Tous les fichiers sont OK"
+ IDS_RESULT "%d corrompu(s), %d manquant(s), %d ignoré(s)"
+ IDS_BUSY "Sally est occupé. La commande demandée ne peut être lancée, veuillez recommencer plus tard."
+ IDS_CLOSE "&Fermer"
+ IDS_READINGTREE "Lecture de l'arborescence, veuillez patienter..."
+ IDS_ERRORREADINGDIR "Erreur de lecture du répertoire"
+ IDS_NOFILES "Pas de fichiers"
+ IDS_VERIFYTITLE "Vérification des Checksums"
+ IDS_VERIFY_CRC "Vérification de CRC"
+ IDS_VERIFY_MD5 "Vérification de MD5"
+ IDS_VERIFY_SHA1 "Vérification de SHA-1"
+ IDS_VERIFY_SHA256 "Vérification de SHA-256"
+ IDS_VERIFY_SHA512 "Vérification de SHA-512"
+ IDS_COLUMN_FILE "Fichier"
+ IDS_COLUMN_SIZE "Taille"
+ IDS_COLUMN_STATUS "Etat"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "Impossible de terminer l'opération en raison d'un nom trop long."
+}

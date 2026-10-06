@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "compat/LegacyPrintfFormat.h"
+#include "narrow_printf_format.h"
 
 #include <string>
 
@@ -564,7 +564,7 @@ public:
     {
         va_list args;
         va_start(args, format);
-        const std::wstring formatW = sally::compat::WidenLegacyPrintfFormat(format);
+        const std::wstring formatW = sally::debug::WidenNarrowPrintfFormat(format);
 #if (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
         SalamanderDebug->Push(format != NULL ? formatW.c_str() : NULL, args, &CallStkMsgContext, doNotMeasureTimes);
 #else  // (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)

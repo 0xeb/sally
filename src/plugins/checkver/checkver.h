@@ -67,7 +67,7 @@ extern CInternetConnection InternetConnection; // how is the user connected to t
 extern CInternetProtocol InternetProtocol;     // how is the user connected to the internet?
 
 extern HINSTANCE DLLInstance; // handle to the SPL - language independent resources
-extern HINSTANCE HLanguage;   // handle to the SLG - language dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 
 extern HWND HMainDialog; // handle of the main dialog (NULL if it is closed)
 

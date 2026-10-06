@@ -60,16 +60,11 @@ jobs:
           if (!(Test-Path -LiteralPath "$runtime/sally.exe")) {
             throw "Missing $runtime/sally.exe"
           }
-          if (!(Test-Path -LiteralPath "$runtime/lang/english.slg")) {
-            throw "Missing $runtime/lang/english.slg"
-          }
           if (!(Test-Path -LiteralPath "$runtime/plugins/plugins.ver")) {
             throw "Missing $runtime/plugins/plugins.ver"
           }
           $expectedSuffix = "(${{ matrix.arch }})"
-          $versionedFiles = @("$runtime/sally.exe") +
-            @(Get-ChildItem -LiteralPath $runtime -Recurse -Filter english.slg -File |
-              Select-Object -ExpandProperty FullName)
+          $versionedFiles = @("$runtime/sally.exe")
           foreach ($file in $versionedFiles) {
             $fileVersion = (Get-Item -LiteralPath $file).VersionInfo.FileVersion
             if (!$fileVersion.EndsWith($expectedSuffix, [StringComparison]::Ordinal)) {

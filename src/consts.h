@@ -50,11 +50,8 @@ BOOL PostMouseWheelMessage(MSG* pMSG);
 // transition from "idle" to "busy" state. Can be called from any thread.
 BOOL SalamanderIsNotBusy(DWORD* lastIdleTime);
 
-// Opens Salamander or plug-in HTML help. The help language (directory with .chm files) is chosen as follows:
-// - directory obtained from the current Salamander .slg file (see SLGHelpDir in shared\versinfo.rc)
-// - HELP\ENGLISH\*.chm
-// - the first subdirectory found under HELP
-// 'helpFileName' is the .chm file name to work with (file name without path). If NULL, "sally.chm" is used.
+// Opens Salamander or plug-in help: the manual's page on the Sally website.
+// 'helpFileName' names the manual by its former .chm file name (file name without path). If NULL, "sally.chm" is used.
 // 'parent' is the parent for any error message box; 'command' is the HTML Help command, see HHCDisplayXXX;
 // 'dwData' is the parameter for the HTML Help command, see HHCDisplayXXX. Can be called from any thread.
 // If 'quiet' is TRUE, no error message is shown. Returns TRUE on success, otherwise FALSE.
@@ -828,6 +825,14 @@ BOOL SafeInvokeCommand(IContextMenu2* menu, CMINVOKECOMMANDINFO& ici);
 std::wstring LoadStrOwned(int resID, HINSTANCE hInstance = NULL);
 WCHAR* LoadStrW(int resID, HINSTANCE hInstance = NULL);
 
+// Reads string 'id' of language 'langID' from 'module', whatever language the process uses
+// (the language selector shows each language's own credits); empty if that language has no
+// such string.
+std::wstring LoadStrForLangW(HMODULE module, UINT id, LANGID langID);
+
+// The built-in languages 'module' carries: the LANGUAGEs of its IDS_LANGMETA_xxx string bundle.
+std::vector<LANGID> GetBuiltinLanguageIDs(HMODULE module);
+
 // Support for creating parameterized texts (handling singular and plural forms
 // in texts); 'lpFmt' is format string for result text - its format description
 // follows; result text is returned in buffer 'lpOut' of size 'nOutMax' bytes;
@@ -1249,8 +1254,6 @@ struct CFocusFileDataW
 
 #define WM_USER_FINDFULLROWSEL WM_APP + 412 // [0, 0] - find windows should set their list view to match Configuration.FindFullRowSelect variable
 
-#define WM_USER_SLGINCOMPLETE WM_APP + 414 // [0, 0] - notification that SLG is not completely translated, motivational text to encourage participation
-
 #define WM_USER_USERMENUICONS_READY WM_APP + 415 // [bkgndReaderData, threadID] - notification for main window that reading icons for User Menu completed in thread with ID 'threadID'
 
 // states for Shift+F1 help mode
@@ -1398,8 +1401,8 @@ extern HINSTANCE NtDLL;               // handle to ntdll.dll
 extern HINSTANCE Shell32DLL;          // handle to shell32.dll (icons)
 extern HINSTANCE ImageResDLL;         // handle to imageres.dll (icons - Vista+)
 extern HINSTANCE User32DLL;           // handle to user32.dll (DisableProcessWindowsGhosting)
-extern HINSTANCE HLanguage;           // handle to language-dependent resources (path: Configuration.LoadedSLGName)
-extern WORD LanguageID;               // language-id of language-dependent resources (.SLG file)
+extern HINSTANCE HLanguage;           // module with the language-dependent resources: sally.exe itself (every language is built in)
+extern WORD LanguageID;               // LANGID of the UI language Sally started in (Configuration.LoadedSLGName)
 
 extern BOOL UseCustomPanelFont; // if TRUE, Font and FontUL come from LogFont structure; otherwise from system font (default)
 extern HFONT Font;              // panel font
@@ -1554,9 +1557,7 @@ extern const wchar_t* SALAMANDER_VERSION_REG;
 extern const wchar_t* SALAMANDER_VERSIONREG_REG;
 extern const wchar_t* CONFIG_ONLYONEINSTANCE_REG;
 extern const wchar_t* CONFIG_LANGUAGE_REG;
-extern const wchar_t* CONFIG_ALTLANGFORPLUGINS_REG;
 extern const wchar_t* CONFIG_LANGUAGECHANGED_REG;
-extern const wchar_t* CONFIG_USEALTLANGFORPLUGINS_REG;
 extern const wchar_t* CONFIG_STATUSAREA_REG;
 extern const wchar_t* CONFIG_SHOWSPLASHSCREEN_REG;
 extern const wchar_t* CONFIG_ENABLECUSTICOVRLS_REG;
@@ -1577,7 +1578,6 @@ extern const wchar_t* SALAMANDER_PLUGINS_VERSION;
 extern const wchar_t* SALAMANDER_PLUGINS_COPYRIGHT;
 extern const wchar_t* SALAMANDER_PLUGINS_EXTENSIONS;
 extern const wchar_t* SALAMANDER_PLUGINS_DESCRIPTION;
-extern const wchar_t* SALAMANDER_PLUGINS_LASTSLGNAME;
 extern const wchar_t* SALAMANDER_PLUGINS_HOMEPAGE;
 //extern const char *SALAMANDER_PLUGINS_PLGICONS;
 extern const wchar_t* SALAMANDER_PLUGINS_PLGICONLIST;
@@ -1589,7 +1589,6 @@ extern const wchar_t* SALAMANDER_PLUGINS_REGKEYNAME;
 extern const wchar_t* SALAMANDER_PLUGINS_FSNAME;
 extern const wchar_t* SALAMANDER_PLUGINS_FUNCTIONS;
 extern const wchar_t* SALAMANDER_PLUGINS_LOADONSTART;
-extern const wchar_t* SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED;
 extern const wchar_t* SALAMANDER_PLUGINS_MENU;
 extern const wchar_t* SALAMANDER_PLUGINS_MENUITEMNAME;
 extern const wchar_t* SALAMANDER_PLUGINS_MENUITEMHOTKEY;
@@ -2163,10 +2162,6 @@ BOOL Use256ColorsBitmap();
 
 // restores focus in source panel (used when focus disappears - after disabling main window, etc.)
 void RestoreFocusInSourcePanel();
-
-#define ISSLGINCOMPLETE_SIZE 200
-extern wchar_t IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // matched forward to its
-                                                      // wide definition (sally_entry_lifecycle.cpp)
 
 //******************************************************************************
 // file name enumeration from panel/Find for viewers

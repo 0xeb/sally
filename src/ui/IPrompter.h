@@ -50,6 +50,8 @@ public:
     // Question with Yes/No and "don't show again" checkbox - returns kYes or kNo
     virtual PromptResult AskYesNoWithCheckbox(const wchar_t* title, const wchar_t* message,
                                               const wchar_t* checkboxText, bool* checkboxValue) = 0;
+    virtual PromptResult AskYesNoWithCheckbox(HWND parent, const wchar_t* title, const wchar_t* message,
+                                              const wchar_t* checkboxText, bool* checkboxValue);
 
     // Info with OK and "don't show again" checkbox
     virtual void ShowInfoWithCheckbox(const wchar_t* title, const wchar_t* message,

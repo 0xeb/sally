@@ -1,0 +1,213 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for undelete. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/undelete/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\undelete.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Wiederherstellen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,12,12,323,8
+    LTEXT           "",IDC_PROGRESSBAR,43,32,284,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Abbrechen",IDCANCEL,144,54,50,14
+    LTEXT           "Gesamt:",IDC_STATIC_1,12,33,30,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Wiederherstellen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Wählen Sie das zu analysierende &Laufwerk",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "&Festplattenimage",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,71,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,361,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Öffnen...",IDC_BUTTON_BROWSE,379,178,50,14,WS_GROUP
+    CONTROL         "Freie &Cluster auf FAT-Partitionen scannen",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,184,10
+    CONTROL         "&Bestehende Dateien und Verzeichnisse zeigen",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "Dateien mit &Größe Null zeigen",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "L&eere Verzeichnisse zeigen",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "&Metadateien zeigen",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "Beschädigte &Dateien abschätzen",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "OK",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 372, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Wiederherstellen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Wiederherstellen",IDC_LABEL_UNDELETING,4,11,58,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,66,11,301,8
+    RTEXT           "in",IDC_STATIC_1,4,23,58,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,66,23,301,8
+    RTEXT           "Datei:",IDC_STATIC_2,4,41,58,8
+    LTEXT           "",IDC_PROGRESS_FILE,66,40,293,12,NOT WS_GROUP
+    RTEXT           "Gesamt:",IDC_STATIC_3,4,56,58,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,66,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Abbrechen",IDCANCEL,161,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 285, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Beschädigter Dateiname"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Der erste Buchstabe des folgenden Dateinamens konnte nicht wiederhergestellt werden. Bitte geben Sie den ursprünglichen Buchstaben ein.",IDC_STATIC_1,7,7,272,16
+    EDITTEXT        IDC_EDIT_FILENAME,7,27,271,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,61,53,50,14
+    PUSHBUTTON      "&Alle",IDC_BUTTON_ALL,117,53,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,173,53,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 327, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Wiederherstellen - Konfiguration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Alternatives temporäres Verzeichnis zum Anzeigen der Dateien:",IDC_STATIC_1,7,7,219,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,292,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,305,17,16,14,WS_GROUP
+    CONTROL         "Informationen früherer &Clusterscans über FAT wiederverwenden",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,229,10
+    CONTROL         "Keine &Warnung beim Wiederherstellen in dasselbe logische Laufwerk",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,243,10
+    CONTROL         "&Keine Warnung beim Wiederherstellen von verschlüsselten Dateien in FAT oder exFAT",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,301,10
+    DEFPUSHBUTTON   "OK",IDOK,161,80,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,216,80,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,271,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 276, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Wiederherstellen verschlüsselter Dateien aus einem Backup"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Diese Funktion kopiert, zuvor verschlüsselte, wiederhergestellte Dateien in eine Partition ohne verschlüsseltem Dateisystem (EFS), wie z.B. FAT. Normale Dateien (ausgenommen *.bak) werden unverändert kopiert.",IDC_STATIC_1,7,7,262,24
+    LTEXT           "&Wiederherstellen %s nach:",IDC_LABEL_SOURCE,7,41,262,8
+    EDITTEXT        IDC_EDIT_TARGET,7,51,244,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,255,51,14,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,57,74,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,113,74,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,169,74,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_LOWMEM, "Nicht genügend Speicher."
+  IDS_ERRORREADINGMFT, "Fehler beim Lesen des MFT-Clusters."
+  IDS_MFTRECORDDAMAGED, "Fehler beim Lesen der MFT: Die erste Spur ist beschädigt."
+  IDS_ROOTNOTFOUND, "Kann das Wurzelverzeichnis nicht finden."
+  IDS_VDIRECTORY, "Verzeichnis%06d"
+  IDS_ALLDELETEDFILES, "{Alle gelöschten Dateien}"
+  IDS_ERRORNOTNTFS, "Interner Fehler: Partition ist kein NTFS."
+  IDS_ERRORNOTOPEN, "Interner Fehler: Partition ist nicht geöffnet."
+  IDS_ERROROPENINGVOLUME, "Fehler beim Öffnen des Laufwerks."
+  IDS_ERRORREADINGBOOT, "Fehler beim Lesen des Bootsektors."
+  IDS_ERRORVOLUMETYPE, "Unbekannter Laufwerkstyp, nur FAT12, FAT16, FAT32 und NTFS-Partitionen werden unterstützt."
+  IDS_READINGMFT, "Lese MFT..."
+  IDS_ERRORREADINGFAT, "Fehler beim Lesen der FAT."
+  IDS_ERRORREADINGDIRCLUSTERS, "Fehler beim Lesen des Verzeichnis-Clusters."
+  IDS_ERRORNOTFAT, "Interner Fehler: Das Laufwerk ist kein FAT."
+  IDS_LOADINGFAT, "Lese FAT..."
+  IDS_READINGDIRS, "Lese Verzeichnisse..."
+  IDS_READINGEXISTINGDIRS, "Lese existierende Verzeichnisse..."
+  IDS_READINGDELETEDDIRS, "Lese gelöschte Verzeichnisse..."
+  IDS_SCANNINGVACANTCLUSTERS, "Scanne leere Cluster..."
+  IDS_REUSESCANNEDINFO, "Möchten Sie die Informationen des letzten Clusterscans wiederverwenden?"
+  IDS_RELOADINGCLUSTERS, "Neuladen der vorherigen gefundenen Cluster..."
+  IDS_FLOPPY350, "3.5 Diskette"
+  IDS_FLOPPY525, "5.25 Diskette"
+  IDS_FLOPPY800, "8.0 Diskette"
+  IDS_COMPACT_DISK, "CD"
+  IDS_LOCAL_DISK, "Lokaler Datenträger"
+  IDS_REMOVABLE_DISK, "Entfernbarer Datenträger"
+  IDS_ANALYZINGDIRS, "Analysiere Verzeichnisse..."
+  IDS_INCOMPLETEMFT, "Das Plugin war nicht in der Lage die gesamte MFT (Master File Table) einzulesen. Sollen die Teilergebnisse angezeigt werden?"
+  IDS_BITMAPNOTFOUND, "Fehler beim Ermitteln der $Bitmap auf diesem Laufwerk. Dateischadensabschätzung abgebrochen."
+  IDS_BITMAPNOSTREAM, "Fehler beim Ermitteln des Standardstroms der $Bitmap-Datei. Dateischadensabschätzung abgebrochen."
+  IDS_LOWMEMBITMAP, "Nicht genügend Speicher zum Laden des Clusters der Bitmap-Datei. Dateischadensabschätzung abgebrochen."
+  IDS_ERRORREADINGBMP, "Fehler beim Lesen der $Bitmap-Datei. Dateischadensabschätzung abgebrochen."
+  IDS_BITMAPISEMPTY, "$Bitmap hat Größe Null. Dateischadensabschätzung abgebrochen."
+}
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "Wiederherstellen"
+  IDS_DESCRIPTION, "Stellt auf FAT oder NTFS-Partitionen gelöschte Dateien wieder her."
+  IDS_ABOUTTITLE, "Über Plugin"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{Metadateien}"
+  IDS_PATHDISK, "Pfad muss einen Datenträger beinhalten."
+  IDS_PATHFILE, "Der Pfad führt zu einer Datei. Fehler beim Öffnen der Datei."
+  IDS_PATHNOTFOUND, "Pfad nicht gefunden."
+  IDS_IMAGENOTFOUND, "Die spezifizierte Datei wurde nicht gefunden."
+  IDS_ERROROPENINGPROGRESS, "Fehler beim Öffnen der Fortschrittsanzeige."
+  IDS_VOLENUMERATE, "Fehler bei Ermittlung der Laufwerke des Systems."
+  IDS_OPENINGVOLUME, "Öffne Laufwerk..."
+  IDS_SCANNINGFOUND, "{!}Scanne leere Cluster... (%d Verzeichniscluster{} gefunden)"
+  IDS_ALWAYSCHOOSEYES, "Wähle immer 'JA' (wenn erforderlich, können Sie das im Konfigurationsdialog zurücksetzen)"
+  IDS_PATHTOOLONG, "Der Zielpfad ist zu lang"
+  IDS_QUESTION, "Frage"
+  IDS_WANTCANCEL, "Möchten diesen Vorgang abbrechen?"
+  IDS_BADPATH, "Wiederherstellen in ein Archiv oder Dateisystem-Plugin wird nicht unterstützt."
+  IDS_ERROR, "Fehler" // title of error messages
+  IDS_VIEW, "Anzeigen" // the function "F3"
+  IDS_TEMPDIR, "Zum Anzeigen der Dateien auf %c: müssen Sie ein alternatives temporäres Verzeichnis auf einem anderen logischen Laufwerk angeben als %c:"
+  IDS_WAIT, "Wiederherstellen der Datei in ein temporäre Verzeichniss, bitte warten"
+  IDS_ENCRYPTEDWARNING, "Das Ziellaufwerk unterstützt kein verschlüsseltes Dateisystem (EFS).\n\nVerschlüsselte Dateien werden im Backup-Format wiederhergestellt, diese können später in einer NTFS-Partition wiederhergestellt werden. Benutzen Sie dazu den Befehl ""'Plugins/Wiederherstellen/Wiederherstellen verschlüsselter Dateien aus einem Backup'""."
+  IDS_DONTSHOWAGAIN, "Nicht wieder anzeigen"
+  IDS_CHOOSETEMPDIR, "Wählen Sie ein alternatives temporäres Verzeichnis:"
+  IDS_SAMEPARTITION, "Es scheint, als wenn Sie die Dateien auf demselben logischen Laufwerk wiederherstellen, wo die gelöschten Dateien gefunden wurden. Sie sollten immer auf ein anderes Laufwerk wiederherstellen, ansonsten könnten die wiederhergestellten Dateien mit sich selbst überschrieben werden oder Sie könnten andere gelöschte Dateien verlieren.\n\nHinweis: Sollten Sie nur eine Partition besitzen, können Sie auch auf eine Diskette, ein USB-Laufwerk oder einen Memory-Stick wiederherstellen."
+  IDS_UNDELETECMD, "&Gelöschter Dateien und Verzeichnisse..."
+  IDS_ERRORENCRYPTED, "Kann die verschlüsselte Datei nicht wiederherstellen: "
+  IDS_RESTORECMD, "&Verschlüsselter Dateien aus einem Backup..."
+  IDS_CANNOTVIEW, "Kann die Datei nicht anzeigen - das temporäre Verzeichniss unterstützt kein verschlüsseltes Dateisystem (EFS)"
+  IDS_CHOOSETARGET, "Wählen Sie das Zielverzeichnis"
+  IDS_RESTORE, "Speichern" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "Speichere" // label inside the progress dialog
+  IDS_READINGTREE, "Lese Verzeichnisbaum..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "Das Ziellaufwerk unterstützt kein verschlüsseltes Dateisystem (EFS)."
+  IDS_VOLUME_MOUNT, "Einhängepunkt"
+  IDS_VOLUME_NAME, "Name"
+  IDS_VOLUME_FORMAT, "Format"
+  IDS_VOLUME_SIZE, "Größe"
+  IDS_VOLUME_FREE, "Frei"
+  IDS_VOLUME_FREEPROC, "% Frei"
+  IDS_VOLUME_VOLID, "GUID Pfad"
+  IDS_CONDITION, "Zustand"
+  IDS_CONDITIONDESC, "Schadensabschätzung der Datei"
+  IDS_CONDITION_GOOD, "Gut"
+  IDS_CONDITION_FAIR, "Mittelmäßig"
+  IDS_CONDITION_POOR, "Schlecht"
+  IDS_CONDITION_LOST, "Verloren"
+  IDS_CONDITION_UNKNOWN, "Unbekannt"
+  IDS_UNDELETEINCHDRVMENU, "\tWiederherstellen"
+  IDS_PARTIALRECOVER, "Folgende Datei kann nicht völlig wiederhergestellt werden: %s\n\nMöchten Sie einen Teil der Datei wiederherstellen?"
+  IDS_PARTIALRECOVER_DONTASK, "Beim nächsten Mal gleiche Antwort wählen"
+  IDS_ERRORRECOVER, "Fehler beim Wiederherstellen der Datei %s"
+}

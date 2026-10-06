@@ -329,7 +329,6 @@ const wchar_t* CONFIG_SHIFTFORHOTPATHS_REG_W = L"Use Shift For GoTo HotPath";
 const wchar_t* CONFIG_SHOWGREPERRORS_REG_W = L"Show Errors In Find Files";
 const wchar_t* CONFIG_SHOWPANELCAPTION_REG_W = L"Show Panel Caption";
 const wchar_t* CONFIG_SHOWPANELZOOM_REG_W = L"Show Panel Zoom";
-const wchar_t* CONFIG_SHOWSLGINCOMPLETE_REG_W = L"Show Translation Is Incomplete";
 const wchar_t* CONFIG_SHOWSPLASHSCREEN_REG_W = L"Show Splash Screen";
 const wchar_t* CONFIG_SINGLECLICK_REG_W = L"Single Click";
 const wchar_t* CONFIG_SIZEFORMAT_REG_W = L"Size Format";
@@ -350,7 +349,6 @@ const wchar_t* CONFIG_TOOLBARBREAK_REG_W = L"ToolBar Break";
 const wchar_t* CONFIG_TOOLBARINDEX_REG_W = L"ToolBar Index";
 const wchar_t* CONFIG_TOOLBARWIDTH_REG_W = L"ToolBar Width";
 const wchar_t* CONFIG_TOPTOOLBARVISIBLE_REG_W = L"Show Top ToolBar";
-const wchar_t* CONFIG_USEALTLANGFORPLUGINS_REG_W = L"Use Alternate Language for Plugins";
 const wchar_t* CONFIG_USECUSTOMPANELFONT_REG_W = L"Use Custom Panel Font";
 const wchar_t* CONFIG_USEDRAGDROPMINTIME_W = L"Use DragDrop Min Time";
 const wchar_t* CONFIG_USEICONTINCTURE_REG_W = L"Use Icon Tincture";
@@ -573,6 +571,8 @@ const wchar_t* CONFIG_LASTPLUGINVER_OP = L"Plugins.ver Version (x86)";
 const wchar_t* CONFIG_LASTPLUGINVER = L"Plugins.ver Version (x86)";
 const wchar_t* CONFIG_LASTPLUGINVER_OP = L"Plugins.ver Version (x64)";
 #endif // _WIN64
+// persisted name of the UI language, e.g. czech.slg (an identifier; no file): the same value older
+// versions read, so a configuration works with both, see common/BuiltinLanguages.h
 const wchar_t* CONFIG_LANGUAGE_REG = L"Language";
 const wchar_t* CONFIG_SHOWSPLASHSCREEN_REG = L"Show Splash Screen";
 const wchar_t* CONFIG_CONVERSIONTABLE_REG = L"Conversion Table";
@@ -599,14 +599,11 @@ const wchar_t* CONFIG_COMPAREIGNOREDIRS_REG = L"Compare Ignore Dirs";
 const wchar_t* CONFIG_CONFIGTIGNOREFILESMASKS_REG = L"Compare Ignore Files Masks";
 const wchar_t* CONFIG_CONFIGTIGNOREDIRSMASKS_REG = L"Compare Ignore Dirs Masks";
 const wchar_t* CONFIG_THUMBNAILSIZE_REG = L"Thumbnail Size";
-const wchar_t* CONFIG_ALTLANGFORPLUGINS_REG = L"Alternate Language for Plugins";
-const wchar_t* CONFIG_USEALTLANGFORPLUGINS_REG = L"Use Alternate Language for Plugins";
 const wchar_t* CONFIG_LANGUAGECHANGED_REG = L"Language Changed";
 const wchar_t* CONFIG_ENABLECUSTICOVRLS_REG = L"Enable Custom Icon Overlays";
 const wchar_t* CONFIG_DISABLEDCUSTICOVRLS_REG = L"Disabled Custom Icon Overlays";
 const wchar_t* CONFIG_COPYMOVEOPTIONS_REG = L"Copy Move Options";
 const wchar_t* CONFIG_KEEPPLUGINSSORTED_REG = L"Keep Plugins Sorted";
-const wchar_t* CONFIG_SHOWSLGINCOMPLETE_REG = L"Show Translation Is Incomplete";
 
 const wchar_t* CONFIG_EDITNEWFILE_USEDEFAULT_REG = L"Edit New File Use Default";
 const wchar_t* CONFIG_EDITNEWFILE_DEFAULT_REG = L"Edit New File Default";
@@ -828,7 +825,6 @@ const wchar_t* SALAMANDER_PLUGINS_VERSION = L"Version";
 const wchar_t* SALAMANDER_PLUGINS_COPYRIGHT = L"Copyright";
 const wchar_t* SALAMANDER_PLUGINS_EXTENSIONS = L"Extensions";
 const wchar_t* SALAMANDER_PLUGINS_DESCRIPTION = L"Description";
-const wchar_t* SALAMANDER_PLUGINS_LASTSLGNAME = L"LastSLGName";
 const wchar_t* SALAMANDER_PLUGINS_HOMEPAGE = L"HomePage";
 //const char *SALAMANDER_PLUGINS_PLGICONS = "PluginIcons";
 const wchar_t* SALAMANDER_PLUGINS_PLGICONLIST = L"PluginIconList";
@@ -840,7 +836,6 @@ const wchar_t* SALAMANDER_PLUGINS_REGKEYNAME = L"Configuration Key";
 const wchar_t* SALAMANDER_PLUGINS_FSNAME = L"FS Name";
 const wchar_t* SALAMANDER_PLUGINS_FUNCTIONS = L"Functions";
 const wchar_t* SALAMANDER_PLUGINS_LOADONSTART = L"Load On Start";
-const wchar_t* SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED = L"Legacy Compat Approved";
 const wchar_t* SALAMANDER_PLUGINS_MENU = L"Menu";
 const wchar_t* SALAMANDER_PLUGINS_MENUITEMNAME = L"Name";
 const wchar_t* SALAMANDER_PLUGINS_MENUITEMSTATE = L"State";
@@ -1089,7 +1084,7 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, std::wstring& autoImportConfigFromKe
 //
 // FindLanguageFromPrevVerOfSal
 //
-// Retrieves the language (the .slg module used) from an older version of Salamander.
+// Retrieves the language (persisted name, e.g. czech.slg) from an older version of Salamander.
 // The oldest version from which we obtain this information is 2.53 beta 2 (the first version shipped with multiple languages: CZ+DE+EN).
 // If a configuration for the current version exists or such a language is not found, returns FALSE.
 // Otherwise returns the language in 'slgName'.
@@ -2058,10 +2053,6 @@ void CMainWindow::SaveConfig(HWND parent)
                          &Configuration.ShiftForHotPaths, sizeof(DWORD));
                 SetValue(actKey, CONFIG_LANGUAGE_REG, REG_SZ,
                          Configuration.SLGName.c_str(), -1);
-                SetValueW(actKey, CONFIG_USEALTLANGFORPLUGINS_REG_W, REG_DWORD,
-                         &Configuration.UseAsAltSLGInOtherPlugins, sizeof(DWORD));
-                SetValue(actKey, CONFIG_ALTLANGFORPLUGINS_REG, REG_SZ,
-                         Configuration.AltPluginSLGName.c_str(), -1);
                 DWORD langChanged = (StrICmpW(Configuration.SLGName.c_str(), Configuration.LoadedSLGName.c_str()) != 0); // TRUE if user changed Salamander language
                 SetValueW(actKey, CONFIG_LANGUAGECHANGED_REG_W, REG_DWORD, &langChanged, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_SHOWSPLASHSCREEN_REG_W, REG_DWORD,
@@ -2117,8 +2108,6 @@ void CMainWindow::SaveConfig(HWND parent)
                          &Configuration.ThumbnailSize, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_KEEPPLUGINSSORTED_REG_W, REG_DWORD,
                          &Configuration.KeepPluginsSorted, sizeof(DWORD));
-                SetValueW(actKey, CONFIG_SHOWSLGINCOMPLETE_REG_W, REG_DWORD,
-                         &Configuration.ShowSLGIncomplete, sizeof(DWORD));
 
                 // WARNING: when an icon overlay handler crashes, these values are written directly into the registry
                 //         (prevents Salamander from becoming "unstartable"), see InformAboutIconOvrlsHanCrash()
@@ -3671,12 +3660,7 @@ BOOL CMainWindow::LoadConfig(
                      &Configuration.ReloadEnvVariables, sizeof(DWORD));
             GetValueW(actKey, CONFIG_SHIFTFORHOTPATHS_REG_W, REG_DWORD,
                      &Configuration.ShiftForHotPaths, sizeof(DWORD));
-            //      GetValue(actKey, CONFIG_LANGUAGE_REG, REG_SZ,
-            //               Configuration.SLGName, MAX_PATH);
-            //      GetValueW(actKey, CONFIG_USEALTLANGFORPLUGINS_REG_W, REG_DWORD,
-            //               &Configuration.UseAsAltSLGInOtherPlugins, sizeof(DWORD));
-            //      GetValue(actKey, CONFIG_ALTLANGFORPLUGINS_REG, REG_SZ,
-            //               Configuration.AltPluginSLGName, MAX_PATH);
+            // CONFIG_LANGUAGE_REG is read at startup, before the language is applied
             GetStringValueW(actKey, CONFIG_CONVERSIONTABLE_REG,
                             Configuration.ConversionTable);
             GetValueW(actKey, CONFIG_SKILLLEVEL_REG_W, REG_DWORD,
@@ -3744,13 +3728,6 @@ BOOL CMainWindow::LoadConfig(
 
             GetValueW(actKey, CONFIG_KEEPPLUGINSSORTED_REG_W, REG_DWORD,
                      &Configuration.KeepPluginsSorted, sizeof(DWORD));
-
-            Configuration.ShowSLGIncomplete = TRUE;
-            if (Configuration.ConfigVersion == THIS_CONFIG_VERSION)
-            {
-                GetValueW(actKey, CONFIG_SHOWSLGINCOMPLETE_REG_W, REG_DWORD,
-                         &Configuration.ShowSLGIncomplete, sizeof(DWORD));
-            }
 
             GetValueW(actKey, CONFIG_EDITNEWFILE_USEDEFAULT_REG_W, REG_DWORD,
                      &Configuration.UseEditNewFileDefault, sizeof(DWORD));

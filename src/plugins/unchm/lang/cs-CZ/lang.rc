@@ -1,0 +1,48 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for unchm. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unchm/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unchm.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "Nelze otevřít soubor."
+    IDS_UNKNOW_ERROR            "Nespecifikovaná chyba."
+    IDS_UNPACKING_ARCHIVE       "Extrahování CHM archivu"
+    IDS_ERROR_UNPACKING         "Chyba extrahování souboru."
+    IDS_CANT_HANDLE_FILE        "Nelze pracovat s tímto souborem."
+    IDS_INSUFFICIENT_MEMORY     "Nedostatek paměti."
+    IDS_ABOUT                   "O pluginu"
+    IDS_PLUGIN_DESCRIPTION      "Prohlíží a extrahuje CHM soubory."
+    IDS_CANT_CREATE_TEMP        "Nelze vytvořit dočasný adresář."
+    IDS_CANT_DELETE_TEMP_FILE   "Nelze odstranit dočasný soubor."
+    IDS_UNKNOWN_FILE_FORMAT     "Neznámý formát souboru nebo neplatný CHM obraz.\n\nPokud jste si jistý, že je to platný CHM obraz, založte prosím issue na https://github.com/0xeb/sally/issues a pomůžete nám s podporou tohoto formátu."
+    IDS_CANT_OPEN_FILE          "Nelze otevřít tento soubor."
+    IDS_ERR_TMP                 "Vytváření dočasného souboru selhalo."
+    IDS_CANT_SET_ATTRS          "Nelze nastavit atributy souboru."
+    IDS_CANT_CREATE_DIR         "Nelze vytvořit adresář '%s'."
+    IDS_YES                     "Ano"
+    IDS_NO                      "Ne"
+    IDS_ERROR                   "Chyba"
+    IDS_WARNING                 "Upozornění"
+    IDS_READERROR               "Chyba čtení"
+    IDS_WRITEERROR              "Chyba zápisu"
+    IDS_INTERNAL_PLUGIN_ERROR   "Interní chyba pluginu."
+    IDS_INVALIDNUMBER           "Neplatné číslo."
+    IDS_CANCELOPER              "stornování operace, čekejte prosím..."
+    IDS_CHMLIBCOPYRIGHT         "CHMLIB knihovna Copyright © 2001-2010 Jed Wing"
+}

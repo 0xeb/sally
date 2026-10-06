@@ -43,9 +43,9 @@ struct CSalmonSharedMemory
     DWORD ThreadId;          // ID of the crashed thread
     HANDLE Fire;             // AS signals SALMON to send reports
     HANDLE Done;             // SALMON signals back to AS that it is done
-    HANDLE SetSLG;           // AS signals SALMON to load SLG based on SLGName buffer, which it sets before signaling the event
+    HANDLE SetSLG;           // AS signals SALMON to switch to the UI language named in SLGName, which it sets before signaling the event
     HANDLE CheckBugs;        // AS signals SALMON to check the bug report directory and if it finds any (from a previous crash), offer upload
-    wchar_t SLGName[MAX_PATH];  // meaningful when AS signals SetSLG and says which SLG should be loaded
+    wchar_t SLGName[MAX_PATH];  // meaningful when AS signals SetSLG: persisted name of the UI language (e.g. czech.slg; no file)
     wchar_t BugPath[MAX_PATH];  // set by Salamander, path where bug reports will be written (path may not exist, created only on crash)
     wchar_t BugName[MAX_PATH];  // set by Salamander, internal name of the minidump/bug report file
     wchar_t BaseName[MAX_PATH]; // set by Salmon, composed as "UID-BugName-DATE-TIME"; for a minidump it appends ".DMP"

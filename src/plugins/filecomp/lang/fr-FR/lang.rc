@@ -1,0 +1,375 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for filecomp. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/filecomp/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\filecomp.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_COMPAREFILES DIALOGEX 10, 24, 227, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Comparaison de fichiers"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Comparer le fichier:",IDC_STATIC_1,10,9,207,8
+    COMBOBOX        IDE_PATH1,10,19,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE1,207,19,13,12
+    CONTROL         "a&vec le fichier:",IDC_STATIC_2,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,37,207,8
+    COMBOBOX        IDE_PATH2,10,47,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE2,207,47,13,12
+    DEFPUSHBUTTON   "OK",IDOK,29,71,50,14,WS_GROUP
+    PUSHBUTTON      "Annuler",IDCANCEL,88,71,50,14
+    PUSHBUTTON      "&Avancé...",IDADVANCED,147,71,50,14
+END
+
+IDD_CFGCOLORS DIALOGEX 15, 24, 274, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Couleurs"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Elément",IDC_STATIC_1,6,6,30,8,NOT WS_GROUP
+    COMBOBOX        IDC_ITEMS,6,16,155,82,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Nombre de lignes:",IDC_STATIC_2,169,38,64,8,NOT WS_GROUP
+    LTEXT           "Texte:",IDC_STATIC_3,236,38,24,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION1,11,51,150,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION2,11,67,150,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION3,11,83,150,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION4,11,99,150,8,NOT WS_GROUP
+    PUSHBUTTON      "texte",IDB_LINENUM1,169,48,30,14
+    PUSHBUTTON      "texte",IDB_TEXT1,236,48,30,14
+    PUSHBUTTON      "texte",IDB_LINENUM2,169,64,30,14
+    PUSHBUTTON      "texte",IDB_TEXT2,236,64,30,14
+    PUSHBUTTON      "texte",IDB_LINENUM3,169,80,30,14
+    PUSHBUTTON      "texte",IDB_TEXT3,236,80,30,14
+    PUSHBUTTON      "texte",IDB_LINENUM4,169,96,30,14
+    PUSHBUTTON      "texte",IDB_TEXT4,236,96,30,14
+    PUSHBUTTON      "Par &défaut",IDB_DEFAULT,196,202,70,14
+    LTEXT           "",IDS_PREVIEW2,137,129,129,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "",IDS_PREVIEW1,6,129,130,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "Prévisualisation",IDC_STATIC_4,6,120,60,8,NOT WS_GROUP
+END
+
+IDD_ADVANCEDOPTIONS DIALOGEX 70, 33, 244, 286
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Options avancées"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ignorer",IDC_STATIC_1,5,6,28,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,35,10,205,1
+    CONTROL         "Tous les espaces &vides",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,11,16,89,12
+    CONTROL         "&Modifications dans le nombre d'espaces vides",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,28,164,12
+    CONTROL         "&Casse",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,40,33,12
+    LTEXT           "Types de fichiers",IDC_STATIC_3,5,60,59,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,66,64,174,1
+    CONTROL         "&Autodétection",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY | WS_GROUP | WS_TABSTOP,11,70,60,12
+    CONTROL         "&Binaire",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,82,36,12
+    CONTROL         "&Texte",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,94,32,12
+    LTEXT           "Encodage des fichiers texte:",IDC_STATIC_15,11,111,97,8
+    LTEXT           "Premier fichier:",IDC_STATIC_5,11,126,54,8
+    LTEXT           "Second fichier:",IDC_STATIC_6,11,143,53,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,66,124,154,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,66,141,154,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,223,124,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,223,141,14,12
+    LTEXT           "Fins de ligne",IDC_STATIC_7,5,163,45,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,52,167,188,1
+    LTEXT           "&Premier fichier:",IDC_STATIC_9,11,175,54,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,69,173,34,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,113,173,23,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,154,173,21,12
+    CONTROL         "NULL",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,195,173,30,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,69,185,34,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,113,185,23,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,154,185,21,12
+    CONTROL         "NULL",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,195,185,30,12
+    LTEXT           "Second fichier:",IDC_STATIC_10,11,187,53,8
+    LTEXT           "Options Unicode",IDC_STATIC_11,5,205,57,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,64,209,176,1
+    CONTROL         "Combiner les marques &diacritiques aux caractères précomposés",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,215,225,12
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,4,237,236,1
+    CONTROL         "&Utiliser ces réglages dans les comparaisons futures",IDC_USEINFUTURE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,242,182,12
+    CONTROL         "",IDC_STATIC_14,"Static",SS_ETCHEDHORZ | WS_GROUP,4,257,236,1
+    DEFPUSHBUTTON   "OK",IDOK,75,266,50,14,WS_GROUP
+    PUSHBUTTON      "Annuler",IDCANCEL,131,266,50,14
+    PUSHBUTTON      "Aide",IDHELP,187,266,50,14
+END
+
+IDD_CFGGENERAL DIALOGEX 28, 34, 274, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Général"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Sélection de fichiers",IDC_STATIC_1,6,7,69,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,77,11,191,1
+    CONTROL         "Confirmer la &sélection de fichiers avant de lancer le Comparateur",IDC_CONFIRM,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,17,230,12
+    LTEXT           "Options de visualisation de fichiers",IDC_STATIC_3,6,36,117,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,125,40,143,1
+    LTEXT           "&Nombre de lignes à afficher si seules les différences sont visualisées:",IDC_STATIC_5,12,48,232,8,NOT WS_GROUP
+    EDITTEXT        IDE_CONTEXT,245,46,16,12,ES_AUTOHSCROLL
+    LTEXT           "Taille de &tabulation:",IDC_STATIC_6,12,62,69,8,NOT WS_GROUP
+    EDITTEXT        IDE_TABSIZE,98,60,16,12
+    LTEXT           "C&aractère d'espace vide:",IDC_STATIC_7,12,76,85,8
+    COMBOBOX        IDC_WHITESPACE,98,74,55,98,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Montrer les &différences détaillées par défaut",IDC_DETAILDIFFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,91,189,12
+    CONTROL         "Partager la vue de fichier &horizontalement",IDC_VIEW_HORIZONTAL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,103,189,12
+    LTEXT           "Police de visualisation de fichier",IDC_STATIC_8,6,121,108,8
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,116,125,152,1
+    PUSHBUTTON      "&Police",IDB_FONT,12,134,50,14
+    EDITTEXT        IDE_FONT,65,134,185,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    LTEXT           "Autre",IDC_STATIC_10,6,156,21,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,29,160,239,1
+    CONTROL         "&Charger le module au démarrage d'Sally",IDC_LOADONSTART,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,166,192,12
+END
+
+IDD_CFGDEFOPTIONS DIALOGEX 31, 27, 274, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Options de comparaison par défaut"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ignorer",IDC_STATIC_1,6,7,28,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,36,11,232,1
+    CONTROL         "Tous les espaces &vides",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,17,89,12
+    CONTROL         "C&hangements dans la quantité d'espaces vides",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,29,169,12
+    CONTROL         "&Casse",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,41,33,12
+    LTEXT           "Type de fichiers",IDC_STATIC_3,6,59,56,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,64,63,204,1
+    CONTROL         "&Autodétection",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,13,69,60,12
+    CONTROL         "&Binaire",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON,13,81,36,12
+    CONTROL         "&Texte",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON,13,93,32,12
+    LTEXT           "Encodage des fichiers texte:",IDC_STATIC_13,13,110,97,8
+    LTEXT           "Premier fichier:",IDC_STATIC_5,13,125,54,8
+    LTEXT           "Second fichier:",IDC_STATIC_6,13,142,53,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,68,123,177,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,68,140,177,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,248,123,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,248,140,14,12
+    LTEXT           "Fins de ligne",IDC_STATIC_7,6,158,45,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,53,162,215,1
+    LTEXT           "Premier fichier:",IDC_STATIC_9,13,170,54,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,71,168,34,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,114,168,23,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,157,168,21,12
+    CONTROL         "NULL",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,200,168,30,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,71,180,34,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,114,180,23,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,157,180,21,12
+    CONTROL         "NULL",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,200,180,30,12
+    LTEXT           "Second fichier:",IDC_STATIC_10,13,182,53,8
+    LTEXT           "Options Unicode",IDC_STATIC_11,6,197,57,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,65,201,203,1
+    CONTROL         "Combiner les signes &diacritiques en caractères précomposés",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,207,213,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_MENU MENU 
+BEGIN
+    POPUP "&Fichier"
+    BEGIN
+        MENUITEM "Comparer...\tCtrl+O",          CM_COMPARE
+        MENUITEM "Recomparer\tCtrl+R",           CM_RECOMPARE
+        MENUITEM SEPARATOR
+        MENUITEM "&Quitter\tAlt+F4",               CM_EXIT
+    END
+    POPUP "&Editer"
+    BEGIN
+        MENUITEM "Copier\tCtrl+C",                CM_COPY
+    END
+    POPUP "&Visualiser"
+    BEGIN
+        MENUITEM "Montrer les espaces &vides\tCtrl+W",   CM_SHOWWHITESPACE
+        MENUITEM "M&ontrer seulement les différences\tCtrl+D", CM_ONLYDIFFERENCES
+        MENUITEM "&Différences détaillées\tF4",   CM_DETAILDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "&Première différence\tAlt+Home", CM_FIRSTDIFF
+        MENUITEM "Di&fférence précédente\tAlt+Flèche Haut", CM_PREVDIFF
+        MENUITEM "Différence &suivante\tAlt+Flèche Bas", CM_NEXTDIFF
+        MENUITEM "D&ernière différence\tAlt+Fin",   CM_LASTDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "&Montrer le caret\tF2",             CM_SHOWCARET
+        MENUITEM SEPARATOR
+        MENUITEM "Maximiser la vue du fichier de &gauche\tCtrl+,", CM_MAXLEFTVIEW
+        MENUITEM "M&aximiser la vue du fichier droit\tCtrl+.", CM_MAXRIGHTVIEW
+        MENUITEM "Volets de v&ue de fichiers égaux\tCtrl+E", CM_SAMESIZEVIEW
+        MENUITEM "&Basculer en plein écran\tF11",    CM_MAXIMIZE
+        MENUITEM "Vue &horizontale\tCtrl+H",    CM_VIEW_HORIZONTAL
+    END
+    POPUP "&Options"
+    BEGIN
+        MENUITEM "C&opie auto de la sélection dans le presse-papiers", CM_AUTOCOPY
+        MENUITEM SEPARATOR
+        MENUITEM "&Configuration...",           CM_OPTIONS
+    END
+    POPUP "&Aide"
+    BEGIN
+        MENUITEM "&Table des matières\tF1",               CM_HELP
+        MENUITEM "&Raccourcis clavier",         CM_HELPKEYBOARD
+        MENUITEM SEPARATOR
+        MENUITEM "&A propos",                      CM_ABOUT
+    END
+END
+
+IDM_CTX_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Tout sélectionner",                 CM_SELECTALL
+        MENUITEM "&Copier",                       CM_COPY
+    END
+END
+
+IDM_CTX_1COLOR_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Couleur personnalisée...",             CM_CUSTOMBACKGROUND
+        MENUITEM "Couleur automatique",             CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_2COLOR_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Couleur personnalisée du texte...",     CM_CUSTOMTEXT
+        MENUITEM "Couleur automatique du texte",     CM_AUTOTEXT
+        MENUITEM SEPARATOR
+        MENUITEM "Couleur personnalisée du fond...", CM_CUSTOMBACKGROUND
+        MENUITEM "Couleur automatique du fond", CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_FONT_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Police personnalisée...",              CM_CUSTOMFONT
+        MENUITEM "Police automatique",              CM_AUTOFONT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGIN_DESCRIPTION, "Comparaison virtuelle de deux fichiers texte ou binaires."
+  IDS_ABOUT, "A propos du modfule"
+  IDS_SPLERROR, "Comparateur de fichier - Erreur"
+  IDS_PLUGINNAME, "Comparateur de fichiers"
+  IDS_LOWMEM, "Mémoirr insuffisante."
+  IDS_COMPAREFILES, "Comparer des fichiers..."
+  IDS_CONFIGURATION, "Configurer..."
+  //IDS_SOMEWINDOWSOPEN, "Some File Comparator windows are opened. Do you want to close them?"
+  IDS_READFILE, "Lecture impossible à partir du fichier '%s'. "
+  IDS_ACCESFILE, "Accès impossible au fichier '%s'. "
+  IDS_ACCESFILE2, "Impossible d'accéder au fichier. "
+  IDS_INTERNALERROR, "Erreur interne dans l'algorythme de comparaison."
+  IDS_LARGEFILE, "Impossible d'ouvrir le fichier '%s' pour la comparaison suivante,le fichier est trop gros.\nUtilisez la comparaison binaire."
+  IDS_OPEN, "Impossible d'ouvrir le fichier: '%s'. "
+  IDS_NODIFFERRENCE, "Les fichiers sont identiques."
+  IDS_ALLDIFFSIGNORED, "Les fichiers semblent identiques. Leurs différences ont été ignorées suivant les réglages."
+  IDS_BINARYDIFFER, "Les fichiers binaires diffèrent."
+  IDS_MAXLINES, "Nombre maximal de lignes atteint"
+  IDS_MAINWNDHEADER, "{!}%s %s: %s %s- Comparatur de fichiers  - %d Différence{|1|s}"
+  IDS_MAINWNDHEADER_NODIF "%s %s: %s %s- Comparateur de fichiers - Pas de différences"
+  IDS_MAINWNDHEADERCOMPUTING, "%s : %s - Comparateur de fichier - Calcul des différences (appuyez sur ESC pour annuler)"
+  IDS_MAINWNDHEADERCOMPUTING2, "%s %s: %s %s - Comparateur de fichier - Calcul des différences"
+  IDS_MAINWNDHEADERCOMPUTING_PROGRESS, "%s : %s - Comparateur de fichier - Calcul des différences (%d%% effectué)"
+  IDS_MAINWNDHEADERCOMPUTING_PROGRESS_FOUND, "{!}%s : %s - Comparateur de fichier - Calcul des différences (%d%% effectué, %d trouvé{})"
+  IDS_MAINWNDHEADERTOOMANY, "%s : %s - Comparateur de fichier - Plus de 32768 différences"
+  IDS_DIFFERENCES, "&Différence"
+  IDS_MISSINGPATH, "Nom de fichier manquant."
+  IDS_ERROR, "Erreur"
+  IDS_SELECTALL, "&Tout sélectionner"
+  IDS_RECOMPARE, "Recomparer (Ctrl+R)"
+  IDS_COPY, "&Copier"
+  IDS_COPYCLIP, "Copier dans le presse-papiers (Ctr+C)"
+  IDS_FIRSTDIFF, "Aller à la première différence (Alt+Home)"
+  IDS_PREVDIFF, "Aller à la différence précédente (Alt+Flèche Haut)"
+  IDS_NEXTDIFF, "Aller à la différence suivante (Alt+Flèche Bas)"
+  IDS_LASTDIFF, "Aller à la derniçère différence (Alt+Fin)"
+  IDS_CANCELED, "Opération annulée."
+  IDS_CLOSEDIFF, "Voulez-vous fermer le Comparateur de fichiers?"
+  IDS_COMMONTEXT, "Texte non modifié"
+  IDS_SELECTEDTEXT, "Texte sélectionné"
+  IDS_CHANGEDTEXT, "Texte modifié"
+  IDS_FOCUSEDCHANGE, "Texte modifié dans la différence notée"
+  IDS_FOCUSEDFRAME, "Cadre autour de la différence notée"
+  IDS_FOCUSEDCHANGE2, "Ciblé sur la différence"
+  IDS_COMMONFOCUSED, "Texte inchangé dans la différence ciblée"
+  IDS_COMMONFOCUSED2, "Inchangé + ciblé"
+  IDS_COMMONCOLORS, "Couleurs communes"
+  IDS_RIGHTCOLORS, "Couleurs du panneau droit"
+  IDS_LEFTCOLORS, "Couleurs du panneau gauche"
+  IDS_POSITIVEVALUE, "Veuillez saisir une valeur positive"
+  IDS_SELECTFIRST, "Sélectionnez le premier fichier"
+  IDS_SELECTSECOND, "Sélectionnez le second fichier"
+  IDS_FILEDOESNOTEXIST, "Le fichier %s n'existe pas.\nVeuillez indiquer un nom de fichier valide."
+  IDS_ALLFILES, "Tous les fichierts (*.*)"
+  // font description in configuration dialog box   "10 pt. MS Shell Dlg"
+  IDS_FONTDESCRIPTION, "%d pt. %s"
+  IDS_BINREPORT1, "{!}%d: %s octet{|1|s} modifié{1:|1|s} au décalage %s"
+  IDS_BINREPORT2, "{!}%s octet{|1|s} modifé{1:|1|s} au décalage %s"
+  IDS_ADD1, "%d: Insérer la ligne %d du fichier de droite (%s) après la ligne %d dans le fichier de gauche (%s)"
+  IDS_ADD2, "%d: Insérer les lignes %d-%d du fichier de droite (%s) après la ligne %d dans le fichier de gauche (%s)"
+  IDS_DELETE1, "%d: Supprimer la ligne %d du fichier de gauche (%s)"
+  IDS_DELETE2, "%d: supprimer les lignes %d-%d du fichier de gauche (%s)"
+  IDS_CHANGEFROM1, "%d: Modifier la ligne %d du fichier de gauche (%s) en"
+  IDS_CHANGEFROM2, "%d: Modifier les lignes %d-%d dans le fichier de gauche (%s) en"
+  IDS_CHANGETO1, "%s ligne %d du fichier de droite (%s)"
+  IDS_CHANGETO2, "%s lignes %d-%d du fichier de droite (%s)"
+  IDS_CONFIGURATIONTITLE, "Configuration du Comparateur de fichiers"
+  IDS_OK, "OK"
+  IDS_CANCEL, "Annuler"
+  IDS_OPTIONSCHANGED, "Les options de comparaison par défaut ont changées.\nRecomparer les fichiers avec les nouvelles options?"
+  IDS_DETAILCANCEL, "Vous avez annulé l'opération pendant le calcul des différences détaillées. L'analyse des différences détaillées peut prendre du temps, notamment pour des fichiers ayant de grands blocs différents.\n\nVoulez-vous désactiver les différences détaillées et relancer la comparaison?"
+  IDS_INVALIDNUMBER, "Nombre invalide!"
+  IDS_NOTVALIDFILE, "Impossible d'ouvrir '%s'."
+  IDS_INVALIDARGS, "Arguments invalides. Usage:\n\tfilecomp.exe [options] premier second\nLes options sont:\n\t-w\tAttendez la fermeture du Comparateur de fichiers.\n\t--attendez\tAttendez la fermeture du Comparateur de fichiers."
+  IDS_MSGERR, "Impossible d'expédier un message au module du Comparateur de fichiers."
+  IDS_LAUNCHSAL, "Impossible de lancer Sally."
+  IDS_MSGERR2, "Impossible d'expédier un message au module de Comparateur de fichiers. Vérifiez que l'option 'Lancer au démarrage d'Sally' est activée dans la configuration du Comparateur de fichiers."
+  IDS_ERRORUNICODE, "Echec de la conversion en Unicode."
+  IDS_ENCMENU_AUTO, "Automatique"
+  IDS_ENCMENU_ASCII8, "ASCII-8"
+  IDS_ENCMENU_ASCII8NOINPUTENC, "Pas de conversion d'entrée"
+  IDS_ENCMENU_ASCII8AUTOINPUTENC, "Conversion d'entrée automatique"
+  IDS_ENCMENU_UNICODE, "Unicode"
+  IDS_ENCMENU_UTF8, "UTF-8"
+  IDS_ENCMENU_UTF16LE, "UTF-16"
+  IDS_ENCMENU_UTF16BE, "UTF-16 (Big Endian)"
+  IDS_ENCMENU_UTF32LE, "UTF-32"
+  IDS_ENCMENU_UTF32BE, "UTF-32 (Big Endian)"
+  IDS_AUTOINPUTENC ", conversion d'entrée automatique"
+  IDS_NOINPUTENC ", pas de conversion d'entrée"
+  IDS_MAXLEFTVIEW   "Maximiser la vue du fichier de &gauche\tCtrl+,"
+  IDS_MAXTOPVIEW    "Maximiser la vue du fichier du &haut\tCtrl+,"
+  IDS_MAXRIGHTVIEW  "Maximiser la vue du fichier de &droite\tCtrl+."
+  IDS_MAXBOTTOMVIEW "Maximiser la vue du fichier du &bas\tCtrl+."
+  IDS_ERROR_COPY_LARGE_SELECTION "La sélection est trop grande pour être copiée dans le presse-papiers."
+  IDS_ERROR_COPY_OOM  "Mémoire insuffisante pour copier le texte sélectionné dans le presse-papiers."
+  IDS_ERROR_COPY_FAILED "Impossible de copier le texte sélectionné dans le presse-papiers."
+  IDS_LOWMEM_TRY_BINARY "La comparaison en mode texte a échoué car la mémoire disponible est insuffisante ou les fichiers sont trop gros. Vous pourriez essayer la comparaison binaire."
+}

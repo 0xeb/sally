@@ -1,0 +1,660 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for zip. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\zip.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_EXPACKOPTIONS DIALOGEX 41, 41, 316, 201
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Erweiterte Packoptionen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archiv:",IDC_STATIC_1,17,9,25,8
+    CONTROL         "",IDC_ARCHIVE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,45,9,263,8
+    LTEXT           "",IDC_STATIC_2,8,24,299,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Mehrteiliges Archiv erstellen",IDC_MULTIVOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,31,107,12
+    LTEXT           "&Teilgröße:",IDC_STATIC_3,176,33,36,8,NOT WS_GROUP
+    COMBOBOX        IDC_VOLSIZE,215,31,60,110,CBS_DROPDOWN | WS_DISABLED | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_UNITS,280,31,27,34,CBS_DROPDOWNLIST | WS_DISABLED | WS_TABSTOP
+    CONTROL         "Datei&namen fortlaufend",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,17,45,92,12
+    LTEXT           "",IDC_STATIC_4,8,63,299,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Selbstentpackendes &Archiv erstellen",IDC_SELFEXTR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,70,132,12
+    PUSHBUTTON      "&Erweitert...",IDC_ADVANCED,252,70,55,14,WS_DISABLED
+    LTEXT           "",IDC_STATIC_5,8,90,299,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Dateien &verschlüsseln",IDC_ENCRYPT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,97,86,12
+    LTEXT           "&Passwort:",IDC_STATIC_6,28,113,60,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD1,101,111,89,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    LTEXT           "Pass&wort bestätigen:",IDC_STATIC_7,28,129,72,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD2,101,127,89,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    GROUPBOX        " Verschlüsselungsmethode ",IDC_STATIC_8,199,97,108,50
+    CONTROL         "&ZIP 2.0 kompatibel",IDC_ENC_ZIP20,"Button",BS_AUTORADIOBUTTON | WS_DISABLED | WS_GROUP,204,108,75,12
+    CONTROL         "&128-Bit AES",IDC_ENC_AES128,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,204,120,53,12
+    CONTROL         "&256-Bit AES",IDC_ENC_AES256,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,204,132,55,12
+    LTEXT           "",IDC_STATIC_9,8,154,299,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Diese &Dialogbox nicht mehr zeigen (kann in Konfiguration geändert werden)",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,161,269,12
+    DEFPUSHBUTTON   "OK",IDOK,20,180,65,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,90,180,65,14
+    PUSHBUTTON      "&Konfigurieren...",IDC_CONFIG,160,180,65,14
+    PUSHBUTTON      "Hilfe",IDHELP,230,180,65,14
+END
+
+IDD_CONFIG DIALOGEX 50, 37, 322, 277
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP - Konfiguration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Entpacken",IDC_STATIC_1,7,6,38,8
+    LTEXT           "",IDC_STATIC_2,44,10,272,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Automatisches Zusammenfügen von mehrteiligen Archiven",IDC_AUTOEXPANDMV,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,17,209,12
+    LTEXT           "Packen",IDC_STATIC_3,7,35,26,8
+    LTEXT           "",IDC_STATIC_4,34,39,282,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Bei Archivänderungen eine &temporäre Kopie des Archivs verwenden (sicherer)",IDC_BACKUP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,46,275,12
+    CONTROL         "Keine leeren Verzeichnisse im &ZIP-Archiv speichern",IDC_NOEMPTYDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,58,183,12
+    CONTROL         "Bei Archivänderung die Archi&vzeit auf das neueste Dateidatum setzen",IDC_SETFILETIME,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,70,245,12
+    CONTROL         "WinZip kompatible Dateinamen für mehrteilige Archive benutzen (ausgenommen sind",IDC_WINZIPNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,82,300,12
+    LTEXT           "selbstentpackende Archive, die immer Sally übliche Namen verwenden)",IDC_STATIC_5,26,94,286,8
+    LTEXT           "&Kompressionslevel (0 - 9, 9 beste Kompression, langsamste Methode):",IDC_STATIC_6,14,107,237,8
+    EDITTEXT        IDC_LEVEL,252,105,16,12
+    LTEXT           "Standardsprache des sel&bstentpackenden Archivs:",IDC_STATIC_7,14,120,171,8
+    COMBOBOX        IDC_LANGUAGE,186,118,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Bestätigungen",IDC_STATIC_8,7,136,50,8
+    LTEXT           "",IDC_STATIC_9,55,140,261,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Bei Änderung der SFX Sprache",IDC_STATIC_10,14,148,228,49
+    CONTROL         "&Immer nachfragen bevor Texte geändert werden",IDC_ASK,"Button",BS_AUTORADIOBUTTON | WS_GROUP,20,158,178,12
+    CONTROL         "Texte automatisch durch die Standardwerte &ersetzen",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,20,170,190,12
+    CONTROL         "&Nicht wieder fragen und Texte immer unverändert lassen",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,20,182,205,12
+    CONTROL         "Dialogbox mit den erweiterten &Optionen vor dem Packen zeigen",IDC_SHOWEXOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,200,226,12
+    LTEXT           "Einstellungen des Dateifensters",IDC_STATIC_11,7,217,107,8
+    LTEXT           "",IDC_STATIC_12,112,221,204,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Beim Auflisten von Archiven die Spalte ""&Gepackt"" anzeigen",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,228,209,12
+    LTEXT           "",IDC_STATIC_13,6,247,310,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,47,256,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,106,256,50,14
+    PUSHBUTTON      "&Standard",IDC_DEFAULT,165,256,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,224,256,50,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 289, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP-Passwort eingeben"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK,21,10,18,20
+    LTEXT           "Diese Datei ist verschlüsselt. Bitte geben Sie das Passwort ein.",IDC_STATIC_1,57,10,225,8
+    LTEXT           "Datei:",IDC_STATIC_2,57,23,22,8
+    CONTROL         "",IDC_FILE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,81,23,196,8
+    LTEXT           "&Passwort:",IDC_STATIC_3,57,36,35,8
+    EDITTEXT        IDC_PASSWORD,97,34,180,12,ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,19,55,50,14,WS_GROUP
+    PUSHBUTTON      "&Überspringen",IDC_SKIP,74,55,68,14
+    PUSHBUTTON      "&Alle überspringen",IDC_SKIPALL,147,55,68,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,220,55,50,14
+END
+
+IDD_LOWFREESPACE DIALOGEX 13, 54, 379, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zu wenig freier Speicherplatz"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Achtung: Der freie Speicherplatz auf dem Datenträger ist kleiner als die Teilgröße die Sie angegeben haben.",IDC_TEXT,7,9,367,8
+    RTEXT           "Pfad:",IDC_STATIC_1,4,26,56,8
+    LTEXT           "",IDC_PATH,63,26,304,8
+    RTEXT           "Freier Speicher:",IDC_STATIC_2,4,39,56,8
+    LTEXT           "",IDC_FREESPACE,63,39,304,8
+    RTEXT           "Teilgröße:",IDC_STATIC_3,4,52,56,8
+    LTEXT           "",IDC_VOLUMESIZE,63,52,304,8
+    DEFPUSHBUTTON   "&Ignorieren",IDC_IGNORE,62,73,60,14
+    PUSHBUTTON      "&Alle Ignorieren",IDC_ALL,127,73,60,14
+    PUSHBUTTON      "&Wiederholen",IDC_RETRY,192,73,60,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,257,73,60,14
+END
+
+IDD_CHANGEDISK DIALOGEX 24, 40, 194, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Datenträger wechseln"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,168,24
+    LTEXT           "Drücken Sie OK wenn Sie bereit sind.",IDC_STATIC_1,13,39,168,8
+    DEFPUSHBUTTON   "OK",IDOK,42,57,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,102,57,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 6, 15, 357, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Überschreiben der Datei bestätigen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Datei überschreiben:",IDC_STATIC_1,4,14,73,8
+    LTEXT           "",IDC_FILE,82,14,269,8
+    LTEXT           "",IDC_FILEATTR,82,24,269,8
+    LTEXT           "Diese Datei existiert bereits. Überschreiben?",IDC_STATIC_2,82,39,174,8
+    DEFPUSHBUTTON   "&Ja",IDC_YES,61,56,55,14
+    PUSHBUTTON      "&Alle",IDC_ALL,121,56,55,14
+    PUSHBUTTON      "&Wiederholen",IDC_RETRY,181,56,55,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,241,56,55,14
+END
+
+IDD_CHANGEDISK2 DIALOGEX 24, 40, 214, 108
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Diese Datei ist Teil eines mehrteiligen Archivs oder sie ist defekt.",IDC_STATIC_1,13,8,188,16
+    LTEXT           "Falls Sie glauben das es sich um ein mehrteiliges Archiv handelt, legen Sie den Datenträger mit dem letzten Teil des Archivs ein oder geben Sie den Pfad zur Datei an.",IDC_STATIC_2,13,31,188,24
+    LTEXT           "&Letzter Teil des Archivs:",IDC_STATIC_3,13,61,89,8
+    EDITTEXT        IDC_FILENAME,13,71,172,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,189,71,13,12
+    DEFPUSHBUTTON   "OK",IDOK,52,89,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,112,89,50,14
+END
+
+IDD_CHANGEDISK3 DIALOGEX 24, 40, 216, 132
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Datenträger wechseln"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,190,16
+    LTEXT           "Drücken Sie 'OK' wenn Sie bereit sind.",IDC_STATIC_1,13,31,190,8
+    CONTROL         "Dateien werden &sequentiell benannt",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,43,135,12
+    CONTROL         "Datenträgernummer in der &Erweiterung",IDC_WINZIP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,55,146,12
+    CONTROL         "Fortsetzen &aller Teile ohne Nachfrage",IDC_PROCEEDALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,67,138,12
+    LTEXT           "&Dateiname:",IDC_STATIC_2,13,84,60,8
+    EDITTEXT        IDC_FILENAME,13,94,174,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,191,94,13,12
+    DEFPUSHBUTTON   "OK",IDOK,52,112,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,114,112,50,14
+END
+
+IDD_ADVANCEDSE DIALOGEX 37, 14, 306, 303
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Self-Extractor Einstellungen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_STATIC_1,0,0,306,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Verzeichnis für das Entpacken der Dateien",IDC_STATIC_2,7,7,293,89,WS_GROUP
+    LTEXT           "&Entpacken nach:",IDC_STATIC_3,20,19,59,8,NOT WS_GROUP
+    EDITTEXT        IDC_TARGETDIR,20,29,250,12,ES_AUTOHSCROLL | ES_NOHIDESEL
+    PUSHBUTTON      ">",IDC_SPECDIR,273,29,12,12
+    LTEXT           "Hinweis: Sie können einen relativen Pfad der mit dem aktuellen Verzeichnis kombiniert wird, oder einen kompletten Pfad angeben. Wenn Sie das Feld frei lassen wird das aktuelle Verzeichnis verwendet.",IDC_STATIC_4,20,47,258,24,NOT WS_GROUP
+    CONTROL         "&Benutzer darf das Verzeichnis ändern",IDC_ALLOWUSER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,77,138,12
+    LTEXT           "Befehl ausführen oder &Dokument öffnen:",IDC_STATIC_5,20,113,141,8,NOT WS_GROUP
+    EDITTEXT        IDC_EXECUTE,20,123,265,12,ES_AUTOHSCROLL
+    CONTROL         "Ent&packte Dateien entfernen",IDC_REMOVE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,139,109,12
+    PUSHBUTTON      "&Warte auf...",IDC_WAITFOR,228,138,57,14
+    GROUPBOX        "Benutzeroberfläche",IDC_STATIC_6,7,163,293,53,WS_GROUP
+    PUSHBUTTON      "&Texte...",IDC_TEXTS,20,177,50,14
+    LTEXT           "&Sprache:",IDC_STATIC_7,20,198,36,8,NOT WS_GROUP
+    COMBOBOX        IDC_LANGUAGE,74,196,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Symbol:",IDC_STATIC_8,156,198,30,8,NOT WS_GROUP
+    LTEXT           "",IDC_EXEICON,188,194,19,18,NOT WS_GROUP
+    PUSHBUTTON      "Symbol &ändern...",IDC_CHANGEICON,215,196,70,14
+    GROUPBOX        "Bestätigungen und weitere Optionen",IDC_STATIC_9,7,221,293,57
+    CONTROL         "Entpac&ken automatisch starten",IDC_AUTO,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,20,234,116,12
+    CONTROL         "&Hauptdialogbox nicht anzeigen",IDC_HIDEMAINDLG,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,246,129,12
+    CONTROL         "&Zielverzeichnis automatisch anlegen",IDC_AUTODIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,258,133,12
+    CONTROL         "Zusammen&fassung anzeigen",IDC_SUMDLG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,161,234,108,12
+    CONTROL         "&Vorhandene Dateien überschreiben",IDC_OVEWRITE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,161,246,132,12
+    CONTROL         "Benötigt &Administratorrechte ",IDC_REQSADMIN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,161,258,111,12
+    DEFPUSHBUTTON   "OK",IDOK,67,283,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,128,283,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,189,283,50,14
+    GROUPBOX        "Nach Beendigung des Entpackens",IDC_STATIC_10,7,101,293,57,WS_GROUP
+END
+
+IDD_OVERWRITE2 DIALOGEX 6, 15, 364, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Überschreiben der Datei bestätigen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Datei überschreiben:",IDC_STATIC_1,4,14,73,8
+    LTEXT           "",IDC_FILE,80,14,275,8
+    LTEXT           "",IDC_FILEATTR,80,24,275,8
+    LTEXT           "Diese Datei existiert bereits. Überschreiben?",IDC_STATIC_2,80,39,174,8
+    DEFPUSHBUTTON   "&Ja",IDC_YES,100,56,50,14
+    PUSHBUTTON      "&Nein",IDC_NO_,157,56,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,214,56,50,14
+END
+
+IDD_RENAMEFAVSET DIALOGEX 100, 37, 203, 99
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Einstellungen neuer Favoriten"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Name:",IDC_STATIC_1,14,8,60,8
+    EDITTEXT        IDC_NAME,14,18,173,12,ES_AUTOHSCROLL
+    LTEXT           "Hinweis: Zum Definieren einer Kurztaste für diesen Favoriten schreiben Sie das Zeichen '&&' vor einem Zeichen. Dieses Zeichen wird dann die Kurztaste.",IDC_STATIC_2,14,41,178,24
+    LTEXT           "",IDC_STATIC_3,7,74,189,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,46,80,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,106,80,50,14
+END
+
+IDD_CREATESFX DIALOGEX 6, 15, 214, 113
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Selbstentpackendes Archiv erstellen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Selbstentpackendes &Archiv aus dem Archiv erstellen:",IDC_SOURCE,16,11,179,8
+    EDITTEXT        IDC_ARCHIVE,16,21,182,12,ES_AUTOHSCROLL
+    LTEXT           "&Dateiname des neuen selbstentpackenden Archivs:",IDC_TARGET,16,39,174,8
+    EDITTEXT        IDC_NEWARCHIVE,16,49,182,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Erweitert...",IDC_ADVANCED,138,68,60,14
+    LTEXT           "",IDC_STATIC_1,7,87,200,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,23,94,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,82,94,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,141,94,50,14
+END
+
+IDD_COMMENT DIALOGEX 9, 34, 340, 180
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "ZIP-Archivkommentar"
+MENU IDM_COMMENTMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_COMMENT,0,0,340,180,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+END
+
+IDD_SFXTEXTS DIALOGEX 94, 18, 260, 352
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Texte des Self-Extractors"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Hinweisfenster ",IDC_STATIC_1,8,5,245,158
+    LTEXT           "Dieses Hinweisfenster wird vor dem Hauptdialogfenster und vor Beginn des Entpackens angezeigt.",IDC_STATIC_2,20,18,221,16,NOT WS_GROUP
+    LTEXT           "Wenn kein Hinweisfenster angezeigt werden soll, lassen Sie die Felder 'Titel' und 'Hinweis' leer.",IDC_STATIC_3,20,38,221,16,NOT WS_GROUP
+    LTEXT           "&Schaltflächen:",IDC_STATIC_4,20,61,50,8
+    COMBOBOX        IDC_MBOXBUTTONS,71,59,94,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Typ:",IDC_STATIC_5,20,77,22,8,NOT WS_GROUP
+    COMBOBOX        IDC_MBOXICON,71,75,94,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Tite&l:",IDC_STATIC_6,20,92,145,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTITLE,20,102,221,12,ES_AUTOHSCROLL
+    LTEXT           "Hi&nweis:",IDC_STATIC_7,20,117,32,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTEXT,20,127,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    GROUPBOX        "Hauptdialogfenster",IDC_STATIC_8,8,169,245,158
+    LTEXT           "Titel des &Dialogfensters:",IDC_STATIC_9,20,179,83,8
+    EDITTEXT        IDC_TITLE,20,189,221,12,ES_AUTOHSCROLL
+    LTEXT           "Text der im Dialogfenster &angezeigt wird:",IDC_STATIC_10,20,205,142,8,NOT WS_GROUP
+    EDITTEXT        IDC_TEXT,20,215,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Text der Schaltfläche '&Entpacken':",IDC_STATIC_11,20,247,117,8,NOT WS_GROUP
+    EDITTEXT        IDC_BUTTONTEXT,20,257,68,12,ES_AUTOHSCROLL
+    LTEXT           "&Herstellername:",IDS_VENDOR,20,272,174,8
+    EDITTEXT        IDE_VENDOR,20,282,184,12,ES_AUTOHSCROLL
+    LTEXT           "&Webadresse:",IDS_WWW,20,297,174,8
+    EDITTEXT        IDE_WWW,20,307,108,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,14,333,55,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,73,333,55,14
+    PUSHBUTTON      "&Zurücksetzen",IDC_RESET,132,333,55,14
+    PUSHBUTTON      "Hilfe",IDHELP,191,333,55,14
+END
+
+IDD_MANFAVS DIALOGEX 59, 61, 230, 123
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Favoriten verwalten"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Favoriten:",IDC_STATIC_1,9,4,60,8
+    LISTBOX         IDC_FAVORITIES,9,14,142,100,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Umbenennen",IDC_RENAME,161,13,60,14,WS_GROUP
+    PUSHBUTTON      "&Entfernen",IDC_REMOVE,161,32,60,14
+    PUSHBUTTON      "&Alle entfernen",IDC_REMOVEALL,161,51,60,14
+    DEFPUSHBUTTON   "Schließen",IDOK,161,100,60,14
+END
+
+IDD_WAITFOR DIALOGEX 15, 24, 254, 147
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Warten auf"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Diese Option ermöglicht es Ihnen, auf einen anderen Prozess als den, den Sie im Feld 'Befehl' angegeben haben, zu warten. Nachdem dieser Prozess beendet wurde entfernt der Self-Extractor temporäre Dateien und beendet sich selbst.",IDC_STATIC_1,12,9,228,32
+    LTEXT           "",IDC_STATIC_2,12,49,228,32
+    LTEXT           "&Dateiname der ausführbaren Datei:",IDC_STATIC_3,12,89,122,8
+    EDITTEXT        IDC_FILENAME,12,99,227,12,ES_AUTOHSCROLL
+    LTEXT           "",IDC_STATIC_4,3,121,247,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,42,128,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,102,128,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,162,128,50,14
+END
+
+IDD_CHANGELANG DIALOGEX 6, 15, 240, 114
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Self-Extractor Texte ändern"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Sie haben die Self-Extractor Sprache geändert, möchten Sie die Texte in der Dialogbox 'Self-Extractor Texte' ändern oder die Standardtexte der ausgewählten Sprache benutzen?",IDC_STATIC_1,11,8,217,32
+    DEFPUSHBUTTON   "Ja",IDOK,35,48,50,14
+    PUSHBUTTON      "Nein",IDCANCEL,94,48,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,153,48,50,14
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,3,70,223,1
+    CONTROL         "&Immer nachfragen bevor Texte geändert werden",IDC_ASK,"Button",BS_AUTORADIOBUTTON,11,74,178,12
+    CONTROL         "&Texte automatisch durch ihre Standardwerte ersetzen",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,11,86,193,12
+    CONTROL         "&Nicht wieder fragen und Texte immer unverändert lassen",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,11,98,205,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SFXMENU MENU 
+BEGIN
+    POPUP "&Datei"
+    BEGIN
+        MENUITEM "&Einstellungen exportieren...\tStrg+E", CM_SFX_EXPORT
+        MENUITEM "Einstellungen &importieren...\tStrg+I", CM_SFX_IMPORT
+    END
+    POPUP "&Anzeigen"
+    BEGIN
+        MENUITEM "&Vorschau SFX-Fenster...\tStrg+V", CM_SFX_PREVIEW
+    END
+    POPUP "&Optionen"
+    BEGIN
+        MENUITEM "Alles zu&rücksetzen\tStrg+Umschalt+R",    CM_SFX_RESETALL
+        MENUITEM "Werte &zurücksetzen\tStrg+R",       CM_SFX_RESETVALUES
+        MENUITEM "&Texte zurücksetzen\tStrg+T",        CM_SFX_RESETTEXTS
+        MENUITEM SEPARATOR
+        MENUITEM "Zu F&avoriten hinzufügen...\tStrg+A", CM_SFX_ADD
+        MENUITEM "&Favoriten\tStrg+F",          CM_SFX_FAVORITIES
+        MENUITEM SEPARATOR
+        MENUITEM "Zu&letzt verwendet\tStrg+L",          CM_SFX_LASTUSED
+    END
+END
+
+IDM_FAVMANMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Umbenennen",                     CM_FAVRENAME
+        MENUITEM "&Löschen",                     CM_FAVDELETE
+        MENUITEM SEPARATOR
+        MENUITEM "&Alles entfernen",                 CM_FAVREMOVEALL
+    END
+END
+
+IDM_COMMENTMENU MENU 
+BEGIN
+    POPUP "&Datei"
+    BEGIN
+        MENUITEM "&Speichern",                       CM_SAVE
+        MENUITEM SEPARATOR
+        MENUITEM "&Beenden\tAlt+F4",              CM_CLOSE
+    END
+END
+
+IDM_SPECDIR MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Temporäres Verzeichnis",        CM_TEMP
+        MENUITEM "&Programme",              CM_PROGFILES
+        MENUITEM "&Windows Verzeichnis",          CM_WINDIR
+        MENUITEM "&System Verzeichnis",           CM_SYSDIR
+        MENUITEM SEPARATOR
+        MENUITEM "&Umgebungsvariable",       CM_ENVVAR
+        MENUITEM "&Registry Eintrag",             CM_REGENTRY
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_ABOUTPLUGINTITLE, "Über Plugin"
+  IDS_PLUGIN_DESCRIPTION, "Erstellt, durchsucht, und entpackt ZIP-Archive."
+  IDS_ERROPEN, "Datei kann nicht geöffnet werden."
+  IDS_ERRFORMAT, "Falsches Datenformat."
+  IDS_ERREOCENTRDIR, "Kann das Ende der zentralen Verzeichnissignatur nicht finden. Datei ist möglicherweise beschädigt."
+  IDS_LOWMEM, "Zu wenig Speicher."
+  IDS_ERRADDFILE, "Kann die Datei nicht zur Liste hinzufügen."
+  IDS_ERRADDFILE_TOOLONG, "1 oder mehrere Dateien können nicht zu der Liste hinzugefügt werden. Der Gesamtpfad ist zu lang.\nMöglicherweise fehlen einige Verzeichnisse oder Dateien in der Archivliste."
+  IDS_ERRADDDIR, "Kann das Verzeichnis nicht zur Liste hinzugefügen."
+  IDS_ERRADDDIR_TOOLONG, "1 oder mehrere Verzeichnisse können nicht zu der Liste hinzugefügt werden. Der Gesamtpfad ist zu lang.\nMöglicherweise fehlen einige Verzeichnisse oder Dateien in der Archivliste."
+  IDS_PLUGINNAME, "ZIP-Archiv"
+  IDS_TOOBIG, "Dateien die größer als 4GB sind werden nicht unterstützt."
+  IDS_ERRACCESS, "Kann nicht auf die Datei zugreifen."
+  IDS_ERRREAD, "Kann die Datei nicht lesen."
+  IDS_EOF, "Unerwartetes Ende der Datei."
+  IDS_NODISPLAY, "Die Fehlermeldung wurde bereits angezeigt. Dieser Text sollte nicht auf dem Bildschirm erscheinen."
+  IDS_ERRCREATE, "Kann die Datei weder erstellen noch öffnen."
+  IDS_MULDISK, "Auf mehrere Datenträger verteilte Archive werden in dieser Version des ZIP-Plugins nicht unterstützt."
+  IDS_TOOLONGNAME, "Die Datei hat einen zu langen Pfadnamen und kann nicht verarbeitet werden."
+  IDS_TOOLONGNAME2, "Die Datei hat einen zu langen Pfadnamen und kann nicht im Fenster angezeigt werden."
+  IDS_PREPAREDATA, "Bereite die Daten vor..."
+  IDS_EXTRPROGTITLE, "Entpacken aus ZIP-Archiv - %s"
+  IDS_ERRTEMPDIR, "Kann kein temporäres Verzeichnis im Zielverzeichnis anlegen."
+  IDS_EXTRACTING, "Entpacke: "
+  IDS_TOOLONGNAME3, "Die Datei kann wegen zu langem Pfadnamen nicht entpackt werden."
+  IDS_ERRCOMPDATA, "Fehler in den komprimierten Daten."
+  IDS_BADMETHOD, "Die Datei wurde mit einer Methode komprimiert, die von dieser Version des ZIP-Plugin nicht unterstützt wird."
+  IDS_ERRCRC, "Fehler in den komprimierten Daten. CRC passt nicht."
+  IDS_ERRWRITE, "Kann die Datei nicht schreiben."
+  IDS_TOOLONGMASK, "Die Maske ist zu lang."
+  IDS_EXTRACTFILES, "Entpacke..."
+  IDS_BADPACKLEVEL, "Falsches Kompressionslevel."
+  IDS_BLOCKVANISHED, "Unerwarteter Fehler während der Komprimierung aufgetreten: Block verschwunden."
+  IDS_DELPROGTITLE, "Löschen von ZIP-Archiveinträgen - %s"
+  IDS_DELETEFILES, "Lösche..."
+  IDS_DELETING, "Lösche: "
+  IDS_CANCELING, "Vorgang wird abgebrochen, bitte warten..."
+  IDS_ERRTEMP, "Kann keine temporäre Backupdatei erstellen."
+  IDS_READONLY, "Diese Archivdatei ist schreibgeschützt. Entfernen Sie erst das Schreibschutz-Attribut."
+  IDS_USERBREAK, "Benutzerabbruch. Dieser Text sollte nicht auf dem Bildschirm erscheinen."
+  IDS_REMOVEFILES, "Entferne überflüssige Dateien aus dem Archiv..."
+  IDS_ADDFILES, "Packe..."
+  IDS_ADDING, "Packe: "
+  IDS_BACKUPING, "Sichere Archiv..."
+  IDS_SKIP, "Datei übersprungen. Dieser Text sollte nicht auf dem Bildschirm erscheinen."
+  IDS_ERRACCESDIR, "Kann nicht auf das Verzeichnis zugreifen."
+  IDS_REMOVING, "Entferne: "
+  IDS_ERRRESTORE, "Kann das Originalarchiv nicht durch die temporäre Arbeitsdatei ersetzen. Das Archiv wurde nicht geändert."
+  IDS_AUTO, "Automatisch"
+  IDS_BADLEVEL, "Das Kompressionslevel muss zwischen 0 und 9 liegen."
+  IDS_ERROR, "Fehler"
+  IDS_BADVOLSIZE, "Falscher Wert für die Größe eines Teils. Der Eintrag darf nur Zahlen und einen Dezimalpunkt enthalten.\n\nDie Teilgröße muss größer oder gleich 1KB und kleiner als 4GB sein."
+  IDS_PWDDONTMATCH, "Das eingegebene Passwort ist falsch."
+  IDS_PWDTOOSHORT, "Das Passwort sollte mindestens ein Zeichen lang sein."
+  IDS_BADPWD, "Das Passwort ist falsch. Eingabe des Passwortes wiederholen. Achten Sie auf die richtige Groß/Kleinschreibung. Stellen Sie sicher das die Umschalttaste nicht gedrückt ist."
+  IDS_BADPWDTITLE, "Falsches Passwort"
+  IDS_ADDPROGTITLE, "Packe ZIP-Archiv - %s"
+  IDS_ERRRECOVER, "Der Versuch das ZIP-Archiv wiederherzustellen ist fehlgeschlagen. Dateidaten könnten beschädigt sein."
+  IDS_ECRYPTSTORED, "Bei Methode 'Speichern' (Packlevel 0) kann keine Verschlüsselung durchgeführt werden."
+  IDS_ECRYPTSFX, "Die AES-Verschlüsselung wird von selbstentpackenden Archiven nicht unterstützt."
+  IDS_ERRCREATEDIR, "Kann das Verzeichnis nicht erstellen."
+  IDS_CANTMULTIVOL, "Es existiert bereits ein Archiv mit diesem Namen.\nDas mehrteilige Archiv kann nur als neues Archiv erstellt werden."
+  IDS_FILEEXIST, "Die angegebene Datei existiert bereits, möchten Sie sie überschreiben?"
+  IDS_CHDISKTEXT, "Packen von Teil %d wurde beendet.\nLegen Sie einen anderen Datenträger ein, er wird dann für Teil %d benutzt."
+  IDS_BYTES, "Bytes"
+  IDS_TOOLOWSPACE, "Nicht genügend freier Speicherplatz auf dem Datenträger. Datenträger kann nicht benutzt werden."
+  IDS_LOWSPACE, "Achtung: Der freie Speicherplatz auf dem Datenträger ist kleiner als die angegebene Größe eines Teils."
+  IDS_LOWSPACE2, "Achtung: Nicht genügend freier Speicherplatz auf dem Datenträger."
+  IDS_MULTISTORED, "Methode 'Speichern' (Packlevel 0) kann keine mehrteiligen Archive erstellen."
+  IDS_CHDISKTEXT2, "Legen Sie den Datenträger mit dem Teilarchiv Nummer %d ein oder suchen Sie die Datei auf dem Datenträger."
+  IDS_ZIPARCHIVES, "ZIP-Archivdateien (*.zip; *.z*; *.pk3; *.jar)"
+  IDS_BROWSEARCHIVETITLE, "Archivdatei auswählen"
+  IDS_ZIPARCHIVESEXTS, "*.zip;*.z*;*.pk3;*.jar"
+  IDS_ERRMULTIVOL, "Der gewünschte Vorgang wird bei mehrteiligen Archiven nicht unterstützt. Mehrteilige Archive können nur aufgelistet und entpackt werden.\n\nHinweis: Falls dies kein mehrteiliges Archiv ist, haben die Daten ein unbekanntes Format oder sind defekt."
+  IDS_MISSLHSIG, "Falsches Datenformat. Kopfsignatur der lokalen Datei fehlt."
+  IDS_ERRGETDISKFREESP, "Kann den freien Speicherplatz nicht ermitteln."
+  IDS_MISSCHSIG, "Falsches Datenformat. Zentrale Dateikopfsignatur fehlt."
+  IDS_WRITINGEXE, "Schreiben des selbstentpackenden Archivs..."
+  IDS_TOOLONGZIPNAME, "Kann nicht fortfahren. Der Pfadname des ZIP-Archivs ist zu lang."
+  IDS_ERRGETMODULENAME, "Modulname kann nicht ermittelt werden."
+  IDS_DEFAULTTEXT, "Dies wird das ZIP-Archiv entpacken."
+  IDS_CREAETARCH, "Neues Archiv erstellen"
+  IDS_ADDTOARCHIVE, "Dateien zum Archiv hinzufügen"
+  IDS_DEFSFXTITLE, "Selbstentpackendes ZIP-Archiv"
+  IDS_ERRBADTITLE, "Der Titel des Hauptdialogfensters darf nicht leer sein. Geben Sie bitte mindestens ein Zeichen ein."
+  IDS_ERRBADMBOXTITLE, "Der Titel im Hinweisfenster darf nicht leer sein. Bitte geben Sie mindestens ein Zeichen ein."
+  IDS_ERRLAODSHELLDLL, "Shell32.dll kann nicht geladen werden. "
+  IDS_ERRGETPROCADDRESS, "Prozeduradresse im DLL-Modul kann nicht ermittelt werden. "
+  IDS_ERRADDICON, "Das Symbol kann nicht zum selbstentpackenden Archiv hinzugefügt werden."
+  IDS_ERRLOADICON, "Das Symbol der Datei kann nicht geladen werden. "
+  IDS_ERRLOADLIB, "Das Modul mit den Symbolen kann nicht geladen werden. Dieses Modul ist keine gültige Win32-Anwendung. "
+  IDS_ERRLOADLIB2, "Das Modul mit den Symbolen kann nicht geladen werden. "
+  IDS_ERRLOADSFXICON, "Das Symbol für den Self-Extractor kann nicht geladen werden."
+  IDS_EXPIRE, "Das Plugin ist abgelaufen. Bitte überprüfen Sie auf unserer Webseite, ob eine neuere Version vorhanden ist."
+  IDS_UNDERCOSTRUCT, "Wird bearbeitet."
+  IDS_NOSFXINSTALLED, "Self-Extractor konnte nicht gefunden werden.\n\nWenn Sie selbstentpackende Archive erstellen wollen, installieren Sie bitte das ZIP-Plugin erneut."
+  IDS_UNABLEREADSFXDIR, "Das Verzeichnis des Self-Extractors kann nicht gelesen werden: "
+  IDS_UNABLEREADALLSFX, "Keine der Dateien des Self-Extractors konnten geladen werden."
+  IDS_UNABLEREADSFX, "Die selbstentpackende Datei kann nicht geladen werden: %s\n\nDrücken Sie 'OK' für weiter, oder 'Abbrechen' um abzubrechen."
+  IDS_UNABLEREADSFX2, "Die selbstentpackende Standarddatei kann nicht geladen werden: %s"
+  IDS_CORRUPTSFX, "Die selbstentpackende Datei ist defekt."
+  IDS_CORRUPTSFX2, "Die selbstentpackende Datei '%s' ist defekt.\n\nDrücken Sie 'OK' für weiter, oder 'Abbrechen' um abzubrechen."
+  IDS_ERRLOADMENU, "Das Menü kann nicht geladen werden."
+  IDS_ERRLOADACCELS, "Die Zugriffstabelle kann nicht geladen werden."
+  IDS_NODEFSFX, "Die selbstentpackende Standarddatei kann nicht geladen werden."
+  IDS_ERRLOADCONFIG, "Die Konfiguration kann nicht geladen werden - zu wenig Speicher."
+  IDS_EMPTY, "Leer"
+  IDS_RENAMEFAVSET, "Einstellungen für Favoriten umbenennen."
+  IDS_USEDNAME, "Der Name exisistiert bereits."
+  IDS_NOLANGFILE, "Favoriteneinstellungen können nicht geladen werden: die benötigte Sprache des Self-Extractors (%s) ist nicht installiert."
+  IDS_SETTINGSFILE, "Konfigurationsdateien (*.set)"
+  IDS_DEFEXTRBUTTON, "&Entpacken"
+  IDS_EXPORTOVEWRITE, "Die Datei existiert bereits. Überschreiben?"
+  IDS_ERRGETTEMP, "Die temporäre Datei kann nicht erstellt werden."
+  IDS_SFXABOUTBTN1, "Ü&ber >>"
+  IDS_SFXABOUTBTN2, "<< Ü&ber"
+  IDS_MENUCREATESFX, "&Selbstentpackendes Archiv (.exe) erstellen..."
+  IDS_MENUTEST, "Archiv &testen"
+  IDS_MENUREPAIR, "Beschädigtes Archiv &reparieren"
+  IDS_CONTINUE, "Der letzte Vorgang wurde nicht ordungsgemäß beendet. Weiter mit der nächsten Datei?"
+  IDS_NOARCHIVETYPED, "Der Dateiname für das Archiv fehlt."
+  IDS_NOEXETYPED, "Der Dateiname des selbstentpackenden Archivs fehlt."
+  IDS_SFXPROGTITLE, "Selbstentpackendes ZIP-Archiv - %s erstellen"
+  IDS_COPYDATA, "Kopiere Archivdaten..."
+  IDS_EMPTYARCHIVE, "Das Archiv ist leer."
+  IDS_BADMETHODSFX, "Das Archiv enthält Dateien die mit einer Methode komprimiert sind, die der Self-Extractor nicht unterstützt.\n\nBitte komprimieren Sie ausschließlich mit dem ZIP-Plugin."
+  IDS_TESTPROGTITLE, "ZIP-Archiv - %s testen"
+  IDS_TESTFILES, "Teste Dateien..."
+  IDS_TESTING, "Teste: "
+  IDS_TESTOK, "Archiv '%s' ist in Ordnung."
+  IDS_TESTKO, "Einige Dateien im Archiv '%s' sind defekt oder mit einem unbekannten Passwort verschlüsselt."
+  IDS_MENUCOMMENT, "Archiv&kommentar..."
+  IDS_COMMENTMODIFIED, "Der Dateikommentar wurde geändert.\n\nMöchten Sie die Änderungen speichern?"
+  IDS_COMMENTDLGTITLE, "ZIP-Archivkommentar - %s"
+  IDS_ERRREADCOMMENT, "Beim Lesen des ZIP-Archivkommentars ist ein Fehler aufgetreten, die Datei ist entweder defekt oder Sie hat ein unbekanntes Format.\n\nDrücken Sie 'OK' um den Archivkommentar zu überspringen und mit dem Lesen des Archivs fortzufahren."
+  IDS_COMMENTMV, "Der Kommentar eines mehrteiligen Archivs kann angezeigt aber nicht gespeichert werden."
+  IDS_RECOVERARCHIVETITLE, "ZIP-Archiv reparieren"
+  IDS_SOURCEHEADING, "&Repariere Archiv:"
+  IDS_TARGETHEADING, "&Speichern des wiederhergestellten Archivs unter:"
+  IDS_REPAIRPROGTITLE, "Reparatur des ZIP-Archivs - %s"
+  IDS_SAVING, "Speichere: "
+  IDS_REPAIRING, "Repariere Archiv..."
+  IDS_ERROPENICO, "Die Datei mit den Symbolen kann nicht geladen werden."
+  IDS_BADBUTTONTEXT, "Der Titel im Hauptdialogfenster darf nicht leer sein. Bitte geben Sie mindestens ein Zeichen ein."
+  IDS_BADTEMP, "$(Temp) darf von keinem Zeichen gefolgt werden. Geben Sie bitte nur $(Temp) ein, wenn Sie in ein temporäres Verzeichnis entpacken wollen."
+  IDS_MISBAR, "Fehlender Abschlussbalken in einer $()-Sequenz."
+  IDS_BADVAR, "Unbekannte $() Variable."
+  IDS_MBOK, "OK"
+  IDS_MBOKCANCEL, "OK + Abbrechen"
+  IDS_MBYESNO, "Ja + Nein"
+  IDS_MBAGREEDISAGREE, "Annehmen + Ablehnen"
+  IDS_MBNOICON, "Einfach"
+  IDS_MBEXCLAMATION, "Warnung"
+  IDS_MBINFORMATION, "Information"
+  IDS_MBQUESTION, "Frage"
+  IDS_LONGMESSAGE, "Lange Nachricht"
+  IDS_BADKEY, "Falscher Schlüsselname."
+  IDS_MANAGE, "&Konfigurieren..."
+  IDS_REMOVEWARNTITLE, "Favoriteneinstellungen entfernen"
+  IDS_REMOVEWARN, "Sind Sie sicher, das Sie die Einstellungen '%s' entfernen möchten?\n\nDieser Vorgang kann nicht rückgängig gemacht werden."
+  IDS_REMOVEALLWARN, "Sind Sie sicher, das Sie alle gespeicherten Einstellungen entfernen möchten?\n\nDieser Vorgang kann nicht rückgängig gemacht werden."
+  IDS_MISSINGVERSION, "Einstellungen können nicht geladen werden: Versionsnummer fehlt."
+  IDS_BADVERSION, "Einstellungen können nicht geladen werden: Version wird nicht unterstützt."
+  IDS_BADTEMP2, "Einstellungen können nicht geladen werden, falscher Eintrag für 'target_dir': nach $(Temp) darf kein Zeichen folgen."
+  IDS_MISBAR2, "Einstellungen können nicht geladen werden, falscher Eintrag für 'target_dir': fehlender Abschlussbalken in der $()-Sequenz."
+  IDS_BADVAR2, "Einstellungen können nicht geladen werden, falscher Eintrag für 'target_dir': unbekannte $()-Variable."
+  IDS_BADKEY2, "Einstellungen können nicht geladen werden, falscher Eintrag für 'target_dir': falscher Schlüsselname."
+  IDS_CHDISKTEXT3, "Bitte legen Sie einen Datenträger mit Teil Nummer %d ein."
+  IDS_NONTEXT, "Bitte geben Sie mindestens ein Zeichen ein."
+  IDS_BADSFXVER, "Nicht unterstützte Version des SFX-Pakets (%s). Bitte laden Sie sich die neueste Version des ZIP-Plugins mit der passenden SFX-Version herunter."
+  IDS_BADSFXVER2, "Nicht unterstützte Version des SFX-Pakets. Bitte laden Sie sich die neueste Version des ZIP-Plugins mit der passenden SFX-Version herunter."
+  IDS_TOOBIG2, "Der Vorgang kann nicht beendet werden, da die ZIP-Dateigröße auf 4GB beschränkt ist.\n\nWenn Sie mehr als 4GB Daten packen möchten, sollten Sie ein mehrteiliges Archiv verwenden. Sie können 65536 Teile mit einer Größe von 4GB erzeugen. Die zu archivierende Dateigröße darf aber 4GB nicht überschreiten."
+  IDS_FILENOTFOUND, "Datei wurde nicht gefunden."
+  IDS_ALLFILES, "Alle Dateien (*.*)"
+  IDS_NOTFOUND, "Datei wurde nicht gefunden."
+  IDS_BADMSGBOXTYPE, "Die Schaltflächen 'Annehmen + Ablehnen' können nur in Verbindung mit dem Hinweistyp 'Lange Nachricht' verwendet werden."
+  IDS_LOTFILES, "Sie sind dabei ein ZIP-Archiv mit mehr als 65535 Einträgen zu erstellen. Ein solches Archiv ist nicht kompatibel mit dem original ZIP-Format und einige Archivierer sind u.U. nicht in der Lage es zu entpacken.\n\nMöchten Sie fortfahren?"
+  IDS_LOTFILESSFX, "Kann kein selbstentpackendes ZIP-Archiv mit mehr als 65535 Einträgen erzeugen."
+  IDS_BADAES, "Diese Datei ist mit einer unbekannten AES Version verschlüsselt."
+  IDS_PWDTOOLONG, "Das Passwort ist zu lang.\nDie maximale Passwortlänge für AES-Verschlüsselungen beträgt 128 Zeichen."
+  IDS_AESERROR, "AES Fehler."
+  IDS_MACERROR, "Authentifizierungscode passt nicht. Die Datei ist entweder defekt oder das eingegebende Passwort ist fehlerhaft."
+  IDS_ERRZIP64, "Die gewünschte Operation wird von Zip64 Archiven nicht unterstützt. Zip64 Archive können nur aufgelistet und entpackt werden."
+  IDS_ONLYFULLVERSION, " (nur in der Vollversion verfügbar)"
+  IDS_ERRBZIP2 "Fehler im BZIP2-Strom aufgetreten. Das Archiv könnte beschädigt sein."
+  IDS_UNSUP_CD_ENCRYPTION "Das Hauptverzeichnis des Archivs, dass die Liste der Dateien enthält, ist verschlüsselt oder komprimiert.\nDas wird nicht unterstützt."
+  IDS_LISTINFO_PAKEDSIZE      "Gepackt"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Packgröße der Datei"
+  IDS_SIZE_KB, "KB"
+  IDS_SIZE_MB, "MB"
+  IDS_MODIFICATION_NOT_SUPPORTED, "Die ZIP-Datei verwendet ein Datenformat, dass keine Änderungen durch die aktuelle Version des ZIP-Plugins unterstützt"
+  IDS_WAITFOR_INFO, "Das ist nur notwendig, wenn das Installationsprogramm eine andere ausführbare Datei startet, die die Installation fortsetzt, während das ursprüngliche Installationsprogramm beendet wird.\nEs arbeiten z.B. einige Versionen von InstallShield so."
+}
+
+STRINGTABLE
+{
+  IDS_SFX_COMMENT_HEAD1, ";Self-Extractor Einstellungen\r\n\r\n;Das ist die Einstellungsdatei für den Self-Extractor.\r\n;\r\n;Dateiformat Syntax:\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD2, ";Zeilen die mit ';' beginnen werden als Kommentar behandelt und beim\r\n;Auslesen der Einstellungen ignoriert.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD3, ";Alle Variablen außer 'Version' sind optional. Wird die Variable in der\r\n;Datei nicht gefunden, wird der Standardwert benutzt.\r\n;Standardwerte für sprachabhängige Variablen (dlg_text, dlg_title,\r\n;button_text) sind aus dem SFX-Paket entnommen.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD4, ";Alle Zeichenketten, einschließlich leere (Nullstrings), müssen in\r\n;doppelten Anführungszeichen eingeschlossen werden. Um doppelte\r\n;Anführungsszeichen einzugeben, schreiben Sie 2 hintereinander.\r\n;\r\n;Mit doppelten Anführungszeichen können keine Zahlen eingeschlossen werden.\r\n\r\n"
+  IDS_SFX_COMMENT_VERSION, "\r\n;Version der Einstellungsdatei, aktuelle Version ist 2\r\n;das ist die einzige verbindliche Variable\r\n\r\n"
+  IDS_SFX_COMMENT_TARGDIR1, "\r\n;Zielverzeichnis-Vorgabe, es kann entweder ein absoluter Pfad\r\n;oder ein relativer Pfad sein; ein relativer Pfad ist relativ\r\n;zum aktuellen Verzeichnis wenn SFX gestartet wird\r\n"
+  IDS_SFX_COMMENT_TARGDIR2, ";Sie können auch vordefinierte Variablen am Anfang (!)\r\n;der 'target_dir'-Zeichenkette verwenden:\r\n;\r\n"
+  IDS_SFX_COMMENT_TARGDIR3, ";  $(Temp)      temporäres Verzeichnis, sollte immer alleine\r\n;               im 'target_dir' Feld stehen, ohne weitere Pfadangaben\r\n"
+  IDS_SFX_COMMENT_TARGDIR4, ";  $(ProgFiles) Programmverzeichnis\r\n;  $(WinDir)    Windowsverzeichnis\r\n;  $(SysDir)    Systemverzeichnis\r\n"
+  IDS_SFX_COMMENT_TARGDIR5, ";  $[variable]  Wert der Umgebungsvariable 'variable'\r\n;  $<regkey>    Wert des Registrierungsschlüssels 'regkey'\r\n;  z.B. SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ProgramFilesDir\r\n\r\n"
+  IDS_SFX_COMMENT_ALLOWCHANGE, "\r\n;Bestimmt, ob der Benutzer beim Entpacken das Zielverzeichnis ändern darf\r\n;Setzen Sie den Wert auf 1 um es zuzulassen\r\n\r\n"
+  IDS_SFX_COMMENT_REMOVE1, "\r\n;Bestimmt, ob entpackte Dateien aus dem temporären Verzeichnis gelöscht werden\r\n;sollen, wenn das durch die Variable 'command' angegebene Programm beendet wird\r\n"
+  IDS_SFX_COMMENT_REMOVE2, ";Setzen Sie den Wert auf 1 wenn die Temporärdateien entfernt werden sollen\r\n;Die Verwendung dieser Variablen macht nur Sinn, wenn 'target_dir' auf\r\n;'$(Temp)' gesetzt wurde, ansonsten wird sie ignoriert\r\n\r\n"
+  IDS_SFX_COMMENT_AUTO, "\r\n;Bestimmt, ob das Entpacken automatisch gestartet werden soll, wenn der\r\n;Anwender das selbstentpackende Archiv aufruft\r\n;Setzen Sie den Wert auf 1 wenn das Entpacken automatisch gestartet werden soll\r\n\r\n"
+  IDS_SFX_COMMENT_SUMMARY, "\r\n;Bestimmt, ob ein Hinweis gezeigt werden soll nachdem das Entpacken der\r\n;Dateien erfolgreich beendet wurde\r\n;Setzen sie den Wert auf 1 wenn der Hinweis gezeigt werden soll\r\n\r\n"
+  IDS_SFX_COMMENT_HIDE, "\r\n;Bestimmt, ob das Hauptfenster des Self-Extractors gezeigt werden soll\r\n;Setzen Sie den Wert auf 1 wenn das SFX-Hauptfenster nicht gezeigt werden soll\r\n;Die Verwendung dieser Variablen macht nur Sinn wenn 'autostart' auf 1 gesetzt\r\n;wurde, ansonsten wird sie ignoriert\r\n\r\n"
+  IDS_SFX_COMMENT_OVERWRITE, "\r\n;Bestimmt, ob im Zielverzeichnis alle Dateien automatisch überschrieben\r\n;werden sollen\r\n;Setzen Sie den Wert auf 1 wenn alle Dateien automatisch überschrieben\r\nwerden sollen\r\n\r\n;"
+  IDS_SFX_COMMENT_AUTODIR, "\r\n;Bestimmt, ob das Zielverzeichnis ohne den Benutzer zu fragen automatisch\r\n;angelegt werden soll\r\n;Setzen Sie den Wert auf 1 wenn das Zielverzeichnis automatisch\r\n;angelegt werden soll\r\n\r\n"
+  IDS_SFX_COMMENT_COMMAND, "\r\n;Programm, HTTP-Link oder Dokument, das nach dem erfolgreichen Entpacken\r\n;gestartet/aufgerufen werden soll.Der Pfad ist relativ zum Zielverzeichnis\r\n;des Entpackens.\r\n;Wenn Sie ein Programm angeben, können Sie auch Parameter verwenden\r\n\r\n"
+  IDS_SFX_COMMENT_PACKAGE, "\r\n;SFX-Paket das beim Erstellen eines selbstentpackenden Archivs verwendet wird\r\n;relativer Pfad ist relativ zu dem Verzeichnis mit zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_MBUT, "\r\n;Schaltflächen im optionalen Hinweisfenster können folgende sein:\r\n; 'ok', 'ok_cancel', 'yes_no', oder 'agree_disagree'\r\n\r\n"
+  IDS_SFX_COMMENT_MICO, "\r\n;Typ des optionalen Hinweisfensters kann eines der folgenden sein:\r\n;'simple', 'exclamation', 'information', 'question', oder 'long_message'\r\n\r\n"
+  IDS_SFX_COMMENT_MBOX, "\r\n;Text und Titel im optionalen Hinweisfenster, das vor dem Entpacken\r\n;angezeigt werdens soll\r\n;Wenn kein Hinweisfenster anzeigt werden soll, lassen Sie beide Felder\r\n;leer. ("""")\r\n\r\n"
+  IDS_SFX_COMMENT_TEXT, "\r\n;Text der in dem SFX-Hauptdialogfenster angezeigt werden soll\r\n\r\n"
+  IDS_SFX_COMMENT_TITLE, "\r\n;Titel des SFX-Hauptdialogfensters\r\n\r\n"
+  IDS_SFX_COMMENT_BUTTON, "\r\n;Text für die Schaltfläche 'Entpacken' im SFX-Hauptdialogfenster\r\n\r\n"
+  IDS_SFX_COMMENT_VENDOR, "\r\n;Herstellername in der linken unteren Ecke des SFX-Hauptdialogfensters\r\n\r\n"
+  IDS_SFX_COMMENT_WWW, "\r\n;Weblink in der rechten unteren Ecke des SFX-Hauptdialogfensters\r\n\r\n"
+  IDS_SFX_COMMENT_ICOFILE, "\r\n;Dateien mit Symbolen, es kann entweder eine ICO-Datei oder eine\r\n;ausführbare Datei PE (wie Win32 EXEs oder DLLs) das Symbol enthalten\r\n;relativer Pfad ist relativ zu dem Verzeichnis mit zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_ICOINDEX, "\r\n;Positiver Wert bedeutet der Index eines Symbols aus der in der\r\n;'icon_file'-Variablen angegebenen Datei\r\n;Negativer Wert bedeutet eine Ressourcen-ID des Symbols\r\nn;Bei ICO-Dateien ist der Index immer 0 und der Wert wird ignoriert\r\n\r\n"
+  IDS_SFX_COMMENT_WAITFOR1, "\r\n;Diese Option ermöglicht es Ihnen, auf einen anderen Prozess als den,\r\n;den Sie im Feld 'Befehl' angegeben haben, zu warten.\r\n;Nachdem dieser Prozess beendet wurde entfernt der Self-Extractor\r\n;temporäre Dateien und beendet sich schließlich selbst.\r\n"
+  IDS_SFX_COMMENT_WAITFOR2, ";Das ist nur notwendig, wenn das Installationsprogramm eine andere\r\n;ausführbare Datei startet, die die Installation fortsetzt, während das\r\n;ursprüngliche Installationsprogramm beendet wird.\r\n"
+  IDS_SFX_COMMENT_WAITFOR3, ";Es arbeiten z.B. einige Versionen von InstallShield so.\r\n;Diese Option wird ignoriert, es sei denn 'remove_temp' ist auf 1 gesetzt.\r\n\r\n"
+  IDS_SFX_COMMENT_REQUIRESADMIN, "\r\n;Benötigt Administratorrechte um auf Windows Vista oder höher ausgeführt\r\n;werden zu können\r\n\r\n"
+}

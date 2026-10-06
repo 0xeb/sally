@@ -1,0 +1,660 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for zip. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\zip.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_EXPACKOPTIONS DIALOGEX 41, 41, 313, 201
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Rozšírené možnosti extrahovania"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archív:",IDC_STATIC_1,17,9,25,8
+    CONTROL         "",IDC_ARCHIVE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,44,9,261,8
+    LTEXT           "",IDC_STATIC_2,8,24,296,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Vytvoriť viaczväzkový &archív",IDC_MULTIVOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,31,107,12
+    LTEXT           "&Veľkosť zväzku:",IDC_STATIC_3,157,33,55,8,NOT WS_GROUP
+    COMBOBOX        IDC_VOLSIZE,213,31,59,110,CBS_DROPDOWN | WS_DISABLED | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_UNITS,277,31,27,34,CBS_DROPDOWNLIST | WS_DISABLED | WS_TABSTOP
+    CONTROL         "&Názov súborov následne",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,17,45,94,12
+    LTEXT           "",IDC_STATIC_4,8,63,296,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Vytvoriť &samorozbaliteľný archív",IDC_SELFEXTR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,70,120,12
+    PUSHBUTTON      "&Pokročilé...",IDC_ADVANCED,244,70,60,14,WS_DISABLED
+    LTEXT           "",IDC_STATIC_5,8,90,296,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Š&ifrovať súbory",IDC_ENCRYPT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,97,66,12
+    LTEXT           "&Heslo:",IDC_STATIC_6,28,113,22,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD1,89,111,90,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    LTEXT           "P&otvrdenie hesla:",IDC_STATIC_7,28,129,60,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD2,89,127,90,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    GROUPBOX        " Metóda šifrovania ",IDC_STATIC_8,188,97,116,50
+    CONTROL         "&ZIP 2.0 kompatibilný (slabé)",IDC_ENC_ZIP20,"Button",BS_AUTORADIOBUTTON | WS_DISABLED | WS_GROUP,193,108,106,12
+    CONTROL         "&128-bit AES",IDC_ENC_AES128,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,193,120,53,12
+    CONTROL         "&256-bit AES",IDC_ENC_AES256,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,193,132,55,12
+    LTEXT           "",IDC_STATIC_9,8,154,296,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Nabudúce nezo&brazovať (neskôr môžete zmeniť v dialógovom okne konfigurácie)",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,161,284,12
+    DEFPUSHBUTTON   "OK",IDOK,27,180,60,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,93,180,60,14
+    PUSHBUTTON      "&Konfigurácia...",IDC_CONFIG,159,180,60,14
+    PUSHBUTTON      "Nápoveda",IDHELP,225,180,60,14
+END
+
+IDD_CONFIG DIALOGEX 50, 37, 303, 277
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP - Konfigurácia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Extrahovanie",IDC_STATIC_1,7,6,46,8
+    LTEXT           "",IDC_STATIC_2,53,10,244,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Automaticky extrahovať viaczväzkové archívy uložené na pevnom disku",IDC_AUTOEXPANDMV,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,17,250,12
+    LTEXT           "Komprimácia",IDC_STATIC_3,7,35,46,8
+    LTEXT           "",IDC_STATIC_4,51,39,246,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Na zmeny použiť dočasné &kópie archívu (odporúčané, odolný voči zrúteniu)",IDC_BACKUP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,46,266,12
+    CONTROL         "N&eukladať prázdne adresáre do ZIP archívu",IDC_NOEMPTYDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,58,160,12
+    CONTROL         "Pri zmene archívu nastaviť čas archívu podľa času &najnovšieho súboru",IDC_SETFILETIME,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,70,248,12
+    CONTROL         "Použiť WinZip kompatibilné názvy súborov pre viaczväzkové archívy (s výnimkou",IDC_WINZIPNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,82,280,12
+    LTEXT           "samorozbaliteľných archívov, ktoré vždy použijú názvy Sally)",IDC_STATIC_5,26,94,248,8
+    LTEXT           "St&upeň komprimácie (0 - 9, 9 najlepšia komprimácia, najdlhší čas):",IDC_STATIC_6,14,107,226,8
+    EDITTEXT        IDC_LEVEL,241,105,16,12
+    LTEXT           "Predvolený jazyk &SFX archívu:",IDC_STATIC_7,14,120,102,8
+    COMBOBOX        IDC_LANGUAGE,117,118,76,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Potvrdenie",IDC_STATIC_8,7,136,38,8
+    LTEXT           "",IDC_STATIC_9,46,140,251,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Pri zmene SFX jazyka",IDC_STATIC_10,14,148,245,49
+    CONTROL         "Vždy sa pýtať pred zmenou &textu",IDC_ASK,"Button",BS_AUTORADIOBUTTON | WS_GROUP,20,158,124,12
+    CONTROL         "Automaticky nah&radiť texty ich štandardnými hodnotami",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,20,170,201,12
+    CONTROL         "Nepýtať sa a vždy zanechať te&xty nezmenené",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,20,182,167,12
+    CONTROL         "Zobraziť dialógové okno s rozšírenými &možnosťami pred komprimáciou",IDC_SHOWEXOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,200,249,12
+    LTEXT           "Hlavičková lišta",IDC_STATIC_11,7,217,53,8
+    LTEXT           "",IDC_STATIC_12,60,221,237,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Zobraziť stĺpec ""Komprimovaná veľkosť"" pri výpise archívu",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,228,209,12
+    LTEXT           "",IDC_STATIC_13,6,247,291,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,38,256,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,97,256,50,14
+    PUSHBUTTON      "&Predvolené",IDC_DEFAULT,156,256,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,215,256,50,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 276, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zadanie ZIP hesla"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK,21,10,18,20
+    LTEXT           "Súbor je šifrovaný. Prosím zadajte heslo na dešifrovanie.",IDC_STATIC_1,57,10,207,8
+    LTEXT           "Súbor:",IDC_STATIC_2,57,23,28,8
+    CONTROL         "",IDC_FILE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,87,23,177,8
+    LTEXT           "&Heslo:",IDC_STATIC_3,57,36,22,8
+    EDITTEXT        IDC_PASSWORD,86,34,178,12,ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,14,55,55,14,WS_GROUP
+    PUSHBUTTON      "&Preskočiť",IDC_SKIP,75,55,55,14
+    PUSHBUTTON      "Pres&kočiť všetko",IDC_SKIPALL,136,55,65,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,207,55,55,14
+END
+
+IDD_LOWFREESPACE DIALOGEX 13, 54, 352, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nedostatok voľného miesta na disku"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Varovanie: Voľné miesto na disku je menšie ako veľkosť vybraného zväzku.",IDC_TEXT,64,9,279,8
+    RTEXT           "Cesta:",IDC_STATIC_1,4,26,55,8
+    LTEXT           "",IDC_PATH,64,26,279,8
+    RTEXT           "Voľné miesto:",IDC_STATIC_2,4,39,55,8
+    LTEXT           "",IDC_FREESPACE,64,39,279,8
+    RTEXT           "Veľkosť zväzku:",IDC_STATIC_3,4,52,55,8
+    LTEXT           "",IDC_VOLUMESIZE,64,52,279,8
+    DEFPUSHBUTTON   "&Ignorovať",IDC_IGNORE,49,73,55,14
+    PUSHBUTTON      "Ignorovať &všetko",IDC_ALL,110,73,70,14
+    PUSHBUTTON      "&Opakovať",IDC_RETRY,186,73,55,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,247,73,55,14
+END
+
+IDD_CHANGEDISK DIALOGEX 24, 40, 194, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zmena disku"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,168,24
+    LTEXT           "Stlačte OK, ak ste pripravený.",IDC_STATIC_1,13,39,168,8
+    DEFPUSHBUTTON   "OK",IDOK,42,57,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,102,57,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 6, 15, 350, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Potvrdenie nahradenia súboru"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Nahradiť súbor:",IDC_STATIC_1,5,14,56,8
+    LTEXT           "",IDC_FILE,66,14,269,8
+    LTEXT           "",IDC_FILEATTR,66,24,269,8
+    LTEXT           "Súbor už na disku existuje. Nahradiť?",IDC_STATIC_2,66,39,174,8
+    DEFPUSHBUTTON   "&Áno",IDC_YES,63,56,50,14
+    PUSHBUTTON      "&Všetko",IDC_ALL,121,56,50,14
+    PUSHBUTTON      "&Opakovať",IDC_RETRY,179,56,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,237,56,50,14
+END
+
+IDD_CHANGEDISK2 DIALOGEX 24, 40, 210, 108
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Tento súbor je buď časť viaczväzkového archívu alebo je poškodený.",IDC_STATIC_1,13,8,184,16
+    LTEXT           "Ak viete, že by to mal byť viaczväzkový archív, prosím vložte disk s poslednou časťou archívu alebo vyhľadajte súbor na pevnom disku. Potom stlačte OK.",IDC_STATIC_2,13,31,184,24
+    LTEXT           "&Posledná časť archívu:",IDC_STATIC_3,13,61,89,8
+    EDITTEXT        IDC_FILENAME,13,71,168,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,185,71,13,12
+    DEFPUSHBUTTON   "OK",IDOK,50,89,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,110,89,50,14
+END
+
+IDD_CHANGEDISK3 DIALOGEX 24, 40, 210, 132
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zmena disku"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,184,16
+    LTEXT           "Stlačte OK, ak ste pripravený.",IDC_STATIC_1,13,31,184,8
+    CONTROL         "Názvy súborov ná&sledne",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,43,135,12
+    CONTROL         "Číslo disku v príp&one",IDC_WINZIP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,55,114,12
+    CONTROL         "Vykonať všetky zv&äzky bez opýtania",IDC_PROCEEDALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,67,133,12
+    LTEXT           "&Názov súboru:",IDC_STATIC_2,13,84,60,8
+    EDITTEXT        IDC_FILENAME,13,94,168,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,185,94,13,12
+    DEFPUSHBUTTON   "OK",IDOK,49,112,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,111,112,50,14
+END
+
+IDD_ADVANCEDSE DIALOGEX 37, 14, 295, 303
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nastavenie samorozbaliteľného archívu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_STATIC_1,0,0,295,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Adresár pre extrahované súbory",IDC_STATIC_2,7,7,282,89,WS_GROUP
+    LTEXT           "E&xtrahovať do:",IDC_STATIC_3,20,19,53,8,NOT WS_GROUP
+    EDITTEXT        IDC_TARGETDIR,20,29,239,12,ES_AUTOHSCROLL | ES_NOHIDESEL
+    PUSHBUTTON      ">",IDC_SPECDIR,262,29,12,12
+    LTEXT           "Poznámka: Môžete zadať relatívnu cestu, ktorá bude v kombinácii s aktuálnym adresárom, v ktorom je spustený SFX archív alebo úplnú cestu. Nechajte pole prázdne na extrahovanie do aktuálneho adresára.",IDC_STATIC_4,20,47,249,24,NOT WS_GROUP
+    CONTROL         "Povoliť &užívateľovi zmeniť adresár",IDC_ALLOWUSER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,77,146,12
+    LTEXT           "V&ykonať príkaz alebo otvoriť dokument:",IDC_STATIC_5,20,113,136,8,NOT WS_GROUP
+    EDITTEXT        IDC_EXECUTE,20,123,254,12,ES_AUTOHSCROLL
+    CONTROL         "&Odstrániť extrahované súbory",IDC_REMOVE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,139,131,12
+    PUSHBUTTON      "&Počkať na...",IDC_WAITFOR,224,138,50,14
+    GROUPBOX        "Rozhranie",IDC_STATIC_6,7,163,282,53,WS_GROUP
+    PUSHBUTTON      "&Texty...",IDC_TEXTS,20,177,50,14
+    LTEXT           "&Jazyk:",IDC_STATIC_7,20,198,36,8,NOT WS_GROUP
+    COMBOBOX        IDC_LANGUAGE,74,196,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Ikona:",IDC_STATIC_8,155,198,24,8,NOT WS_GROUP
+    LTEXT           "",IDC_EXEICON,183,194,19,18,NOT WS_GROUP
+    PUSHBUTTON      "Zmeniť &ikonu...",IDC_CHANGEICON,210,196,64,14
+    GROUPBOX        "Potvrdenia a ďalšie možnosti",IDC_STATIC_9,7,221,282,57
+    CONTROL         "Automaticky spustiť extra&hovanie",IDC_AUTO,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,20,234,124,12
+    CONTROL         "S&kryť hlavné okno SFX archívu",IDC_HIDEMAINDLG,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,246,115,12
+    CONTROL         "Automati&cky vytvoriť cieľový adresár",IDC_AUTODIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,258,134,12
+    CONTROL         "Zobraziť okno &súhrnu operácie",IDC_SUMDLG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,161,234,116,12
+    CONTROL         "&Automaticky nahradzovať súbory",IDC_OVEWRITE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,161,246,122,12
+    CONTROL         "Vyža&dovať práva administrátora ",IDC_REQSADMIN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,161,258,121,12
+    DEFPUSHBUTTON   "OK",IDOK,61,283,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,122,283,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,183,283,50,14
+    GROUPBOX        "Po dokončení extrahovania",IDC_STATIC_10,7,101,282,57,WS_GROUP
+END
+
+IDD_OVERWRITE2 DIALOGEX 6, 15, 350, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Potvrdenie nahradenia súboru"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Nahradiť súbor:",IDC_STATIC_1,5,14,56,8
+    LTEXT           "",IDC_FILE,66,14,269,8
+    LTEXT           "",IDC_FILEATTR,66,24,269,8
+    LTEXT           "Súbor už na disku existuje. Nahradiť?",IDC_STATIC_2,66,39,174,8
+    DEFPUSHBUTTON   "&Áno",IDC_YES,89,56,50,14
+    PUSHBUTTON      "&Nie",IDC_NO_,150,56,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,211,56,50,14
+END
+
+IDD_RENAMEFAVSET DIALOGEX 100, 37, 194, 99
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nastavenie novej obľúbenej položky"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Názov:",IDC_STATIC_1,14,8,60,8
+    EDITTEXT        IDC_NAME,14,18,164,12,ES_AUTOHSCROLL
+    LTEXT           "Poznámka: Klávesovú skratku pre obľúbenú položku určíte touto značkou (&&) napísanou pred znak, ktorý chcete mať ako klávesovú skratku.",IDC_STATIC_2,14,41,168,24
+    LTEXT           "",IDC_STATIC_3,7,74,180,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,42,80,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,102,80,50,14
+END
+
+IDD_CREATESFX DIALOGEX 6, 15, 194, 113
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Vytvorenie samorozbaliteľného archívu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Vytvoriť samorozbaliteľný archív z archívu:",IDC_SOURCE,16,11,162,8
+    EDITTEXT        IDC_ARCHIVE,16,21,162,12,ES_AUTOHSCROLL
+    LTEXT           "&Názov nového samorozbaliteľného archívu:",IDC_TARGET,16,39,149,8
+    EDITTEXT        IDC_NEWARCHIVE,16,49,162,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Pokročilé...",IDC_ADVANCED,118,68,60,14
+    LTEXT           "",IDC_STATIC_1,7,87,180,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,13,94,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,72,94,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,131,94,50,14
+END
+
+IDD_COMMENT DIALOGEX 9, 34, 340, 180
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Komentár ZIP archívu"
+MENU IDM_COMMENTMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_COMMENT,0,0,340,180,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+END
+
+IDD_SFXTEXTS DIALOGEX 94, 18, 260, 352
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Texty samorozbaliteľného archívu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Okno správy ",IDC_STATIC_1,8,5,245,158
+    LTEXT           "Táto správa je zobrazovaná pred hlavným dialógovým oknom a pred začiatkom extrahovania.",IDC_STATIC_2,20,18,221,16,NOT WS_GROUP
+    LTEXT           "Zanechajte pole 'Titulok' a 'Správa' prázdne, ak nechcete správu zobrazovať.",IDC_STATIC_3,20,38,221,16,NOT WS_GROUP
+    LTEXT           "Tl&ačidlá:",IDC_STATIC_4,20,61,30,8
+    COMBOBOX        IDC_MBOXBUTTONS,53,59,94,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ty&p:",IDC_STATIC_5,20,77,22,8,NOT WS_GROUP
+    COMBOBOX        IDC_MBOXICON,53,75,94,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Titu&lok:",IDC_STATIC_6,20,92,145,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTITLE,20,102,221,12,ES_AUTOHSCROLL
+    LTEXT           "&Správa:",IDC_STATIC_7,20,117,32,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTEXT,20,127,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    GROUPBOX        "Hlavné okno dialógu",IDC_STATIC_8,8,169,245,158
+    LTEXT           "Tit&ulok:",IDC_STATIC_9,20,179,28,8
+    EDITTEXT        IDC_TITLE,20,189,221,12,ES_AUTOHSCROLL
+    LTEXT           "Text zo&brazovaný v dialógovom okne:",IDC_STATIC_10,20,205,128,8,NOT WS_GROUP
+    EDITTEXT        IDC_TEXT,20,215,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Text tlačidla '&Extrahovať':",IDC_STATIC_11,20,247,90,8,NOT WS_GROUP
+    EDITTEXT        IDC_BUTTONTEXT,20,257,68,12,ES_AUTOHSCROLL
+    LTEXT           "&Názov predajcu:",IDS_VENDOR,20,272,174,8
+    EDITTEXT        IDE_VENDOR,20,282,184,12,ES_AUTOHSCROLL
+    LTEXT           "&WWW odkaz:",IDS_WWW,20,297,174,8
+    EDITTEXT        IDE_WWW,20,307,108,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,24,333,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,78,333,50,14
+    PUSHBUTTON      "Rese&tovať",IDC_RESET,132,333,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,186,333,50,14
+END
+
+IDD_MANFAVS DIALOGEX 59, 61, 240, 123
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Úprava obľúbených položiek"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Obľúbené položky:",IDC_STATIC_1,9,4,66,8
+    LISTBOX         IDC_FAVORITIES,9,14,142,100,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Premenovať",IDC_RENAME,161,13,70,14,WS_GROUP
+    PUSHBUTTON      "O&dstrániť",IDC_REMOVE,161,32,70,14
+    PUSHBUTTON      "Odstrániť &všetko",IDC_REMOVEALL,161,51,70,14
+    DEFPUSHBUTTON   "Zatvoriť",IDOK,161,100,70,14
+END
+
+IDD_WAITFOR DIALOGEX 15, 24, 227, 147
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Počkať na"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Táto voľba Vám umožní počkať na iný proces ako je proces, ktorý ste určili v poli 'Príkaz'. Po ukončení tohto procesu samorozbaliteľný archív odstráni dočasné súbory a ukončí sa.",IDC_STATIC_1,12,9,200,32
+    LTEXT           "",IDC_STATIC_2,12,49,200,32
+    LTEXT           "&Názov spustiteľného súboru:",IDC_STATIC_3,12,89,103,8
+    EDITTEXT        IDC_FILENAME,12,99,200,12,ES_AUTOHSCROLL
+    LTEXT           "",IDC_STATIC_4,3,121,220,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,28,128,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,88,128,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,148,128,50,14
+END
+
+IDD_CHANGELANG DIALOGEX 6, 15, 240, 114
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zmena textu Self-Extractora"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Zmenili ste jazyk Self-Extractora, chcete užívateľské texty, ktoré ste zadali v dialógovom okne 'Texty samorozbaliteľného archívu' zmeniť na štandardné hodnoty zodpovedajúce jazyku, ktorý ste vybrali?",IDC_STATIC_1,11,8,207,32
+    DEFPUSHBUTTON   "Áno",IDOK,35,48,50,14
+    PUSHBUTTON      "Nie",IDCANCEL,94,48,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,153,48,50,14
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,3,70,223,1
+    CONTROL         "Vždy sa pýtať pred zmenou &textu",IDC_ASK,"Button",BS_AUTORADIOBUTTON,11,74,127,12
+    CONTROL         "Automaticky nah&radiť texty ich štandardnými hodnotami",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,11,86,220,12
+    CONTROL         "Nepýtať sa a vždy ponechať te&xty nezmenené",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,11,98,203,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SFXMENU MENU 
+BEGIN
+    POPUP "&Súbor"
+    BEGIN
+        MENUITEM "&Exportovať nastavenia...\tCtrl+E", CM_SFX_EXPORT
+        MENUITEM "&Importovať nastavenia...\tCtrl+I", CM_SFX_IMPORT
+    END
+    POPUP "&Zobrazenie"
+    BEGIN
+        MENUITEM "&Náhľad SFX Dialógového okna...\tCtr+V", CM_SFX_PREVIEW
+    END
+    POPUP "Nast&avenie"
+    BEGIN
+        MENUITEM "&Resetovať všetko\tCtrl+Shift+R",    CM_SFX_RESETALL
+        MENUITEM "Resetovať &hodnoty\tCtrl+R",       CM_SFX_RESETVALUES
+        MENUITEM "Resetovať &texty\tCtrl+T",        CM_SFX_RESETTEXTS
+        MENUITEM SEPARATOR
+        MENUITEM "&Pridať k obľúbeným...\tCtrl+A", CM_SFX_ADD
+        MENUITEM "&Obľúbené\tCtrl+F",          CM_SFX_FAVORITIES
+        MENUITEM SEPARATOR
+        MENUITEM "&Naposledy použité\tCtrl+L",          CM_SFX_LASTUSED
+    END
+END
+
+IDM_FAVMANMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Premenovať",                     CM_FAVRENAME
+        MENUITEM "&Odstrániť",                     CM_FAVDELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Odstrániť &všetko",                 CM_FAVREMOVEALL
+    END
+END
+
+IDM_COMMENTMENU MENU 
+BEGIN
+    POPUP "&Súbor"
+    BEGIN
+        MENUITEM "&Uložiť",                       CM_SAVE
+        MENUITEM SEPARATOR
+        MENUITEM "&Zatvoriť\tAlt+F4",              CM_CLOSE
+    END
+END
+
+IDM_SPECDIR MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Dočasného adresára",        CM_TEMP
+        MENUITEM "&Program Files",              CM_PROGFILES
+        MENUITEM "Adresára &Windows",          CM_WINDIR
+        MENUITEM "Adresára &System",           CM_SYSDIR
+        MENUITEM SEPARATOR
+        MENUITEM "Premenné pros&tredia",       CM_ENVVAR
+        MENUITEM "Hodnoty z &registra",             CM_REGENTRY
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_ABOUTPLUGINTITLE, "O plugine"
+  IDS_PLUGIN_DESCRIPTION, "Vytvára, prehliada a extrahuje ZIP archívy."
+  IDS_ERROPEN, "Nie je možné otvoriť súbor."
+  IDS_ERRFORMAT, "Nesprávny formát dát."
+  IDS_ERREOCENTRDIR, "Nie je možné nájsť koniec značky hlavného adresára. Súbor je asi poškodený."
+  IDS_LOWMEM, "Nedostatok pamäti."
+  IDS_ERRADDFILE, "Nie je možné pridať súbor do výpisu."
+  IDS_ERRADDFILE_TOOLONG, "Nie je možné pridať 1 alebo viac súborov do výpisu. Plná cesta je príliš dlhá.\nVo výpise archívu môžu chýbať niektoré adresáre alebo súbory."
+  IDS_ERRADDDIR, "Nie je možné pridať adresár do výpisu."
+  IDS_ERRADDDIR_TOOLONG, "Nie je možné pridať 1 alebo viac adresárov do výpisu. Plná cesta je príliš dlhá.\nVo výpise archívu môžu chýbať niektoré adresáre alebo súbory."
+  IDS_PLUGINNAME, "ZIP"
+  IDS_TOOBIG, "Súbory väčšie ako 4GB nie sú podporované."
+  IDS_ERRACCESS, "Nie je možné sprístupniť súbor."
+  IDS_ERRREAD, "Nie je možné čítať zo súboru."
+  IDS_EOF, "Neočakávaný koniec súboru."
+  IDS_NODISPLAY, "Správa o chybe bola už zobrazená. Tento text by sa nemal objaviť na obrazovke."
+  IDS_ERRCREATE, "Nie je možné otvoriť alebo vytvoriť súbor."
+  IDS_MULDISK, "Prepáčte, táto verzia ZIP pluginu nepodporuje viacnásobné diskové archívy."
+  IDS_TOOLONGNAME, "Súbor má príliš dlhý názov cesty a nemôže byť spracovaný."
+  IDS_TOOLONGNAME2, "Súbor má príliš dlhý názov cesty a nebude zobrazený v paneli."
+  IDS_PREPAREDATA, "pripravujem dáta..."
+  IDS_EXTRPROGTITLE, "Extrahovanie ZIP archívu - %s"
+  IDS_ERRTEMPDIR, "Nie je možné vytvoriť dočasný adresár v cieľovom adresári."
+  IDS_EXTRACTING, "extrahujem: "
+  IDS_TOOLONGNAME3, "Nie je možné extrahovať súbor, kvôli príliš dlhému názvu cesty."
+  IDS_ERRCOMPDATA, "Chyba v komprimovaných dátach."
+  IDS_BADMETHOD, "Táto verzie ZIP pluginu nepodporuje použitú metódu komprimácie súboru."
+  IDS_ERRCRC, "Chyba v komprimovaných dátach. CRC nesúhlasí."
+  IDS_ERRWRITE, "Nie je možné zapisovať do súboru."
+  IDS_TOOLONGMASK, "Maska je príliš dlhá."
+  IDS_EXTRACTFILES, "extrahujem..."
+  IDS_BADPACKLEVEL, "Neplatná úroveň balíka."
+  IDS_BLOCKVANISHED, "Počas komprimácie sa vyskytla neočakávaná chyba: blok zmizol."
+  IDS_DELPROGTITLE, "Odstraňovanie položky ZIP archívu - %s"
+  IDS_DELETEFILES, "odstraňujem..."
+  IDS_DELETING, "odstraňujem: "
+  IDS_CANCELING, "rušenie operácie, čakajte prosím..."
+  IDS_ERRTEMP, "Nie je možné vytvoriť dočasný záložný súbor."
+  IDS_READONLY, "Archív je len na čítanie. Prosím najskôr odstráňte atribút len na čítanie."
+  IDS_USERBREAK, "Prerušené užívateľom. Tento text by sa nemal objaviť na obrazovke."
+  IDS_REMOVEFILES, "odstraňujem nepotrebné súbory z archívu..."
+  IDS_ADDFILES, "pridávam..."
+  IDS_ADDING, "pridávam: "
+  IDS_BACKUPING, "zálohujem archív..."
+  IDS_SKIP, "Preskočený súbor. Tento text by sa nemal objaviť na obrazovke."
+  IDS_ERRACCESDIR, "Nie je možné sprístupniť adresár."
+  IDS_REMOVING, "odstraňujem: "
+  IDS_ERRRESTORE, "Nie je možné nahradiť pôvodný archív za dočasný pracovný súbor. Archív nebol zmenený."
+  IDS_AUTO, "automaticky"
+  IDS_BADLEVEL, "Úroveň komprimácie musí byť v rozsahu 0 až 9."
+  IDS_ERROR, "Chyba"
+  IDS_BADVOLSIZE, "Neplatná hodnota veľkosti zväzku. Reťazec môže obsahovať len čísla a jednu desatinnú čiarku.\n\nVeľkosť zväzku musí byť väčšia alebo rovná 1KB a menšia ako 4GB."
+  IDS_PWDDONTMATCH, "Vami zadané heslá nie sú zhodné."
+  IDS_PWDTOOSHORT, "Heslo by malo byť aspoň jeden znak dlhé."
+  IDS_BADPWD, "Neplatné heslo. Prosím zadajte heslo znova. Písmená v hesle musia byť napísané správnou veľkosťou. Uistite sa, že CapsLock nie je náhodne zapnutý."
+  IDS_BADPWDTITLE, "Nesprávne heslo"
+  IDS_ADDPROGTITLE, "Komprimácia ZIP archívu - %s"
+  IDS_ERRRECOVER, "Pokus o obnovenie zip archívu zlyhal. Dáta súboru môžu byť poškodené."
+  IDS_ECRYPTSTORED, "Šifrovanie nemôže byť vykonané použitím metódy záloha (úroveň komprimácie 0)."
+  IDS_ECRYPTSFX, "AES šifrovanie nie je podporované v samorozbaliteľných archívoch."
+  IDS_ERRCREATEDIR, "Nie je možné vytvoriť adresár."
+  IDS_CANTMULTIVOL, "Archív s rovnakým názvom súboru už existuje.\nViaczväzkové archívy môžu byť vytvorené len ako nový archív."
+  IDS_FILEEXIST, "Zadaný súbor už existuje, chcete ho prepísať?"
+  IDS_CHDISKTEXT, "Komprimácia zväzku číslo %d bola ukončená.\nProsím vložte ďalší disk do jednotky, ktorý bude použitý pre zväzok archívu číslo %d."
+  IDS_BYTES, "bajtov"
+  IDS_TOOLOWSPACE, "Na tomto disku nie je dostatok miesta. Disk nemôže byť použitý na komprimáciu."
+  IDS_LOWSPACE, "Upozornenie: Voľné miesto na disku je menšie ako zadaná veľkosť zväzku."
+  IDS_LOWSPACE2, "Upozornenie: Na tomto disku nie je dostatok miesta."
+  IDS_MULTISTORED, "Viaczväzkové archívy nemôžu byť vytvorené použitím metódy záloha (úroveň komprimácie 0)."
+  IDS_CHDISKTEXT2, "Prosím vložte disk so zväzkom číslo %d alebo vyhľadajte súbor na disku."
+  IDS_ZIPARCHIVES, "Súbory ZIP archívu (*.zip; *.z*; *.pk3; *.jar)"
+  IDS_BROWSEARCHIVETITLE, "Výber archívu"
+  IDS_ZIPARCHIVESEXTS, "*.zip;*.z*;*.pk3;*.jar"
+  IDS_ERRMULTIVOL, "Požadovaná operácia nie je podporovaná pre viaczväzkové archívy. Viaczväzkové archívy sa môžu len prehliadať a extrahovať.\n\nPoznámka: Ak to nie je viaczväzkový archív, tak dáta súboru majú neznámy formát alebo sú poškodené."
+  IDS_MISSLHSIG, "Neplatný formát dát. Chýba miestny podpis hlavičky súboru."
+  IDS_ERRGETDISKFREESP, "Nie je možné zistiť voľné miesto na disku."
+  IDS_MISSCHSIG, "Neplatný formát dát. Chýba hlavný podpis hlavičky súboru."
+  IDS_WRITINGEXE, "zapisujem samorozbaliteľný archív..."
+  IDS_TOOLONGZIPNAME, "Nie je možné pokračovať. ZIP archív má príliš dlhý názov cesty."
+  IDS_ERRGETMODULENAME, "Nie je možné získať názov modulu."
+  IDS_DEFAULTTEXT, "Toto extrahuje zip archív."
+  IDS_CREAETARCH, "Vytvorenie nového archívu"
+  IDS_ADDTOARCHIVE, "Pridať súbory do archívu"
+  IDS_DEFSFXTITLE, "Samorozbaliteľný ZIP archív"
+  IDS_ERRBADTITLE, "Názov hlavného dialógového okna nemôže byť prázdny. Prosím zadajte najmenej jeden znak."
+  IDS_ERRBADMBOXTITLE, "Názov okna správy nemôže byť prázdny. Prosím zadajte najmenej jeden znak."
+  IDS_ERRLAODSHELLDLL, "Nie je možné načítať shell32.dll. "
+  IDS_ERRGETPROCADDRESS, "Nie je možné získať jednaciu adresu z dll modulu. "
+  IDS_ERRADDICON, "Nie je možné pridať ikonu do samorozbaliteľného súboru."
+  IDS_ERRLOADICON, "Nie je možné nahrať ikonu zo súboru. "
+  IDS_ERRLOADLIB, "Nie je možné nahrať modul obsahujúci dáta ikony. Tento modul nie je platnou aplikáciou Win32. "
+  IDS_ERRLOADLIB2, "Nie je možné nahrať modul obsahujúci dáta ikony. "
+  IDS_ERRLOADSFXICON, "Nie je možné nahrať ikonu pre self-extractor."
+  IDS_EXPIRE, "Prepáčte, tento plugin vypršal. Prosím skontrolujte našu web stránku pre novšiu verziu."
+  IDS_UNDERCOSTRUCT, "Vo výstavbe."
+  IDS_NOSFXINSTALLED, "Nie je možné nájsť žiadny Self-Extractor súbor.\n\nAk chcete vytvoriť samorozbaliteľné archívy, prosím preinštalujte ZIP plugin."
+  IDS_UNABLEREADSFXDIR, "Nie je možné načítať adresár self-extractorov: "
+  IDS_UNABLEREADALLSFX, "Žiadny zo súborov self-extractor nie je možné nahrať."
+  IDS_UNABLEREADSFX, "Nie je možné nahrať súbor self-extractor: %s\n\nStlačte OK na pokračovanie, Zrušiť na prerušenie."
+  IDS_UNABLEREADSFX2, "Nie je možné nahrať predvolený súbor self-extractor: %s"
+  IDS_CORRUPTSFX, "Súbor self-extractor je poškodený."
+  IDS_CORRUPTSFX2, "Súbor self-extractor '%s' je poškodený.\n\nStlačte OK na pokračovanie, Zrušiť na prerušenie."
+  IDS_ERRLOADMENU, "Nie je možné nahrať ponuku."
+  IDS_ERRLOADACCELS, "Nie je možné nahrať tabuľku akcelerátorov."
+  IDS_NODEFSFX, "Predvolený súbor self-extractor nie je nahraný."
+  IDS_ERRLOADCONFIG, "Nie je možné nahrať nastavenie - nedostatok pamäti."
+  IDS_EMPTY, "Prázdny"
+  IDS_RENAMEFAVSET, "Premenovať obľúbené nastavenia."
+  IDS_USEDNAME, "Názov bol už použitý."
+  IDS_NOLANGFILE, "Nie je možné nahrať obľúbené nastavenia: požadovaný jazyk self-extractora nie je nainštalovaný (%s)."
+  IDS_SETTINGSFILE, "Súbory nastavení (*.set)"
+  IDS_DEFEXTRBUTTON, "&Extrahovať"
+  IDS_EXPORTOVEWRITE, "Súbor už existuje. Prepísať?"
+  IDS_ERRGETTEMP, "Nie je možné vytvoriť dočasný súbor."
+  IDS_SFXABOUTBTN1, "&O programe >>"
+  IDS_SFXABOUTBTN2, "<< &O programe"
+  IDS_MENUCREATESFX, "Vytvoriť &samorozbaliteľný archív (.exe)..."
+  IDS_MENUTEST, "&Test archívu"
+  IDS_MENUREPAIR, "&Opraviť poškodený archív"
+  IDS_CONTINUE, "Posledná operácia nebola úspešne dokončená. Pokračovať ďalším súborom?"
+  IDS_NOARCHIVETYPED, "Chýba názov súboru archívu."
+  IDS_NOEXETYPED, "Chýba názov súboru samorozbaliteľného archívu na vytvorenie."
+  IDS_SFXPROGTITLE, "Vytváranie samorozbaliteľného ZIP archívu - %s"
+  IDS_COPYDATA, "kopírujem dáta archívu..."
+  IDS_EMPTYARCHIVE, "Archív je prázdny."
+  IDS_BADMETHODSFX, "Archív obsahuje súbory komprimované metódou, ktorú nepodporuje Self-Extractor.\n\nProsím skomprimujte archív znova použitím ZIP pluginu."
+  IDS_TESTPROGTITLE, "Testovanie ZIP archívu - %s"
+  IDS_TESTFILES, "testujem súbory..."
+  IDS_TESTING, "testujem: "
+  IDS_TESTOK, "Archív '%s' je OK."
+  IDS_TESTKO, "Niektoré súbory v archíve '%s' sú poškodené alebo zašifrované neznámym heslom."
+  IDS_MENUCOMMENT, "&Komentár archívu..."
+  IDS_COMMENTMODIFIED, "Komentár súboru sa zmenil.\n\nChcete zmeny uložiť?"
+  IDS_COMMENTDLGTITLE, "Komentár ZIP archívu - %s"
+  IDS_ERRREADCOMMENT, "Vyskytla sa chyba čítania komentára ZIP archívu, súbor je buď poškodený alebo neznámeho formátu.\n\nStlačte OK na preskočenie komentára archívu a pokračovanie v čítaní archívu."
+  IDS_COMMENTMV, "Komentár viaczväzkového archívu môže byť zobrazený, ale nemôže byť uložený."
+  IDS_RECOVERARCHIVETITLE, "Oprava ZIP archívu"
+  IDS_SOURCEHEADING, "&Opraviť archív:"
+  IDS_TARGETHEADING, "&Uložiť obnovený archív ako:"
+  IDS_REPAIRPROGTITLE, "Opravovanie ZIP archívu - %s"
+  IDS_SAVING, "ukladám: "
+  IDS_REPAIRING, "opravujem archív..."
+  IDS_ERROPENICO, "Nie je možné otvoriť súbor obsahujúci dáta ikony."
+  IDS_BADBUTTONTEXT, "Hlavička hlavného dialógového okna nemôže byť prázdna. Prosím zadajte reťazec dlhý najmenej jeden znak."
+  IDS_BADTEMP, "$(Temp) nemôže nasledovať žiadny znak. Prosím zadajte len $(Temp) na extrahovanie do dočasného adresára."
+  IDS_MISBAR, "Chýba uzatvárajúci bar $() sekvencie."
+  IDS_BADVAR, "Neznáma $() premenná."
+  IDS_MBOK, "OK"
+  IDS_MBOKCANCEL, "OK + Zrušiť"
+  IDS_MBYESNO, "Áno + Nie"
+  IDS_MBAGREEDISAGREE, "Súhlasím + Nesúhlasím"
+  IDS_MBNOICON, "Jednoduché"
+  IDS_MBEXCLAMATION, "Výstraha"
+  IDS_MBINFORMATION, "Informácia"
+  IDS_MBQUESTION, "Otázka"
+  IDS_LONGMESSAGE, "Dlhá správa"
+  IDS_BADKEY, "Neplatný názov kľúča."
+  IDS_MANAGE, "&Upraviť..."
+  IDS_REMOVEWARNTITLE, "Odstrániť obľúbené nastavenia"
+  IDS_REMOVEWARN, "Chcete odstrániť nastavenia '%s' ?\n\nTúto operáciu nie je možné vrátiť."
+  IDS_REMOVEALLWARN, "Chcete odstrániť všetky uložené nastavenia?\n\nTúto operáciu nie je možné vrátiť."
+  IDS_MISSINGVERSION, "Nie je možné nahrať nastavenia súboru: chýba číslo verzie."
+  IDS_BADVERSION, "Nie je možné nahrať nastavenia súboru: nepodporovaná verzia."
+  IDS_BADTEMP2, "Nie je možné nahrať nastavenia súboru, neplatná hodnota 'target_dir': $(Temp) nemôže nasledovať žiadny znak."
+  IDS_MISBAR2, "Nie je možné nahrať nastavenia súboru, neplatná hodnota 'target_dir': chýba uzatvárajúca bar $() sekvencia."
+  IDS_BADVAR2, "Nie je možné nahrať nastavenia súboru, neplatná hodnota 'target_dir': neznáma $() premenná."
+  IDS_BADKEY2, "Nie je možné nahrať nastavenia súboru, neplatná hodnota 'target_dir': neplatný názov kľúča."
+  IDS_CHDISKTEXT3, "Prosím vložte disk so zväzkom číslo %d."
+  IDS_NONTEXT, "Prosím zadajte najmenej jeden znak."
+  IDS_BADSFXVER, "Nepodporovaná verzia SFX zväzku (%s). Prosím, stiahnite posledný ZIP plugin s príslušnou SFX verziou."
+  IDS_BADSFXVER2, "Nepodporovaná verzia SFX zväzku. Prosím, stiahnite posledný ZIP plugin s príslušnou SFX verziou."
+  IDS_TOOBIG2, "Nie je možné dokončiť operáciu, kvôli 4GB limitu pre veľkosť ZIP súboru.\n\nNa komprimáciu viac ako 4GB dát do ZIP archívu použite viaczväzkový archív. Môžete vytvoriť 65536 zväzkov, každý s veľkosťou 4GB. Avšak limit veľkosti každého súboru komprimovaného do archívu je 4GB."
+  IDS_FILENOTFOUND, "Súbor nenájdený."
+  IDS_ALLFILES, "Všetky súbory (*.*)"
+  IDS_NOTFOUND, "Súbor nenájdený."
+  IDS_BADMSGBOXTYPE, "Tlačidlá ""Súhlasím + Nesúhlasím"" môžu byť použité len v spojení s typom dialógového okna ""Dlhá správa""."
+  IDS_LOTFILES, "Chystáte sa vytvoriť ZIP archív obsahujúci viac ako 65535 položiek. Takýto archív nie je kompatibilný s originálnym ZIP formátom a niektoré archivačné programy nemusia byť schopné ho extrahovať.\n\nChcete pokračovať?"
+  IDS_LOTFILESSFX, "Nie je možné vytvoriť samorozbaľovací ZIP archív obsahujúci viac ako 65535 položiek."
+  IDS_BADAES, "Súbor je zašifrovaný neznámou AES verziou."
+  IDS_PWDTOOLONG, "Heslo je príliš dlhé.\nMaximálna dĺžka hesla pre AES šifrovanie je 128 znakov."
+  IDS_AESERROR, "AES chyba."
+  IDS_MACERROR, "Autorizačný kód nie je zhodný. Súbor je buď poškodený alebo je neplatné heslo."
+  IDS_ERRZIP64, "Požadovaná operácia nie je podporovaná pre zip64 archívy. Zip64 archívy je možné len prehliadať a extrahovať."
+  IDS_ONLYFULLVERSION, " (dostupné len v plnej verzii)"
+  IDS_ERRBZIP2 "Nastala chyba v BZIP2 streame. Archív môže byť poškodený."
+  IDS_UNSUP_CD_ENCRYPTION "Centrálny adresár tohto archívu obsahuje šifrovaný alebo komprimovaný zoznam súborov.\nToto nie je podporované."
+  IDS_LISTINFO_PAKEDSIZE      "Komprimovaná"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Komprimovaná veľkosť súboru"
+  IDS_SIZE_KB, "KB"
+  IDS_SIZE_MB, "MB"
+  IDS_MODIFICATION_NOT_SUPPORTED, "Tento ZIP súbor používa formát údajov, v ktorom aktuálna verzia pluginu ZIP nedokáže vykonávať zmeny"
+  IDS_WAITFOR_INFO, "Je potrebné len ak inštalačný program spustí ďalší spustiteľný súbor, ktorý pokračuje v inštalácii zatiaľ čo pôvodný inštalačný program je ukončený.\nTakto sa správajú napr. niektoré verzie Install Shield."
+}
+
+STRINGTABLE
+{
+  IDS_SFX_COMMENT_HEAD1, ";Voľby pre Self-Extractor\r\n\r\n;Toto je súbor s nastavením pre Self-Extractor.\r\n;\r\n;Syntax súboru:\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD2, ";Riadky začínajúce bodkočiarkou sú považované za komentáre a sú \r\n;ignorované počas spracovania súboru.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD3, ";Všetky premenné okrem premennej version sú nepovinné. Ak nie je\r\n;premenná v súbore s voľbami nájdená, je použitá jej implicitná\r\n;hodnota. Implicitné hodnoty pre jazykovo závislé premenné (dlg_text,\r\n;dlg_title, button_text) sú načítané z použitého sfx balíčka.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD4, ";Všetky hodnoty reprezentované reťazcom, vrátane prázdnych reťazcov,\r\n;musia byť uzatvorené v dvojitých úvodzovkách. Na zapísanie úvodzoviek do\r\n;reťazca použite dve po sebe idúce dvojité úvodzovky.\r\n;\r\n;Číselné hodnoty nesmú byť uzatvorené v úvodzovkách.\r\n\r\n"
+  IDS_SFX_COMMENT_VERSION, "\r\n;verzia súboru s nastavením, súčasná verzia je 2\r\n;toto je jediná povinná premenná\r\n\r\n"
+  IDS_SFX_COMMENT_TARGDIR1, "\r\n;špecifikácia cieľového adresára, môže to byť buď absolútna cesta\r\n;alebo relatívna cesta; relatívna cesta je relatívna k aktuálnemu \r\n;adresáru, keď je samorozbaliteľný archív spustený\r\n"
+  IDS_SFX_COMMENT_TARGDIR2, ";na začiatku (!) reťazca 'target_dir' môžete použiť aj preddefinované\r\n;premenné:\r\n;\r\n"
+  IDS_SFX_COMMENT_TARGDIR3, ";  $(Temp)      dočasný adresár, nesmie byť v premennej target_dir \r\n;               nasledovaný žiadnym ďalším textom\r\n"
+  IDS_SFX_COMMENT_TARGDIR4, ";  $(ProgFiles) užívateľova zložka 'Program Files'\r\n;  $(WinDir)    Windows adresár\r\n;  $(SysDir)    systémový adresár\r\n"
+  IDS_SFX_COMMENT_TARGDIR5, ";  $[variable]  hodnota systémovej premennej s názvom 'variable'\r\n;  $<regkey>    hodnota premennej v registroch s názvom 'regkey'\r\n;  napr. SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ProgramFilesDir\r\n\r\n"
+  IDS_SFX_COMMENT_ALLOWCHANGE, "\r\n;určuje, či má užívateľ povolené zmeniť cieľový adresár na rozbalenie\r\n;archívu\r\n;nastavte túto hodnotu na 1, ak si prajete zmenu povoliť\r\n\r\n"
+  IDS_SFX_COMMENT_REMOVE1, "\r\n;určuje, či sa majú zmazať súbory v dočasnom adresári, keď\r\n;program špecifikovaný premennou 'command' skončí\r\n"
+  IDS_SFX_COMMENT_REMOVE2, ";nastavte túto hodnotu na 1, ak si prajete zmazať súbory v dočasnom\r\n;adresári\r\n;použitie tejto voľby má zmysel iba vtedy, ak je 'target_dir' nastavená\r\n;na ""$(Temp)"", v ostatných prípadoch je hodnota ignorovaná\r\n\r\n"
+  IDS_SFX_COMMENT_AUTO, "\r\n;určuje, či začať rozbaľovanie automaticky po spustení samorozba-\r\n;liteľného archívu\r\n;nastavte túto hodnotu na 1, ak si prajete, aby rozbaľovanie začalo\r\n;automaticky\r\n\r\n"
+  IDS_SFX_COMMENT_SUMMARY, "\r\n;určuje, či zobraziť dialógové okno informujúce o úspešnosti\r\n;rozbaľovania archívu\r\n;nastavte túto hodnotu na 1, ak si prajete zobraziť toto okno\r\n\r\n"
+  IDS_SFX_COMMENT_HIDE, "\r\n;určuje, či zobraziť dialógové okno programu\r\n;nastavte túto hodnotu na 1, ak si prajete zobraziť toto okno\r\n;použitie tejto voľby má zmysel iba vtedy, ak je 'autostart' nastavená\r\n;na 1, v ostatných prípadoch je hodnota ignorovaná\r\n\r\n"
+  IDS_SFX_COMMENT_OVERWRITE, "\r\n;určuje, či automaticky prepisovať súbory v cieľovom adresári\r\n;nastavte túto hodnotu na 1, ak si prajete automatické prepisovanie\r\n;súborov\r\n\r\n"
+  IDS_SFX_COMMENT_AUTODIR, "\r\n;určuje, či automaticky vytvoriť cieľový adresár bez pýtania sa užívateľa\r\n;nastavte túto hodnotu na 1, ak si prajete automatické vytváranie cieľového\r\n;adresára\r\n\r\n"
+  IDS_SFX_COMMENT_COMMAND, "\r\n;program, http link alebo dokument, ktorý má byť spustený/otvorený\r\n;keď je archív úspešne rozbalený, cesta je relatívna k cieľovému \r\n;adresáru, do ktorého je archív rozbaľovaný, pri programe môžete uviesť aj\r\n;jeho parametre pre spustenie\r\n\r\n"
+  IDS_SFX_COMMENT_PACKAGE, "\r\n;sfx balíček, ktorý má byť použitý pre tvorbu samorozbaliteľného\r\n;archívu; relatívna cesta je relatívna k adresáru s zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_MBUT, "\r\n;tlačidlá vo voliteľnom dialógovom okne\r\n;môže byť jedno z nasledujúcich: ""ok"", ""ok_cancel"", ""yes_no"",\r\n;""agree_disagree""\r\n\r\n"
+  IDS_SFX_COMMENT_MICO, "\r\n;typ voliteľného dialógového okna\r\n;môže byť jeden z nasledujúcich: ""simple"", ""exclamation"", ""information"",\r\n;""question"", ""long_message""\r\n\r\n"
+  IDS_SFX_COMMENT_MBOX, "\r\n;text a titulok voliteľného dialógového okna, ktoré je zobrazené\r\n;kým začne rozbaľovanie archívu\r\n;ak si neprajete zobraziť žiadne okno, nechajte hodnoty oboch premenných\r\n;prázdne("""")\r\n\r\n"
+  IDS_SFX_COMMENT_TEXT, "\r\n;text, ktorý bude zobrazený v hlavnom dialógovom okne\r\n\r\n"
+  IDS_SFX_COMMENT_TITLE, "\r\n;titulok hlavného dialógového okna\r\n\r\n"
+  IDS_SFX_COMMENT_BUTTON, "\r\n;text tlačidla 'rozbaliť' v hlavnom dialógovom okne\r\n\r\n"
+  IDS_SFX_COMMENT_VENDOR, "\r\n;meno firmy v ľavom dolnom rohu dialógového okna\r\n\r\n"
+  IDS_SFX_COMMENT_WWW, "\r\n;www odkaz v pravom dolnom rohu dialógového okna\r\n\r\n"
+  IDS_SFX_COMMENT_ICOFILE, "\r\n;súbor obsahujúci ikonu, môže to byť buď ICO súbor alebo PE \r\n;spustiteľný modul (ako sú win32 EXE a DLL súbory) obsahujúci ikonu\r\n;relatívna cesta je relatívna k adresáru so zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_ICOINDEX, "\r\n;kladná hodnota znamená index ikony (poradové číslo) v spustiteľnom\r\n;súbore špecifikovanom premennou 'icon_file'\r\n;záporná hodnota znamená resource ID ikony\r\n;pre ICO súbory je index vždy 0 a hodnota premennej je ignorovaná\r\n\r\n"
+  IDS_SFX_COMMENT_WAITFOR1, "\r\n;Táto voľba umožňuje čakať pred zmazaním súborov v dočasnom adresári\r\n;na iný program než program špecifikovaný premennou 'Command'\r\n;Po ukončení tohto programu self-extractor zmaže súbory v dočasnom\r\n;adresári a sám skončí.\r\n"
+  IDS_SFX_COMMENT_WAITFOR2, ";Táto voľba je nutná iba v prípade, že inštalačný program spustí\r\n;program, ktorý pokračuje v inštalácii, zatiaľ čo pôvodný inštalačný\r\n;program skončí\r\n"
+  IDS_SFX_COMMENT_WAITFOR3, ";Takto sa správajú napr. niektoré verzie programu Install Shield.\r\n;Táto voľba je ignorovaná ak 'remove_temp' nie je nastavený na 1.\r\n\r\n"
+  IDS_SFX_COMMENT_REQUIRESADMIN, "\r\n;vyžadovať práva administrátora na OS Windows Vista alebo novšom\r\n\r\n"
+}

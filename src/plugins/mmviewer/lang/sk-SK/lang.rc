@@ -1,0 +1,343 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for mmviewer. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/mmviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\mmviewer.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_ABOUT DIALOGEX 87, 50, 388, 132
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "O plugine"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Zatvoriť",IDCANCEL,331,113,50,14
+    ICON            "",IDC_MAIN_ICON,11,9,20,20
+    LTEXT           "MMViewer %s - Multimediálny prehliadač pre Sally",IDC_ABOUT_TITLE,46,9,337,8
+    LTEXT           "dummy",IDC_ABOUT_COPYRIGHT,46,19,177,8,SS_NOPREFIX
+    ICON            "",IDC_DISKEXPLORER_ICON,11,42,20,20
+    LTEXT           "MPEG, ID3 Tag verzia 1 a 2, OGG, WMA, VQF a Tracker parsers",IDC_STATIC_1,46,41,233,8
+    LTEXT           "sú licencované pre",IDC_STATIC_2,46,51,65,8
+    LTEXT           "Disk Explorer Professional",IDC_ABOUT_DEPRO,112,51,201,8
+    LTEXT           "Copyright 2003-2016 by",IDC_STATIC_3,46,67,82,8
+    LTEXT           "Tomas Jelinek",IDC_STATIC_4,129,67,60,8
+    LTEXT           "E-mail:",IDC_STATIC_5,46,78,30,8
+    LTEXT           "tomas@tjelinek.com",IDC_ABOUT_EMAIL,129,78,119,8,WS_TABSTOP
+    LTEXT           "Domovská stránka:",IDC_STATIC_6,46,89,66,8
+    LTEXT           "www.tjelinek.com",IDC_ABOUT_WWW,129,89,118,8,WS_TABSTOP
+    LTEXT           "",IDC_STATIC_7,2,107,380,1,SS_ETCHEDHORZ | WS_GROUP
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_PLUGIN_DESCRIPTION  "Zobrazí informácie o multimediálnych súboroch ako napr.: MP3, OGG, WAV, atď."
+    IDS_ABOUT               "O plugine"
+    IDS_PLUGIN_NAME         "Multimediálny prehliadač"
+    IDS_OPENED_WINDOWS      "Multimediálny prehliadač má otvorené najmenej jedno okno. Chcete ho zatvoriť?"
+    IDS_ERROR_OPENING       "Chyba otvárania %s.\nTento formát Multimediálny prehliadač nepodporuje."
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_FILES          "&Súbor"
+    IDS_MENU_FILES_OPEN     "&Otvoriť...\tCtr+O"
+    IDS_MENU_FILES_EXPORT_HTML     "Exportovať do &HTML...\tCtr+H"
+    //IDS_MENU_FILES_EXPORT_XML     "Export to &XML...\tCtr+X"
+    IDS_MENU_FILES_PROPERTIES "&Vlastnosti...\tCtrl+F1"
+    IDS_MENU_FILES_EXIT     "&Koniec\tAlt+F4"
+
+    IDS_MENU_FILE_OTHER     "&Ďalšie súbory"
+    IDS_MENU_FILE_FIRST     "&Prvý\tShift+Backspace"
+    IDS_MENU_FILE_LAST      "Pos&ledný\tShift+Space"
+    IDS_MENU_FILE_PREV      "Pr&edchádzajúci\tBackspace"
+    IDS_MENU_FILE_NEXT      "&Nasledujúci\tSpace"
+
+    IDS_MENU_EDIT           "Úpr&avy"
+    IDS_MENU_EDIT_COPY      "&Kopírovať všetko\tCtrl+A"
+    //IDS_MENU_EDIT_SELECT_ALL "&Select All\tCtrl+A"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_VIEW           "&Zobrazenie"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_VIEW_FULLSCREEN "&Celá obrazovka\tF11"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_OPTIONS        "Nas&tavenie"
+    IDS_MENU_OPTIONS_CONFIG "&Konfigurácia..."
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_HELP           "&Nápoveda"
+    IDS_MENU_HELP_ABOUT     "&O plugine..."
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_TBTT_COPY           "Kopírovať všetko\tCtrl+A"
+    IDS_TBTT_OPEN           "Otvoriť\tCtrl+O"
+    IDS_TBTT_EXP_HTML       "Exportovať do HTML\tCtrl+H"
+    //IDS_TBTT_EXP_XML        "Export to XML\tCtrl+X"
+    IDS_TBTT_FIND           "Nájsť\tCtrl+F"
+    IDS_TBTT_PROPERTIES     "Vlastnosti\tCtrl+F1"
+    IDS_TBTT_FULLSCREEN     "Celá obrazovka\tF11"
+    IDS_TBTT_PREV           "Otvoriť predchádzajúci\tBackspace"
+    IDS_TBTT_NEXT           "Otvoriť ďalší\tSpace"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_VIEWERFILTER        "Multimediálne súbory (*.mp3;*.mp2;*.ogg;*.vqf;*.wma;*.wav;*.669;*.it;*.mod;*.mtm;*s3m;*.stm;*.xm)|*.mp3;*.mp2;*.ogg;*.wma;*.wav;*.wave;*.vqf;*.669;*.it;*.mod;*.mtm;*s3m;*.stm;*.xm|Všetky súbory (*.*)|*.*||"
+    IDS_HTMLEXPFILTER   "HTML súbory (*.htm;*.html)|*.htm;*.html|Všetky súbory (*.*)|*.*||"
+    IDS_EXPORTOPEN          "Chcete otvoriť exportované dáta?"
+    IDS_EXPORTHTML          "Exportovať Info do &HTML..."
+    IDS_AUDIOINFO     "Audio vlastnosti"
+    IDS_HTMLEXT       ".html"
+    IDS_PROCESSINGFILES   "Spracovanie súborov, čakajte prosím..."
+    IDS_FILESPROCESSED    "%lu z %lu súborov bolo úspešne spracovaných."
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_YES                 "Áno"
+    IDS_NO                  "Nie"
+
+    IDS_VQF_INFO            "VQF informácia"
+    IDS_VQF_COPYRIGHT       "Copyright"
+    IDS_VQF_AUTHOR          "Autor"
+    IDS_VQF_TITLE           "Názov"
+    IDS_VQF_COMMENTS        "Poznámky"
+    IDS_VQF_YEAR            "Rok"
+    IDS_VQF_ALBUM           "Album"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_VQF_TRACK           "Stopa"
+    IDS_VQF_ORIGFILENAME    "Orig. názov"
+    IDS_VQF_LYRC            "LYRC"
+    IDS_VQF_WORD            "WORD"
+    IDS_VQF_MUSC            "MUSC"
+    IDS_VQF_ARNG            "ARNG"
+    IDS_VQF_PROD            "PROD"
+    IDS_VQF_REMX            "REMX"
+    IDS_VQF_CDCT            "CDCT"
+    IDS_VQF_SING            "SING"
+    IDS_VQF_LABL            "LABL"
+    IDS_VQF_NOTE            "NOTE"
+    IDS_VQF_PRSN            "PRSN"
+    IDS_VQF_BAND            "BAND"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+  IDS_WMA_INFO            "Windows Media Audio informácia"
+    IDS_WMA_BINARY          "binárny (%luB)"
+    IDS_WMA_DURATION        "Dĺžka"
+    IDS_WMA_BITRATE         "Bitrate (kbps)"
+    IDS_WMA_SEEKABLE        "Seekable"
+    IDS_WMA_STRIDABLE       "Stridable"
+    IDS_WMA_BROADCAST       "Broadcast"
+    IDS_WMA_PROTECTED       "Chránený"
+    IDS_WMA_TRUSTED         "Trusted"
+    IDS_WMA_SIGNATURENAME   "Názov podpisu"
+    IDS_WMA_TITLE           "Názov"
+    IDS_WMA_AUTHOR          "Autor"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_WMA_DESCRIPTION     "Popis"
+    IDS_WMA_RATING          "Hodnotenie"
+    IDS_WMA_COPYRIGHT       "Copyright"
+    IDS_WMA_ALBUMTITLE      "Album"
+    IDS_WMA_TRACK           "Stopa"
+    IDS_WMA_PROMOTIONURL    "URL propagácie"
+    IDS_WMA_ALBUMCOVERURL   "URL obalu albumu"
+    IDS_WMA_GENRE           "Žáner"
+    IDS_WMA_YEAR            "Rok"
+    IDS_WMA_MCDI            "MCDI"
+    IDS_WMA_BANNERIMAGETYPE "Typ reklamy"
+    IDS_WMA_BANNERIMAGEDATA "Dáta reklamy"
+    IDS_WMA_BANNERIMAGEURL  "URL reklamy"
+    IDS_WMA_COPYRIGHTURL    "Copyright URL"
+    IDS_WMA_NSCNAME         "NSC názov"
+    IDS_WMA_NSCADDRESS      "NSC adresa"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_WMA_NSCPHONE        "NSC telefón"
+    IDS_WMA_NSCEMAIL        "NSC e-mail"
+    IDS_WMA_NSCDESCRIPTION  "NSC popis"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MOD_INFO            "Informácie Tracker Modulu"
+    IDS_MOD_PATTERNS        "Patterns"
+    IDS_MOD_SAMPLES         "Samples"
+    IDS_MOD_INSTRUMENTS     "Instruments"
+    IDS_MOD_TITLE           "Titul"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_OGG_INFO            "OGG Vorbis informácie"
+    IDS_OGG_VERSION         "Verzia"
+    IDS_OGG_BITRATE         "Nominálny bitrate (kbps)"
+    IDS_OGG_FREQUENCY       "Vzorkovacia frekvencia (Hz)"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_OGG_CHANNELS        "Kanály"
+    IDS_OGG_COPYRIGHT       "Copyright"
+    IDS_OGG_VERSIONS        "Verzia"
+    IDS_OGG_CONTACT         "Kontakt"
+    IDS_OGG_ISRC            "ISRC"
+    IDS_OGG_AUTHOR          "Autor"
+    IDS_OGG_TITLE           "Názov"
+    IDS_OGG_GENRE           "Žáner"
+    IDS_OGG_COMMENTS        "Poznámky"
+    IDS_OGG_DATE            "Dátum"
+    IDS_OGG_ALBUM           "Album"
+    IDS_OGG_TRACK           "Stopa"
+    IDS_OGG_PERFORMER       "Umelec"
+    IDS_OGG_ORGANIZATION    "Organizácia"
+    IDS_OGG_DESCRIPTION     "Popis"
+    IDS_OGG_DETAILS         "Detaily"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_OGG_LOCATION        "Umiestnenie"
+    IDS_OGG_SAMPLES         "Vzorky"
+    IDS_OGG_LENGTH          "Dĺžka"
+    IDS_OGG_ADDINFO         "Dodatočné informácie"
+    IDS_OGG_DISCID          "ID disku"
+    IDS_OGG_VENDOR          "Predajca"
+    IDS_OGG_STDTAGS         "Štandardné tagy"
+    IDS_OGG_OTHERTAG        "Iný tag"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MP4_AACINFO         "AAC informácia"
+    IDS_MP4_BITRATE         "Bitrate (bps)"
+    IDS_MP4_SAMPLINGRATE    "Vzorkovacia frekvencia (Hz)"
+    IDS_MP4_CHANNELS        "Kanály"
+    IDS_MP4_DURATION        "Dĺžka"
+    IDS_MP4_AACHEADERTYPE   "Typ hlavičky"
+    IDS_MP4_MPEGVERSION     "MPEG verzia"
+    IDS_MP4_OBJTYPE_MAIN    "MAIN"
+    IDS_MP4_OBJTYPE_LC      "LC"
+    IDS_MP4_OBJTYPE_SSR     "SSR"
+    IDS_MP4_OBJTYPE_LTP     "LTP"
+    IDS_MP4_HEADTYPE_RAW    "RAW"
+    IDS_MP4_HEADTYPE_ADIF   "ADIF"
+    IDS_MP4_HEADTYPE_ADTS   "ADTS"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_WAV_INFO            "WAVE informácia"
+    IDS_WAV_BITRATE         "Bitrate (bps)"
+    IDS_WAV_FREQUENCY       "Vzorkovacia frekvencia (Hz)"
+    IDS_WAV_MODE            "Režim"
+    IDS_WAV_COMPRESSION     "Komprimácia"
+    IDS_WAV_STEREO          "Stereo"
+    IDS_WAV_MONO            "Mono"
+    IDS_WAV_LENGTH          "Dĺžka"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MP3_MP3VERSION      "Verzia"
+    IDS_MP3_MP3VERSIONFMT   "MPEG %u.%u Layer %s"
+    IDS_MP3_BITRATE         "Bitrate (kbps)"
+    IDS_MP3_FREQUENCY       "Vzorkovacia frekvencia (Hz)"
+    IDS_MP3_MODE            "Režim"
+    IDS_MP3_COPYRIGHT       "Copyright (c)"
+    IDS_MP3_ORIGINAL        "Originál"
+    IDS_MP3_AUTHOR          "Autor"
+    IDS_MP3_TITLE           "Názov"
+    IDS_MP3_GENRE           "Žáner"
+    IDS_MP3_COMMENTS        "Poznámky"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MP3_YEAR            "Rok"
+    IDS_MP3_ALBUM           "Album"
+    IDS_MP3_EMPHASIS        "Emphasis"
+    IDS_MP3_ID3TAGV         "ID3 Tag v%u.%u"
+    IDS_MP3_MP3INFO         "MPEG Audio informácia"
+    IDS_MP3_FRAMES          "Frames"
+    IDS_MP3_LENGTH          "Dĺžka"
+    IDS_MP3_AVERAGE         "Variabilný, priemer "
+    IDS_MP3_TRACK           "Stopa"
+    IDS_MP3_DASH            "-"
+    IDS_MP3_5015MS          "50/15 microsek"
+    IDS_MP3_CCITTJ17        "CCITT J 17"
+    IDS_MP3_QUESTIONMARK    "?"
+    IDS_MP3_STEREO          "Stereo"
+    IDS_MP3_JSTEREO         "Joint Stereo"
+    IDS_MP3_DCHANNEL        "Dual kanál"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MP3_SCHANNEL        "Jeden kanál"
+    IDS_MP3_COMPOSER        "Skladateľ"
+    IDS_MP3_ORIGARTIST      "Orig. umelec"
+    IDS_MP3_ENCODEDBY       "Zakódované"
+    IDS_MP3_URL_COMINFO     "URL reklamnej informácie"
+    IDS_MP3_URL_COPYRIGHT   "URL Copyright/Právnych informácií"
+    IDS_MP3_URL_OFFICIAL    "Oficiálne URL audio súboru"
+    IDS_MP3_URL_ARTIST      "Oficiálne URL umelca/skladateľa"
+    IDS_MP3_URL_ASOURCE     "Oficiálne URL audio zdroja"
+    IDS_MP3_URL_IRADIO      "Oficiálne URL internetového rádia"
+    IDS_MP3_URL_PAYMENT     "Platobné URL"
+    IDS_MP3_URL_PUBLISHER   "Oficiálne URL vydavateľa"
+    IDS_MP3_PUBLISHER       "Vydavateľ"
+    IDS_MP3_USERURL         "Vlastné URL"
+    IDS_MP3_USERTEXT        "Vlastný text"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MMV_OOM             "Nedostatok pamäti"
+    IDS_MMV_UNKNOWN_FILE    "Neznámy súbor"
+    IDS_MMV_OPEN_ERROR      "Chyba otvárania"
+    IDS_MMV_READ_ERROR      "Chyba čítania"
+    IDS_MMV_WRITE_ERROR     "Chyba zápisu"
+    IDS_MMV_SEEK_ERROR      "Chyba hľadania"
+    IDS_MMV_CORRUPTED_FILE  "Poškodený súbor"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MMV_EXTENSION_ERROR "Nie je možné inicializovať Windows prípony"
+END

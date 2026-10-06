@@ -1,0 +1,122 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for uniso. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uniso/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uniso.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 252, 83
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnISO - Konfiguration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Schreibschutz-&Attribut beim Kopieren aus dem Archiv entfernen",IDC_CFG_READONLY,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,11,226,10
+    CONTROL         "Die &Session als Verzeichnis zeigen (erlaubt Zugriff auf alle Sessions)",IDC_CFG_SESSIONASDIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,23,239,10
+    CONTROL         "&Boot-Image-Disk als Datei zeigen",IDC_CFG_BOOTIMAGEASFILE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,35,124,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,2,58,248,1
+    DEFPUSHBUTTON   "OK",IDOK,140,64,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,195,64,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "Kann die Datei nicht öffnen."
+    IDS_UNKNOW_ERROR            "Unbekannter Fehler."
+    IDS_UNPACKING_ARCHIVE       "Entpacke ISO-Archiv"
+    IDS_ERROR_UNPACKING         "Fehler beim Entpacken des Archivs."
+    IDS_CANT_HANDLE_FILE        "Kann diese Datei nicht verarbeiten."
+    IDS_INSUFFICIENT_MEMORY     "Nicht genügend Speicher."
+    IDS_ERR_TOO_LONG_NAME       "Vorgang kann nicht beendet werden, weil der Name zu lang ist."
+    IDS_ABOUT                   "Über Plugin"
+    IDS_PLUGIN_DESCRIPTION      "Durchsucht und entpackt CD/DVD ISO-Dateien."
+    IDS_CANT_CREATE_TEMP        "Kann kein temporäres Verzeichnis erstellen."
+    IDS_CANT_DELETE_TEMP_FILE   "Kann die temporäre Datei nicht löschen."
+    IDS_UNKNOWN_FILE_FORMAT     "Unbekanntes Dateiformat oder ungültiges ISO-Image.\n\nWenn Sie sicher sind, dass das ISO-Image gültig ist, erstellen Sie bitte ein Issue auf https://github.com/0xeb/sally/issues und helfen Sie uns bei der Unterstützung dieses Formats."
+    IDS_CANT_OPEN_FILE          "Fehler beim Öffnen der Datei '%s'."
+    IDS_ERR_TMP                 "Erstellen der temporären Datei fehlgeschlagen."
+    IDS_CANT_SET_ATTRS          "Kann die Dateiattribute nicht setzten."
+    IDS_CANT_CREATE_DIR         "Kann das Verzeichnis '%s' nicht erstellen."
+    IDS_YES                     "Ja"
+    IDS_NO                      "Nein"
+    IDS_ERROR                   "Fehler"
+    IDS_WARNING                 "Warnung"
+    IDS_ERROR_OPENING_MULTISESSION  "Während des Lesens des Multisession-Images sind einige Fehler aufgetreten.\n\nZeige nur die richtig gelesenen Sessions."
+    IDS_UNKNOWN_TRACK_TYPE      "Unbekannter Spurtyp."
+    IDS_READERROR               "Lesefehler"
+    IDS_WRITEERROR              "Schreibfehler"
+    IDS_CCD_BAD_FORMAT          "Falsches Format der .CCD Datei.\n\nGezeigtes Image könnte unvollständig sein."
+    IDS_CCD_MISSING             "Fehlende .CCD Datei.\n\nGezeigtes Image könnte unvollständig sein."
+    IDS_ERROR_READING_SECTOR    "Kann Sektor #%08X nicht lesen."
+    IDS_ERROR_LISTING_IMAGE     "Lesefehler der Verzeichnisstruktur bei Sektor #%08X.\n\nUnvollständiger Inhalt des ISO Images."
+    IDS_INTERNAL_PLUGIN_ERROR   "Interner Pluginfehler."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Unbekannte Aufteilungsstrategie (%d).\n\nBitte erstellen Sie ein Issue auf https://github.com/0xeb/sally/issues und helfen Sie uns dieses Problem zu beseitigen."
+    IDS_UDF_INVALID_TAG_ID      "Ungültige UDF Tag ID."
+    IDS_UDF_ERROR_READING_VAT   "Lesefehler der Virtual Allocation Table (VAT) bei Sektor #%08X."
+    IDS_UDF_MISSING_VAT         "Fehlende Virtual Allocation Table (VAT)."
+    IDS_UDF_BAD_ROOT_ICB        "Falsche Root ICB.\n\nKann die Verzeichnisstruktur nicht lesen."
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "Datei ""%s"" kann nicht entpackt werden.\n\nUnstimmigkeit zwischen Dateigröße und ICB-Blöcken."
+    IDS_CANT_OPEN_TRACK         "Kann den Track #%d nicht öffnen."
+    IDS_BOOT_OR_MBR             "Diese Datei scheint das Image einer Diskette, einer Festplatte oder einer Festplattenpartition zu sein.\nVersuchen Sie die Datei in .ima umzubenennen um das UnFAT-Plugin zu aktivieren."
+    IDS_UNSUPPORTED_APFS        "Dieses Disk-Image enthält das APFS-Dateisystem.\nDieses Dateisystem wird noch nicht unterstützt."
+
+    IDS_ERR_HFS_READ            "Partitionskopf kann nicht gelesen werden. Datei ist zu klein."
+    IDS_ERR_HFS_INVALID_PARTITION "Beschädigte Partitionsmanager-Strukturen."
+    IDS_ERR_HFS_UNRECOGNIZED    "Dieses Festplattenimage enthält keine HFS-Plus Partition."
+    IDS_ERR_HFS_ORIGINAL_HFS    "Dieses Festplattenimage enthält ein HFS und ein nicht HFS-Plus Dateisystem.\nHFS wird nicht unterstützt."
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "Block #%08X kann nicht gelesen werden.\nDatei %s wird nicht entpackt."
+    IDS_ERR_HFS_SEEK            "Block #%08X kann nicht gelesen werden."
+    IDS_ERR_HFS_BTREE_NODETYPE  "Nicht unterstützter BTree-Root-Knotentyp in der Katalogdatei."
+    IDS_ERR_HFS_BTREE_FRAGMENTED "Die Katalogdatei ist in mehr als 8 Teile fragmentiert, das wird nicht unterstützt."
+    IDS_ERR_HFS_FILE_FRAGMENTED "Die Datei '%s' ist in mehr als 8 Teile fragmentiert, das wird nicht unterstützt.\nDie Datei kann nicht entpackt werden."
+
+    IDS_ERR_TOO_LONG_PATH       "Das Datenträgerabbild enthält eine zulange Pfadangabe, diese kann Sally nicht verarbeiten."
+
+    IDS_ERR_DMG_READ_HDR        "Paketkopf kann nicht gelesen werden. Datei ist zu klein."
+    IDS_ERR_DMG_ENCRYPTED       "Dieses Paket ist verschlüsslet.\nVerschlüsselte Pakete werden nicht unterstützt."
+    IDS_ERR_DMG_NO_FOOTER       "Diese Datei ist entweder kein DMG-Paket oder es ist unvollständig.\nEs enthält keine gültige DMG Fußzeile."
+    IDS_ERR_DMG_PLIST           "Diese Datei ist entweder kein gültiges DMG-Paket oder sie ist unvollständig.\nSie enthält keine gültige Eigenschaftsliste."
+    IDS_ERR_DMG_BLOCK_UNDEFINED "Dieses Paket enthält keinen HFS-Plus Partitions-Datenblock an %I64u.\nDieser Block wird für eine einwandfreie Bearbeitung des Pakets benötigt."
+
+    IDS_ERR_BF_READ             "Die Daten an Position %I64u des Disk-Images können nicht gelesen werden."
+    IDS_ERR_BF_SEEK             "Das Disk-Image kann nicht bis zur Position %I64u durchsucht werden."
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "Interner Fehler: Nicht unterstützte Suchmethode."
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "Dieses Paket enhält einen mit einer unbekannten Methode komprimierten Block.\nDiese Pakete werden nicht unterstützt."
+    IDS_ERR_BF_ZLIB             "Das Entpacken des mit ZLIB komprimierten Blocks ist fehlgeschlagen. Das Disk-Image scheint beschädigt zu sein."
+    IDS_ERR_BF_BZIP2            "Das Entpacken des mit BZIP2 komprimierten Blocks ist fehlgeschlagen. Das Disk-Image scheint beschädigt zu sein."
+
+    IDS_ERR_ISZ_NO_HEADER       "Diese Datei scheint kein komprimiertes ISZ Image zu sein oder es ist unvollständig.\nEs enthält keinen gültigen ISZ-Kopf."
+    IDS_ERR_ISZ_READ_HDR        "Komprimierte Imagekopf kann nicht gelesen werden. Datei ist zu klein."
+    IDS_ERR_ISZ_SEGMENTED       "Das Image ist segmentiert.\nSegmentierte Images werden nicht unterstützt."
+    IDS_ERR_ISZ_ENCRYPTED       "Dieses Image ist verschlüsslet.\nVerschlüsselte Images werden nicht unterstützt."
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "Tonspuren können nicht entpackt werden."
+
+    IDS_CANCELING_OPERATION     "Breche den Vorgang ab, bitte warten..."
+
+    IDS_INFO_LABEL              "Image Information\n\n"
+    IDS_INFO_LABEL_LABEL        "Image Information ""%s""\n\n"
+    IDS_INFO_CNT_SESSIONS       "Anzahl der Sessions: %d"
+    IDS_INFO_SESSION_NUM        "\nSession %d\n"
+    IDS_INFO_CNT_TRACKS         "  Spuranzahl: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  Spur: %d, %s, Größe: %d KBytes\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  Spur: %d, %s, Größe: %d KBytes - ""%s""\n"
+}

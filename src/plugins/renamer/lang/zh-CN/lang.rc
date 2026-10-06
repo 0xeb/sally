@@ -1,0 +1,482 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for renamer. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/renamer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\renamer.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_RENAME DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "批量重命名"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_MENUSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,368,1
+    LTEXT           "掩码(&M):",IDC_STATIC_1,16,11,51,8
+    COMBOBOX        IDC_MASK,70,9,95,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "包括子目录(&B)",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,10,66,12
+    PUSHBUTTON      "重命名(&R)",IDOK,301,9,60,14
+    CONTROL         "手动模式(&L)",IDC_MANUAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,27,57,12
+    CONTROL         "",IDS_MANSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,65,32,297,1
+    EDITTEXT        IDE_MANUAL,6,41,355,138,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "新名称(&N):",IDS_LABELNEWNAME,16,43,51,8
+    COMBOBOX        IDC_NEWNAME,70,41,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_NEWNAME,349,41,12,12
+    LTEXT           "替换",IDS_LABELREPLACE,6,60,20,8
+    CONTROL         "",IDS_REPLACESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,28,64,334,1
+    LTEXT           "搜索(&S):",IDS_LABELSEARCHFOR,16,77,51,8
+    COMBOBOX        IDC_SEARCH,70,75,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_SEARCH,349,75,12,12
+    LTEXT           "替换为(&I):",IDS_LABELREPLACEWITH,16,94,51,8
+    COMBOBOX        IDC_REPLACE,70,92,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_REPLACE,349,92,12,12
+    CONTROL         "区分大小写(&T)",IDC_CASESENSITIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,70,109,67,12
+    CONTROL         "每个名称中仅一次(&Y)",IDC_GLOBAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,70,123,92,12
+    CONTROL         "全词匹配(&W)",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,109,61,12
+    CONTROL         "正则表达式(&G)",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,123,67,12
+    CONTROL         "排除扩展名(&D)",IDC_EXCLUDEEXT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,274,109,67,12
+    LTEXT           "更改大小写",IDS_LABELCASE,6,139,45,8
+    CONTROL         "",IDS_CHANGECASESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,53,143,309,1
+    LTEXT           "文件名(&A):",IDS_LABELNAME,16,155,51,8
+    COMBOBOX        IDC_NAMECASE,70,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "扩展名(&X):",IDS_LABELEXT,186,155,41,8
+    COMBOBOX        IDC_EXTCASE,236,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "包括路径部分(&U)",IDC_PATHPART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,70,170,76,12
+    LTEXT           "预览(&P):",IDS_PREVIEW,6,182,32,8
+    RTEXT           "",IDS_COUNT,100,182,261,8
+    CONTROL         "",IDL_PREVIEW,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,0,192,368,68
+END
+
+IDD_CUT DIALOGEX 9, 20, 210, 88
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "添加子字符串"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "子字符串(&S):",IDC_STATIC_1,7,9,50,8
+    COMBOBOX        IDC_CUTFROM,64,7,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "开始位置(&A)",IDC_STATIC_2,7,28,50,8
+    EDITTEXT        IDE_START,64,26,48,12,ES_AUTOHSCROLL
+    LTEXT           "相对于",IDC_STATIC_3,121,28,28,8
+    COMBOBOX        IDC_START,155,26,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "结束位置(&E)",IDC_STATIC_4,7,47,50,8
+    EDITTEXT        IDE_END,64,45,48,12,ES_AUTOHSCROLL
+    LTEXT           "相对于",IDC_STATIC_5,121,47,28,8
+    COMBOBOX        IDC_END,155,45,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "确定",IDOK,53,67,50,14
+    PUSHBUTTON      "取消",IDCANCEL,107,67,50,14
+END
+
+IDD_COUNTER DIALOGEX 9, 20, 162, 130
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "添加计数器"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "开始于(&S):",IDC_STATIC_1,7,9,41,8
+    EDITTEXT        IDE_START,60,7,95,12,ES_AUTOHSCROLL
+    LTEXT           "步进(&E):",IDC_STATIC_2,7,25,32,8
+    EDITTEXT        IDE_STEP,60,23,95,12,ES_AUTOHSCROLL
+    LTEXT           "基数(&B):",IDC_STATIC_3,7,41,32,8
+    COMBOBOX        IDC_BASE,60,39,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "最小宽度(&W):",IDC_STATIC_4,7,57,52,8
+    EDITTEXT        IDE_MINWIDTH,60,55,95,12,ES_AUTOHSCROLL
+    LTEXT           "填充用(&F):",IDC_STATIC_5,7,73,52,8
+    COMBOBOX        IDC_FILL,60,71,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "左对齐(&L)",IDC_LEFT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,90,49,12
+    DEFPUSHBUTTON   "确定",IDOK,29,109,50,14
+    PUSHBUTTON      "取消",IDCANCEL,83,109,50,14
+END
+
+IDD_DEFINESET DIALOGEX 9, 20, 269, 192
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "定义字符集"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "集合中的字符(&S):",IDC_STATIC_1,7,7,67,8
+    EDITTEXT        IDE_SET,7,17,255,12,ES_AUTOHSCROLL
+    LTEXT           "提示:\n\n用 '-' 来包括一个字符范围(例如 A-Z)。\n\n要包括 '-' 字符，将它写在集合的开始或结尾(例如 -AZ)。",IDC_STATIC_2,7,36,255,40
+    LTEXT           "要包括 ']' 字符，将它写在集合的开始或结尾。\n\n要在正字符集中包括 '^' 字符，将它写在除了集合开始或结尾以外的任意位置。",IDC_STATIC_3,7,84,255,32
+    LTEXT           "要包括 POSIX 字符类，使用 [:class:]，类可以是 字母，字母数字，ascii，空白，cntrl，数字，图形，小写，打印，点状，空格，大写，单词，十六进制数字中的一个。\n\n要包括反斜杠，使用 \\\\.",IDC_STATIC_4,7,124,255,40
+    DEFPUSHBUTTON   "确定",IDOK,82,171,50,14
+    PUSHBUTTON      "取消",IDCANCEL,136,171,50,14
+END
+
+IDD_SUBEXPRESSION DIALOGEX 9, 20, 168, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "指定子表达式"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "子表达式数(&S):",IDC_STATIC_1,7,9,58,8
+    COMBOBOX        IDC_NUMBER,71,7,90,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "提示: 用 0 来指定整个匹配的表达式。",IDC_STATIC_2,7,23,154,8
+    LTEXT           "大小写(&C):",IDC_STATIC_3,7,37,41,8
+    COMBOBOX        IDC_CASE,71,35,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "确定",IDOK,32,57,50,14
+    PUSHBUTTON      "取消",IDCANCEL,86,57,50,14
+END
+
+IDD_PROGRESS DIALOGEX 6, 15, 194, 60
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "重命名器"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDS_MESSAGE,7,7,180,8
+    LTEXT           "",IDS_PROGRESS,7,22,180,10,0,WS_EX_STATICEDGE
+    DEFPUSHBUTTON   "取消",IDCANCEL,72,39,50,14
+END
+
+IDD_COMMAND DIALOGEX 9, 20, 368, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "执行外壳命令"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "命令(&C):",IDC_STATIC_1,7,7,82,8
+    COMBOBOX        IDC_COMMAND,7,17,354,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "确定",IDOK,257,37,50,14
+    PUSHBUTTON      "取消",IDCANCEL,311,37,50,14
+END
+
+IDD_ERROR DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "外壳命令错误"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "命令可能没有成功完成。",IDC_STATIC_1,7,7,218,8
+    LTEXT           "命令行:",IDC_STATIC_2,7,22,40,8
+    EDITTEXT        IDE_COMMAND,47,22,314,8,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    LTEXT           "退出代码:",IDC_STATIC_3,7,34,40,8
+    LTEXT           "",IDS_EXITCODE,49,34,312,8
+    LTEXT           "标准错误(&S):",IDC_STATIC_4,7,46,82,8
+    EDITTEXT        IDE_STDERR,7,56,354,176,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON   "忽略",IDOK,257,239,50,14
+    PUSHBUTTON      "取消",IDCANCEL,311,239,50,14
+END
+
+IDD_CONFIG DIALOGEX 45, 31, 257, 160
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "重命名器高级选项"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "手动模式的外部编辑器设置:",IDC_STATIC_1,7,7,240,8
+    LTEXT           "命令(&C):",IDC_STATIC_2,14,21,48,8
+    EDITTEXT        IDE_COMMAND,63,19,171,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_BROWSE,237,19,13,12,WS_GROUP
+    LTEXT           "参数(&A):",IDC_STATIC_3,14,37,48,8
+    EDITTEXT        IDE_ARGUMENTS,63,35,171,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ARGHELP,237,35,13,12,WS_GROUP
+    LTEXT           "开始目录(&I):",IDC_STATIC_4,14,53,48,8
+    EDITTEXT        IDE_INITDIR,63,51,171,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_INITDIRHELP,237,51,13,12,WS_GROUP
+    LTEXT           "手动模式字体:",IDC_STATIC_5,7,74,113,8
+    PUSHBUTTON      "更改(&G)",IDB_FONT,14,84,50,14,WS_GROUP
+    LTEXT           "确认:",IDC_STATIC_6,7,109,60,8
+    CONTROL         "用 &ESC 键关闭主窗口。",IDC_CONFIRMESCCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,118,201,12
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,7,138,243,1
+    DEFPUSHBUTTON   "确定",IDOK,92,142,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,146,142,50,14
+    PUSHBUTTON      "帮助",IDHELP,200,142,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Renamer"
+  IDS_DESCRIPTION, "强大的带有实时预览的批量重命名器。"
+  IDS_ABOUT, "关于插件"
+  IDS_RENAMERERR, "重命名器 - 错误"
+  IDS_LOWMEM, "内存不足。"
+  IDS_PLUGMENU_RENAME, "批量重命名(&B)..."
+  IDS_PLUGMENU_UNDO, "撤消(&U)..."
+  IDS_RENAME, "重命名(&R)"
+  IDS_VALIDATE, "验证(&V)"
+  IDS_ORIGNAME_COLUMN, "原始名称"
+  IDS_NEWNAME_COLUMN, "新名称"
+  IDS_SIZE_COLUMN, "大小"
+  IDS_DATE_COLUMN, "日期"
+  IDS_TIME_COLUMN, "时间"
+  IDS_PATH_COLUMN, "路径"
+
+  // menu
+  IDS_MENU_FILE, "命令(&C)"
+  IDS_MENU_VIEW, "查看(&V)"
+  IDS_MENU_OPTIONS, "选项(&O)"
+  IDS_MENU_HELP, "帮助(&H)"
+  IDS_MENU_RENAME, "重命名(&R)\tAlt+R"
+  IDS_MENU_VALIDATE, "验证(&V)\tCtrl+I"
+  IDS_MENU_EXIT, "退出(&X)\tAlt+F4"
+  IDS_MENU_SORTOLD, "按原始名称排序(&O)\tCtrl+F1"
+  IDS_MENU_SORTNEW, "按新名称排序(&N)\tCtrl+F1"
+  IDS_MENU_SORTSIZE, "按大小排序(&S)\tCtrl+F2"
+  IDS_MENU_SORTTIME, "按时间排序(&T)\tCtrl+F3"
+  IDS_MENU_SORTPATH, "按路径排序(&P)\tCtrl+F4"
+  IDS_MENU_FILENAMES, "重命名文件名(&N)\tCtrl+N"
+  IDS_MENU_RELATIVEPATH, "重命名相对路径(&R)\tCtrl+R"
+  IDS_MENU_FULLPATH, "重命名完整路径(&F)\tCtrl+F"
+  IDS_MENU_FONT, "手动模式字体(&M)..."
+  IDS_MENU_LAST, "上次使用的(&L)\tCtrl+L"
+  IDS_MENU_RESET, "重置(&S)\tCtrl+D"
+  IDS_MENU_REGEXP, "正则表达式(&R)"
+  IDS_MENU_CUSTOMFONT, "使用自定义字体(&C)..."
+  IDS_MENU_AUTOFONT, "使用默认字体(&D)"
+  IDS_MENU_REMOVESOURCEPATH, "移除空目录(&E)"
+  IDS_MENU_UNDO, "撤消(&U)\tCtrl+U"
+  IDS_MENU_EDIT, "编辑(&E)"
+  IDS_MENU_STORELIST, "存储列表到剪贴板(&S)\tF2"
+  IDS_MENU_LOADLIST, "从剪贴板加载列表(&L)\tF3"
+  IDS_MENU_EDITLIST, "在外部编辑器中打开列表(&O)...\tF4"
+  IDS_MENU_FILTER, "通过外壳命令过滤列表(&F)...\tF5"
+  IDS_MENU_ALLFILES, "所有文件(&A)\tF6"
+  IDS_MENU_RENAMED, "成功重命名的文件(&R)\tF7"
+  IDS_MENU_NOTRENAMED, "没有重命名的文件(&N)\tF8"
+  IDS_MENU_ADVANCED, "高级(&A)..."
+  IDS_MENU_BATCHRENDLG, "批量重命名对话框(&B)\tF1"
+
+  IDS_VAR_ORIGNAME, "$(OriginalName)"
+  IDS_CASE_DONTCHANGE, "不更改"
+  IDS_CASE_LOWER, "小写"
+  IDS_CASE_UPPER, "大写"
+  IDS_CASE_MIXED, "混合大小写"
+  IDS_INVALIDMASK, "无效的掩码。"
+  IDS_TOOLONGPATH, "无法读取目录，因为路径名太长"
+  IDS_ERRREADDIR, "无法读取目录。"
+  IDS_ERROR, "错误"
+  IDS_DIRTEXT, "目录"
+  IDS_CANCELCNFRM, "你要取消这个操作吗？"
+  IDS_QUESTION, "问题"
+  IDS_VAR_ORIGINALNAME, "原始名称"
+  IDS_VAR_DRIVE, "驱动器"
+  IDS_VAR_PATH, "路径"
+  IDS_VAR_RELATIVEPATH, "相对路径"
+  IDS_VAR_NAME, "名称"
+  IDS_VAR_NAMEPART, "名称部分"
+  IDS_VAR_EXTPART, "扩展名部分"
+  IDS_VAR_SIZE, "大小"
+  IDS_VAR_TIME, "时间"
+  IDS_VAR_DATE, "日期"
+  IDS_VAR_COUNTER, "计数..."
+  IDS_VAR_LOWER, "小写"
+  IDS_VAR_UPPER, "大写"
+  IDS_VAR_MIXED, "混合大小写"
+  IDS_VAR_STRIPDIA, "除去音调符号"
+  IDS_VAR_CUT, "子字符串..."
+  IDS_LEFT, "开始"
+  IDS_RIGHT, "结束"
+  IDS_BADCUTOFFSET, "请指定一个非负值。"
+  IDS_DECIMAL, "十进制"
+  IDS_HEX_LOWER, "十六进制(abcdef)"
+  IDS_HEX_UPPER, "十六进制(ABCDEF)"
+  IDS_FILL_SPACES, "空格"
+  IDS_FILL_ZEROS, "零"
+  IDS_FILL_UNDERSCORES, "下划线"
+
+  IDS_EXP_UNMATCHEDPAR, "变量名必须以 ')' 终止。"
+  IDS_EXP_VARNOTFOUND, "没有找到变量。"
+  IDS_EXP_UNEXPECTEDCHAR, "期望括号中的变量名或 ""$"" 字符。"
+  IDS_EXP_SMALLBUFFER, "扩展的字符串太大。"
+  IDS_EXP_TRAILINGDOLLAR, "未预期的字符串结尾，字符 ""$"" 后面必须紧跟变量名或 ""$"" 字符。"
+  IDS_EXP_EMPTYSTR, "这里不允许使用空字符串。"
+  IDS_EXP_UNEXPECTARG, "这里不期望参数。"
+  IDS_EXP_EXPECTCUTORCASE, "期望大小写说明(""小写"", ""大写"", 或""除去音调符号"")或名称剪切说明(两个整数)。"
+  IDS_EXP_EXPECTENDCUT, "期望名称剪切说明结尾(整数)。"
+  IDS_EXP_UNEXPECTEDARGUMENT, "未预期的参数。"
+  IDS_EXP_MISTIMEFORMAT, "缺少时间格式。"
+  IDS_EXP_INVALIDTIMEFMT, "无效的时间格式。"
+  IDS_EXP_MISDATEFORMAT, "缺少日期格式"
+  IDS_EXP_INVALIDDATEFMT, "无效的日期格式。"
+  IDS_EXP_TOOMUCHARGUMENTS, "太多参数。"
+  IDS_EXP_EXPECTSTART, "期望计数器开始(整数)。"
+  IDS_EXP_EXPECTSTEP, "期望计数器步骤(浮点数)。"
+  IDS_EXP_EXPECTBASEALIGNWIDTH, "期望基本(""dxX""之一)，对齐(""l"")或宽度(正整数)说明。"
+  IDS_EXP_EXPECTALIGNWIDTH, "期望对齐(""l"")或宽度(正整数)说明。"
+  IDS_EXP_EXPECTWIDTH, "期望宽度(正整数)说明"
+  IDS_EXP_EXPECTFILL, "期望填充说明(一个字母)"
+
+  IDS_NEWNAMEERR, "<新名称错误: %s>"
+  IDS_TRANSFERERROR, "<某个输入字段中有无效值>"
+  IDS_REGEXPERR, "<正则表达式错误: %s>"
+  IDS_BMERR, "<Boyer-Moore 错误: %s>"
+  IDS_GENERICERR, "<错误: %s>"
+  IDS_REPLACEERR, "<替换模式错误: %s>"
+
+  IDS_REP_EXPCLOSEPAR1, "期望右括弧或大小写说明(""小写"", ""大写"", 或""除去音调符号"")。"
+  IDS_REP_EXPCLOSEPAR2, "期望右括弧。"
+  IDS_REP_EXPCLOSEPAR3, "期望右括弧或后面跟随指定大小写说明(""小写"", ""大写"", 或""除去音调符号"")的字符 ':'。"
+  IDS_REP_BADREF, "引用到未定义的子表达式。"
+  IDS_EXP_EXPECTSUBNUM1, "期望子表达式数"
+  IDS_EXP_EXPECTSUBNUM2, "期望子表达式数，在括号中的子表达式数或字符 '$'."
+  IDS_EXP_TRAILINGBACKSLASH, "未预期的字符串结尾，反斜杠不能位于字符串结尾。"
+
+  IDS_REENOERROR, "没有错误。"
+  IDS_REELOWMEMORY, "低内存。"
+  IDS_REEEMPTY, "正则表达式为空。"
+  IDS_REETOOBIG, "正则表达式太大。"
+  IDS_REETOOMANYPARENTHESISES, "太多()."
+  IDS_REEUNMATCHEDPARENTHESIS, "不匹配的()."
+  IDS_REEOPERANDCOULDBEEMPTY, "*+ 操作数不能为空。"
+  IDS_REENESTED, "嵌套的 *?+."
+  IDS_REEUNMATCHEDBRACKET, "不匹配的 []."
+  IDS_REEFOLLOWSNOTHING, "?+* 不跟随任何东西。"
+  IDS_REETRAILINGBACKSLASH, "尾部 \\."
+  IDS_REEINTERNALDISASTER, "内部的灾难。"
+  IDS_REEINVALIDPOSIXCLASS, "未知的 POSIX 类名称。"
+  IDS_REEEXPECTINGXDIGIT, "\\x 之后期望两位十六进制数字。"
+  IDS_REESTACKOVERFLOW, "堆栈溢出"
+  IDS_REENOPATTERN, "需要编译的表达式。"
+  IDS_REEERRORSTARTINGTHREAD, "无法启动新线程。"
+  IDS_REEEXPECTINGEXTENDEDPATTERN1, "在 (? 之后期望 :=!< 之一"
+  IDS_REEEXPECTINGEXTENDEDPATTERN2, "在 (?< 之后期望 =!< 之一"
+  IDS_REEBADFIXEDWIDTHLOOKBEHIND, "后顾模式没有固定宽度。"
+
+  IDS_RE_POSIX_ALPHA, "字母字符(字母)"
+  IDS_RE_POSIX_ALNUM, "字母数字字符(字母数字)"
+  IDS_RE_POSIX_ASCII, "ASCII 字符 (ascii)"
+  IDS_RE_POSIX_CNTRL, "控制字符 (cntrl)"
+  IDS_RE_POSIX_DIGIT, "二进制数字 (数字)"
+  IDS_RE_POSIX_GRAPH, "除了空格以外的可打印字符(图形)"
+  IDS_RE_POSIX_LOWER, "小写字符 (小写)"
+  IDS_RE_POSIX_PRINT, "可打印字符 (打印)"
+  IDS_RE_POSIX_PUNCT, "点状字符(点状)"
+  IDS_RE_POSIX_SPACE, "空白字符(空格)"
+  IDS_RE_POSIX_UPPER, "大写字符(大写)"
+  IDS_RE_POSIX_WORD, "字母数字字符 + '_' (单词)"
+  IDS_RE_POSIX_XDIGIT , "十六进制数字 (x数字)"
+  IDS_RE_LEFTPAREN, "左括弧 '('"
+  IDS_RE_RIGHTPAREN, "右括弧 ')'"
+  IDS_RE_LEFTBRACKET, "左方括号 '['"
+  IDS_RE_CIRCUMFLEX,  "音调符 '^'"
+  IDS_RE_DOLLAR, "美元符号 '$'"
+  IDS_RE_DOT, "点 '.'"
+  IDS_RE_PIPE, "管道 '|'"
+  IDS_RE_ASTERISK, "星号 '*'"
+  IDS_RE_PLUS, "加号 '+'"
+  IDS_RE_QUESTIONMARK, "问号 '?'"
+  IDS_RE_BACKSLASH, "反斜杠 '\\'"
+  IDS_RE_ANYCHAR, "任意字符"
+  IDS_RE_ANYFROM, "来自字符集的任意字符"
+  IDS_RE_ANYBUT, "除了字符集的任意字符"
+  IDS_RE_ANYFROMPOSIX, "POSIX 字符类"
+  IDS_RE_ANYBUTPOSIX, "POSIX 字符类"
+  IDS_RE_BOL, "名称开头"
+  IDS_RE_EOL, "名称结尾"
+  IDS_RE_OR, "或"
+  IDS_RE_ITERATION, "0 或多次匹配"
+  IDS_RE_POSITIVEITERATION, "1 或多次匹配"
+  IDS_RE_ITERATION_GREEDY, "尽可能多地匹配"
+  IDS_RE_ITERATION_UNGREEDY, "尽可能少地匹配"
+  IDS_RE_ONEORZERO, "1 或 0 次匹配"
+  IDS_RE_ZEROORONE, "0 或 1 次匹配"
+  IDS_RE_SUBEXPRESSION, "子表达式"
+  IDS_RE_NOTCAPTURESUBEXP, "非捕获子表达式"
+  IDS_RE_LITERALS, "特殊字符作为文字"
+  IDS_RE_WORDCHAR, "单词字符"
+  IDS_RE_NONWORDCHAR, "非单词字符"
+  IDS_RE_SPACE, "空白字符"
+  IDS_RE_NONSPACE, "非空白字符"
+  IDS_RE_DIGIT, "数字字符"
+  IDS_RE_NONDIGIT, "非数字的字符"
+  IDS_RE_WORDB, "单词边界"
+  IDS_RE_NONWORDB, "非(单词边界)"
+  IDS_RE_NUMBER, "十进制数字"
+  IDS_RE_HEXNUMBER, "十六进制数字"
+  IDS_RE_WORD, "单词"
+  IDS_RE_PATHCOMPONENT, "路径组件"
+  IDS_RE_FILENAME, "文件名(名称用 $1，扩展名用 $2)"
+  IDS_RE_DEFINESET, "定义设置..."
+  IDS_RE_MATCHEDEXPR, "匹配正则表达式"
+  IDS_RE_MATCHEDSUBEXP, "匹配子表达式..."
+  IDS_RE_PLOOKA, "肯定前瞻断言"
+  IDS_RE_NLOOKA, "否定前瞻断言"
+  IDS_RE_PLOOKB, "肯定后顾断言"
+  IDS_RE_NLOOKB, "否定后顾断言"
+  IDS_RE_ZEROWIDTHASSERT, "零宽度断言"
+
+  IDS_EMPTYSTR, "这里不允许使用空字符串。"
+  IDS_EMPTYMSG_DEF, "列表中没有任何项目。"
+  IDS_EMPTYMSG_NOMATCH, "没有文件匹配输入的掩码。"
+  IDS_EMPTYMSG_BADMASK, "无效的掩码。"
+  IDS_EMPTYMSG_GENERATING, "正在创建文件列表。按 ESC 取消"
+  IDS_EMPTYMSG_ERROR, "创建文件列表时发生错误。"
+  IDS_CNFRM_CLOSE, "你想关闭批量重命名吗？"
+  IDS_CNFRM_ESC_CLOSE2, "下次关闭指重命名不再询问(&C)"
+
+  IDS_CANCELING, "正在取消操作，请稍候..."
+  IDS_NOTVALID_FILENAME, "不是有效的文件名。"
+  IDS_NOTVALID_RELATIVEPATH, "不是有效的相对路径。"
+  IDS_NOTVALID_FULLPATH, "不是有效的完整路径。"
+  IDS_DUPLICATENAME, "重复名称。"
+  IDS_DEPENDENCE, "循环名称依赖或依赖于不能被重命名的文件。"
+
+  IDS_RENAMING, "正在重命名文件，按 ESC 取消..."
+  IDS_PREPARING, "正在为重命名操作准备数据..."
+  IDS_DIRNOTSAMEROOT, "不支持移动目录到不同的磁盘驱动器。"
+  IDS_DIRDIR, "已经存在相同名称的目录。"
+  IDS_FILEDIR, "这个名称已经被一个目录使用。"
+  IDS_CNFRM_SHOVERWRITE, "你要覆盖有""系统""或""隐藏""属性的文件吗？"
+  IDS_OVEWWRITETITLE, "确定文件覆盖"
+  IDS_OVERWRITEERROR, "无法覆盖文件: "
+  IDS_MOVEERROR, "无法重命名文件: "
+  IDS_DELETEERROR, "无法删除文件: "
+  IDS_WRITEERROR, "无法写入文件: "
+  IDS_READERROR, "无法读取文件: "
+  IDS_OPENFILEERROR, "无法打开文件: "
+  IDS_DIRCASEERROR, "无法修改目录名的大小写: "
+  IDS_CREATEDIR, "无法创建目录: "
+  IDS_UNDOING, "正在撤消重命名操作..."
+  IDS_REMOVEDIR,"无法移除目录: "
+  IDS_UNDOQUEST, "撤消重命名操作吗？"
+  IDS_SOMEERRORS, "一些文件没有成功重命名。现在将列出这些文件，让你能够改正错误并再次尝试重命名文件。\n\n要查看已经被成功重命名的文件，使用""查看""菜单中的选项。"
+  IDS_VALIDATEOK, "验证成功完成。"
+  IDS_NOTTODO, "没什么可做。"
+  IDS_WAITINGFORWINDOWS, "等待直到所有批量重命名窗口关闭..."
+  IDS_MISLINES, "太少的行。"
+  IDS_BADLINECOUNT, "输入的行数必须和为重命名操作选中的文件数匹配。"
+  IDS_CREATETEMP, "无法创建临时文件。 "
+  IDS_WRITETEMP, "无法写入到临时文件。 "
+  IDS_OPENTEMP, "无法打开临时文件。 "
+  IDS_SIZEOFTEMP, "无法得到临时文件的大小。 "
+  IDS_READTEMP, "无法从临时文件中读取。 "
+  IDS_PROCESS, "无法启动新的进程: "
+  IDS_ERRLAUNCHEDIT, "无法启动外部编辑器。检查重命名插件配置中的外部编辑器设置。 "
+  IDS_LONGDATA, "无法完成操作，因为数据太长。"
+  IDS_EXTEDIT, "当你在外部编辑器中完成编辑并保存更改时，点击""确定""来更新被编辑文件中的名称列表。\n\n点击""取消""不改变名称列表返回。"
+  IDS_CREATEPIPE, "无法创建管道: "
+  IDS_WRITEPIPE, "无法写入到管道。 "
+  IDS_EXEFILES, "可执行文件 (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\t所有文件 (*.*)\t*.*\t\t"
+  IDS_EXP_FULLNAME, "完整名称"
+  IDS_EXP_DRIVE, "驱动器"
+  IDS_EXP_PATH, "路径"
+  IDS_EXP_NAME, "名称"
+  IDS_EXP_NAMEPART, "名称部分"
+  IDS_EXP_EXTPART, "扩展名部分"
+  IDS_EXP_FULLPATH, "完整路径"
+  IDS_EXP_WINDIR, "Windows 目录"
+  IDS_EXP_SYSDIR, "System 目录"
+  IDS_EXP_DOSFULLNAME, "DOS 完整名称"
+  IDS_EXP_DOSDRIVE, "DOS 驱动器"
+  IDS_EXP_DOSPATH, "DOS 路径"
+  IDS_EXP_DOSNAME, "DOS 名称"
+  IDS_EXP_DOSNAMEPART, "DOS 名称部分"
+  IDS_EXP_DOSEXTPART, "DOS 扩展名部分"
+  IDS_EXP_DOSFULLPATH, "DOS 完整路径"
+  IDS_EXP_DOSWINDIR, "DOS Windows 目录"
+  IDS_EXP_DOSSYSDIR, "DOS 系统目录"
+  IDS_EXP_ENVVAR, "环境变量"
+  IDS_EXP_BROWSE, "浏览..."
+  IDS_EXP_SALDIR, "Sally 目录"
+  IDS_CFG_CONFLICT, "配置已经打开。"
+  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
+  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+}

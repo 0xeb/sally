@@ -1,0 +1,197 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for 7zip. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/7zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\7zip.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 23, 38, 220, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "7-Zip - Konfiguration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Fenstereinstellungen",IDC_STATIC_1,5,6,72,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,79,10,138,1
+    CONTROL         "Erweiterte &Optionen vor dem Archivieren zeigen",IDC_CFG_SHOWEXTENDEDOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,19,173,10
+    CONTROL         "Erweiterte &Infos zeigen, wenn das Archiv aufgelistet wird",IDC_CFG_EXTENDEDLISTINFO,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,31,203,10
+    CONTROL         "Archivgröße",IDC_CFG_LISTINFOPACKEDSIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,43,53,10
+    CONTROL         "Methode",IDC_CFG_LISTINFOMETHOD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,55,42,10
+    LTEXT           "Standard Kompressionsparameter",IDC_STATIC_3,5,70,116,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,123,74,94,1
+    LTEXT           "Kompressions&level:",IDC_STATIC_5,10,85,66,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,91,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Kompressions&methode:",IDC_STATIC_6,10,103,80,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,91,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wörter&buchgröße:",IDC_STATIC_7,10,121,64,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,91,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Wortgröße:",IDC_STATIC_8,10,139,79,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,91,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "&Solides Archiv anlegen",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,155,88,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,3,175,214,1
+    DEFPUSHBUTTON   "OK",IDOK,53,181,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,108,181,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,163,181,50,14
+END
+
+IDD_NEWARCHIVE DIALOGEX 27, 37, 291, 224
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Neues Archiv anlegen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archiv:",IDC_STATIC_1,16,7,25,8
+    LTEXT           "",IDC_NA_ARCHIVE,44,7,238,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,8,21,275,1
+    CONTROL         "Dateien &verschlüsseln",IDC_NA_ENCRYPTFILES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,28,86,10
+    LTEXT           "&Passwort:",IDC_NA_PASSWORD_TXT,114,29,60,8
+    EDITTEXT        IDC_NA_PASSWORD,187,27,78,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "P&asswort bestätigen:",IDC_NA_CONFIRMPASSWORD_TXT,114,46,72,8
+    EDITTEXT        IDC_NA_CONFIRMPASSWORD,187,44,78,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Kompressionsparameter",IDC_STATIC_3,8,67,83,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,93,71,190,1
+    LTEXT           "Kompressions&level:",IDC_STATIC_5,16,85,66,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,105,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Kompression&methode:",IDC_STATIC_6,16,103,77,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,105,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wörter&buchgröße:",IDC_STATIC_7,16,121,64,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,105,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Wortgröße:",IDC_STATIC_8,16,139,86,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,105,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "&Solides Archiv anlegen",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,159,88,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,8,181,275,1
+    CONTROL         "Diesen &Dialog nicht mehr zeigen (in der Konfiguration wieder änderbar)",IDC_NA_NOTAGAIN,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,187,254,12
+    PUSHBUTTON      "&Konfigurieren...",IDC_SHOW_CONFIG,10,204,65,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,121,204,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,176,204,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,231,204,50,14
+END
+
+IDD_ENTERPASSWORD DIALOGEX 6, 15, 264, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "7-Zip Passwort eingeben"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,16,12,20,20
+    LTEXT           "Diese Datei ist verschlüsselt. Bitte geben Sie das Passwort ein.",IDC_STATIC_1,48,12,211,8
+/*    LTEXT           "File:",IDC_STATIC_2,48,26,17,8
+    LTEXT           "",IDC_FILE,65,26,175,8 */
+    LTEXT           "Passwort:",IDC_STATIC_3,48,40,35,8
+    EDITTEXT        IDC_PASSWORD,87,38,158,12,ES_PASSWORD | ES_AUTOHSCROLL
+/*
+ // preparation for skip and skip all
+    DEFPUSHBUTTON   "OK",IDOK,12,63,50,14
+    PUSHBUTTON      "Skip",IDC_SKIP,72,63,50,14
+    PUSHBUTTON      "Skip all",IDC_SKIPALL,132,63,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,192,63,50,14
+*/    
+    DEFPUSHBUTTON   "OK",IDOK,139,63,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,199,63,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME,             "7-Zip"
+  IDS_ABOUT,                  "Über 7-Zip"
+  IDS_PLUGIN_DESCRIPTION,     "Erstellt, durchsucht und entpackt 7-Zip Archive."
+  IDS_INSUFFICIENT_MEMORY,    "Nicht genügend Speicher."
+  IDS_CANT_LOAD_LIBRARY,      "Kann die Bibliothek 7za.dll nicht laden."
+  IDS_CANT_GET_CRATEOBJECT,   "Kann die Methode CreateObject nicht ausführen."
+  IDS_CANT_GET_CLASS_OBJECT,  "Kann die Objektklasse nicht ermitteln."
+  IDS_CANT_OPEN_ARCHIVE,      "Kann das Archiv '%s' nicht öffnen."
+  IDS_CANT_OPEN_ARCHIVE_PWD,  "Kann das Archiv '%s' nicht öffnen.\nMöglicherweise wurde das falsche Passwort eingegeben."
+  IDS_ERROR,                  "Interner Fehler."
+  IDS_PACKING_ARCHIVE,        "Packe 7-Zip Archiv"
+  IDS_UNPACKING_ARCHIVE,      "Entpacke 7-Zip Archiv"
+  IDS_UPDATING_ARCHIVE,       "Aktualisiere das 7-Zip Archiv"
+  IDS_TESTING_ARCHIVE,        "Teste 7-Zip Archiv"
+  IDS_TESTING_ARCHIVE_NAME    "Teste Archiv '%s'..."
+  IDS_READING_DIRTREE,        "Lese Verzeichnisbaum..."
+  IDS_CANT_CREATE_ARCHIVE,    "Kann das Archiv nicht erstellen."
+  IDS_TESTARCHIVE,            "Archiv testen"
+  IDS_TESTARCHIVECORRUPTED,   "Das Archiv '%s' ist defekt."
+  IDS_TESTARCHIVEOK,          "Das Archiv '%s' ist in Ordnung."
+  IDS_INCORRECTPASSWORD,      "Falsches Passwort"
+  IDS_INCORRECTPASSWORDBODY,  "Das Passwort ist falsch. Versuchen Sie es noch einmal und beachten Sie die korrekte\nGroß-/Kleinschreibung. Stellen Sie sicher das die Feststell-Taste nicht gedrückt ist."
+  IDS_PASSWORDSNOTMATCH,      "Das eingegebene Passwort ist falsch."
+  IDS_EMPTYPASSWORD,          "Das Passwort sollte mindestens ein Zeichen lang sein."
+  IDS_UPDATE_NOT_SUPPORTED,   "Aktualisierungsvorgänge werden für dieses Archiv nicht unterstützt."
+  IDS_CANT_MOVE_TMPARCHIVE,   "Kann das temporäre Archiv '%s' nicht verschieben."
+  IDS_CANT_DELETE_TMPARCHIVE, "Kann das temporäre Archiv '%s' nicht löschen."
+  IDS_7Z_UPDATE_ERROR,        "Bei der Aktualisierung ist ein Fehler aufgetreten.\n\nDas ist kein Fehler des Sally 7-Zip-Plugins. Das Problem liegt in der 7za.dll,\nsenden sie uns bitte KEINEN Bugreport, wir kennen das Problem."
+  IDS_7Z_SOLID_DELETE_UNSUP,  "Das Löschen von Dateien aus soliden Archiven wird nicht unterstützt."
+  IDS_CANT_UPDATE_ARCHIVE,    "Kann das Archiv '%s' nicht aktualisieren."
+  IDS_CANT_CREATE_TMPFILE,    "Kann die temporäre Datei nicht anlegen."
+//  IDS_CANT_CREATEMUTEX,       "Cannot create mutex."
+  IDS_ARCHIVE_CHANGED,        "Archivdatei '%s' wurde verändert. Archiv wird im Fenster neu geöffnet."
+  IDS_DELETE_ERROR,           "Fehler löschen"
+  IDS_ADD_FILES_TO_ARCHIVE,   "Dateien hinzufügen"
+  IDS_CREATE_NEW_ARCHIVE,     "Neues Archiv erstellen"
+  IDS_REMOVING_FILES,         "Entferne Dateien..."
+  IDS_READING_ARCHIVEITEMS,   "Lese Archivelemente..."
+  IDS_UNPACKING,              "Entpacke..."
+  IDS_PACKING,                "Packe..."
+  IDS_REMOVING,               "Entferne..."
+  IDS_UPDATING,               "Aktualisiere..."
+  IDS_CANCELING_OPERATION,    "Breche den Vorgang ab, bitte warten..."
+  IDS_UNSUPPORTED_METHOD,     "Methode wird nicht unterstützt."
+  IDS_CRC_FAILED,             "CRC Fehler."
+  IDS_UNKNOWN_ERROR,          "Unbekannter Fehler."
+  IDS_DATA_ERROR,             "Beim Entpacken der Datei '%s' ist ein Datenfehler aufgetreten."
+  IDS_DATA_ERROR_PWD,         "Beim Entpacken der Datei '%s' ist ein Datenfehler aufgetreten.\nMöglicherweise wurde das falsche Passwort eingegeben."
+  IDS_BTN_DELETE,             "&Löschen"
+  IDS_BTN_DELETE_ALL,         "A&lle Löschen"
+  IDS_BTN_KEEP,               "&Behalten"
+  IDS_BTN_KEEP_ALL,           "Alle b&ehalten"
+  IDS_ERROR_PROCESSING_FILE,  "Fehler beim Verarbeiten der Datei '%s'.\n\nMöchten Sie die Datei löschen oder behalten?"
+  IDS_ERROR_PROCESSING_FILE_PWD, "Fehler beim Verarbeiten der Datei '%s'.\nMöglicherweise wurde das falsche Passwort eingegeben.\n\nMöchten Sie die Datei löschen oder behalten?"
+  IDS_OVERWRITE_FILE,         "Überschreibe Datei";
+  IDS_READONLY_ARCHIVE,       "Das Archive ist schreibgeschützt. Bitte entfernen Sie das Schreibschutz-Attribut."
+  IDS_CANT_REMOVE_DIRECTORY,  "Kann das Verzeichnis '%s' nicht verschieben"
+  IDS_CANT_READ_ARCHIVE       "Fehler beim Lesen aus der Archivdatei."
+  IDS_CANT_READ               "Fehler beim Lesen der Eingangsdatei."
+  IDS_CANT_WRITE              "{!}%d Byte{|1|s} konnten nicht geschrieben werden."
+  IDS_BTN_RETRY               "Wiederholen"
+  IDS_BTN_ABORT               "Abbrechen"
+  IDS_STORE,                  "Speichern"
+  IDS_FASTEST,                "Schnellste"
+  IDS_FAST,                   "Schnell"
+  IDS_NORMAL,                 "Normal"
+  IDS_MAXIMUM,                "Maximal"
+  IDS_ULTRA,                  "Ultra"
+  IDS_METHOD_LZMA,            "LZMA"
+  IDS_METHOD_LZMA2,           "LZMA2"
+  IDS_METHOD_PPMD,            "PPMd"
+  IDS_PACK_UPDATE_ERROR,      "Beim Packen/Entpacken des Archivs ist ein Fehler aufgetreten."
+  IDS_UNPACK_ERROR,           "Beim Entpacken des Archivs ist ein Fehler aufgetreten."
+  IDS_TEST_ERROR,             "Beim Testen des Archivs ist ein Fehler aufgetreten."
+  IDS_UNSUPPORTED_ARCHIVE,    "Nicht unterstützter oder unbekannter Archivtyp.\nDie Archivdatei könnte auch schwer beschädigt sein."
+  IDS_7Z_FATAL_ERROR          "Das Archiv wurde auf Grund eines fatalen Fehlers nicht erstellt."
+  IDS_7Z_UPDATE_UNKNOWN_ERROR "Das Archiv wurde augrund eines unbekannten Fehlers %x nicht aktualisiert."
+  IDS_7Z_CREATE_UNKNOWN_ERROR "Das Archiv wurde augrund eines unbekannten Fehlers %x nicht erstellt."
+//  IDS_7Z_SOLID_UPDATE_UNSUP   "Updating files in solid archives is not supported."
+  IDS_LISTINFO_PAKEDSIZE      "Gepackte Größe"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Gepackte Größe der Datei"
+  IDS_LISTINFO_METHOD         "Methode"
+  IDS_LISTINFO_METHOD_DESC    "Kompressionsmethode"
+  IDS_ARCLOCK_ERROR           "Fehler in Archivverriegelung"
+  IDS_ERRADDFILE_TOOLONG,     "1 oder mehrere Dateien können nicht zu der Liste hinzugefügt werden. Der Gesamtpfad ist zu lang.\nMöglicherweise fehlen einige Verzeichnisse oder Dateien in der Archivliste."
+  IDS_ERRADDDIR_TOOLONG,      "1 oder mehrere Verzeichnisse können nicht zu der Liste hinzugefügt werden. Der Gesamtpfad ist zu lang.\nMöglicherweise fehlen einige Verzeichnisse oder Dateien in der Archivliste."
+  IDS_NAMEISTOOLONG,          "Der Name ""%s"" des vollständigen Pfades ist zu lang.\n\nPfad: %s"
+}

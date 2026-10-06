@@ -4,8 +4,6 @@
 
 #include "precomp.h"
 
-#include "compat/legacy_host_api.h"
-#include "compat/plugin_abi_routing.h"
 #include "ui/IPrompter.h"
 #include "common/IPathService.h"
 #include "common/IRegistry.h"
@@ -16,6 +14,7 @@
 #include "menu.h"
 #include "cfgdlg.h"
 #include "plugins.h"
+#include "plugin_sdk_version.h"
 #include "fileswnd.h"
 #include "stswnd.h"
 #include "mainwnd.h"
@@ -1993,117 +1992,6 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const wchar_t* pluginName, DWORD
     return TRUE; // data successfully acquired
 }
 
-HINSTANCE
-CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const wchar_t* pluginName)
-{
-    HINSTANCE lang = NULL;
-    std::wstring pluginPath;
-    if (!GetPluginDllPathOwned(Plugin->DLLName, pluginPath).success)
-        return NULL;
-    const size_t separator = pluginPath.find_last_of(L"\\/");
-    if (separator == std::wstring::npos)
-        return NULL;
-    std::wstring langDirectory(pluginPath, 0, separator + 1);
-    langDirectory.append(L"lang\\");
-    std::wstring slgName = Configuration.LoadedSLGName;
-    std::wstring path = langDirectory + slgName;
-
-    // first try to load the SLG of the language Salamander is currently running in
-    lang = HANDLES_Q(LoadLibraryW(path.c_str()));
-    WORD languageID = 0;
-    if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
-    { // the SLG doesn't exist or isn't the expected one (completely different file or at least another version)
-        if (lang != NULL)
-            HANDLES(FreeLibrary(lang));
-        lang = NULL;
-        if (Plugin->LastSLGName.empty() ||                       // no .slg chosen during the previous plugin load
-            _wcsicmp(slgName.c_str(), Plugin->LastSLGName.c_str()) == 0) // we already tried this .slg
-        {
-            if (!Configuration.DoNotDispCantLoadPluginSLG)
-            {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_CANTLOADPLUGINSLG1), path.c_str());
-                bool dontShow = Configuration.DoNotDispCantLoadPluginSLG != FALSE;
-                gPrompter->ShowErrorWithCheckbox(pluginName, msg.c_str(),
-                                                 LoadStrW(IDS_DONOTSHOWCANTLOADPLUGINSLG), &dontShow);
-                Configuration.DoNotDispCantLoadPluginSLG = dontShow ? TRUE : FALSE;
-            }
-        }
-        else // try to load the .slg chosen during the previous plugin load
-        {
-            slgName = Plugin->LastSLGName;
-            path = langDirectory + slgName;
-            lang = HANDLES_Q(LoadLibraryW(path.c_str()));
-            if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
-            { // the SLG doesn't exist or isn't the expected one (completely different file or at least another version)
-                if (lang != NULL)
-                    HANDLES(FreeLibrary(lang));
-                lang = NULL;
-                if (!Configuration.DoNotDispCantLoadPluginSLG2)
-                {
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_CANTLOADPLUGINSLG2), path.c_str());
-                    bool dontShow = Configuration.DoNotDispCantLoadPluginSLG2 != FALSE;
-                    gPrompter->ShowErrorWithCheckbox(pluginName, msg.c_str(),
-                                                     LoadStrW(IDS_DONOTSHOWCANTLOADPLUGINSLG), &dontShow);
-                    Configuration.DoNotDispCantLoadPluginSLG2 = dontShow ? TRUE : FALSE;
-                }
-            }
-        }
-        if (lang == NULL) // find all .slg files on the disk for the plugin and let the user choose (if there's more than one .slg)
-        {
-            std::wstring selSLGName;
-            CLanguageSelectorDialog slgDialog(parent, selSLGName, pluginName);
-            const std::wstring searchPath = langDirectory + L"*.slg";
-            slgDialog.Initialize(searchPath.c_str(), Plugin->GetPluginDLL());
-            if (slgDialog.GetLanguagesCount() == 0)
-                gPrompter->ShowError(pluginName, LoadStrW(IDS_PLUGINSLGNOTFOUND));
-            else
-            {
-                if (slgDialog.GetLanguagesCount() == 1)
-                    slgDialog.GetSLGName(selSLGName); // if only one language exists, use it
-                else
-                {
-                    if (Configuration.UseAsAltSLGInOtherPlugins &&
-                        slgDialog.SLGNameExists(Configuration.AltPluginSLGName.c_str()))
-                    {
-                        selSLGName = Configuration.AltPluginSLGName;
-                    }
-                    else
-                    {
-                        if (Configuration.UseAsAltSLGInOtherPlugins) // fallback language is defined but unavailable for this plugin, let the user choose another one
-                            Configuration.UseAsAltSLGInOtherPlugins = FALSE;
-                        slgDialog.Execute();
-                    }
-                }
-                slgName = selSLGName;
-                path = langDirectory + slgName;
-                lang = HANDLES_Q(LoadLibraryW(path.c_str()));
-                if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
-                { // shouldn't theoretically happen (dialog verifies the validity of the .SLG module)
-                    if (lang != NULL)
-                        HANDLES(FreeLibrary(lang));
-                    lang = NULL;
-                    TRACE_E("CSalamanderPluginEntry::LoadLanguageModule(): unexpected situation: SLG module is invalid!");
-                }
-            }
-        }
-    }
-    Plugin->LastSLGName.clear();
-    if (lang != NULL)
-    {
-        if (_wcsicmp(slgName.c_str(), Configuration.LoadedSLGName.c_str()) != 0)
-            Plugin->LastSLGName = slgName;
-        if (Plugin->SalamanderGeneral.LanguageModule == NULL)
-            Plugin->SalamanderGeneral.LanguageModule = lang;
-        else
-        {
-            HANDLES(FreeLibrary(lang));
-            lang = NULL;
-            TRACE_E("CSalamanderPluginEntry::LoadLanguageModule(): you can call this method only once!");
-        }
-    }
-    return lang;
-}
-
 void CSalamanderPluginEntry::SetPluginHomePageURL(const wchar_t* url)
 {
     CALL_STACK_MESSAGE2("CSalamanderPluginEntry::SetPluginHomePageURL(%ls)", url);
@@ -2193,16 +2081,16 @@ CPluginData::CPluginData(const wchar_t* name, const wchar_t* dllName, BOOL suppo
                          BOOL supportConfiguration, BOOL supportLoadSave, BOOL supportViewer,
                          BOOL supportFS, BOOL supportDynMenuExt, const wchar_t* version, const wchar_t* copyright,
                          const wchar_t* description, const wchar_t* regKeyName, const wchar_t* extensions,
-                         const std::vector<std::wstring>* fsNames, BOOL loadOnStart, const wchar_t* lastSLGName,
+                         const std::vector<std::wstring>* fsNames, BOOL loadOnStart,
                          const wchar_t* pluginHomePageURL)
     : MenuItems(10, 5), Commands(1, 5), PluginIfaceForFS(NULL, 0),
       PluginIfaceForMenuExt(NULL, 0)
 {
-    CALL_STACK_MESSAGE20("CPluginData::CPluginData(%ls, %ls, %d, %d, %d, %d, %d, %d, %d, %d, %d, %ls, %ls, %ls, %ls, %ls, , %d, %ls, %ls)",
+    CALL_STACK_MESSAGE19("CPluginData::CPluginData(%ls, %ls, %d, %d, %d, %d, %d, %d, %d, %d, %d, %ls, %ls, %ls, %ls, %ls, , %d, %ls)",
                          name, dllName, supportPanelView, supportPanelEdit, supportCustomPack,
                          supportCustomUnpack, supportConfiguration, supportLoadSave, supportViewer,
                          supportFS, supportDynMenuExt, version, copyright, description, regKeyName,
-                         extensions, loadOnStart, lastSLGName, pluginHomePageURL);
+                         extensions, loadOnStart, pluginHomePageURL);
     ArcCacheHaveInfo = FALSE;
     ArcCacheOwnDelete = FALSE;
     ArcCacheCacheCopies = TRUE;
@@ -2228,7 +2116,6 @@ CPluginData::CPluginData(const wchar_t* name, const wchar_t* dllName, BOOL suppo
     SupportFS = supportFS;
     if (SupportFS && fsNames != NULL)
         FSNames = *fsNames; // vector copy; throws std::bad_alloc on OOM
-    LastSLGName = (lastSLGName != NULL && lastSLGName[0] != 0) ? lastSLGName : L"";
     PluginHomePageURL = pluginHomePageURL != NULL ? pluginHomePageURL : L"";
     SalamanderDebug.Init(DLLName.c_str(), Version.c_str());
     SalamanderPasswordManager.Init(DLLName.c_str());
@@ -2241,7 +2128,6 @@ CPluginData::CPluginData(const wchar_t* name, const wchar_t* dllName, BOOL suppo
     SupportViewer = supportViewer;
     SupportDynMenuExt = supportDynMenuExt;
     LoadOnStart = loadOnStart;
-    LegacyCompatApproved = FALSE;
     // ChDrvMenuFSItemName default-constructs to empty
     ChDrvMenuFSItemVisible = TRUE;
     ChDrvMenuFSItemIconIndex = -1;
@@ -2276,14 +2162,13 @@ CPluginData::~CPluginData()
 #endif // _DEBUG
     if (PluginIface.NotEmpty())
         PluginIface.Release(NULL, TRUE);
-    LegacyHost.reset();
     if (DLL != NULL)
     {
         TRACE_E("CPluginData::~CPluginData(): unexpected situation (2)!");
         HANDLES(FreeLibrary(DLL));
     }
     // Name, DLLName, Version, Copyright, Extensions, Description, RegKeyName,
-    // ChDrvMenuFSItemName, LastSLGName, PluginHomePageURL are std::wstring (auto-destruct)
+    // ChDrvMenuFSItemName, PluginHomePageURL are std::wstring (auto-destruct)
     // FSNames is std::vector<std::wstring> (auto-destruct)
     // BugReportMessage, BugReportEMail, UnpackDlgUnpackMask, and ArcCacheTmpPath are
     // std::wstring (auto-destruct).
@@ -2374,46 +2259,15 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                 ArcCacheOwnDelete = FALSE;
                 ArcCacheCacheCopies = TRUE;
 
-                FSalamanderPluginGetReqVer getReqVer = (FSalamanderPluginGetReqVer)GetProcAddress(DLL, "SalamanderPluginGetReqVer"); // plugin function
-                BuiltForVersion = -1;                                                                                                // -1 = plugin built for a version older than 2.5 beta 2 (does not export "SalamanderPluginGetReqVer")
-                if (getReqVer != NULL && (BuiltForVersion = getReqVer()) >= PLUGIN_REQVER)
+                FSalamanderPluginGetReqVer getReqVer = (FSalamanderPluginGetReqVer)GetProcAddress(DLL, "SalamanderPluginGetReqVer");
+                FSalamanderPluginGetSDKVer getSDKVer = (FSalamanderPluginGetSDKVer)GetProcAddress(DLL, "SalamanderPluginGetSDKVer");
+                const int reqVersion = getReqVer != NULL ? getReqVer() : -1; // -1: predates SalamanderPluginGetReqVer
+                const int sdkVersion = getSDKVer != NULL ? getSDKVer() : -1;
+                BuiltForVersion = sally::plugin_sdk::ResolveBuiltForVersion(reqVersion, sdkVersion, PLUGIN_REQVER);
+                BOOL oldVer = !sally::plugin_sdk::IsLoadable(BuiltForVersion, LAST_VERSION_OF_SALAMANDER);
+                if (oldVer)
                 {
-                    FSalamanderPluginGetSDKVer getSDKVer = (FSalamanderPluginGetSDKVer)GetProcAddress(DLL, "SalamanderPluginGetSDKVer"); // plugin function
-                    if (getSDKVer != NULL)                                                                                               // if the plugin exports this function it likely wants to raise BuiltForVersion (it pretends to be old for compatibility with older Salamander versions but wants to use new services with newer versions)
-                    {
-                        int verSDK = getSDKVer();
-                        if (BuiltForVersion <= verSDK)
-                            BuiltForVersion = verSDK;
-                        else
-                            TRACE_E("CPluginData::InitDLL(): nonsense: SalamanderPluginGetSDKVer() returns older version than SalamanderPluginGetReqVer()");
-                    }
-                }
-                BOOL suppressOldVerError = FALSE;
-                sally::compat::RoutingDecision abiRoute =
-                    sally::compat::DecideAbiRoute(
-                        BuiltForVersion, LAST_VERSION_OF_SALAMANDER,
-                        LegacyCompatApproved != FALSE);
-                if (abiRoute.route == sally::compat::AbiRoute::NeedsUserApproval &&
-                    !quiet)
-                {
-                    std::wstring msg;
-                    if (Name.empty() || Name[0] == 0)
-                        msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION_CONFIRM2), s);
-                    else
-                        msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION_CONFIRM), Name.c_str(), s);
-                    if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
-                    {
-                        LegacyCompatApproved = TRUE; // persist in configuration so this path is not prompted again
-                        abiRoute = sally::compat::DecideAbiRoute(
-                            BuiltForVersion, LAST_VERSION_OF_SALAMANDER, true);
-                    }
-                    else
-                        suppressOldVerError = TRUE; // user already refused in this attempt
-                }
-                BOOL oldVer = !abiRoute.loadable();
-                if (abiRoute.route == sally::compat::AbiRoute::Refused)
-                {
-                    TRACE_E("CPluginData::InitDLL(): plugin ABI version " << BuiltForVersion << " is refused by the ABI route.");
+                    TRACE_E("CPluginData::InitDLL(): plugin built for SDK " << BuiltForVersion << " is refused; this Sally serves SDK " << LAST_VERSION_OF_SALAMANDER << ".");
                 }
                 if (!oldVer)
                 {
@@ -2434,22 +2288,9 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     SalamanderGeneral.Init((CPluginInterfaceAbstract*)-1); // so SetFlagLoadOnSalamanderStart can be used from the entry point
 
                     // !!! CALLING THE PLUGIN ENTRY POINT !!!
-                    CPluginInterfaceAbstract* resIface = NULL;
-                    if (abiRoute.needsAdapter())
-                    {
-                        LegacyHost = sally::compat::CreateLegacyPluginHost(
-                            salamander, SalamanderDebug, SalamanderGeneral,
-                            SalSafeFile, SalamanderGUI, BuiltForVersion);
-                        if (LegacyHost)
-                            resIface = sally::compat::InvokeLegacyPluginEntry(
-                                *LegacyHost, entryProc);
-                    }
-                    else
-                    {
-                        FSalamanderPluginEntry entry =
-                            reinterpret_cast<FSalamanderPluginEntry>(entryProc);
-                        resIface = entry(&salamander);
-                    }
+                    FSalamanderPluginEntry entry =
+                        reinterpret_cast<FSalamanderPluginEntry>(entryProc);
+                    CPluginInterfaceAbstract* resIface = entry(&salamander);
 
                     Plugins.EnterDataCS();
                     PluginIface.Init(resIface, BuiltForVersion);
@@ -2488,30 +2329,14 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                 }
                 else // clear the other parts of the plugin interface as well
                 {
-                    if (salamander.ShowError() && oldVer && !suppressOldVerError) // old version and it has not been reported yet...
+                    if (salamander.ShowError() && oldVer && !quiet) // unsupported SDK, not reported yet
                     {
-                        if (!quiet)
-                        {
-                            // The quarantined 104 vintage says so by name. That
-                            // message went out with ShouldRejectBrokenWideFSPlugin
-                            // while the routing kept refusing the vintage, so a
-                            // broken transitional FS ABI was reported as a plain
-                            // "plugin too old" — sending the user to look for an
-                            // update that may already be installed. The problem is
-                            // the ABI, not the age.
-                            const bool quarantined =
-                                abiRoute.reason == sally::compat::RefusalReason::Quarantined;
-                            const int withName = quarantined ? IDS_BROKENFSPLUGINVERSION
-                                                             : IDS_OLDPLUGINVERSION;
-                            const int withoutName = quarantined ? IDS_BROKENFSPLUGINVERSION2
-                                                                : IDS_OLDPLUGINVERSION2;
-                            std::wstring msg;
-                            if (Name.empty() || Name[0] == 0)
-                                msg = FormatStrW(LoadStrW(withoutName), s);
-                            else
-                                msg = FormatStrW(LoadStrW(withName), Name.c_str(), s);
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-                        }
+                        std::wstring msg;
+                        if (Name.empty() || Name[0] == 0)
+                            msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION2), s);
+                        else
+                            msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION), Name.c_str(), s);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                     }
 
                     PluginIfaceForArchiver.Init(NULL);
@@ -2662,7 +2487,6 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         SalamanderGeneral.Init(NULL);
                     }
                     SalamanderGeneral.Clear();
-                    LegacyHost.reset();
                     HANDLES(FreeLibrary(DLL));
                     DLL = NULL;
                     BuiltForVersion = 0;
@@ -2835,9 +2659,8 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
             }
             if (unloaded)
             {
-                // unload SPL+SLG and clean up the interfaces
+                // unload the SPL and clean up the interfaces
                 SalamanderGeneral.Clear();
-                LegacyHost.reset();
                 if (DLL != NULL)
                     HANDLES(FreeLibrary(DLL));
                 DLL = NULL;
@@ -3324,9 +3147,8 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
 
                 if (ret)
                 {
-                    // unload SPL+SLG and clean up the interfaces
+                    // unload the SPL and clean up the interfaces
                     SalamanderGeneral.Clear();
-                    LegacyHost.reset();
                     if (DLL != NULL)
                         HANDLES(FreeLibrary(DLL));
                     DLL = NULL;

@@ -13,6 +13,7 @@
 #include "common/IPathService.h"
 #include "common/DiagnosticTextEncoding.h"
 #include "common/LegacyConfigTextEncoding.h"
+#include "common/BuiltinLanguages.h"
 
 #include <cwctype>
 #include <vector>
@@ -142,6 +143,43 @@ RELOAD:
     HANDLES(LeaveCriticalSection(&__StrCriticalSection.cs));
 
     return ret;
+}
+
+std::wstring LoadStrForLangW(HMODULE module, UINT id, LANGID langID)
+{
+    // strings are stored in bundles of 16 (RT_STRING resource id/16+1), each a sequence of
+    // length-prefixed UTF-16 strings; FindResourceEx picks the bundle of exactly this language
+    HRSRC found = FindResourceExW(module, RT_STRING, MAKEINTRESOURCEW(id / 16 + 1), langID);
+    if (found == NULL)
+        return std::wstring();
+    HGLOBAL loaded = LoadResource(module, found);
+    const WCHAR* data = loaded != NULL ? static_cast<const WCHAR*>(LockResource(loaded)) : NULL;
+    if (data == NULL)
+        return std::wstring();
+    const WCHAR* end = data + SizeofResource(module, found) / sizeof(WCHAR);
+    for (UINT i = 0; i < id % 16; i++)
+    {
+        if (data >= end)
+            return std::wstring();
+        data += 1 + *data;
+    }
+    if (data >= end || data + 1 + *data > end)
+        return std::wstring();
+    return std::wstring(data + 1, *data);
+}
+
+static BOOL CALLBACK AddBuiltinLanguageID(HMODULE, LPCWSTR, LPCWSTR, WORD langID, LONG_PTR param)
+{
+    reinterpret_cast<std::vector<LANGID>*>(param)->push_back(langID);
+    return TRUE;
+}
+
+std::vector<LANGID> GetBuiltinLanguageIDs(HMODULE module)
+{
+    std::vector<LANGID> languages;
+    EnumResourceLanguagesW(module, RT_STRING, MAKEINTRESOURCEW(IDS_LANGMETA_AUTHOR / 16 + 1),
+                           AddBuiltinLanguageID, reinterpret_cast<LONG_PTR>(&languages));
+    return languages;
 }
 
 //*****************************************************************************
@@ -2781,242 +2819,28 @@ BOOL ImportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL ignoreIfNo
 // CLanguage
 //
 
-const char* RT_SLGSIGN = "SLGSIGN";
-
-typedef DWORD(WINAPI* FSalamanderLanguageEntry)();
-
-CLanguage::CLanguage()
+BOOL CLanguage::Init(LANGID languageID, HMODULE module)
 {
-    FileName = NULL;
-    LanguageID = 0;
-    AuthorW = NULL;
-    Web = NULL;
-    CommentW = NULL;
-    HelpDir = NULL;
-}
-
-void CLanguage::Free()
-{
-    free(FileName);
-    FileName = NULL;
-    free(AuthorW);
-    AuthorW = NULL;
-    free(Web);
-    Web = NULL;
-    free(CommentW);
-    CommentW = NULL;
-    free(HelpDir);
-    HelpDir = NULL;
-}
-
-BOOL CLanguage::Init(const wchar_t* fileName, WORD languageID, const WCHAR* authorW,
-                     const wchar_t* web, const WCHAR* commentW, const wchar_t* helpdir)
-{
-    Free();
+    if (module == NULL)
+        module = HInstance;
+    const wchar_t* persistedName = sally::languages::PersistedNameFromLangId(languageID);
+    const wchar_t* tag = sally::languages::TagFromLangId(languageID);
+    if (persistedName == NULL || tag == NULL)
+        return FALSE;
     LanguageID = languageID;
-    FileName = DupStr(fileName);
-    AuthorW = DupStr(authorW);
-    Web = DupStr(web);
-    CommentW = DupStr(commentW);
-    HelpDir = DupStr(helpdir);
-    if (FileName == NULL || AuthorW == NULL || Web == NULL || CommentW == NULL || HelpDir == NULL)
-    {
-        Free();
-        return FALSE;
-    }
-    return TRUE;
-}
+    PersistedName = persistedName;
 
-/*
-// a copy of this routine also exists in the Translator program
-BOOL LoadSLGData(HINSTANCE hModule, const char *resName, LPVOID buff, int buffSize, BOOL string)
-{
-  HRSRC hrsrc = FindResource(hModule, resName, RT_SLGSIGN);
-  if (hrsrc != NULL)
-  {
-    int size = SizeofResource(hModule, hrsrc);
-    if (size > 0)
-    {
-      HGLOBAL hglb = LoadResource(hModule, hrsrc);
-      if (hglb != NULL)
-      {
-        LPVOID data = LockResource(hglb);
-        if (data != NULL)
-        {
-          ZeroMemory(buff, buffSize);
-          if (string)
-          {
-            int sz = min(buffSize - 1, size);
-            strncpy_s((char*)buff, buffSize, (char*)data, sz);
-          }
-          else
-          {
-            int sz = min(buffSize, size);
-            memcpy(buff, data, sz);
-          }
-          return TRUE;
-        }
-      }
-    }
-  }
-  ZeroMemory(buff, buffSize);
-  return FALSE;
-}
-*/
-
-BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, wchar_t* isIncomplete)
-{
-    // compare the SLG VERSIONINFO version against Salamander's and return TRUE if they match,
-    // otherwise FALSE; in case of a match also extract \\VarFileInfo\\Translation and set 'langID'
-    CVersionInfo slgVer;
-    CVersionInfo moduleVer;
-
-    BYTE *slgBuf, *moduleBuf;
-    DWORD slgSize, moduleSize;
-
-    if (!slgVer.ReadResource(hSLG, VS_VERSION_INFO))
-    {
-        TRACE_EW(L"Unable to load VERSIONINFO resource from SLG module: " << GetModuleFileNameForTrace(hSLG));
-        return FALSE;
-    }
-    if (!moduleVer.ReadResource(hModule, VS_VERSION_INFO))
-    {
-        TRACE_EW(L"Unable to load VERSIONINFO resource from plugin: " << GetModuleFileNameForTrace(hModule));
-        return FALSE;
-    }
-
-    // retrieve pointers to the VS_FIXEDFILEINFO structures
-    if (!slgVer.QueryValue(L"\\", &slgBuf, &slgSize))
-        return FALSE;
-    if (!moduleVer.QueryValue(L"\\", &moduleBuf, &moduleSize))
-        return FALSE;
-
-    // the SLG version must be identical to our version
-    if (((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionMS != ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionMS ||
-        ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionLS != ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionLS)
-    {
-        wchar_t ver1[20];
-        swprintf_s(ver1, _countof(ver1), L"%08X%08X", ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionMS,
-                   ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionLS);
-        wchar_t ver2[20];
-        swprintf_s(ver2, _countof(ver2), L"%08X%08X", ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionMS,
-                   ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionLS);
-        TRACE_EW(L"Plugin and SLG module are not of the same version (0x" << ver1 << L" != 0x" << ver2 << L"). Plugin: " << GetModuleFileNameForTrace(hModule));
-        TRACE_EW(L"... SLG module: " << GetModuleFileNameForTrace(hSLG));
-        return FALSE;
-    }
-
-    if (isIncomplete != NULL)
-    {
-        isIncomplete[0] = 0;
-        if (!slgVer.QueryString(L"\\StringFileInfo\\040904b0\\SLGIncomplete", isIncomplete, ISSLGINCOMPLETE_SIZE))
-        {
-            TRACE_EW(L"Missing SLGIncomplete value in VERSIONINFO resource in SLG module: " << GetModuleFileNameForTrace(hSLG));
-            return FALSE;
-        }
-    }
-
-    // extract the language in which the SLG is written
-    if (!slgVer.QueryValue(L"\\VarFileInfo\\Translation", &slgBuf, &slgSize))
-    {
-        TRACE_EW(L"Missing Translation value in VERSIONINFO resource in SLG module: " << GetModuleFileNameForTrace(hSLG));
-        return FALSE;
-    }
-
-    slgLangID = *((WORD*)slgBuf);
-
-    return TRUE;
-}
-
-BOOL CLanguage::Init(const wchar_t* fileName, HINSTANCE modul)
-{
-    BOOL ret = FALSE;
-    if (modul == NULL)
-        modul = HInstance;
-    std::wstring pathW;
-    // sally.h:637 always declared this wide and all three callers already
-    // passed wide names; only the definition lagged, so AnsiToWide(fileName) was recovering
-    // bytes it had just been handed.
-    std::wstring slgNameW = fileName;
-
-    HINSTANCE hLib = NULL;
-    if (BuildModuleRelativePathW(modul, (L"lang\\" + slgNameW).c_str(), pathW))
-    {
-        hLib = HANDLES(LoadLibraryW(pathW.c_str()));
-    }
-    if (hLib != NULL)
-    {
-        WORD langID;
-        if (IsSLGFileValid(modul, hLib, langID, NULL))
-        {
-            CVersionInfo ver;
-            WCHAR slg_athorW[500] = {0};
-            WCHAR slg_web[500] = {0};
-            WCHAR slg_commentW[500] = {0};
-            WCHAR slg_helpdir[100] = {0};
-            WCHAR slg_incomplete[200] = {0};
-
-            BOOL ok = TRUE;
-            if (ok)
-            {
-                ok &= ver.ReadResource(hLib, VS_VERSION_INFO);
-                if (!ok)
-                    TRACE_EW(L"Missing VERSIONINFO resource in language file " << pathW);
-            }
-            if (ok)
-            {
-                ok &= ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGAuthor", slg_athorW, _countof(slg_athorW));
-                if (!ok)
-                    TRACE_EW(L"Missing SLGAuthor in VERSIONINFO resource in language file " << pathW);
-            }
-            if (ok)
-            {
-                ok &= ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGWeb", slg_web, _countof(slg_web));
-                if (!ok)
-                    TRACE_EW(L"Missing SLGWeb in VERSIONINFO resource in language file " << pathW);
-            }
-            if (ok)
-            {
-                ok &= ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGComment", slg_commentW, _countof(slg_commentW));
-                if (!ok)
-                    TRACE_EW(L"Missing SLGComment in VERSIONINFO resource in language file " << pathW);
-            }
-            if (ok)
-            {
-                if (!ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGHelpDir", slg_helpdir, _countof(slg_helpdir)))
-                {
-                    slg_helpdir[0] = 0; // plugins do not have SLGHelpDir defined (used only in Salamander's .slg)
-                    if (modul == HInstance)
-                        ok = FALSE; // however this variable cannot be missing in Salamander
-                }
-                // read only to test that the item exists
-                if (!ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGIncomplete", slg_incomplete, _countof(slg_incomplete)))
-                {
-                    slg_incomplete[0] = 0; // plugins do not have SLGIncomplete defined (used only in Salamander's .slg)
-                    if (modul == HInstance)
-                        ok = FALSE; // however this variable cannot be missing in Salamander
-                }
-            }
-            if (ok)
-                ok &= Init(fileName, langID, slg_athorW, slg_web, slg_commentW, slg_helpdir);
-            if (ok)
-                ret = TRUE;
-        }
-        else
-            TRACE_EW(L"SLG is not valid (or plugin's VERSIONINFO resource is not set properly): " << pathW);
-
-        HANDLES(FreeLibrary(hLib));
-    }
+    // the language's own name ("Čeština (Česko)") reads best in a list the user may not
+    // understand yet; Windows knows it even when that language is not installed
+    wchar_t name[LOCALE_NAME_MAX_LENGTH * 4];
+    if (GetLocaleInfoEx(tag, LOCALE_SNATIVEDISPLAYNAME, name, _countof(name)) > 0)
+        DisplayName = name;
     else
-        TRACE_EW(L"Cannot load SLG module " << pathW);
-    return ret;
-}
+        DisplayName = tag;
 
-BOOL CLanguage::GetLanguageName(wchar_t* buffer, int bufferSize)
-{
-    if (GetLocaleInfoW(MAKELCID(LanguageID, SORT_DEFAULT), LOCALE_SLANGUAGE, buffer, bufferSize) == 0)
-    {
-        lstrcpynW(buffer, L"?", bufferSize);
-    }
+    // translation credits, in the language itself
+    Author = LoadStrForLangW(module, IDS_LANGMETA_AUTHOR, languageID);
+    Web = LoadStrForLangW(module, IDS_LANGMETA_WEB, languageID);
+    Comment = LoadStrForLangW(module, IDS_LANGMETA_COMMENT, languageID);
     return TRUE;
 }

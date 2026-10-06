@@ -1,0 +1,140 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for unrar. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unrar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unrar.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 6, 15, 223, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Следующий том архива"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Пожалуйста, вставьте диск со следующим томом архива или выберите соответствующий файл на диске.\n\nНажмите ""OK"" для продолжения.",IDS_NEXTDISK,12,9,199,32
+    LTEXT           "Имя &файла:",IDC_STATIC_1,12,48,44,8
+    EDITTEXT        IDC_FILENAME,12,58,184,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,199,58,13,12
+    DEFPUSHBUTTON   "ОК",IDOK,55,76,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,118,76,50,14
+END
+
+IDD_ERROR DIALOGEX 15, 34, 363, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ошибка"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Имя:",IDC_STATIC_1,8,10,32,8
+    LTEXT           "",IDS_FILENAME,44,10,312,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Ошибка:",IDC_STATIC_2,8,23,32,8,NOT WS_GROUP
+    LTEXT           "Файл не может быть извлечен, так как его начальная часть содержится в предыдущем томе. Для извлечения файла следует начать его извлечение из предыдущего тома.",IDC_STATIC_3,44,23,312,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&Больше не показывать это сообщение.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,44,44,150,12
+    DEFPUSHBUTTON   "ОК",IDOK,126,63,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,186,63,50,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 220, 115
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка UnRAR"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&При распаковке пропускать файлы, начало которых",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,10,197,12
+    CONTROL         "&Не показывать предупреждение о невозможности",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,189,12
+    LTEXT           "содержится в предыдущем томе.",IDC_STATIC_1,23,22,154,8
+    LTEXT           "отобразить содержимое архива полностью.",IDC_STATIC_2,23,44,157,8
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,208,1
+    CONTROL         "Отображать столбец ""&Сжатый"" в оглавлении архива",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,70,200,12
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,6,90,208,1
+    DEFPUSHBUTTON   "ОК",IDOK,57,96,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,112,96,50,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 350, 80
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Введите пароль"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,18,18,18,20
+    LTEXT           "Архив зашифрован. Пожалуйста, введите пароль для расшифровки.",IDC_STATIC_1,57,10,246,8
+    LTEXT           "Файл:",IDC_STATIC_2,57,25,23,8
+    CONTROL         "",IDS_FILENAME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,97,25,240,8
+    LTEXT           "&Пароль:",IDC_STATIC_3,57,38,35,8
+    EDITTEXT        IDC_PASSWORD,97,36,157,12,ES_PASSWORD | ES_AUTOHSCROLL
+    PUSHBUTTON      "О&К",IDOK,19,58,50,14,WS_GROUP
+    DEFPUSHBUTTON   "&Все",IDALL,79,58,50,14
+    PUSHBUTTON      "П&ропустить",IDSKIP,139,58,57,14
+    PUSHBUTTON      "Пр&опустить все",IDSKIPALL,206,58,65,14
+    PUSHBUTTON      "Отмена",IDCANCEL,281,58,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 105
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnRAR - Предупреждение"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Невозможно отобразить полный перечень файлов многотомного архива, так как некоторые тома не были найдены.",IDC_STATIC_1,11,8,194,24
+    LTEXT           "Для просмотра полного перечня файлов необходимо поместить все тома в одну папку.",IDC_STATIC_2,11,39,194,16
+    CONTROL         "&Больше не показывать это сообщение",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,64,157,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,81,202,1
+    DEFPUSHBUTTON   "ОК",IDOK,155,87,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnRAR"
+  IDS_PLUGIN_DESCRIPTION, "Просмотр и извлечение архивов RAR."
+  IDS_ABOUT, "О модуле"
+  IDS_LOWMEM, "Недостаточно памяти."
+  IDS_ERRMODULEFN, "Не удалось определить имя файла модуля."
+  IDS_ERRLOADLIB, "Не удалось загрузить библиотеку ""%s""."
+  IDS_ERRGETPROCADDR, "Не удалось определить адрес процедуры."
+  IDS_BADDATA, "Архив поврежден. (Возможно, введен неправильный пароль.)"
+  IDS_BADPASSWORD, "Неправильный пароль. Буквы пароля должны вводиться в правильном регистре. Убедитесь, что случайно не включен CapsLock."
+  IDS_BADARC, "Файл имеет неизвестный формат или не является архивом RAR. (Возможно, введен неправильный пароль.)"
+  IDS_ERROPENARC, "Не удалось открыть архивный файл."
+  IDS_UNKNOWN, "Произошла неизвестная ошибка."
+  IDS_VOLUMEERR, "Не удалось открыть том архива."
+  IDS_ERRREADARC, "Не удалось прочитать архивный файл."
+  IDS_RARARCHIVES, "Архивы RAR (*.R*)"
+  IDS_BROWSEARCHIVETITLE, "Выберите архивный файл"
+  IDS_CRC, "Ошибка в сжатых данных. Контрольная сумма CRC не совпадает. (Возможно, введен неправильный пароль.)"
+  IDS_LIST, "Не удалось включить элемент архива в перечень файлов."
+  IDS_EXTRPROGTITLE, "Распаковка архива RAR - %s"
+  IDS_PREPAREDATA, "подготовка данных и создание папок..."
+  IDS_EXTRACTFILES, "распаковка..."
+  IDS_EXTRACTING, "распаковка: "
+  IDS_UNABLEGETFIELPOS, "Не удалось определить позицию в файле: "
+  IDS_UNABLEWRITE, "Не удалось выполнить запись в файл:"
+  IDS_UNABLESEEK, "Не удалось установить позицию в файле: "
+  IDS_TOOLONGNAME, "Невозможно завершить операцию, путь слишком длинный."
+  IDS_TOOLONGMASK, "Невозможно завершить операцию, длина маски превышает предел."
+  IDS_ENTERPWD, "Пожалуйста, введите хотя бы один символ."
+  IDS_ALLFILES, "Все файлы (*.*)"
+  IDS_ERROR, "Ошибка"
+  IDS_NOTFOUND, "Файл не найден"
+  IDS_BADDLL, "Некорректная версия библиотеки UNRAR.DLL. Пожалуйста, выполните переустановку модуля UnRAR."
+  IDS_SELECTFIRST, "Возможно, этот архив состоит из нескольких томов. Если это действительно так, пожалуйста, выберите первый том и нажмите ""OK"" для продолжения.\n\nЕсли архив не является многотомным, нажмите кнопку ""Отмена""."
+  IDS_SELECTFIRSTTITLE, "Выберите первый том"
+  IDS_FILENOTFOUND "Файл не найден в архиве."
+  IDS_LISTINFO_PAKEDSIZE      "Сжатый"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Размер сжатого файла"
+}

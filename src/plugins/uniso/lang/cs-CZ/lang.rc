@@ -1,0 +1,122 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for uniso. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uniso/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uniso.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 230, 83
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnISO - Konfigurace"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Odstranit atribut Jen pro čtení při kopírování z archivu",IDC_CFG_READONLY,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,11,193,10
+    CONTROL         "Zobrazit &sekce jako adresář (povolí přístup ke všem sekcím)",IDC_CFG_SESSIONASDIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,23,211,10
+    CONTROL         "Zobrazit &boot image disku jako soubor",IDC_CFG_BOOTIMAGEASFILE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,35,140,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,2,58,226,1
+    DEFPUSHBUTTON   "OK",IDOK,118,64,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,173,64,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "Nelze otevřít soubor."
+    IDS_UNKNOW_ERROR            "Neznámá chyba."
+    IDS_UNPACKING_ARCHIVE       "Extrahování ISO archivu"
+    IDS_ERROR_UNPACKING         "Chyba extrahování archivu."
+    IDS_CANT_HANDLE_FILE        "Nelze pracovat s tímto souborem."
+    IDS_INSUFFICIENT_MEMORY     "Nedostatek paměti."
+    IDS_ERR_TOO_LONG_NAME       "Nelze dokončit operaci kvůli příliš dlouhému názvu."
+    IDS_ABOUT                   "O pluginu"
+    IDS_PLUGIN_DESCRIPTION      "Prohlíží a extrahuje CD/DVD ISO obrazy."
+    IDS_CANT_CREATE_TEMP        "Nelze vytvořit dočasný adresář."
+    IDS_CANT_DELETE_TEMP_FILE   "Nelze vymazat dočasný soubor."
+    IDS_UNKNOWN_FILE_FORMAT     "Neznámý formát souboru nebo neplatný ISO obraz.\n\nPokud jste si jistý, že je to platný ISO obraz, založte prosím issue na https://github.com/0xeb/sally/issues a pomůžete nám s podporou tohoto formátu."
+    IDS_CANT_OPEN_FILE          "Nelze otevřít soubor '%s'."
+    IDS_ERR_TMP                 "Vytváření dočasného souboru selhalo."
+    IDS_CANT_SET_ATTRS          "Nelze nastavit atributy souboru."
+    IDS_CANT_CREATE_DIR         "Nelze vytvořit adresář '%s'."
+    IDS_YES                     "Ano"
+    IDS_NO                      "Ne"
+    IDS_ERROR                   "Chyba"
+    IDS_WARNING                 "Upozornění"
+    IDS_ERROR_OPENING_MULTISESSION  "Při načítání více-sekčního obrazu vznikla neznámá chyba.\n\nZobrazit jen správně načtené sekce."
+    IDS_UNKNOWN_TRACK_TYPE      "Neznámý typ stopy."
+    IDS_READERROR               "Chyba čtení"
+    IDS_WRITEERROR              "Chyba zápisu"
+    IDS_CCD_BAD_FORMAT          "Neplatný formát .CCD souboru.\n\nZobrazit i nekompletní obraz."
+    IDS_CCD_MISSING             "Chybí .CCD soubor.\n\nZobrazit i nekompletní obraz."
+    IDS_ERROR_READING_SECTOR    "Nelze načíst sektor #%08X."
+    IDS_ERROR_LISTING_IMAGE     "Chyba načítání struktury adresáře v sektoru #%08X.\n\nNekompletní obsah ISO obrazu."
+    IDS_INTERNAL_PLUGIN_ERROR   "Interní chyba pluginu."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Neznámá alokační strategie (%d).\n\nZaložte prosím issue na https://github.com/0xeb/sally/issues a pomůžete nám opravit tento problém."
+    IDS_UDF_INVALID_TAG_ID      "Neplatný UDF Tag ID."
+    IDS_UDF_ERROR_READING_VAT   "Chyba načítání virtuální alokační tabulky v sektoru #%08X."
+    IDS_UDF_MISSING_VAT         "Chybí virtuální alokační tabulka."
+    IDS_UDF_BAD_ROOT_ICB        "Neplatný kořen ICB.\n\nNelze načíst strukturu adresáře."
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "Nelze extrahovat soubor ""%s"".\n\nNeshoda mezi velikostí souboru a ICB bloky."
+    IDS_CANT_OPEN_TRACK         "Nelze otevřít stopu #%d."
+    IDS_BOOT_OR_MBR             "Tento soubor se zdá být disketa nebo pevný disk nebo obraz oddílu pevného disku.\nZkuste přejmenovat soubor na .ima a spusťte UnFAT plugin."
+    IDS_UNSUPPORTED_APFS        "Tento obraz disku obsahuje systém souborů APFS.\nTento systém souborů není podporován."
+
+    IDS_ERR_HFS_READ            "Nelze načíst hlavičku oddílu. Soubor je malý."
+    IDS_ERR_HFS_INVALID_PARTITION "Poškozená struktura manažera oddílu."
+    IDS_ERR_HFS_UNRECOGNIZED    "Tento obraz disku neobsahuje HFS Plus oddíl."
+    IDS_ERR_HFS_ORIGINAL_HFS    "Tento obraz disku obsahuje HFS ale ne HFS Plus systém souborů.\nHFS není podporována."
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "Nelze najít blok #%08X.\nSoubor %s nebude extrahován."
+    IDS_ERR_HFS_SEEK            "Nelze najít blok #%08X."
+    IDS_ERR_HFS_BTREE_NODETYPE  "Nepodporovaný BTree root node typ v souboru katalogu."
+    IDS_ERR_HFS_BTREE_FRAGMENTED "Soubor katalogu je rozdělen na více než 8 částí, které nejsou podporovány."
+    IDS_ERR_HFS_FILE_FRAGMENTED "Soubor '%s' je rozdělen na více než 8 částí, které nejsou podporovány.\nSoubor nebude extrahován."
+
+    IDS_ERR_TOO_LONG_PATH       "Tento obraz disku obsahuje příliš dlouhou cestu, kterou Sally neumí zpracovat."
+
+    IDS_ERR_DMG_READ_HDR        "Nelze načíst hlavičku svazku. Soubor je malý."
+    IDS_ERR_DMG_ENCRYPTED       "Tento svazek je zašifrovaný.\nZašifrované svazky nejsou podporovány."
+    IDS_ERR_DMG_NO_FOOTER       "Tento soubor se nezdá být DMG svazek nebo je nekompletní.\nNeobsahuje platný DMG footer."
+    IDS_ERR_DMG_PLIST           "Tento soubor se nezdá být platný DMG svazek nebo je nekompletní.\nNeobsahuje platný Property List."
+    IDS_ERR_DMG_BLOCK_UNDEFINED "Tento svazek neobsahuje datový blok HFS Plus oddílu začínající v %I64u.\nTento blok je potřeba pro správné zacházení se svazkem."
+
+    IDS_ERR_BF_READ             "Nelze číst data z obrazu disku na pozici %I64u."
+    IDS_ERR_BF_SEEK             "Nelze procházet v obrazu disku na pozici %I64u."
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "Interní chyba: Nepodporovaná metoda hledání."
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "Tento obraz disku obsahuje blok zkomprimovaný neznámou metodou.\nTakové obrazy disků nejsou podporovány."
+    IDS_ERR_BF_ZLIB             "Extrahování ZLIB-komprimovaného bloku selhalo. Tento obraz disku je poškozený."
+    IDS_ERR_BF_BZIP2            "Extrahování SZIP2-komprimovaného bloku selhalo. Tento obraz disku je poškozený."
+
+    IDS_ERR_ISZ_NO_HEADER       "Tento soubor se nezdá být komprimovaný ISZ obraz nebo je nekompletní.\nNeobsahuje platnou ISZ hlavičku."
+    IDS_ERR_ISZ_READ_HDR        "Nelze číst hlavičku komprimovaného obrazu. Soubor je malý."
+    IDS_ERR_ISZ_SEGMENTED       "Tento obraz je rozdělený.\nRozdělené obrazy nejsou podporovány."
+    IDS_ERR_ISZ_ENCRYPTED       "Tento obraz je zašifrovaný.\nZašifrované obrazy nejsou podporovány."
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "Nelze extrahovat audio stopy."
+
+    IDS_CANCELING_OPERATION     "Stornování operace, čekejte prosím..."
+
+    IDS_INFO_LABEL              "Informace o obrazu\n\n"
+    IDS_INFO_LABEL_LABEL        "Informace o obrazu ""%s""\n\n"
+    IDS_INFO_CNT_SESSIONS       "Počet sekcí: %d"
+    IDS_INFO_SESSION_NUM        "\nSekce %d\n"
+    IDS_INFO_CNT_TRACKS         "  Počet stop: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  Stopa: %d, %s, Velikost: %d KBajtů\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  Stopa: %d, %s, Velikost: %d KBajtů - ""%s""\n"
+}

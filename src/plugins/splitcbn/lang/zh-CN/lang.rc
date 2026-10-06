@@ -1,0 +1,166 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for splitcbn. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/splitcbn/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\splitcbn.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 53, 55, 210, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "分割 & 合并配置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "包括原始扩展名到输出文件名(&I)",IDC_CHECK_INCLUDE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,6,166,10
+    CONTROL         "为合并创建批处理文件(&B)",IDC_CHECK_CREATE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,19,116,10
+    CONTROL         "分割到目标面板(&O)",IDC_CHECK_SPLITOTHER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,32,90,10
+    CONTROL         "分割到由源文件命名的子目录(&S)",IDC_CHECK_SPLITSUB,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,45,152,10
+    CONTROL         "合并到目标面板(&C)",IDC_CHECK_COMBINEOTHER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,58,104,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,4,76,202,1
+    DEFPUSHBUTTON   "确定",IDOK,38,83,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,95,83,50,14
+    PUSHBUTTON      "帮助",IDHELP,152,83,50,14
+END
+
+IDD_SPLIT DIALOGEX 32, 33, 248, 125
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "分割"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_SPLIT_ICON,6,7,20,20,WS_GROUP
+    CONTROL         "",IDC_STATIC_TITLE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,35,9,201,8
+    EDITTEXT        IDC_EDIT_DIR,35,19,188,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,227,19,14,14,WS_GROUP
+    CONTROL         "每部分的大小(&S):",IDC_RADIO_SIZE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,35,43,78,10
+    CONTROL         "分割数(&N):",IDC_RADIO_NUMBER,"Button",BS_AUTORADIOBUTTON,35,60,70,10
+    COMBOBOX        IDC_COMBO_SIZE,115,42,127,83,CBS_DROPDOWN | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDC_EDIT_NUMBER,115,59,55,14,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "最后部分的大小:",IDC_STATIC_1,47,79,65,8
+    EDITTEXT        IDC_EDIT_LASTPART,115,79,126,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,7,97,235,1
+    PUSHBUTTON      "配置(&C)...",IDC_BUTTON_CONFIG,7,105,50,14,WS_GROUP
+    DEFPUSHBUTTON   "确定",IDOK,77,105,50,14
+    PUSHBUTTON      "取消",IDCANCEL,134,105,50,14
+    PUSHBUTTON      "帮助",IDHELP,191,105,50,14
+END
+
+IDD_COMBINE DIALOGEX 30, 28, 270, 194
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "合并"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "部分文件(&P):",IDC_STATIC_1,7,9,49,8
+    LISTBOX         IDC_LIST_FILES,7,19,200,108,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_WANTKEYBOARDINPUT | WS_VSCROLL | WS_HSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "上(&U)",IDC_BUTTON_UP,214,20,50,14,WS_GROUP
+    PUSHBUTTON      "下(&D)",IDC_BUTTON_DOWN,214,43,50,14
+    PUSHBUTTON      "添加(&A)...",IDC_BUTTON_ADD,214,66,50,14
+    PUSHBUTTON      "移除(&R)",IDC_BUTTON_REMOVE,214,89,50,14
+    PUSHBUTTON      "&CRC...",IDC_BUTTON_CRC,214,112,50,14
+    LTEXT           "合并到(&T):",IDC_STATIC_2,7,136,41,8
+    EDITTEXT        IDC_EDIT_TARGET,7,146,237,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE2,250,146,14,14,WS_GROUP
+    LTEXT           "",IDC_STATIC_3,7,166,259,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "确定",IDOK,100,176,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,157,176,50,14
+    PUSHBUTTON      "帮助",IDHELP,214,176,50,14
+END
+
+IDD_CRC DIALOGEX 39, 34, 162, 106
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "CRC 测试"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "关闭",IDCANCEL,105,85,50,14
+    LTEXT           "计算的 CRC:",IDC_STATIC_1,7,7,47,8
+    EDITTEXT        IDC_EDIT_CRC1,21,23,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC2,86,23,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "原始 CRC:",IDC_STATIC_2,7,44,38,8
+    EDITTEXT        IDC_EDIT_CRC3,21,61,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC4,86,61,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,56,10,100,1
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,47,48,109,1
+    ICON            "",IDC_ICON_WARN,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+    ICON            "",IDC_ICON_OK,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "分割 & 合并"
+ IDS_PLUGIN_DESCRIPTION, "分割和合并文件。"
+ IDS_OPENERROR, "打开文件错误。"
+ IDS_SELECTDIR, "选择目标目录。"
+ IDS_ZEROSIZE, "文件不够大不能分割。"
+ IDS_INSERTDISK, "插入有足够空间的格式化的磁盘。"
+ IDS_FIXEDNOSENSE, "在固定驱动器上使用自动检测没有意义。\n你要继续吗？"
+ IDS_OUTOFSPACE, "目标磁盘上没有足够可用空间。"
+ IDS_OUTOFMEM, "内存溢出。"
+ IDS_READERROR, "读取错误"
+ IDS_WRITEERROR, "写入错误"
+ IDS_INSERTNEXT, "插入下一张磁盘并点击""确定""。"
+ IDS_SPLIT, "分割"
+ IDS_COMBINE, "合并"
+ IDS_TOOMANYPARTS, "分割的文件数已超过100。\n你真的想要继续吗？"
+ IDS_WRITING, "写入"
+ IDS_TOOLONGNAME, "原始文件名太长并且生成的批处理文件在某些系统中可能不能正常工作。你想要继续吗？"
+ IDS_ADDFILTER, "所有文件 (*.*)"
+ IDS_ADDTITLE, "添加部分文件"
+ IDS_BROWSETITLE, "选择目标文件"
+ IDS_CRCERROR, "CRC 校验失败。\n\n部分文件已损坏，不完整或者以错误的顺序被合并。\n输出文件很可能无效。"
+ IDS_PROCESSING, "正在处理"
+ IDS_ZEROFILES, "没什么可合并。"
+ IDS_CANCEL, "你要取消此操作吗？"
+ IDS_CRCTITLE, "CRC 测试"
+ IDS_CRCDEC, "%lu (十进制)"
+ IDS_CRCHEX, "%X (十六进制)"
+ IDS_CRCNOTFOUND, "未找到"
+ IDS_CALCCRC, "计算 CRC"
+ IDS_SPLITTITLE, "分割 ""%%s"" (%s 字节) 为:"
+ IDS_144FLOPPY, "1.44 MB (3.5"" 软盘)"
+ IDS_720FLOPPY, "720 KB (3.5"" 软件)"
+ IDS_12FLOPPY, "1.2 MB (5.25"" 软盘)"
+ IDS_360FLOPPY, "360 KB (5.25"" 软盘)"
+ IDS_AUTODETECT, "自动检测"
+ IDS_FILECRCTITLE, "文件 ""%s"" 的 CRC32 是:"
+ IDS_BATTOOLONG, "创建批处理文件错误。"
+ IDS_BYTES, "字节"
+ IDS_BYTE, "字节"
+ IDS_PATHERROR, "路径错误"
+ IDS_TARGETPATHEXIST, "目标路径不存在。你要创建它吗？"
+ IDS_WINPATH, "不能合并到非 Windows 路径。"
+ IDS_SPECIFYFILE, "输入的路径未指定文件。"
+ IDS_MENU1 "分割文件(&S)..."
+ IDS_MENU2 "合并文件(&C)..."
+ IDS_ABOUTTITLE "关于插件"
+ IDS_BATFILE_GENBYSAL, "由 Sally 生成"
+ IDS_BATFILE_CTRL_C_TO_QUIT, "按下 Ctrl-C 退出。"
+ IDS_BATFILE_DESCR, "此批处理文件将创建文件 '%s'。"
+ IDS_SIZE_B, "B"
+ IDS_SIZE_KB, "KB"
+ IDS_SIZE_K, "K"
+ IDS_SIZE_MB, "MB"
+ IDS_SIZE_GB, "GB"
+ IDS_100MB_ZIP, "100 MB (ZIP)"
+ IDS_250MB_ZIP, "250 MB (ZIP)"
+ IDS_120MB_LS120, "120 MB (LS-120)"
+ IDS_650MB_CDR, "650 MB (CD-R)"
+ IDS_700MB_CDR, "700 MB (CD-R)"
+ IDS_TOOLONGNAME2, "无法完成操作，因为名称太长。"
+}

@@ -771,14 +771,10 @@ bool GenerateCopyOfTargetNameW(const std::wstring& directoryWithBackslash,
                                std::vector<std::wstring>& reservedNames,
                                std::wstring& targetNameW)
 {
-    // LoadStrW is safe here: the earlier "e2e test host catches a real bug"
-    // read was wrong. texts.rc2 (where IDS_NEWNAME_COPY lives) is compiled only into the
-    // language-pack module (lang/lang.rc2 -> texts.rc2), never into sally.rc, so a real
-    // running Sally always resolves this through a genuinely loaded .slg - the e2e test
-    // host's HLanguage == HInstance has no langpack loaded and can't resolve ANY IDS_*
-    // string via either LoadStr or LoadStrW (confirmed empirically: both return their
-    // "ERROR LOADING [WIDE ]STRING" fallback there). The two affected tests
-    // (gtest_f5_unicode_copy_e2e) no longer depend on the literal token text.
+    // LoadStrW is safe here: texts.rc2 (where IDS_NEWNAME_COPY lives) is compiled into
+    // sally.exe through the built-in languages (lang/languages.rc -> lang.rc2 -> texts.rc2),
+    // not through sally.rc, so a host that does not link them gets the
+    // "ERROR LOADING [WIDE ]STRING" fallback; nothing below depends on the token's text.
     const std::wstring copyTokenW = LoadStrW(IDS_NEWNAME_COPY);
     if (!isDir)
     {

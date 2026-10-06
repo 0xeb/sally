@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for tar. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/tar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\tar.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "浏览并解压 Unix 压缩包。"
+ IDS_ABOUT, "关于插件"
+ IDS_TARERR_TITLE, "TAR 插件错误"
+ IDS_TARERR_UNKNOWN, "压缩包格式未被识别或不被支持。"
+ IDS_TARERR_HEADER, "TAR 头部有无效数据 - 压缩包损坏。"
+ IDS_TARERR_CHECKSUM, "坏的文件或头部校验和 - 压缩包损坏。"
+ IDS_TARERR_FDATA, "内部错误: 文件数据结构损坏。"
+ IDS_TARERR_BADSIG, "未知的块签名 - 跳过。"
+ IDS_TARERR_NOTFOUND, "压缩包中未发现必需的文件。"
+ IDS_TARERR_MEMORY, "内存分配错误。"
+ IDS_UNPACKPROGRESS_TITLE, "解压缩"
+ IDS_UNPACKPROGRESS_TEXT, "正在提取 "
+ IDS_SKIPPROGRESS_TEXT, "跳过 "
+ IDS_GZERR_TITLE, "GZip 错误"
+ IDS_GZERR_BADMETHOD, "使用了未知压缩方式，不能解压缩。"
+ IDS_GZERR_ENCRYPTED, "此文件已损坏。不支持加密的 GZip 压缩包。"
+ IDS_GZERR_MULTIPART, "此文件是多卷压缩包的一部分。不支持多卷 GZip 压缩包。"
+ IDS_GZERR_BADFLAGS, "在 GZip 头部中碰到未知标记，不能解压缩。"
+ IDS_GZERR_FOPEN, "打开压缩文件错误: "
+ IDS_ERR_FREAD, "读取压缩文件错误: "
+ IDS_TARERR_FWRITE, "写到输出文件错误: "
+ IDS_TARERR_WRSIZE, "WriteFile 函数拒绝写请求的所有数据。"
+ IDS_GZERR_BADBLOCKTYPE, "在 GZip 流中碰到无效块，无法解压缩。"
+ IDS_ERR_INTERNAL, "TAR 插件出现内部错误，请在 https://github.com/0xeb/sally/issues 报告此问题。"
+ IDS_ERR_MEMORY, "内存分配错误。"
+ IDS_GZERR_CRC, "CRC 错误。"
+ IDS_ERR_CORRUPT, "压缩流中未预期的数据，压缩包损坏。"
+ IDS_ERR_EOF, "碰到文件过早结束。"
+ IDS_GZERR_SEEK, "在压缩文件中搜索出错: "
+ IDS_RPM_VIEWTITLE, "RPM 查看器"
+ IDS_ERR_RPMTITLE, "RPM 错误"
+ IDS_RPMERR_TMPNAME, "创建临时文件名错误。"
+ IDS_RPMERR_TMPFILE, "创建临时文件错误。"
+ IDS_ERR_NORPM, "文件未被识别为 RPM 压缩包。"
+ IDS_ERR_BADRPMVERSION, "此压缩包请求的 RPM 版本不被支持。"
+ IDS_ERR_BADSIGNATURE, "碰到未知 RPM 压缩包签名。"
+ IDS_CPIOERR_BADSIG, "文件记录有坏签名。"
+ IDS_CPIOERR_HEADER, "损坏的文件头部记录。"
+ IDS_CPIOERR_FORMAT, "未知格式的 cpio 头部。"
+ IDS_LZH_NOT_IMPLEMENTED, "尚不支持 LZH 压缩包。"
+}

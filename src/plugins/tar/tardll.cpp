@@ -64,7 +64,7 @@ CSalamanderSafeFileAbstract* SalamanderSafeFile = NULL;
 CSalamanderDebugAbstract* SalamanderDebug = NULL;
 
 HINSTANCE DLLInstance = NULL; // handle to the SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to the SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 //
 // ****************************************************************************
@@ -144,10 +144,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // let Salamander load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"TAR" /* do not translate! */);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // obtain Salamander's general interface
     SalamanderGeneral = salamander->GetSalamanderGeneral();

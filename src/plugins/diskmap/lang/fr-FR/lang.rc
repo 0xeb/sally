@@ -1,0 +1,120 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for diskmap. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/diskmap/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#define SALAMANDER
+#include "..\..\DiskMap\Resources\DiskMap.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDC_ZAREVAKDISKMAP MENU 
+BEGIN
+    POPUP "&Fichier"
+    BEGIN
+        MENUITEM "&Ouvrir le fichier",                       IDM_FILE_OPEN
+        MENUITEM "&Cibler dans le panneau\tF",        IDM_FILE_FOCUSINSALAMANDER
+        MENUITEM SEPARATOR
+        MENUITEM "&Annuler\tEchap",                      IDM_FILE_ABORT
+        MENUITEM "&Rafraîchir\tCtrl+R",            IDM_FILE_REFRESH
+        MENUITEM SEPARATOR
+        MENUITEM "&Fermer\tAlt+F4",                      IDM_FILE_EXIT
+    END
+    POPUP "&Visualiser"
+    BEGIN
+        MENUITEM "&Zoomer\t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "&Dézoomer\t -",                IDM_VIEW_ZOOMOUT
+        MENUITEM "&Vue initiale\t Maj+Retour arrière",   IDM_VIEW_GOTOROOT
+        MENUITEM SEPARATOR
+        MENUITEM "&Fenêtre de journalisation...\tCtrl+L",              IDM_VIEW_LOG
+    END
+
+    POPUP "&Options"
+    BEGIN
+	MENUITEM "&Surligner les dossiers",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
+	MENUITEM "&Afficher l'infobulle\tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+        POPUP "&Format du chemin dans l'infobulle"
+        BEGIN
+            MENUITEM "&Nom de fichier",            IDM_PATHFORMAT_FILENAME
+            MENUITEM "&Relatif",            IDM_PATHFORMAT_RELATIVEVIEW
+//            MENUITEM "&Relative to Root",  IDM_PATHFORMAT_RELATIVEROOT
+            MENUITEM "&Absolu",            IDM_PATHFORMAT_ABSOLUTE
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Confirmer la fermeture par Echap",       IDM_OPTIONS_CONSFIRMCLOSE, CHECKED
+    END
+    POPUP "&Aide"
+    BEGIN
+//        POPUP "&Debug"
+//        BEGIN
+//            MENUITEM "&Export Directory Structure...", IDM_DEBUG_EXPORTDIR
+//        END
+//        MENUITEM SEPARATOR
+        MENUITEM "&A propos...",                  IDM_HELP_ABOUT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME,            "DiskMap"
+    IDS_PLUGIN_DESCRIPTION,     "Affiche un graphique hiérarchique des fichiers sur votre disque."
+    IDS_PLUGIN_ABOUT,           "A propos du module DiskMap de Sally"
+    IDS_PLUGIN_MENU,            "Voir &DiskMap"
+    IDS_CLOSE_CONFIRMATION,     "Voulez-vous fermer DiskMap?"
+    IDS_CLOSE_CONFIRMATION_CHECKBOX, "Ne pas remontrer ce message et fermer DiskMap sans rien demander"
+
+    IDS_DISKMAP_TITLE,               "DiskMap"
+    IDS_DISKMAP_TITLEPREFIX,         "DiskMap - "
+
+    IDS_DISKMAP_LOAD_TITLE,          "Recherche de fichiers..."
+    IDS_DISKMAP_LOAD_FOOTER,         "...appuyez sur Echap pour annuler"
+    IDS_DISKMAP_LOAD_HSIZE,          "Taille:"
+    IDS_DISKMAP_LOAD_HFILE,          "Fichiers:"
+    IDS_DISKMAP_LOAD_HDIRS,          "Dossiers:"
+
+    IDS_DISKMAP_ABORT_TITLE,         "Recherche de fichier annulée..."
+    IDS_DISKMAP_ABORT_FOOTER,        "...appuyez sur Ctrl+R pour rafraîchir la vue"
+
+    IDS_DISKMAP_LOG_TITLE,           "Journal"
+    IDS_DISKMAP_LOG_HTYPE,           "Type"
+    IDS_DISKMAP_LOG_HTEXT,           "Texte"
+    IDS_DISKMAP_LOG_HFILE,           "Fichier ou répertoire"
+    IDS_DISKMAP_LOG_LINFO,           "Information"
+    IDS_DISKMAP_LOG_LWARN,           "Attention"
+    IDS_DISKMAP_LOG_LERROR,          "Erreur"
+
+    IDS_DISKMAP_SHELL_FOCUS,         "&Cibler dans le panneau"
+    IDS_DISKMAP_SHELL_ZOOMIN,        "&Zoomer"
+    IDS_DISKMAP_SHELL_ZOOMOUT,       "&Dézoomer"
+    IDS_DISKMAP_SHELL_DIROPEN,       "&Ouvrir dans le panneau"
+    IDS_DISKMAP_SHELL_DIRCHANGE,     "Changer de &répertoire"
+
+    IDS_DISKMAP_TTIP_TIMECREATE,     "Créé:"
+    IDS_DISKMAP_TTIP_TIMEMODIFY,     "Modifié:"
+    IDS_DISKMAP_TTIP_TIMEACCESS,     "Dernier accès:"
+    IDS_DISKMAP_TTIP_SIZEDATA,       "Taille des données:"
+    IDS_DISKMAP_TTIP_SIZEREAL,       "Taille réelle:"
+    IDS_DISKMAP_TTIP_SIZEDISK,       "Taille du disque:"
+    IDS_DISKMAP_TTIP_COUNTFILE,      "Fichiers:"
+    IDS_DISKMAP_TTIP_COUNTDIRS,      "Dossiers:"
+
+    IDS_DISKMAP_FORMAT_BYTE0,        "octets"
+    IDS_DISKMAP_FORMAT_BYTE1,        "octet"
+    IDS_DISKMAP_FORMAT_BYTEN,        "octets"
+
+    IDS_DISKMAP_EMPTY_TITLE,         "Rien à afficher..."
+    IDS_DISKMAP_EMPTY_FOOTER,        "...ce dossier ne contient aucun fichier à cartographier"
+END

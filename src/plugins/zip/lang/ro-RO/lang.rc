@@ -1,0 +1,660 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for zip. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\zip.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_EXPACKOPTIONS DIALOGEX 41, 41, 308, 201
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Optiuni Extinse de Arhivare"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archiva:",IDC_STATIC_1,17,9,30,8
+    CONTROL         "",IDC_ARCHIVE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,50,9,250,8
+    LTEXT           "",IDC_STATIC_2,8,24,291,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Creaza arhiva &multi-volum",IDC_MULTIVOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,31,101,12
+    LTEXT           "Marime &Volum:",IDC_STATIC_3,163,33,53,8,NOT WS_GROUP
+    COMBOBOX        IDC_VOLSIZE,218,31,49,110,CBS_DROPDOWN | WS_DISABLED | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_UNITS,272,31,27,34,CBS_DROPDOWNLIST | WS_DISABLED | WS_TABSTOP
+    CONTROL         "&Nume fisiere secvential",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,17,45,90,12
+    LTEXT           "",IDC_STATIC_4,8,63,291,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Creaza arhiva &self-extract",IDC_SELFEXTR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,70,108,12
+    PUSHBUTTON      "&Advansat...",IDC_ADVANCED,244,70,55,14,WS_DISABLED
+    LTEXT           "",IDC_STATIC_5,8,90,291,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Cripteaza fisiere",IDC_ENCRYPT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,97,67,12
+    LTEXT           "&Parola:",IDC_STATIC_6,28,113,55,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD1,87,111,94,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    LTEXT           "C&onfirma Parola:",IDC_STATIC_7,28,129,58,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD2,87,127,94,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    GROUPBOX        " Metoda Criptare ",IDC_STATIC_8,190,97,109,50
+    CONTROL         "&ZIP 2.0 compatibil (slab)",IDC_ENC_ZIP20,"Button",BS_AUTORADIOBUTTON | WS_DISABLED | WS_GROUP,195,108,99,12
+    CONTROL         "&128-bit AES",IDC_ENC_AES128,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,195,120,53,12
+    CONTROL         "&256-bit AES",IDC_ENC_AES256,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,195,132,55,12
+    LTEXT           "",IDC_STATIC_9,8,154,291,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "N&u arata acest dialog din nou (puteti schimba mai tarziu in config dialog)",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,161,258,12
+    DEFPUSHBUTTON   "OK",IDOK,27,180,55,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,90,180,55,14
+    PUSHBUTTON      "Con&figureaza...",IDC_CONFIG,153,180,65,14
+    PUSHBUTTON      "Help",IDHELP,226,180,55,14
+END
+
+IDD_CONFIG DIALOGEX 50, 37, 323, 277
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configurare ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Dezarhivare",IDC_STATIC_1,7,6,42,8
+    LTEXT           "",IDC_STATIC_2,50,10,267,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Dezarhiveaza &automat arhivele multi-volum stocate pe hdd",IDC_AUTOEXPANDMV,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,17,232,12
+    LTEXT           "Arhivare",IDC_STATIC_3,7,35,30,8
+    LTEXT           "",IDC_STATIC_4,38,39,279,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Foloseste copia &temporara a arhivei pt modificarile sale (recomandat, imuna la crash)",IDC_BACKUP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,46,298,12
+    CONTROL         "Nu stoca directoare &goale in arhiva ZIP",IDC_NOEMPTYDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,58,155,12
+    CONTROL         "Seteaza ora arhiva la ora celui mai &nou fisiercand modifici arhiva",IDC_SETFILETIME,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,70,240,12
+    CONTROL         "Foloseste nume fisiere compatibile WinZip pentru arhive multi-volum (cu exceptia",IDC_WINZIPNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,82,285,12
+    LTEXT           "arhivelor self-extract, ce fol. totdeauna conventii de numire a Sally)",IDC_STATIC_5,26,94,272,8
+    LTEXT           "Ni&vel compresie (0 - 9, 9 compresie super, cel mai lung timp):",IDC_STATIC_6,14,107,210,8
+    EDITTEXT        IDC_LEVEL,225,105,16,12
+    LTEXT           "Limbaj default &self-extractor:",IDC_STATIC_7,14,120,99,8
+    COMBOBOX        IDC_LANGUAGE,114,118,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Confirmari",IDC_STATIC_8,7,136,37,8
+    LTEXT           "",IDC_STATIC_9,44,140,273,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Cand limba SFX se schimba",IDC_STATIC_10,14,148,245,49
+    CONTROL         "Int&reaba intotdeauna inainte de a schimba textele",IDC_ASK,"Button",BS_AUTORADIOBUTTON | WS_GROUP,20,158,180,12
+    CONTROL         "In&locuieste atumomat textele cu valorile lor default",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,20,170,212,12
+    CONTROL         "Nu intreba si totdeauna lasa textele n&eschimbate",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,20,182,200,12
+    CONTROL         "Arata dialogul cu &optiuni extinse inainte de arhivare",IDC_SHOWEXOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,200,194,12
+    LTEXT           "Setari panou",IDC_STATIC_11,7,217,45,8
+    LTEXT           "",IDC_STATIC_12,52,221,265,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Arata coloana ""Ar&hivat"" cand listezi arhiva",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,228,220,12
+    LTEXT           "",IDC_STATIC_13,6,247,311,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,41,256,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,97,256,50,14
+    PUSHBUTTON      "Seteaza &Defaults",IDC_DEFAULT,153,256,72,14
+    PUSHBUTTON      "Help",IDHELP,231,256,50,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 297, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Introdu Parola ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK,21,10,18,20
+    LTEXT           "Acest fisier e criptat. Va rugam introduceti parola pentru decriptare.",IDC_STATIC_1,57,10,230,8
+    LTEXT           "Fisier:",IDC_STATIC_2,57,23,22,8
+    CONTROL         "",IDC_FILE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,82,23,203,8
+    LTEXT           "&Parola:",IDC_STATIC_3,57,36,26,8
+    EDITTEXT        IDC_PASSWORD,84,34,201,12,ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,21,55,60,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDC_SKIP,86,55,60,14
+    PUSHBUTTON      "Sari Peste &Tot",IDC_SKIPALL,151,55,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,216,55,60,14
+END
+
+IDD_LOWFREESPACE DIALOGEX 13, 54, 368, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Spatiu Putin Liber Pe Disk"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Atentie: Spatiul liber e disk e mai putin decat marimea volumului specificat de dvs.",IDC_TEXT,78,9,279,8
+    RTEXT           "Cale:",IDC_STATIC_1,4,26,69,8
+    LTEXT           "",IDC_PATH,78,26,279,8
+    RTEXT           "Spatiu Liber:",IDC_STATIC_2,4,39,69,8
+    LTEXT           "",IDC_FREESPACE,78,39,279,8
+    RTEXT           "Marimea Volumului:",IDC_STATIC_3,4,52,69,8
+    LTEXT           "",IDC_VOLUMESIZE,78,52,279,8
+    DEFPUSHBUTTON   "&Ignora",IDC_IGNORE,66,73,55,14
+    PUSHBUTTON      "Ignora &Tot",IDC_ALL,126,73,55,14
+    PUSHBUTTON      "&Mai Incearca",IDC_RETRY,186,73,55,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,246,73,55,14
+END
+
+IDD_CHANGEDISK DIALOGEX 24, 40, 199, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Schimba Disk"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,173,24
+    LTEXT           "Apasa OK cand esti gata.",IDC_STATIC_1,13,39,173,8
+    DEFPUSHBUTTON   "OK",IDOK,44,57,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,104,57,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 6, 15, 354, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Confirm Suprascriere Fisier"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Suprascriere fisier:",IDC_STATIC_1,4,14,65,8
+    LTEXT           "",IDC_FILE,74,14,269,8
+    LTEXT           "",IDC_FILEATTR,74,24,269,8
+    LTEXT           "Fisierul exista deja pe disk. Suprascriu?",IDC_STATIC_2,74,39,174,8
+    DEFPUSHBUTTON   "&Da",IDC_YES,59,56,55,14
+    PUSHBUTTON      "&Tot",IDC_ALL,119,56,55,14
+    PUSHBUTTON      "&Mai Incearca",IDC_RETRY,179,56,55,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,239,56,55,14
+END
+
+IDD_CHANGEDISK2 DIALOGEX 24, 40, 210, 108
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Acest fisier face parte din o arhiva multi-volum sau e corupt.",IDC_STATIC_1,13,8,184,16
+    LTEXT           "Daca tu crezi, ca ar trebui sa fie arhiva multi-volum, te rog introduce un disk cu ultima parte a arhivei sau localizeaza fisierul pe hdd. Apasa OK cand esti gata.",IDC_STATIC_2,13,31,184,24
+    LTEXT           "&Ultima parte a arhivei:",IDC_STATIC_3,13,61,89,8
+    EDITTEXT        IDC_FILENAME,13,71,168,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,185,71,13,12
+    DEFPUSHBUTTON   "OK",IDOK,50,89,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,110,89,50,14
+END
+
+IDD_CHANGEDISK3 DIALOGEX 24, 40, 210, 132
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Schimba Disk"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,184,16
+    LTEXT           "Apasa OK cand esti gata.",IDC_STATIC_1,13,31,184,8
+    CONTROL         "Fisierele sunt numite &secvential",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,43,135,12
+    CONTROL         "Numere disk in &extensie",IDC_WINZIP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,55,114,12
+    CONTROL         "Proceseaza &toate volumele fara intrebari",IDC_PROCEEDALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,67,147,12
+    LTEXT           "Nume &fisier:",IDC_STATIC_2,13,84,60,8
+    EDITTEXT        IDC_FILENAME,13,94,168,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,185,94,13,12
+    DEFPUSHBUTTON   "OK",IDOK,49,112,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,111,112,50,14
+END
+
+IDD_ADVANCEDSE DIALOGEX 37, 14, 305, 303
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Setari Self-Extractor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_STATIC_1,0,0,305,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Director in care extrag fisierele",IDC_STATIC_2,7,7,292,89,WS_GROUP
+    LTEXT           "E&xtrag in:",IDC_STATIC_3,20,19,38,8,NOT WS_GROUP
+    EDITTEXT        IDC_TARGETDIR,20,29,249,12,ES_AUTOHSCROLL | ES_NOHIDESEL
+    PUSHBUTTON      ">",IDC_SPECDIR,272,29,12,12
+    LTEXT           "Nota: Puteti introduce o cale relativa, care va fi combinata cu directorul curent cand se executa self-extractor-ul, sau calea intreaga. Lasati campul gol pentru extragere in directorul curent.",IDC_STATIC_4,20,47,267,24,NOT WS_GROUP
+    CONTROL         "Permiteti &utilizator sa schimbe directorul",IDC_ALLOWUSER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,77,146,12
+    LTEXT           "&Executa comanda sau deschide document:",IDC_STATIC_5,20,113,147,8,NOT WS_GROUP
+    EDITTEXT        IDC_EXECUTE,20,123,264,12,ES_AUTOHSCROLL
+    CONTROL         "Sc&oate fisierele extrase",IDC_REMOVE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,139,131,12
+    PUSHBUTTON      "A&steapta pt...",IDC_WAITFOR,224,138,60,14
+    GROUPBOX        "Interfata",IDC_STATIC_6,7,163,292,53,WS_GROUP
+    PUSHBUTTON      "&Texte...",IDC_TEXTS,20,177,50,14
+    LTEXT           "&Limba:",IDC_STATIC_7,20,198,36,8,NOT WS_GROUP
+    COMBOBOX        IDC_LANGUAGE,74,196,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Icoana:",IDC_STATIC_8,156,198,28,8,NOT WS_GROUP
+    LTEXT           "",IDC_EXEICON,187,194,19,18,NOT WS_GROUP
+    PUSHBUTTON      "Schimba &Icoana...",IDC_CHANGEICON,214,196,70,14
+    GROUPBOX        "Confirmari si alte optiuni",IDC_STATIC_9,7,221,292,57
+    CONTROL         "Start extra&gere automat",IDC_AUTO,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,20,234,93,12
+    CONTROL         "Ascunde &principal dialog self-extract",IDC_HIDEMAINDLG,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,246,133,12
+    CONTROL         "&Creaza automat director tinta",IDC_AUTODIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,258,111,12
+    CONTROL         "Arata dialog cu su&marul operatiunii",IDC_SUMDLG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,164,234,130,12
+    CONTROL         "Suprascriere fisiere &automat",IDC_OVEWRITE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,164,246,107,12
+    CONTROL         "Cere p&rivilegii administrative ",IDC_REQSADMIN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,164,258,109,12
+    DEFPUSHBUTTON   "OK",IDOK,66,283,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,127,283,50,14
+    PUSHBUTTON      "Help",IDHELP,188,283,50,14
+    GROUPBOX        "Dupa ce dezarhivarea s-a terminat",IDC_STATIC_10,7,101,292,57,WS_GROUP
+END
+
+IDD_OVERWRITE2 DIALOGEX 6, 15, 350, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Confirm Suprascriere Fisier"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Suprascriu fisier:",IDC_STATIC_1,4,14,59,8
+    LTEXT           "",IDC_FILE,68,14,269,8
+    LTEXT           "",IDC_FILEATTR,68,24,269,8
+    LTEXT           "Fisier existent deja pe disk. Suprascriu?",IDC_STATIC_2,68,39,174,8
+    DEFPUSHBUTTON   "&Da",IDC_YES,89,56,50,14
+    PUSHBUTTON      "&Nu",IDC_NO_,150,56,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,211,56,50,14
+END
+
+IDD_RENAMEFAVSET DIALOGEX 100, 37, 194, 99
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Setari Favorite Noi"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Nume:",IDC_STATIC_1,14,8,60,8
+    EDITTEXT        IDC_NAME,14,18,164,12,ES_AUTOHSCROLL
+    LTEXT           "Nota: Pentru a defini meniu tasta-rapida pentru aceasta setare favorite tastati (&&) inaintea caracterului ce doristi sa fie tasta-rapida.",IDC_STATIC_2,14,41,161,24
+    LTEXT           "",IDC_STATIC_3,7,74,180,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,39,80,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,99,80,50,14
+END
+
+IDD_CREATESFX DIALOGEX 6, 15, 194, 113
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Creaza Arhiva Self-Extract"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Creaza o arhiva self-extract din arhiva:",IDC_SOURCE,16,11,162,8
+    EDITTEXT        IDC_ARCHIVE,16,21,162,12,ES_AUTOHSCROLL
+    LTEXT           "&Nume fisier arhiva noua self-extract:",IDC_TARGET,16,39,149,8
+    EDITTEXT        IDC_NEWARCHIVE,16,49,162,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Avansat...",IDC_ADVANCED,118,68,60,14
+    LTEXT           "",IDC_STATIC_1,7,87,180,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,13,94,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,72,94,50,14
+    PUSHBUTTON      "Help",IDHELP,131,94,50,14
+END
+
+IDD_COMMENT DIALOGEX 9, 34, 340, 180
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Comentariu Arhiva ZIP"
+MENU IDM_COMMENTMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_COMMENT,0,0,340,180,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+END
+
+IDD_SFXTEXTS DIALOGEX 94, 18, 260, 352
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Texte Self-Extractor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Caseta Mesaje ",IDC_STATIC_1,8,5,245,158
+    LTEXT           "Aceasta caseta de mesaje e aratata inainte de dialogul principal si inainte de a incepe dezahivarea.",IDC_STATIC_2,20,18,221,16,NOT WS_GROUP
+    LTEXT           "Lasati campurile 'Titlu' si 'Mesaj' goale daca nu doriti sa arate vreun mesaj.",IDC_STATIC_3,20,38,221,16,NOT WS_GROUP
+    LTEXT           "&Butoane:",IDC_STATIC_4,20,61,32,8
+    COMBOBOX        IDC_MBOXBUTTONS,53,59,136,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Tip:",IDC_STATIC_5,20,77,22,8,NOT WS_GROUP
+    COMBOBOX        IDC_MBOXICON,53,75,136,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Tit&lu:",IDC_STATIC_6,20,92,145,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTITLE,20,102,221,12,ES_AUTOHSCROLL
+    LTEXT           "&Mesaj:",IDC_STATIC_7,20,117,32,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTEXT,20,127,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    GROUPBOX        "Caseta Principala Mesaje",IDC_STATIC_8,8,169,245,158
+    LTEXT           "Titl&u:",IDC_STATIC_9,20,179,28,8
+    EDITTEXT        IDC_TITLE,20,189,221,12,ES_AUTOHSCROLL
+    LTEXT           "Text &aratat in caseta mesaje:",IDC_STATIC_10,20,205,110,8,NOT WS_GROUP
+    EDITTEXT        IDC_TEXT,20,215,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Text in butonul 'E&xtrage':",IDC_STATIC_11,20,247,90,8,NOT WS_GROUP
+    EDITTEXT        IDC_BUTTONTEXT,20,257,68,12,ES_AUTOHSCROLL
+    LTEXT           "Nume &vanzator:",IDS_VENDOR,20,272,174,8
+    EDITTEXT        IDE_VENDOR,20,282,184,12,ES_AUTOHSCROLL
+    LTEXT           "Adresa &WWW:",IDS_WWW,20,297,174,8
+    EDITTEXT        IDE_WWW,20,307,108,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,24,333,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,78,333,50,14
+    PUSHBUTTON      "&Reset",IDC_RESET,132,333,50,14
+    PUSHBUTTON      "Help",IDHELP,186,333,50,14
+END
+
+IDD_MANFAVS DIALOGEX 59, 61, 230, 123
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Manage Favorite"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Favorite:",IDC_STATIC_1,9,4,60,8
+    LISTBOX         IDC_FAVORITIES,9,14,142,100,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Re&denumeste",IDC_RENAME,161,13,60,14,WS_GROUP
+    PUSHBUTTON      "&Scoate",IDC_REMOVE,161,32,60,14
+    PUSHBUTTON      "Remove &Tot",IDC_REMOVEALL,161,51,60,14
+    DEFPUSHBUTTON   "Inchide",IDOK,161,100,60,14
+END
+
+IDD_WAITFOR DIALOGEX 15, 24, 247, 139
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Asteapta Pentru"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Aceasta optiune iti da voie sa astepti alt proces specificat de tine in campul 'Comanda'. Dupa ce acest proces e terminat self-extractor scoate fisierle temporare si se inchide singur.",IDC_STATIC_1,12,9,224,24
+    LTEXT           "",IDC_STATIC_2,12,41,224,32
+    LTEXT           "&Nume fisier al executabilului:",IDC_STATIC_3,12,81,103,8
+    EDITTEXT        IDC_FILENAME,12,91,220,12,ES_AUTOHSCROLL
+    LTEXT           "",IDC_STATIC_4,3,113,240,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,38,120,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,98,120,50,14
+    PUSHBUTTON      "Help",IDHELP,158,120,50,14
+END
+
+IDD_CHANGELANG DIALOGEX 6, 15, 248, 114
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Schimba Texte Self-Extractor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ati schimbat limba self-extractor, doriti textele paricularizate pe care le-ati introdus in caseta dialog 'Texte Self-Extractor' sa fie schimbate la valorile lor default corespunzatoare cu limba pe care ati selectat-o?",IDC_STATIC_1,11,8,214,32
+    DEFPUSHBUTTON   "Da",IDOK,40,48,50,14
+    PUSHBUTTON      "Nu",IDCANCEL,99,48,50,14
+    PUSHBUTTON      "Help",IDHELP,158,48,50,14
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,3,70,242,1
+    CONTROL         "&Intreaba intodeauna inainte de a schimba textele",IDC_ASK,"Button",BS_AUTORADIOBUTTON,11,74,178,12
+    CONTROL         "I&nlocuieste automat textele cu valorile lor default pe viitor",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,11,86,204,12
+    CONTROL         "Nu intreba pe viitor si lasa intotdeauna textele n&eschimbate",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,11,98,211,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SFXMENU MENU 
+BEGIN
+    POPUP "&Fisier"
+    BEGIN
+        MENUITEM "&Exporta Setari...\tCtrl+E", CM_SFX_EXPORT
+        MENUITEM "&Importa Setari...\tCtrl+I", CM_SFX_IMPORT
+    END
+    POPUP "&Vizualizeaza"
+    BEGIN
+        MENUITEM "Pre&vizualizeaza Casuta Mesaje SFX...\tCtr+V", CM_SFX_PREVIEW
+    END
+    POPUP "&Optiuni"
+    BEGIN
+        MENUITEM "&Reseteaza Tot\tCtrl+Shift+R",    CM_SFX_RESETALL
+        MENUITEM "Reseteaza &Valorile\tCtrl+R",       CM_SFX_RESETVALUES
+        MENUITEM "Reseteaza &Textele\tCtrl+T",        CM_SFX_RESETTEXTS
+        MENUITEM SEPARATOR
+        MENUITEM "&Adauga la Favorite...\tCtrl+A", CM_SFX_ADD
+        MENUITEM "&Favorite\tCtrl+F",          CM_SFX_FAVORITIES
+        MENUITEM SEPARATOR
+        MENUITEM "Folosit &UltimulLast Used\tCtrl+L",          CM_SFX_LASTUSED
+    END
+END
+
+IDM_FAVMANMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Redenumeste",                     CM_FAVRENAME
+        MENUITEM "&Sterge",                     CM_FAVDELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Scoate &Tot",                 CM_FAVREMOVEALL
+    END
+END
+
+IDM_COMMENTMENU MENU 
+BEGIN
+    POPUP "&Fisier"
+    BEGIN
+        MENUITEM "&Salveaza",                       CM_SAVE
+        MENUITEM SEPARATOR
+        MENUITEM "&Inchide\tAlt+F4",              CM_CLOSE
+    END
+END
+
+IDM_SPECDIR MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Director &Temporar",        CM_TEMP
+        MENUITEM "&Program Files",              CM_PROGFILES
+        MENUITEM "Director &Windows",          CM_WINDIR
+        MENUITEM "Director &System",           CM_SYSDIR
+        MENUITEM SEPARATOR
+        MENUITEM "Variabila de &Mediu",       CM_ENVVAR
+        MENUITEM "Intrare &Registry",             CM_REGENTRY
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_ABOUTPLUGINTITLE, "Despre Plugin"
+  IDS_PLUGIN_DESCRIPTION, "Creaza, rasfoieste, si extrage arhivele ZIP."
+  IDS_ERROPEN, "Nu pot deschide fisierul."
+  IDS_ERRFORMAT, "Format de  data incorecta."
+  IDS_ERREOCENTRDIR, "Nu pot gasi sfarsitul semnaturii centrale a directorului. Probabil fisier corupt."
+  IDS_LOWMEM, "Memorie insuficienta."
+  IDS_ERRADDFILE, "Nu pot adauga fisierul la lista."
+  IDS_ERRADDFILE_TOOLONG, "Nu pot adauga 1 sau mai multe directoare la lista. Calea finala e prea lunga.\nCateva directoare sau fisiere pot lipsi in listarea arhivei."
+  IDS_ERRADDDIR, "Nu pot adauga directorul la lista."
+  IDS_ERRADDDIR_TOOLONG, "Nu pot adauga 1 sau mai multe directoare la lista. Calea finala e prea lunga.\nCateva directoare sau fisiere pot lipsi in listarea arhivei."
+  IDS_PLUGINNAME, "ZIP"
+  IDS_TOOBIG, "Fisierele mai mari de 4GB nu sunt suportate."
+  IDS_ERRACCESS, "Nu pot accesa fisierul."
+  IDS_ERRREAD, "Nu pot citi din fisier."
+  IDS_EOF, "Sfarsit neasteptat al fisierului."
+  IDS_NODISPLAY, "Mesajul de eroare a fost deja afisat. Acest text nu ar trebui sa apara pe ecran."
+  IDS_ERRCREATE, "Nu pot deschide sau crea fisier."
+  IDS_MULDISK, "Ne pare rau, arhive cu volume multiple nu sunt suportate in aceasta versiune de plugin ZIP."
+  IDS_TOOLONGNAME, "Fisierul are nume cale prea lung si nu poate fi procesat."
+  IDS_TOOLONGNAME2, "Fisierul are nume cale prea lung si nu poate fi aratat in panou."
+  IDS_PREPAREDATA, "pregatesc data..."
+  IDS_EXTRPROGTITLE, "Dezarhivez ZIP Archive - %s"
+  IDS_ERRTEMPDIR, "Nu pot crea director temporar in directorul tinta."
+  IDS_EXTRACTING, "extrag: "
+  IDS_TOOLONGNAME3, "Nu pot extrage fisierul pentru ca are nume cale prea lung."
+  IDS_ERRCOMPDATA, "Eroare in data comprimata."
+  IDS_BADMETHOD, "Fisierul e comprimat folosind o metoda care nu e suportata de aceasta versiune de plugin ZIP."
+  IDS_ERRCRC, "Eroare in data comprimata. CRC nu se potriveste."
+  IDS_ERRWRITE, "Nu pot scrie in fisier."
+  IDS_TOOLONGMASK, "Masca e prea lunga."
+  IDS_EXTRACTFILES, "extrag..."
+  IDS_BADPACKLEVEL, "Nivel de arhivare prost."
+  IDS_BLOCKVANISHED, "O eroare necunoscuta a avut loc in timpul comprimarii: blocul a disparut."
+  IDS_DELPROGTITLE, "Sterg Intrari Arhiva ZIP - %s"
+  IDS_DELETEFILES, "sterg..."
+  IDS_DELETING, "sterg: "
+  IDS_CANCELING, "anulez operatiunea, va rugam asteptati..."
+  IDS_ERRTEMP, "Nu pot crea fisier temporar de back-up."
+  IDS_READONLY, "Fiserul arhiva e mod doar citire. Va rugam mai intai scoateti atributul de doar citire."
+  IDS_USERBREAK, "Pauza utilizator. Acest text nu ar trebui sa apara pe ecran."
+  IDS_REMOVEFILES, "scot fisierele de prisos din arhiva..."
+  IDS_ADDFILES, "adaug..."
+  IDS_ADDING, "adaug: "
+  IDS_BACKUPING, "fac back-up la arhiva..."
+  IDS_SKIP, "Sar peste fisier. Acest text nu ar trebui sa apara pe ecran."
+  IDS_ERRACCESDIR, "Nu pot accesa directorul."
+  IDS_REMOVING, "elimin: "
+  IDS_ERRRESTORE, "Nu pot inlocui arhiva originala cu fisierul de lucru temporar. arhiva nu s-a modificat."
+  IDS_AUTO, "automat"
+  IDS_BADLEVEL, "Nivelul de comprimare trebuie sa fie intre 0 si 9."
+  IDS_ERROR, "Eroare"
+  IDS_BADVOLSIZE, "Valoare incorecta a marimii volumului. Sirul poate contine doar numere si separator de 1 zecimala.\n\nMarimea volumului trebuie sa fie mai mare sau egala cu 1KB si mai mica de 4GB."
+  IDS_PWDDONTMATCH, "Parolele care le-ai tastat nu se potrivesc."
+  IDS_PWDTOOSHORT, "Parola trebuie sa fie de cel putin un caracter."
+  IDS_BADPWD, "Parola e incorecta. Va rugam re-tastati parola. Literele in parola trebuie tastate folosind litera corecta(ex: Marina). Asigurati-va ca butonul caps lock nu este activat."
+  IDS_BADPWDTITLE, "Parola Incorecta"
+  IDS_ADDPROGTITLE, "Arhivez Arhiva ZIP - %s"
+  IDS_ERRRECOVER, "Incercarea de a recupera arhiva zip a esuat. Data din fisier poate fi compromisa."
+  IDS_ECRYPTSTORED, "Criptarea nu poate fi facuta folosind metoda stocare (nivel arhivare 0)."
+  IDS_ECRYPTSFX, "criptarea AES nu e suportata de arhivele self-extract."
+  IDS_ERRCREATEDIR, "Nu pot crea directorul."
+  IDS_CANTMULTIVOL, "arhiva cu acelasi nume ca si fisierul exista deja.\nArhivele multi-volum pot fi create doar ca o noua arhiva."
+  IDS_FILEEXIST, "Fisierul specificat exista deja, doriti sa-l suprascrieti?"
+  IDS_CHDISKTEXT, "Arhivarea volumului numarul %d s-a terminat.\nVa rugam introduceti o alta disketa in unitate, va fi folosita pentru arhiva volum numarul %d."
+  IDS_BYTES, "bytes"
+  IDS_TOOLOWSPACE, "Nu exista spatiu suficient pe disk. Disk-ul nu poate fi utilizat pentru arhivare."
+  IDS_LOWSPACE, "Atentie: spatiul liber de pe disk e mai mic decat marimea volumului pe care l-ai specificat."
+  IDS_LOWSPACE2, "Atentie: Nu exte suficient spatiu pe disk."
+  IDS_MULTISTORED, "Arhivele multi-volum nu pot fi create folosind metoda stocare (nivel arhivare 0)."
+  IDS_CHDISKTEXT2, "Va rugam introduceti disketa cu volum numarul %d sau localiazti fisierul pe disk."
+  IDS_ZIPARCHIVES, "Fisiere Arhiva ZIP (*.zip; *.z*; *.pk3; *.jar)"
+  IDS_BROWSEARCHIVETITLE, "Selecteaza Fisier Arhiva"
+  IDS_ZIPARCHIVESEXTS, "*.zip;*.z*;*.pk3;*.jar"
+  IDS_ERRMULTIVOL, "Operatiunea dorita nu e suportata pentru arhive multi-volum. Arhivele multi-volum pot fi doar listate si dezarhivate.\n\nNota: Daca aceasta nu este o arhiva multi-volum, data fisierului are format necunoscut sau este compromisa."
+  IDS_MISSLHSIG, "Format data incorect. Lipseste semnatura din inceputul de fisier."
+  IDS_ERRGETDISKFREESP, "Nu pot detecta spatiul liber."
+  IDS_MISSCHSIG, "Format data incorect. Lipseste semnatura inceput fisier central."
+  IDS_WRITINGEXE, "scriu executabilul selfextractor..."
+  IDS_TOOLONGZIPNAME, "Nu pot continua. Fisierul arhiva ZIP are nume cale prea lung."
+  IDS_ERRGETMODULENAME, "Nu pot obtine modulul nume."
+  IDS_DEFAULTTEXT, "Acesta va extrage arhiva zip."
+  IDS_CREAETARCH, "Creez Arhiva Noua"
+  IDS_ADDTOARCHIVE, "Adaug Fisierele in Arhiva"
+  IDS_DEFSFXTITLE, "Arhiva ZIP Self-Extracting"
+  IDS_ERRBADTITLE, "Casuta dialog principala nu poate fi goala. Va rugam introduceti macar un caracter."
+  IDS_ERRBADMBOXTITLE, "Titlul casutei de dialog nu poate fi gol. Va rugam introduceti macar un caracter."
+  IDS_ERRLAODSHELLDLL, "Nu pot incarca shell32.dll. "
+  IDS_ERRGETPROCADDRESS, "Nu pot obtine adresa procedurii din modulul dll. "
+  IDS_ERRADDICON, "Nu pot adauga icoana la executabilul self-extractor."
+  IDS_ERRLOADICON, "Nu pot incarca icoana din fisier. "
+  IDS_ERRLOADLIB, "Nu pot incarca modulul care contine icoana. Modulul nu este o aplicatie valida win32. "
+  IDS_ERRLOADLIB2, "Nu pot incarca modulul care contine icoana. "
+  IDS_ERRLOADSFXICON, "Nu pot incarca icoana pentru self-extractor."
+  IDS_EXPIRE, "Ne pare rau, plugin-ul a expirat. Va rugam verificati pagina noastra web pentru o versiune mai noua."
+  IDS_UNDERCOSTRUCT, "In constructie."
+  IDS_NOSFXINSTALLED, "Nu gasesc fisierul Self-Extractor.\n\nDaca doriti sa creati arhive self-extracting, va rugam sa reinstalati plugin-ul ZIP."
+  IDS_UNABLEREADSFXDIR, "Nu pot citi directorul self-extractors: "
+  IDS_UNABLEREADALLSFX, "Nici unul din fisierele self-extractor nu pot fi incarcate."
+  IDS_UNABLEREADSFX, "Nu pot incarca un fisier self-extractor: %s\n\nApasa OK pentru a continua, Anuleaza pentru a renunta."
+  IDS_UNABLEREADSFX2, "Nu pot incarca un fisier self-extractor default: %s"
+  IDS_CORRUPTSFX, "Fisierul self-extractor e corupt."
+  IDS_CORRUPTSFX2, "Fisierul self-extractor '%s' e corupt.\n\nApasati OK pentru a continua, Anuleaza pentru a renunta."
+  IDS_ERRLOADMENU, "Nu pot incarca meniul."
+  IDS_ERRLOADACCELS, "Nu pot incarca tabelul cu accelaratori."
+  IDS_NODEFSFX, "Fisierul default self-extractor nu e incarcat."
+  IDS_ERRLOADCONFIG, "Nu pot incarca configurarea - memorie putina."
+  IDS_EMPTY, "Gol"
+  IDS_RENAMEFAVSET, "Redenumeste Setarile Favorite."
+  IDS_USEDNAME, "Numele a fost deja folosit."
+  IDS_NOLANGFILE, "Nu pot incarca setarile favorite: limba ceruta pentru self-extractor nu e instalata (%s)."
+  IDS_SETTINGSFILE, "Setari Fisiere (*.set)"
+  IDS_DEFEXTRBUTTON, "&extrage"
+  IDS_EXPORTOVEWRITE, "Fisierul exista deja. Suprascriu?"
+  IDS_ERRGETTEMP, "Nu pot crea fisier temporar."
+  IDS_SFXABOUTBTN1, "&Despre >>"
+  IDS_SFXABOUTBTN2, "<< &Despre"
+  IDS_MENUCREATESFX, "Creaza Arhiva &Self-Extracting (.exe)..."
+  IDS_MENUTEST, "Arhiva &Test"
+  IDS_MENUREPAIR, "&Repara Arhiva Compromisa"
+  IDS_CONTINUE, "Ultima opratiune nu s-a terminat cu succes. Continui cu fisierul urmator?"
+  IDS_NOARCHIVETYPED, "Lipseste numele fisierului arhivei."
+  IDS_NOEXETYPED, "Lipseste nume fisier al arhivei self-extract pentru a o crea."
+  IDS_SFXPROGTITLE, "Creez Arhiva ZIP Self-Extracting - %s"
+  IDS_COPYDATA, "copii data arhiva..."
+  IDS_EMPTYARCHIVE, "Arhiva e goala."
+  IDS_BADMETHODSFX, "Arhiva contine fisiere comprimate cu o metoda care nu e suportata de Self-Extractor.\n\nVa rugam comprimati arhiva din nou folosind plugin-ul ZIP."
+  IDS_TESTPROGTITLE, "Testez Arhiva ZIP - %s"
+  IDS_TESTFILES, "testez fisierele..."
+  IDS_TESTING, "testez: "
+  IDS_TESTOK, "Arhiva '%s' e OK."
+  IDS_TESTKO, "Cateva fisiere din arhiva '%s' sunt compromise sau criptate cu parola necunoscuta."
+  IDS_MENUCOMMENT, "&Comentariu arhiva..."
+  IDS_COMMENTMODIFIED, "Fisierul comentariu s-a modificat.\n\nDoriti sa salvati schimbarile?"
+  IDS_COMMENTDLGTITLE, "Comentariu Arhiva ZIP - %s"
+  IDS_ERRREADCOMMENT, "A avut loc o eroare citind comentariul arhivei ZIP, fisierul este ori corupt ori de format necunoscut.\n\nApasa OK pentru a sari peste comentariul arhivei si continua sa citesti arhiva."
+  IDS_COMMENTMV, "Comentariul arhivei multi-volum poate fi vizualizat dar nu poate fi salvat."
+  IDS_RECOVERARCHIVETITLE, "Repara Arhiva ZIP"
+  IDS_SOURCEHEADING, "&Repara arhiva:"
+  IDS_TARGETHEADING, "&Salveaza arhiva recuperata ca:"
+  IDS_REPAIRPROGTITLE, "Repar Arhiva ZIP - %s"
+  IDS_SAVING, "salvez: "
+  IDS_REPAIRING, "repar arhiva..."
+  IDS_ERROPENICO, "Nu pot deschide fisierul ce contine icoana."
+  IDS_BADBUTTONTEXT, "Capul casutei de dialog principal nu poate fi gol. Va rugam introduceti macar un caracter."
+  IDS_BADTEMP, "$(Temp) nu poate fi urmat de orice caracter. Va rugam introduceti doar $(Temp) pentru extragere in director temporar."
+  IDS_MISBAR, "Lipseste bara de inchidere din $() secventa."
+  IDS_BADVAR, "Variabila $() necunoscuta."
+  IDS_MBOK, "OK"
+  IDS_MBOKCANCEL, "OK + Anuleaza"
+  IDS_MBYESNO, "Da + Nu"
+  IDS_MBAGREEDISAGREE, "Sunt de Acord + Nu Sunt de Acord"
+  IDS_MBNOICON, "Simplu"
+  IDS_MBEXCLAMATION, "Exclamatie"
+  IDS_MBINFORMATION, "Informatie"
+  IDS_MBQUESTION, "Intrebare"
+  IDS_LONGMESSAGE, "Mesaj Lung"
+  IDS_BADKEY, "Nume invalid cheie."
+  IDS_MANAGE, "&Manage..."
+  IDS_REMOVEWARNTITLE, "Scoate setarile favorite"
+  IDS_REMOVEWARN, "Sunteti sigur-a ca doriti sa scoateti setarile '%s' ?\n\nAceasta operatiune este unica. Nu se mai poate reveni."
+  IDS_REMOVEALLWARN, "Sunteti sigur-a ca doriti sa scoateti toate seterile stocate?\n\nAceasta operatiune este unica. Nu se mai poate reveni."
+  IDS_MISSINGVERSION, "Nu pot incarca setarile fisierului: lipseste numarul versiunii."
+  IDS_BADVERSION, "Nu pot incarca setarile fisierului:versiune nesuportata."
+  IDS_BADTEMP2, "Nu pot incarca setarile fisierului, valoare proasta a 'target_dir': $(Temp) nu poate fi urmata de orice caracter."
+  IDS_MISBAR2, "Nu pot incarca setarile fisierului, valoareproasta a 'target_dir': lipseste bara de inchidere din $() secventa."
+  IDS_BADVAR2, "Nu pot incarca setarile fisierului, valoare proasta a 'target_dir': variabila $() necunoscuta."
+  IDS_BADKEY2, "Nu pot incarca setarile fisierului, valoare proasta a 'target_dir': nume invalid cheie."
+  IDS_CHDISKTEXT3, "Va rugam introduceti o disketa cu numarul %d de volum."
+  IDS_NONTEXT, "Va rugam introduceti cel putin un caracter."
+  IDS_BADSFXVER, "Versiune de pachet SFX nesuportata (%s). Va rugam, descarcati ultimul plugin ZIP cu o versiune noua de SFX."
+  IDS_BADSFXVER2, "Versiune de pachet SFX nesuportata. Va rugam, descarcati ultimul plugin ZIP cu o versiune noua de SFX."
+  IDS_TOOBIG2, "Nu pot termina operatiunea, din cauza limitei de 4GB pentru fisierele ZIP.\n\nPentru a arhiva mai mult de 4GB de data intr-o arhiva ZIP foloseste caracteristica arhivei de multi-volum. Pot fi create maxim 65536 volume, fiecare de 4GB. Totusi limita de marime pentru fiecare fisier comprimat intr-o arhiva e de 4GB."
+  IDS_FILENOTFOUND, "Fisier negasit."
+  IDS_ALLFILES, "Toate Fisierele (*.*)"
+  IDS_NOTFOUND, "Fisier negasit."
+  IDS_BADMSGBOXTYPE, "Butoanele ""Sunt de Acord + Nu Sunt de Acord"" pot fi folosite doar cu conjunctie cu caseta de mesaj ""Mesaj Lung""."
+  IDS_LOTFILES, "Sunteti pe cale sa creati o arhiva ZIP care contine mai mult de 65535 intrari. Asemenea arhiva nu e compatibila cu formatul original ZIP si cateva arhivatoare nu vor putea s-o dezarhiveze.\n\nDoriti sa continuati?"
+  IDS_LOTFILESSFX, "Nu pot crea arhiva self-extracting ZIP care sa contina mai mult de 65535 intrari."
+  IDS_BADAES, "Fisierul e criptat cu o versiune de AES necunoscuta."
+  IDS_PWDTOOLONG, "Parola e prea lunga.\nLungimea maxima a parolei pentru criptarea AES este de 128 caractere."
+  IDS_AESERROR, "Eroare AES."
+  IDS_MACERROR, "Codul de atutentificare nu se potriveste. Fisierul este ori corupt ori parola este incorecta."
+  IDS_ERRZIP64, "Operatiunea dorita nu e suportata pentru arhivele zip64. Arhivele zip64 pot fi doar listate si dezarhivate."
+  IDS_ONLYFULLVERSION, " (disponibil doar in versiunea cu licenta)"
+  IDS_ERRBZIP2 "Eroare intampinata in stream BZIP2. arhiva poate fi corupta."
+  IDS_UNSUP_CD_ENCRYPTION "Directorul Central al acestei arhive care contine lista fisierelor este criptat sau comprimat.\nAcesta nu e suportat."
+  IDS_LISTINFO_PAKEDSIZE      "Arhivat"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Marimea fisierului arhivat"
+  IDS_SIZE_KB, "KB"
+  IDS_SIZE_MB, "MB"
+  IDS_MODIFICATION_NOT_SUPPORTED, "Fisierele ZIP folosesc data format care nu e suportata pentru modificarea versiunii curente de plugin ZIP"
+  IDS_WAITFOR_INFO, "E necesar doar daca programul de instalare lanseaza alt executabil care continua instalarea in timp ce programul original de instalare se inchide. In aceasta maniera se comporta de ex. \ncateva versiuni de Install Shield."
+}
+
+STRINGTABLE
+{
+  IDS_SFX_COMMENT_HEAD1, ";Setari Self-Extractor\r\n\r\n;Acesta este fisierul de setari pentru Self-Extractor.\r\n;\r\n;Sintaxa formatului de fisier:\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD2, ";Liniile incep cu  ';' caracterele sunt tratate ca si comentarii si sunt\n;ignorate in timp ce proceseaza fisierul de setari.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD3, ";Toate variabilele cu exceptia versiunii sunt optionale. Daca variabila nu e\r\n;gasita in fisierul de setari,  e folosita valoarea sa default.\r\n;Valori default pentru variblie dependente de limba (dlg_text, dlg_title,\r\n;button_text) sunt luate din pachetul sfx.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD4, ";Toate valorile sirului, incluzand siruri nule, ar trebui sa fie incluse in\r\n;ghilimele duble. Pentru a introduce ghilimele duble in sir folositi doua\r\n;randuri consecvente de ghilimele duble.\r\n;\r\n;Numerele nu pot fi incluse in ghilimele duble.\r\n\r\n"
+  IDS_SFX_COMMENT_VERSION, "\r\n;versiune a fisierului de setari, versiunea curenta este 2\r\n;aceasta este singura variabila imputernicita\r\n\r\n"
+  IDS_SFX_COMMENT_TARGDIR1, "\r\n;specificafrea directorului tinta, poate fi ori calea absoluta\r\n;sau calea relativa; calea relativa este relativa la directorul curent\r\n;cand executabilul sfx e lansat\r\n"
+  IDS_SFX_COMMENT_TARGDIR2, ";puteti de asemena folosi variabile predefinite la inceputul (!)\r\n;sirului 'target_dir':\r\n;\r\n"
+  IDS_SFX_COMMENT_TARGDIR3, ";  $(Temp)      director temporar, ar trebui sa stea doar singur\r\n;               in campul target_dir neurmat de nici o cale\r\n;               portiune\r\n"
+  IDS_SFX_COMMENT_TARGDIR4, ";  $(ProgFiles) directorul 'Program Files' al utilizatorului\r\n;  $(WinDir)   directorul windows\r\n;  $(SysDir)    directorul system\r\n"
+  IDS_SFX_COMMENT_TARGDIR5, ";  $[variable]  valoarea variabilei de mediu descrisa de\r\n;               'variable'\r\n;  $<regkey>    valoarea cheii din registri valoare descrisa de 'regkey'\r\n;  ex. SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ProgramFilesDir\r\n\r\n"
+  IDS_SFX_COMMENT_ALLOWCHANGE, "\r\n; specifica daca utilizatorul poate schimba directorul tinta cand\r\n;dezarhiveaza\r\n;setati valoarea la 1 daca doriti sa activati acest lucru\r\n\r\n"
+  IDS_SFX_COMMENT_REMOVE1, "\r\n;specifica daca sa scoata fisierele extrase in director temporar\r\n;cand un program specificat de variabila 'command' e terminat\r\n"
+  IDS_SFX_COMMENT_REMOVE2, ";setati valoarea la 1 daca doriti sa scoateti fisierele temporare\r\n;folosirea acestei variabile are sens doar daca 'target_dir' e setat in\r\n;""$(Temp)"", altfel valoarea e ignorata\r\n\r\n"
+  IDS_SFX_COMMENT_AUTO, "\r\n;specifica daca sa porneasca extragerea automat cand un utilizator ruleaza\r\n;arhiva self-extracting\r\n;setati valoarea la 1 daca doriti extragerea sa inceapa automat\r\n\r\n"
+  IDS_SFX_COMMENT_SUMMARY, "\r\n;specifica daca sa arate o casuta de dialog care sa dea mesaj despre operatiune\r\n;succes dupa ce au fost extrase fisierele\r\n;setati valoarea la 1 daca doriti sa apara sumarul operatiunii\r\n\r\n"
+  IDS_SFX_COMMENT_HIDE, "\r\n;specifica daca sa arate dialogul principal al self-extractor\r\n;setati valoarea la 1 daca nu doriti sa arate dialogul principal sfx\r\n;folosirea acestei variabile are sens doar daca 'autostart' e setat la 1,\r\n;altfel valoarea e ignorata\r\n\r\n"
+  IDS_SFX_COMMENT_OVERWRITE, "\r\n;specifica daca toate fisierele in directorul tinta sa fie suprascrise in mod automat\r\n;setati valoarea la 1 daca doriti ca fisierele sa fie suprascrise\r\n;automat\r\n\r\n"
+  IDS_SFX_COMMENT_AUTODIR, "\r\n;specifica daca sa creeze automat directorul tinta fara permisiunea\r\n;utilizatorului\r\n;setati valoarea la 1 daca doriti  ca directorul tinta sa fie creat\r\n;automat\r\n\r\n"
+  IDS_SFX_COMMENT_COMMAND, "\r\n;program, legatura http sau document sa fie rulat/deschis cand extragerea\r\n;fisierelor s-a terminat cu succes, calea e relativa cu\r\n;directorul tinta pentru extragere, daca ati specificat un program puteti de asemeni\r\n;sa introduceti si argumenteletype in its arguments\r\n\r\n"
+  IDS_SFX_COMMENT_PACKAGE, "\r\n;pachetul sfx sa fie folosit cand cream arhiva self-extracting\r\n;calea relativa este relativa la directorul cu zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_MBUT, "\r\n;butoanele in caseta de mesaje optionala\r\n;pot fi unul din urmatoarele: ""ok"", ""ok_cancel"", ""yes_no"",\r\n;""agree_disagree""\r\n\r\n"
+  IDS_SFX_COMMENT_MICO, "\r\n;tipul de casuta de mesaje optionala\r\n;poate fi una din urmatoarele: ""simple"", ""exclamation"", ""information"",\r\n;""question"", ""long_message""\r\n\r\n"
+  IDS_SFX_COMMENT_MBOX, "\r\n;textul si titlul casutei optionale de dialog, care e aratata inainte\r\n;ca extragerea sa inceapa\r\n;daca nu doriti sa se arate nici un mesaj lasati ambele campuri\r\n;goale ("""")\r\n\r\n"
+  IDS_SFX_COMMENT_TEXT, "\r\n;textul care va fi aratat in dialogul principal al self-extractor\r\n\r\n"
+  IDS_SFX_COMMENT_TITLE, "\r\n;titlul dialogului principal al self-extractor\r\n\r\n"
+  IDS_SFX_COMMENT_BUTTON, "\r\n;textul in butonul dialogului principal al sfx\r\n\r\n"
+  IDS_SFX_COMMENT_VENDOR, "\r\n;numele vanzatorului in coltul stanga jos al dialogului principal al sfx\r\n\r\n"
+  IDS_SFX_COMMENT_WWW, "\r\n;legatura www in coltul dreapta jos al dialogului principal al sfx\r\n\r\n"
+  IDS_SFX_COMMENT_ICOFILE, "\r\n;fisierele contin icoane, pot fi ori un fisier ICO sau un PE\r\n;fisier executabil (cum ar fi win32 EXE sau DLL) care contin icoane\r\n;calea relativa este relativa cu directorul cu zip2sfx.exe\r\n\r\n"
+  IDS_SFX_COMMENT_ICOINDEX, "\r\n;valoare pozitiva inseamna indexul unei icoane in fisierul executabil\r\n;specificat de variabila 'icon_file'\r\n;negativa inseamna o resursa ID a icoanei\r\n;pentru fisierele ICO indexul este intotdeauna 0 si valoarea sa e ignorata\r\n\r\n"
+  IDS_SFX_COMMENT_WAITFOR1, "\r\n;Aceasta optiune iti permite sa astepti alt proces altul decat procesul\r\n;pe care l-ai psecificat in campul 'Command'. Dupa ce acest proces e terminat\r\n;self-extractor scoate fisierele temporare si se inchide.\r\n"
+  IDS_SFX_COMMENT_WAITFOR2, ";E necesar doar daca programul de instalare lanseaza alt\r\n;executabil care continua instalarea in timp ce programul original\r\n; de instalare e terminat.\r\n"
+  IDS_SFX_COMMENT_WAITFOR3, ";In aceasta maniera se comporta ex. ca niste versiuni de Install Shield.\r\n;Aceasta optiune e ignoratadoar daca 'remove_temp' nu e setat la 1.\r\n\r\n"
+  IDS_SFX_COMMENT_REQUIRESADMIN, "\r\n;cere privilegii administrative de a rula pe Windows Vista sau versiuni mai noi de Windows\r\n\r\n"
+}

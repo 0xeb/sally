@@ -1139,8 +1139,6 @@ CToolBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // 'wchar_t* Buffer' (spl_gui.h) since P1.4, the local below was already wchar_t, and
             // all three core WM_USER_TBGETTOOLTIP handlers answer with lstrcpyW - so the
             // conversion was the conversion layer applied to already-wide data.
-            // The v107 half of this sub-protocol is unaffected and still owed: compat/sdk107
-            // keeps 'char* Buffer', and bridging it belongs to the adapter, not to this path.
             wchar_t reply[TOOLTIP_TEXT_MAX];
             reply[0] = 0;
             TOOLBAR_TOOLTIP tt;

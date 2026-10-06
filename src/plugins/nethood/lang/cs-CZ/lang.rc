@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for nethood. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/nethood/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\nethood.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 22, 38, 220, 127
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Network - Konfigurace"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Zobrazit &administrative shares",IDC_SYSSHARES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,7,114,10
+    CONTROL         "Zobrazit administrative shares jako s&kryté položky",IDC_HIDESYSSHARES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,22,178,10
+    CONTROL         "Zobrazit položky z &Místa v síti na nejvyšší úrovni adresáře",IDC_NETSHORTCUTS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,37,203,10
+    CONTROL         "Zobrazit síťové počítače na &nejvyšší úrovni adresáře",IDC_SHOWWORKGRP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,52,185,10
+    CONTROL         "Zobrazit &disky připojené přes Vzdálenou plochu",IDC_SHOWTSC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,67,170,10
+    CONTROL         "&Skenovat síť při spuštění Sally",IDC_PRELOAD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,82,161,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,99,206,1
+    DEFPUSHBUTTON   "OK",IDOK,30,106,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,85,106,50,14
+    PUSHBUTTON      "Nápověda",IDHELP,140,106,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_COLUMN_COMMENTS     "Poznámka"
+    IDS_INFOLINE_SELECTION_PLURAL "{!}<%d> vybran{ý objekt|1|é objekty|4|ých objektů}"
+    IDS_MENUITEM            "Síť"
+    IDS_REFRESHING          "Skenuji síť…"
+    IDS_NETWORK_UNAVAILABLE "Síť není dostupná."
+    IDS_ABOUT               "O pluginu"
+    IDS_TSCLIENT            "%1 na %2"
+    IDS_TSFOLDER            "Místní počítač"
+    IDS_TSHOST              "Vzdálený počítač"
+    IDS_TSFOLDERCOMMENT     "Disky z %s"
+END
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME         "Síť"
+    IDS_DESCRIPTION         "Poskytuje přístup k počítačům na síti."
+END

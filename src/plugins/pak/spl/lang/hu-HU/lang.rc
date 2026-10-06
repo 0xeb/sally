@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for pak. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 211, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "PAK archívum optimalizálása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Érvényes adatméret:",IDC_STATIC_1,8,9,72,8
+    LTEXT           "",IDC_VALIDSIZE,81,9,118,8
+    LTEXT           "Teljes fájlméret:",IDC_STATIC_2,8,20,57,8
+    LTEXT           "",IDC_TOTALSIZE,81,20,118,8
+    LTEXT           "Pazarolt hely:",IDC_STATIC_3,8,31,50,8
+    LTEXT           "",IDC_WASTEDSPACE,81,31,118,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,195,1
+    DEFPUSHBUTTON   "Optimalizál",IDOK,50,53,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,110,53,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "Nem nyitható meg: %s"
+ IDS_PAK_ERRINIT, "Nem inicializálható a paklib felület. Egy fájl már nyitva van."
+ IDS_PAK_ERROPEN2, "A fájl nem nyitható meg. Egy fájl már nyitva van."
+ IDS_PAK_ERRGETFILESIZE, "Nem lehet tudni a fájlméretet: %s"
+ IDS_PAK_INVLAIDDATA, "Érvénytelen adatformátum."
+ IDS_PAK_LOWMEMORY, "Kevés memória."
+ IDS_PAK_CENTRDIR, "aktuális PAK központi mappa"
+ IDS_PAK_ERRSETFILEPTR, "Nem állítható be a mutató: %s"
+ IDS_PAK_ERRREADFILE, "Nem lehet a fájlból olvasni: %s"
+ IDS_PAK_ERRGETFILEPTR, "Nincs meg a fájlmutató: %s"
+ IDS_PAK_ERRWRITEFILE, "Nem lehet a fájlba írni: %s"
+ IDS_PAK_TOOLONGNAME, "A fájl nem adható hozzá, mert túl hosszú nevű."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Quake PAK archívumok böngészése és kibontása."
+ IDS_ABOUT, "Plugin névjegy"
+ IDS_LOWMEM, "Kevés memória."
+ IDS_ERRLIST, "Nem adható a fájl a listához."
+ IDS_ERRLOADPAKLIB, "nem tölthető be a paklib.dll vagy nincs eljárási cím: "
+ IDS_EXTRPROGTITLE, "Kitömörítés PAK archívumból - %s"
+ IDS_PREPAREDATA, "adat előkészítése..."
+ IDS_EXTRACTFILES, "kibontás..."
+ IDS_EXTRACTING, "kibontás: "
+ IDS_TOOLONGNAME, "A művelet nem fejezhető be, mert az elérési út neve túl hosszú."
+ IDS_UNABLESEEK, "nem állítható be a fájl mutató: "
+ IDS_UNABLEGETFIELPOS, "Nem érhető el a fájl mutató: "
+ IDS_UNABLEWRITE, "Nem lehet a fájlba írni:"
+ IDS_ERROPEN, "A fájl nem nyitható meg: "
+ IDS_TOOLONGMASK, "A művelet nem fejezhető be, mert a maszk túl hosszú."
+ IDS_DELPROGTITLE, "Törlés PAK archívumból - %s"
+ IDS_DELFILES, "törlés..."
+ IDS_DELETING, "törlés: "
+ IDS_CANCELING, "művelet megszakítása, kérem várjon..."
+ IDS_ADDPROGTITLE, "Tömörítés PAK archívumba - %s"
+ IDS_TOOLARGE, "A fájl nem adható hozzá: túl nagy."
+ IDS_ADDFILES, "tömörítés..."
+ IDS_TOOLONGNAME2, "A fájl nem adható hozzá, mert túl hosszú nevű."
+ IDS_PACKING, "tömörítés: "
+ IDS_UNABLEREAD, "Nem lehet a fájlból olvasni: "
+ IDS_ERRCONNECT, "A plugin nem tud a Sally-hez kapcsolódni."
+ IDS_OPTIMIZING, "optimalizálás, kérem várjon..."
+ IDS_OPTPROGTITLE, "PAK archívum optimalizálása - %s"
+ IDS_NEEDOPT, "A fájlok törlését nem sikerült befejezni. Talán futtatnia kellene a PAK optimalizálót a PAK Plugin menüjéből, a terület pazarlása miatt."
+ IDS_MENUOPTIMIZE, "PAK &optimalizálása"
+ IDS_EXPIRE, "Sajnálom, a plugin lejárt. Keresse weboldalunkon az újabb verziót."
+}

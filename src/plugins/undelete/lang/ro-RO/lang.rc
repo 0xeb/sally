@@ -1,0 +1,213 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for undelete. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/undelete/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\undelete.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Recupereaza ce ai sters"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,13,12,323,8
+    LTEXT           "",IDC_PROGRESSBAR,37,32,290,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Anuleaza",IDCANCEL,144,54,50,14
+    LTEXT           "Total:",IDC_STATIC_1,13,33,22,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Recupereaza ce ai sters"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Selecteaza &discul pt. analizat",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "&Imagine Disc",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,57,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,351,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Rasfoieste...",IDC_BUTTON_BROWSE,369,178,60,14,WS_GROUP
+    CONTROL         "Scanare clustere &vacante pe partitii FAT",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,184,10
+    CONTROL         "Arata fisiere si directoare &existente",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "Arata fisierle cu dimensiune &zero",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "Ara&ta directoarele goale",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "Arata &metafișiere",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "Estimeaza stricarea &fisierelor",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "OK",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "Help",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Recupereaza ce ai sters"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Recuperare",IDC_LABEL_UNDELETING,3,11,40,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,47,11,301,8
+    RTEXT           "pe",IDC_STATIC_1,3,23,40,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,47,23,301,8
+    RTEXT           "Fisier:",IDC_STATIC_2,3,41,40,8
+    LTEXT           "",IDC_PROGRESS_FILE,47,40,293,12,NOT WS_GROUP
+    RTEXT           "Total:",IDC_STATIC_3,3,56,40,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,47,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Anuleaza",IDCANCEL,151,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 213, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nume fisier compromis"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Prima litera din numele urmatorului fisier nu poate fi recuperata. Va rugam introduceti caracterul original.",IDC_STATIC_1,7,7,199,16
+    EDITTEXT        IDC_EDIT_FILENAME,7,27,199,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,44,53,50,14
+    PUSHBUTTON      "&Tot",IDC_BUTTON_ALL,100,53,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,156,53,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 287, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configurare Recuperare ce ai sters"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Director &temporar alternativ pentru vizualizare fisiere:",IDC_STATIC_1,7,7,181,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,252,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,265,17,16,14,WS_GROUP
+    CONTROL         "Tot timpul &refoloseste informatii din scanari anterioare cluster pe FAT",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,244,10
+    CONTROL         "Nu atentiona cand recuperezi de pe acela&si disc logic",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,190,10
+    CONTROL         "Nu atentiona inainte de recuperare fisiere criptat&e pe FAT sau exFAT",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,243,10
+    DEFPUSHBUTTON   "OK",IDOK,121,80,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,176,80,50,14
+    PUSHBUTTON      "Help",IDHELP,231,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 276, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Restaureaza Fisiere Criptate din Backup"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Aceasta functie va reface fisierele criptate, anterior recuperate pe o partitie care nu suporta Encrypting File System (EFS), cum ar fi FAT. Fisierele normale (altele decat *.bak) vor fi copiate nemodificat.",IDC_STATIC_1,7,7,262,24
+    LTEXT           "&Restaureaza %s in:",IDC_LABEL_SOURCE,7,41,262,8
+    EDITTEXT        IDC_EDIT_TARGET,7,51,244,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,255,51,14,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,57,74,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,113,74,50,14
+    PUSHBUTTON      "Help",IDHELP,169,74,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_LOWMEM, "Nu-i destula memorie."
+  IDS_ERRORREADINGMFT, "Eroare citire clustere MFT."
+  IDS_MFTRECORDDAMAGED, "Eroare citire MFT: prima inregistrare este compromisa."
+  IDS_ROOTNOTFOUND, "Nu pot gasi directorul radacina."
+  IDS_VDIRECTORY, "Director%06d"
+  IDS_ALLDELETEDFILES, "{Toate Fisierele Sterse}"
+  IDS_ERRORNOTNTFS, "Eroare interna : volumul nu este NTFS."
+  IDS_ERRORNOTOPEN, "Eroare interna : volumul nu este deschis."
+  IDS_ERROROPENINGVOLUME, "Eroare deschidere volum."
+  IDS_ERRORREADINGBOOT, "Eroare citire sector de boot."
+  IDS_ERRORVOLUMETYPE, "Tip volum nerecunoscut, numai volume FAT 12, 16, 32 si NTFS sunt suportate."
+  IDS_READINGMFT, "Citesc MFT..."
+  IDS_ERRORREADINGFAT, "Eroare citire FAT."
+  IDS_ERRORREADINGDIRCLUSTERS, "Eroare citire clustere director."
+  IDS_ERRORNOTFAT, "Eroare interna : volumul nu este FAT."
+  IDS_LOADINGFAT, "Citire FAT..."
+  IDS_READINGDIRS, "Citirea directoarelor..."
+  IDS_READINGEXISTINGDIRS, "Citesc directoarele existente..."
+  IDS_READINGDELETEDDIRS, "Citesc directoarele sterse..."
+  IDS_SCANNINGVACANTCLUSTERS, "Scanare clustere vacante..."
+  IDS_REUSESCANNEDINFO, "Vrei sa reutilizezi informatiile din scanarea anterioara a clusterului?"
+  IDS_RELOADINGCLUSTERS, "Reincarc clusterele gasite anterior..."
+  IDS_FLOPPY350, "3.5 Floppy"
+  IDS_FLOPPY525, "5.25 Floppy"
+  IDS_FLOPPY800, "8.0 Floppy"
+  IDS_COMPACT_DISK, "Compact Disc"
+  IDS_LOCAL_DISK, "Disc local"
+  IDS_REMOVABLE_DISK, "Disc amovibil"
+  IDS_ANALYZINGDIRS, "Analizare directoare..."
+  IDS_INCOMPLETEMFT, "Refacere nu poate scana intreg MFT (Master File Table). Vrei afisare rezultate partiale?"
+  IDS_BITMAPNOTFOUND, "Esec de localizare $Bitmap pe acest volum. Estimarea compromiterii fisierului anulata."
+  IDS_BITMAPNOSTREAM, "Esec de localizare curs implicit a fisierului $Bitmap. Estimarea compromiterii fisierului anulata."
+  IDS_LOWMEMBITMAP, "Nu-i destula memorie sa incarc cluster fisier bitmap. Estimarea compromiterii fisierului va fi anulat."
+  IDS_ERRORREADINGBMP, "Eroare citire fisier $Bitmap. Estimarea compromiterii fisierului anulata."
+  IDS_BITMAPISEMPTY, "$Bitmap are marime zero. Estimarea compromiterii fisierului va fi anulat."
+}
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "Recuperare"
+  IDS_DESCRIPTION, "Recupereaza fisiere sterse de pe partitii FAT sau NTFS."
+  IDS_ABOUTTITLE, "Despre Plugin"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{Metafișiere}"
+  IDS_PATHDISK, "Calea trebuie sa contina discul."
+  IDS_PATHFILE, "Calea duce la un fisier. Nu pot deschide fisierul."
+  IDS_PATHNOTFOUND, "Cale negasita."
+  IDS_IMAGENOTFOUND, "Fisierul specificat nu a fost gasit."
+  IDS_ERROROPENINGPROGRESS, "Eroare deschidere dialogul de progres."
+  IDS_VOLENUMERATE, "Eroare enumerare volume sistem."
+  IDS_OPENINGVOLUME, "Deschid volumul..."
+  IDS_SCANNINGFOUND, "{!}Scanare clustere vacante... (%d cluster {|1|s} director gasit)"
+  IDS_ALWAYSCHOOSEYES, "Alege intodeauna Da (daca e nevoie, poti reseta aceasta in dialogul de Configurare)"
+  IDS_PATHTOOLONG, "Cale tinta prea lunga"
+  IDS_QUESTION, "Intrebare"
+  IDS_WANTCANCEL, "Vrei sa anulezi aceasta operatiune?"
+  IDS_BADPATH, "Recuperarea in arhive sau plugin fisier sistem nu este suportata."
+  IDS_ERROR, "Eroare" // title of error messages
+  IDS_VIEW, "Vizualizare" // the function "F3"
+  IDS_TEMPDIR, "Ca sa vezi fisiere pe %c: trebuie sa specifici un director temporar alternativ pe un disc logic diferit de %c:"
+  IDS_WAIT, "Recuperez fisier in director temporar, v rugam asteptati"
+  IDS_ENCRYPTEDWARNING, "Volumul tinta nu suporta Encrypting File System (EFS).\n\nFisierele criptate vor fi recuperate in formatul backup, care poate fi utilizat pentru refacerea fisierelor mai tarziu pe o partitie NTFS folosind comanda ""Plugins/Undelete/Restore Encrypted Files from Backup""."
+  IDS_DONTSHOWAGAIN, "Nu mai afisa asta alta data"
+  IDS_CHOOSETEMPDIR, "Alege director temporar alternativ:"
+  IDS_SAMEPARTITION, "Se pare ca ai recuperat pe acelasi disc logic unde sunt localizate fisiere(-le) sterse. Trebuie intodeauna sa recuperezi pe o partitie diferita, altfel fisierele pe care le-ai recuperat pot sa se suprascrie peste ele insele sau poti pierde alte fisiere sterse.\n\nIndicatie: daca nu ai partitii multiple, poti recupera pe un floppy sau un stick USB."
+  IDS_UNDELETECMD, "&Recuperez Fisiere si Directoare Sterse..."
+  IDS_ERRORENCRYPTED, "Nu pot recupera fisierul criptat: "
+  IDS_RESTORECMD, "Restaureaza Fisiere Criptat&e din Backup..."
+  IDS_CANNOTVIEW, "Nu pot vizualiza fisierul - directorul temporar nu suporta Encrypting File System (EFS)"
+  IDS_CHOOSETARGET, "Alege directorul tinta"
+  IDS_RESTORE, "Restaureaza" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "Restaurez" // label inside the progress dialog
+  IDS_READINGTREE, "Citire arbore director..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "Volumul tinta nu suporta Encrypting File System (EFS)."
+  IDS_VOLUME_MOUNT, "Punct de montare"
+  IDS_VOLUME_NAME, "Nume"
+  IDS_VOLUME_FORMAT, "Format"
+  IDS_VOLUME_SIZE, "Marime"
+  IDS_VOLUME_FREE, "Liber"
+  IDS_VOLUME_FREEPROC, "% Liber"
+  IDS_VOLUME_VOLID, "Cale GUID"
+  IDS_CONDITION, "Conditie"
+  IDS_CONDITIONDESC, "Estimarea compromiterii fisierului"
+  IDS_CONDITION_GOOD, "Bun"
+  IDS_CONDITION_FAIR, "Corect"
+  IDS_CONDITION_POOR, "Slab"
+  IDS_CONDITION_LOST, "Pierdut"
+  IDS_CONDITION_UNKNOWN, "Necunoscut"
+  IDS_UNDELETEINCHDRVMENU, "\tUndelete"
+  IDS_PARTIALRECOVER, "Urmatorul fisier nu a putu fi recuperat in intregime: %s\n\nDoriti sa recuperati doar o parte din fisier?"
+  IDS_PARTIALRECOVER_DONTASK, "Aele acelasi raspuns data viitoare"
+  IDS_ERRORRECOVER, "Eroare in recuperarea fisierului %s"
+}

@@ -1,0 +1,122 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for uniso. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uniso/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uniso.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 230, 83
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnISO beállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Í&rásvédett attribútum törlése archívumból másoláskor",IDC_CFG_READONLY,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,11,190,10
+    CONTROL         "Menetek mutatá&sa mappaként (minden menet hozzáférhető)",IDC_CFG_SESSIONASDIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,23,216,10
+    CONTROL         "&Boot lemez mutatása fájlként",IDC_CFG_BOOTIMAGEASFILE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,35,110,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,2,58,226,1
+    DEFPUSHBUTTON   "OK",IDOK,118,64,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,173,64,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "A fájl nem nyitható meg."
+    IDS_UNKNOW_ERROR            "Nem meghatározható hiba."
+    IDS_UNPACKING_ARCHIVE       "ISO archívum kibontása"
+    IDS_ERROR_UNPACKING         "Hiba az archívum kibontásakor."
+    IDS_CANT_HANDLE_FILE        "A fájl nem kezelhető."
+    IDS_INSUFFICIENT_MEMORY     "Kevés memória."
+    IDS_ERR_TOO_LONG_NAME       "A művelet nem fejezhető be, mert a fájlnév túl hosszú."
+    IDS_ABOUT                   "Plugin névjegy"
+    IDS_PLUGIN_DESCRIPTION      "CD/DVD ISO képfájlok böngészése és kibontása."
+    IDS_CANT_CREATE_TEMP        "Az ideiglenes mappa nem hozható létre."
+    IDS_CANT_DELETE_TEMP_FILE   "Az ideiglenes fájl nem törölhető."
+    IDS_UNKNOWN_FILE_FORMAT     "Ismeretlen fájl formátum vagy nem érvényes ISO kép.\n\nHa biztos benne, hogy ez érvényes ISO kép, nyisson egy hibajegyet itt: https://github.com/0xeb/sally/issues és segítsen támogatni ezt a formátumot."
+    IDS_CANT_OPEN_FILE          "A fájl nem nyitható meg: '%s'."
+    IDS_ERR_TMP                 "Ideiglenes fájl létrehozása sikertelen."
+    IDS_CANT_SET_ATTRS          "A fájl attribútum nem állítható be."
+    IDS_CANT_CREATE_DIR         "A(z) '%s' mappa nem hozható létre."
+    IDS_YES                     "Igen"
+    IDS_NO                      "Nem"
+    IDS_ERROR                   "Hiba"
+    IDS_WARNING                 "Figyelem"
+    IDS_ERROR_OPENING_MULTISESSION  "Hiba lépett fel a többmenetes kép olvasásakor.\n\nCsak a helyesen olvasott menetek jelennek meg."
+    IDS_UNKNOWN_TRACK_TYPE      "Ismeretlen sáv típus."
+    IDS_READERROR               "Olvasási hiba"
+    IDS_WRITEERROR              "Írási hiba"
+    IDS_CCD_BAD_FORMAT          "Rossz formátumú .CCD fájl.\n\nA megjelenített kép hiányos."
+    IDS_CCD_MISSING             "Hiányzó .CCD fájl.\n\nA megjelenített kép hiányos."
+    IDS_ERROR_READING_SECTOR    "A szektor nem olvasható: #%08X."
+    IDS_ERROR_LISTING_IMAGE     "Mappa szerkezet olvasási hiba a szektorban: #%08X.\n\nHiányos tartalmú ISO kép."
+    IDS_INTERNAL_PLUGIN_ERROR   "Belső plugin hiba."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Ismeretlen kiosztási stratégia (%d).\n\nNyisson egy hibajegyet itt: https://github.com/0xeb/sally/issues és segítsen kijavítani ezt a problémát."
+    IDS_UDF_INVALID_TAG_ID      "Érvénytelen UDF Tag ID."
+    IDS_UDF_ERROR_READING_VAT   "Virtuális kiosztási tábla olvasási hiba a szektorban: #%08X."
+    IDS_UDF_MISSING_VAT         "Hiányzó virtuális kiosztási tábla."
+    IDS_UDF_BAD_ROOT_ICB        "Rossz ICB gyökér.\n\nA mappa szerkezet nem olvasható."
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "A(z) ""%s"" fájl nem bontható ki.\n\nEltérés van a fájlméret és az ICB blokkok között."
+    IDS_CANT_OPEN_TRACK         "A sáv nem nyitható meg: #%d."
+    IDS_BOOT_OR_MBR             "A fájl floppy lemez, merevlemez vagy merevlemez partíció képnek tűnik.\nPróbálja .ima kiterjesztésre átnevezni, hogy az UnFAT plugin bekapcsoljon."
+    IDS_UNSUPPORTED_APFS        "Ez a lemezkép az APFS fájlrendszert tartalmazza.\nEz a fájlrendszer még nem támogatott."
+
+    IDS_ERR_HFS_READ            "Nem olvasható a partíciós fejléc. Túl kicsi a fájl."
+    IDS_ERR_HFS_INVALID_PARTITION "Sérült partíciókezelő szerkezetek."
+    IDS_ERR_HFS_UNRECOGNIZED    "A lemezkép nem tartalmaz HFS Plus partíciót."
+    IDS_ERR_HFS_ORIGINAL_HFS    "A lemezkép HFS és nem HFS Plus fájlrendszert tartalmaz.\nHFS nem támogatott."
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "Nem kereshető a blokk: #%08X.\n%s fájl nem bontható ki."
+    IDS_ERR_HFS_SEEK            "Nem kereshető a blokk: #%08X."
+    IDS_ERR_HFS_BTREE_NODETYPE  "Nem támogatott BTree root node típus a katalógus fájlban."
+    IDS_ERR_HFS_BTREE_FRAGMENTED "A katalógus fájl több, mint 8 darabba van töredezve, ami nem támogatott."
+    IDS_ERR_HFS_FILE_FRAGMENTED "A(z) '%s' fájl több, mint 8 darabba van töredezve, ami nem támogatott.\nA fájlt nem lehet kibontani."
+
+    IDS_ERR_TOO_LONG_PATH       "A lemezkép túl hosszú elérési utat tartalmaz, melyet az Sally nem tud kezelni."
+
+    IDS_ERR_DMG_READ_HDR        "Nem olvasható a csomag fejléce. A fájl túl kicsi."
+    IDS_ERR_DMG_ENCRYPTED       "A csomag titkosítva van.\nA titkosított csomagok nem támogatottak."
+    IDS_ERR_DMG_NO_FOOTER       "A fájl nem tűnik DMG csomagnak vagy hiányos.\nNem tartalmaz érvényes DMG láblécet."
+    IDS_ERR_DMG_PLIST           "A fájl nem tűnik DMG csomagnak vagy hiányos.\nNem tartalmaz érvényes Tulajdonság listát."
+    IDS_ERR_DMG_BLOCK_UNDEFINED "A csomag nem tartalmaz egy HFS Plus partíciós adatblokkot, mely itt kezdődne: %I64u.\nA blokk szükséges a csomag helyes kezeléséhez."
+
+    IDS_ERR_BF_READ             "Nem olvasható adat a lemezképből a következő pozíciónál: %I64u."
+    IDS_ERR_BF_SEEK             "Nem kereshető a lemezkép a következő pozíciónál: %I64u."
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "Belső hiba: Nem támogatott keresési mód."
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "A lemezkép ismeretlen tömörítésű blokkot tartalmaz.\nAz ilyen képek nem támogatottak."
+    IDS_ERR_BF_ZLIB             "A ZLIB tömörítésű blokk kibontása sikertelen. A lemezkép sérültnek tűnik."
+    IDS_ERR_BF_BZIP2            "A BZIP2 tömörítésű blokk kibontása sikertelen. A lemezkép sérültnek tűnik."
+
+    IDS_ERR_ISZ_NO_HEADER       "A fájl nem tűnik ISZ tömörítésű csomagnak vagy hiányos.\nNem tartalmaz érvényes ISZ fejlécet."
+    IDS_ERR_ISZ_READ_HDR        "Nem olvasható a tömörített kép fejléce. Túl kicsi a fájl."
+    IDS_ERR_ISZ_SEGMENTED       "A kép fel van darabolva.\nA darabolt képek nem támogatottak."
+    IDS_ERR_ISZ_ENCRYPTED       "A kép titkosítva van.\nA titkosított képek nem támogatottak."
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "Audio-sáv nem bontható ki."
+
+    IDS_CANCELING_OPERATION     "Művelet megszakítása, kérem várjon..."
+
+    IDS_INFO_LABEL              "Kép információi\n\n"
+    IDS_INFO_LABEL_LABEL        """%s"" kép információi\n\n"
+    IDS_INFO_CNT_SESSIONS       "Menetek száma: %d"
+    IDS_INFO_SESSION_NUM        "\n%d.menet\n"
+    IDS_INFO_CNT_TRACKS         "  Sávok száma: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  Sáv: %d, %s, Méret: %d Kbájt\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  Sáv: %d, %s, Méret: %d Kbájt - ""%s""\n"
+}

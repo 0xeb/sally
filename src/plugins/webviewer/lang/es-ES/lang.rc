@@ -1,0 +1,27 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for webviewer. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/webviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\webviewer.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Visor ligero de HTML, XML y Markdown basado en Microsoft Edge WebView2."
+ IDS_ABOUT, "Acerca del Plugin"
+ IDS_PLUGINNAME, "Visor Web"
+ IDS_UNABLETOOPENIE, "No se puede abrir el Visor Web.\nPor favor, asegúrese de que Microsoft Edge WebView2 Runtime está instalado."
+ IDS_ERRORTITLE, "Error"
+}

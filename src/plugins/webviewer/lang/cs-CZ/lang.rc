@@ -1,0 +1,27 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for webviewer. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/webviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\webviewer.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Jednoduchý prohlížeč HTML, XML a Markdownu založený na Microsoft Edge WebView2."
+ IDS_ABOUT, "O pluginu"
+ IDS_PLUGINNAME, "Webový prohlížeč"
+ IDS_UNABLETOOPENIE, "Nelze otevřít Webový prohlížeč.\nZkontrolujte prosím, že je nainstalováno prostředí Microsoft Edge WebView2 Runtime."
+ IDS_ERRORTITLE, "Chyba"
+}

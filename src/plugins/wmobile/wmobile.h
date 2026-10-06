@@ -7,7 +7,7 @@
 // global data
 extern DWORD DWord;
 extern HINSTANCE DLLInstance; // handle to SPL - language-independent resources
-extern HINSTANCE HLanguage;   // handle to SLG - language-dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 
 // Salamander general interface - valid from startup until the plugin terminates
 extern CSalamanderGeneralAbstract* SalamanderGeneral;

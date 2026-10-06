@@ -1,0 +1,110 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for automation. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/automation/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_INPUTBOX DIALOGEX 75, 140, 205, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Окно ввода"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Запрос:",IDC_PROMPT,8,8,189,8
+    EDITTEXT        IDC_INPUTBOX,8,18,189,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "ОК",1,48,42,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",2,107,42,50,14
+END
+
+IDD_CONFIG DIALOGEX 75, 140, 332, 143
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка автоматизации"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Папки сценариев:",IDC_DIRLISTHEADER,8,9,66,8
+    CONTROL         "",IDC_DIRLIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,8,19,316,73
+    CONTROL         "В&ключить отладку сценариев",IDC_ENABLEDBG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,102,116,10
+    DEFPUSHBUTTON   "OK",IDOK,81,121,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,141,121,50,14
+    PUSHBUTTON      "&Справка",IDHELP,201,121,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_BROWSE MENU
+BEGIN
+    POPUP "[POPUP]"
+    BEGIN
+        MENUITEM "Обзор…",                     ID_BROWSE
+        MENUITEM SEPARATOR
+        MENUITEM "Папка Sally",        ID_SALDIR
+        MENUITEM "Переменная окружения",        ID_ENVVAR
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+BEGIN
+    IDS_SCRIPTERROR         "Ошибка сценария автоматизации"
+    IDS_LINE                "Строка:\t%u\r\n"
+    IDS_COLUMN              "Столбец:\t%u\r\n"
+    IDS_ERROR               "Ошибка:\t%s"
+    IDS_RUNFOCUSED          "Запустить выделенный сценарий"
+    IDS_PROGRESSTITLE       "Ход выполнения работы"
+    IDS_SOURCE              "Источник:\t%s\r\n"
+    IDS_SCRIPTPOPUPMENU     "Открыть меню сценариев"
+    IDS_MENUEMPTY           "(сценарий отсутствует)"
+    IDS_LOADERRFMT          "Не удалось запустить сценарий ""%s"".\r\n%s"
+    IDS_UNKERROR            "Неизвестная ошибка."
+    IDS_ABORT               "1\t&Отмена"
+    IDS_DEBUGABORT          "1\tО&тладка\t2\t&Отмена"
+    IDS_ADDDIRTITLE         "Папка сценария"
+    IDS_ADDDIRDESCR         "Выберите папку-репозиторий сценария."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGINNAME          "Автоматизация"
+    IDS_DESCRIPTION         "Автоматизация регулярных задач с использованием сценариев."
+    IDS_ABOUT               "О модуле"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_E_INVALIDARCHIVE    "Некорректный архив."
+    IDS_E_CANNOTCLOSEPATH   "Данный путь не может быть закрыт."
+    IDS_E_SHORTERPATH       "Путь был сокращен."
+    IDS_E_READONLYWHILEPROGRESSSHOWN 
+                            "Невозможно изменить свойства или вызвать метод %s, пока окно открыто."
+    IDS_E_READONLYWHILEPROGRESSHIDDEN 
+                            "Невозможно изменить свойства или вызвать метод %s, пока окно скрыто."
+    IDS_E_PLUGLOADFAIL      "Не удалось загрузить модуль."
+    IDS_E_PLUGERROR         "Ошибка модуля."
+    IDS_E_CACHEERROR        "Не удалось переместить файл в кэш на диске."
+    IDS_E_FILEMASKSYNTAX    "Ошибка синтаксиса маски файла."
+    IDS_E_NOTCOMPONENT      "Только компоненты могут быть добавлены в контейнер."
+    IDS_E_FORMPUT           "Формы не могут быть добавлены в контейнер."
+    IDS_E_SCRIPTABORTED     "Выполнение сценария прервано пользователем."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABORTCAPTION        "Отмена сценария"
+    IDS_ABORTTIP            "Отменить исполнение сценария\tCtrl+Break"
+    IDS_MAINWINDOWLOCKED    "Окно Sally заблокировано модулем автоматизации. Пожалуйста, завершите сценарий."
+    IDS_ENGINECREATEFAIL    "Не удалось инициализировать обработчик сценариев."
+END

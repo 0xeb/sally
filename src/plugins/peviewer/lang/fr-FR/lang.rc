@@ -1,0 +1,50 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for peviewer. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/peviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\peviewer.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 0, 0, 346, 154
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuration du Visualiseur de fichier exécutable"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Sections disponi&bles:",IDC_STATIC_1,7,7,72,8
+    LISTBOX         IDC_AVAILABLELB,7,17,105,130,LBS_SORT | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Ajouter ->",IDC_ADD,119,17,50,14,WS_GROUP
+    PUSHBUTTON      "<- &Retirer",IDC_REMOVE,119,35,50,14
+    LTEXT           "Sections &visibles:",IDC_STATIC_2,176,7,58,8
+    LISTBOX         IDC_SELECTEDLB,176,17,105,130,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Vers le &haut",IDC_UP,289,17,50,14,WS_GROUP
+    PUSHBUTTON      "Vers le ba&s",IDC_DOWN,289,35,50,14
+    DEFPUSHBUTTON   "OK",IDOK,289,97,50,14,WS_GROUP
+    PUSHBUTTON      "Annuler",IDCANCEL,289,115,50,14
+    PUSHBUTTON      "RA&Z",IDC_RESET,289,133,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_NAME, "Visualiseur de fichier exécutable"
+ IDS_PLUGIN_DESCRIPTION, "Affiche des informations sur les fichiers exécutables de type EXE, DLL, etc."
+ IDS_ABOUT, "A propos du module"
+ IDS_ERR_OPEN_FILE, "Impossible d'ouvrir le fichier %s."
+ IDS_ERR_TMP, "La création d'un fichier temporaire a échoué."
+ IDS_EXCEPTION, "Une exception s'est produite.\n\nFichier visualisé: %s\n\nSi vous pensez que le fichier visualisé n'est pas corrompu, veuillez ouvrir un ticket sur https://github.com/0xeb/sally/issues et y joindre ce fichier.\nNous reproduirons et réparerons le bogue du visualiseur. Merci de votre coopération!"
+ IDS_HIDDEN_SECTIONS, "Aucune section d'exécutable n'a été sélectionnée dans la configuration du module.\nUtilisez le menu Options > Configuration de module > Visualiseur de fichier exécutable\ndans la feznêtre principale d'Sally pour définir les sections visibles."
+}

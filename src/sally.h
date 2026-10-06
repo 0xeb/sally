@@ -617,30 +617,23 @@ extern CSalamanderHelp SalamanderHelp;
 // CLanguage
 //
 
+// One of the languages built into sally.exe (see common/BuiltinLanguages.h).
 class CLanguage
 {
 public:
-    // SLG file name (only name.spl)
-    wchar_t* FileName; // NOTE: stored in TDirectArray (memmove) — must NOT be std::string
+    LANGID LanguageID = 0;
+    std::wstring PersistedName; // Configuration\Language identifier, e.g. czech.slg (no file)
+    std::wstring DisplayName;   // the language's own name, e.g. "Čeština (Česko)"
 
-    // data retrieved from the SLG file
-    WORD LanguageID;
-    WCHAR* AuthorW;
-    wchar_t* Web;
-    WCHAR* CommentW;
-    wchar_t* HelpDir;
+    // translation credits, read from the language's own IDS_LANGMETA_xxx strings
+    std::wstring Author;
+    std::wstring Web;
+    std::wstring Comment;
 
 public:
-    CLanguage();
-
-    BOOL Init(const wchar_t* fileName, WORD languageID, const WCHAR* authorW,
-              const wchar_t* web, const WCHAR* commentW, const wchar_t* helpdir);
-    BOOL Init(const wchar_t* fileName, HINSTANCE modul);
-    void Free();
-    BOOL GetLanguageName(wchar_t* buffer, int bufferSize);
+    // FALSE if 'languageID' is not a built-in language; 'module' NULL = sally.exe
+    BOOL Init(LANGID languageID, HMODULE module = NULL);
 };
-
-BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, wchar_t* isIncomplete);
 
 //*****************************************************************************
 //

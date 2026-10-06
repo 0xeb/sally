@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for nethood. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/nethood/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\nethood.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 22, 38, 220, 127
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "网络配置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "显示管理共享(&A)",IDC_SYSSHARES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,7,106,10
+    CONTROL         "显示管理共享为隐藏项目(&H)",IDC_HIDESYSSHARES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,22,159,10
+    CONTROL         "在顶层目录显示来自我的网络位置的项目(&M)",IDC_NETSHORTCUTS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,37,204,10
+    CONTROL         "在顶层目录显示网络计算机(&C)",IDC_SHOWWORKGRP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,52,168,10
+    CONTROL         "显示通过远程桌面连接的磁盘(&D)",IDC_SHOWTSC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,67,155,10
+    CONTROL         "在 Sally 启动时扫描网络(&S)",IDC_PRELOAD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,82,137,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,99,206,1
+    DEFPUSHBUTTON   "确定",IDOK,30,106,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,85,106,50,14
+    PUSHBUTTON      "帮助",IDHELP,140,106,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_COLUMN_COMMENTS     "说明"
+    IDS_INFOLINE_SELECTION_PLURAL "{!}<%d> 选中的对象{}"
+    IDS_MENUITEM            "网络"
+    IDS_REFRESHING          "正在扫描网络…"
+    IDS_NETWORK_UNAVAILABLE "网络不可用。"
+    IDS_ABOUT               "关于插件"
+    IDS_TSCLIENT            "%1 在 %2 上"
+    IDS_TSFOLDER            "本地计算机"
+    IDS_TSHOST              "主机计算机"
+    IDS_TSFOLDERCOMMENT     "来自 %s 的磁盘"
+END
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME         "网络"
+    IDS_DESCRIPTION         "提供到网络上的计算机的访问。"
+END

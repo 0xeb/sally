@@ -6,7 +6,7 @@
 #error this file is not editable by Microsoft Visual C++
 #endif //defined(APSTUDIO_INVOKED) && !defined(APSTUDIO_READONLY_SYMBOLS)
 
-// defines for plugin.SPL and plugin.SLG VERSIONINFO
+// defines for plugin.SPL VERSIONINFO
 // look at shared\versinfo.rc
 
 #define VERSINFO_MAJOR       1
@@ -20,16 +20,7 @@
 
 #define VERSINFO_DESCRIPTION "7-Zip plugin for Sally"
 
-#ifdef _LANG
-#define VERSINFO_INTERNAL    "ENGLISH"
-#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
-#else
 #define VERSINFO_INTERNAL    "7ZIP"
 #define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SPL"
-#endif
-
-// for SLG translators
-#define VERSINFO_SLG_WEB     "https://github.com/0xeb/sally/discussions"
-#define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __7ZIP_VERSINFO_RH2

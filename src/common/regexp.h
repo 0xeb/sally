@@ -84,8 +84,7 @@ const char* RegExpErrorText(CRegExpErrors err);
 // header. Four independent authorities say narrow is correct:
 //   1. THE ALGORITHM - Boyer-Moore's bad-character tables (LowerCase, Fail1)
 //      have 256 entries. A wchar_t index above U+00FF read off the end of both.
-//   2. THE PLUGIN ABI - zip.cpp:3603-3607/3641/3642 and the FROZEN v107
-//      compat/sdk107/spl_gen.h:576/612/616 both declare const char*.
+//   2. THE PLUGIN ABI - zip.cpp:3603-3607/3641/3642 declares const char*.
 //   3. EVERY CALLER - find.cpp and viewer_interaction_scrolling.cpp pass
 //      memory-mapped file bytes, with explicit (char*) casts.
 //   4. UPSTREAM - Open Salamander's regedt/utils.cpp declares

@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for tar. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/tar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\tar.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "Blader en extraheer Unix archiefbestanden."
+ IDS_ABOUT, "Over deze plugin"
+ IDS_TARERR_TITLE, "TAR plugin fout"
+ IDS_TARERR_UNKNOWN, "Archief bestandsformaat wordt niet herkend of niet ondersteund."
+ IDS_TARERR_HEADER, "Ongeldige gegevens in TAR-kop - archiefbestand beschadigd."
+ IDS_TARERR_CHECKSUM, "Slecht bestand of kop checksum - archiefbestand beschadigd."
+ IDS_TARERR_FDATA, "Interne fout: bestand datastractuur beschadigd."
+ IDS_TARERR_BADSIG, "Onbekende block handtekening - overslaan."
+ IDS_TARERR_NOTFOUND, "Vereist bestand niet gevonden in archiefbestand."
+ IDS_TARERR_MEMORY, "Geheugen toewijzingsfout."
+ IDS_UNPACKPROGRESS_TITLE, "Uitpakken"
+ IDS_UNPACKPROGRESS_TEXT, "Extraheren "
+ IDS_SKIPPROGRESS_TEXT, "Overslaan "
+ IDS_GZERR_TITLE, "GZip fout"
+ IDS_GZERR_BADMETHOD, "Onbekende compressie methode gebruikt, kan niet uitpakken."
+ IDS_GZERR_ENCRYPTED, "Dit bestand is gecodeerd. Codering wordt niet ondersteund in GZip archiefbestanden."
+ IDS_GZERR_MULTIPART, "Dit bestand is onderdeel van een multi-delig archiefbestand. Multi-delig wordt niet ondersteund in GZip archiefbestanden."
+ IDS_GZERR_BADFLAGS, "Onbekende flags in GZip-kop ondervonden, kan niet uitpakken."
+ IDS_GZERR_FOPEN, "Fout bij het openen van achiefbestand: "
+ IDS_ERR_FREAD, "Fout bij het lezen van archiefbestand: "
+ IDS_TARERR_FWRITE, "Fout bij het schrijven naar bestand: "
+ IDS_TARERR_WRSIZE, "De functie WriteFile weigert alle gegevens weg te schrijven waarom werd gevraagd."
+ IDS_GZERR_BADBLOCKTYPE, "Ongeldige block in GZip stream ondervonden, onmogelijk om uit te pakken."
+ IDS_ERR_INTERNAL, "Interne fout in TAR plugin, meld dit aub op https://github.com/0xeb/sally/issues."
+ IDS_ERR_MEMORY, "Geheugen toewijzingsfout."
+ IDS_GZERR_CRC, "CRC fout."
+ IDS_ERR_CORRUPT, "Onverwachte gegevens in gecomprimeerde stream, archiefbestand beschadigd."
+ IDS_ERR_EOF, "Voortijdig einde van het bestand ondervonden."
+ IDS_GZERR_SEEK, "Zoeken naar fouten in archiefbestand: "
+ IDS_RPM_VIEWTITLE, "RPM bekijken"
+ IDS_ERR_RPMTITLE, "RPM fout"
+ IDS_RPMERR_TMPNAME, "Fout bij het creëren van een tijdelijk bestandsnaam."
+ IDS_RPMERR_TMPFILE, "Fout bij het creëren van een tijdelijk bestand."
+ IDS_ERR_NORPM, "Het bestand wordt niet herkend als zijnde een RPM archiefbestand."
+ IDS_ERR_BADRPMVERSION, "De gevraagde versie van RPM door dit archiefbestand wordt nog niet ondersteund."
+ IDS_ERR_BADSIGNATURE, "Onbekend RPM archiefshandtekening ondervonden."
+ IDS_CPIOERR_BADSIG, "Bestand heeft een incorrecte handtekening."
+ IDS_CPIOERR_HEADER, "Vermelding van beschadigd bestands-kop."
+ IDS_CPIOERR_FORMAT, "Onbekend bestandsformaat van cpio-kop."
+ IDS_LZH_NOT_IMPLEMENTED, "LZH archiefbestanden worden nog niet ondersteund."
+}

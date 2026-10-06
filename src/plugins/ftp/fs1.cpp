@@ -767,8 +767,8 @@ BOOL CPluginInterfaceForFS::ConvertPathToInternal(const wchar_t* fsName, int fsN
     // server bytes as UTF-8 whenever OPTS UTF8 ON succeeded, that is ordinary traffic on a
     // modern server, and both callers of the FALSE - GetGeneralPath and
     // CopyCurrentPathToClipboard - return it without a message, so Ctrl+C on a directory
-    // named in Chinese simply appeared to do nothing. The frozen v107 slot for this
-    // operation returns void (sdk107/spl_fs.h:1010); it never had a way to say no.
+    // named in Chinese simply appeared to do nothing. The old narrow (v107) slot for this
+    // operation returned void; it never had a way to say no.
     if (!FTPConvertHexEscapeSequencesW(value))
         return FALSE;
     return sally::plugin_abi::WriteStringBuffer(*fsUserPart, value) ? TRUE : FALSE;

@@ -129,8 +129,9 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
 
 std::wstring GetStartupSLGName()
 {
-    // extract from registry the SLG name that will probably be used
-    // later during Salamander runtime a different one may be selected, which will be changed afterwards
+    // extract from registry the persisted name of the UI language that will probably be used (e.g.
+    // czech.slg, an identifier; no file); later during Salamander startup a different one may be
+    // selected, which will be changed afterwards (SalmonSetSLG)
     // this serves only as a default; if the record is not found, we pass an empty string
     std::wstring slgName;
     const std::wstring keyName = std::wstring(SalamanderConfigurationRoots[0]) + L"\\" + SALAMANDER_CONFIG_REG;
@@ -325,13 +326,13 @@ BOOL SalmonInit()
             {
                 SalmonGetBugReportUID(&SalmonSharedMemory->UID);
 
-                // if salmon fails to start, we still return TRUE - problem will be reported later after SLG is loaded
+                // if salmon fails to start, we still return TRUE - problem will be reported later after the UI language is applied
                 SalmonStartProcess(salmonFileMappingName.c_str());
                 return TRUE;
             }
         }
     }
-    // a serious (and unexpected) error occurred, we block Salamander startup, message will be in English (we don't have slg)
+    // a serious (and unexpected) error occurred, we block Salamander startup, message will be in English (no UI language applied yet)
     return FALSE;
 }
 
@@ -357,11 +358,11 @@ void SalmonSetSLG(const wchar_t* slgName)
 #ifdef _DEBUG
             TRACE_E("Salmon is not running (debug build, suppressing dialog)");
 #else
-            // wide: this fires whenever a .slg language pack is loaded
-            // (HLanguage != NULL), so IDS_SALMON_NOT_RUNNING's translation can contain
-            // characters outside the process ANSI code page - MessageBoxA/LoadStr silently
-            // mangled it. SALAMANDER_TEXT_VERSIONW()/LoadStrW/MessageBoxW already proven
-            // together elsewhere (sally_entry_lifecycle.cpp).
+            // wide: this fires once the UI language is applied (HLanguage != NULL), so
+            // IDS_SALMON_NOT_RUNNING's translation can contain characters outside the process
+            // ANSI code page - MessageBoxA/LoadStr silently mangled it.
+            // SALAMANDER_TEXT_VERSIONW()/LoadStrW/MessageBoxW already proven together
+            // elsewhere (sally_entry_lifecycle.cpp).
             MessageBoxW(NULL, LoadStrW(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
 #endif
             SalmonNotRunningReported = TRUE;

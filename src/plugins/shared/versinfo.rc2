@@ -15,17 +15,10 @@
 #endif //APSTUDIO_INVOKED
 
 //
-// sablona VERSIONINFO pro pluginy a jejich LANG soubory
-// kazdy modul/plugin definuje promenne VERSINFO_xxx zve svem versinfo.rh
-//
-// tento resource vkladame pomoci include jak do SALAMAND.EXE, LANG.SPL,
-// do vsech pluginu (SPL) a do jejich SLG
-// pri prekladu SLG je v projektu definovana konstanta _LANG
-//
-// VarFileInfo\[Translation, Author, Email, Web, Comment, HelpDir] umi nastavovat
-// Translator; originalni SLG je anglicke
-// VarFileInfo\Translation je zobrazovano ve vlastnostech souboru
-// na strance Version jako "Language"
+// VERSIONINFO template for sally.exe and the plugins (SPL); each module defines its
+// VERSINFO_xxx values in its own versinfo.rh2. The translations are not separate files: every
+// language is compiled into the module itself.
+// VarFileInfo\Translation is shown in the file properties on the Details page as "Language".
 //
 
 VS_VERSION_INFO VERSIONINFO
@@ -57,17 +50,6 @@ BEGIN
             VALUE "LegalCopyright", VERSINFO_COPYRIGHT "\0"
             VALUE "ProductVersion", VERSINFO_SALAMANDER_VERSION "\0"
             VALUE "ProductName", "Sally\0"
-#ifdef _LANG
-            VALUE "Comments", "Language resources\0"
-            VALUE "SLGAuthor", VERSINFO_COMPANY "\0"
-            VALUE "SLGWeb", VERSINFO_SLG_WEB "\0"
-            VALUE "SLGComment", VERSINFO_SLG_COMMENT "\0"
-            VALUE "SLGCRCofImpSLT", "none\0"
-#ifdef _LANG_SALLY
-            VALUE "SLGHelpDir", "ENGLISH\0"
-            VALUE "SLGIncomplete", "\0" // for an incomplete translation, put the URL where translators can help here
-#endif
-#endif
         END
     END
     BLOCK "VarFileInfo"

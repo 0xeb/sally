@@ -36,7 +36,7 @@ extern "C"
 // since _sal_safe_memcpy above is declared only in the global namespace (it must be, being
 // extern "C"). Redeclare the same extern "C" function inside std:: too, so qualified call
 // sites resolve to the same overlap-checking function as unqualified ones, without having to
-// touch every std::memcpy(...) call site across the compat/ adapter layer - extern "C"
+// touch every std::memcpy(...) call site - extern "C"
 // functions share one link-time symbol no matter which C++ namespace declares them.
 namespace std
 {
@@ -765,20 +765,13 @@ public:
     // condition: (GetLoadInformation() & LOADINFO_XXX) != 0)
     virtual DWORD WINAPI GetLoadInformation() = 0;
 
-    // loads module with language-dependent resources (SLG file); always tries to load module
-    // of the same language in which Salamander is currently running, if such module is not found
-    // (or version doesn't match), lets user select alternative module (if more than one
-    // alternative exists + if user's selection from previous plugin load is not already stored);
-    // if no module is found, returns NULL -> plugin should terminate;
-    // 'parent' is parent of error messageboxes and dialog for selecting alternative
-    // language module; 'pluginName' is plugin name (so user knows which plugin
-    // is involved in error message or alternative language module selection)
-    // WARNING: this method can only be called once; obtained language module handle
-    //          is released automatically on plugin unload
-    virtual HINSTANCE WINAPI LoadLanguageModule(HWND parent, const wchar_t* pluginName) = 0;
+    // NOTE: a plugin's language-dependent resources are in the plugin DLL itself, every language
+    // under its own LANGUAGE; Salamander makes the Win32 resource loader pick the language it runs
+    // in (with English for anything a translation lacks), so the plugin loads its strings, dialogs
+    // and menus from its own module handle (SDK 109 removed LoadLanguageModule)
 
-    // returns ID of current language selected for Salamander environment (e.g. english.slg =
-    // English (US) = 0x409, czech.slg = Czech = 0x405)
+    // returns ID of current language selected for Salamander environment (e.g. English (US) =
+    // 0x409, Czech = 0x405)
     virtual WORD WINAPI GetCurrentSalamanderLanguageID() = 0;
 
     // returns pointer to interface providing modified Windows controls used
@@ -902,18 +895,8 @@ inline BOOL SalIsWindowsVersionOrGreater(WORD wMajorVersion, WORD wMinorVersion,
 #define M1xA_FV_MINOR_VERSION_MAX_VALUE 16
 
 // M1xA_testValue/M1xA_findPart{DWORD,WORD,BYTE} are private implementation
-// details of SalGetVersionEx below - not called anywhere else in the tree - so an unnamed
-// namespace is a safe, no-behavior-change fix for a real ambiguity: compat/sdk107/spl_base.h
-// (the frozen v107 SDK snapshot, immutable and hash-pinned - see compat/sdk107.h - never to be
-// edited) is a byte-for-byte copy of this section wrapped in `namespace sdk107`, and both
-// headers are meant to coexist in one translation unit (the adapter's own documented usage
-// pattern). An unqualified call to M1xA_testValue from inside the frozen copy's own
-// namespace-sdk107-scoped SalGetVersionEx finds sdk107::M1xA_testValue via ordinary lookup, but
-// argument-dependent lookup (from the OSVERSIONINFOEX* parameter, a global-namespace type) also
-// finds this live, unnamespaced copy - two equally-viable candidates, ambiguous call. Moving
-// these helpers into an unnamed namespace removes them from ADL's associated namespaces (ADL
-// follows the argument type's own declaring namespace, not every namespace containing a
-// same-signature function), leaving each copy's own internal calls to resolve unambiguously.
+// details of SalGetVersionEx below - not called anywhere else in the tree - so they live in an
+// unnamed namespace.
 // SalGetVersionEx itself stays in the global namespace unchanged - it has external callers
 // (bugreprt.cpp, plugins/automation/salamanderaut.cpp) that only the live SDK serves.
 namespace

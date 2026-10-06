@@ -1,0 +1,27 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for webviewer. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/webviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\webviewer.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Простое средство просмотра HTML, XML и Markdown на основе Microsoft Edge WebView2."
+ IDS_ABOUT, "О модуле"
+ IDS_PLUGINNAME, "Средство просмотра Web"
+ IDS_UNABLETOOPENIE, "Не удалось открыть средство просмотра Web.\nПожалуйста, убедитесь, что установлена среда Microsoft Edge WebView2 Runtime."
+ IDS_ERRORTITLE, "Ошибка"
+}

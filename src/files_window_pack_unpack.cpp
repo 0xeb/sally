@@ -1599,9 +1599,7 @@ _PACK_AGAIN:
                     // Unpack does; built plugins receive the exact live UTF-16 paths.
                     //
                     // The gate used to run for every packer. A plugin archiver takes
-                    // wchar_t* (plugins/shared/spl_arc.h:95), and an sdk107 plugin gets
-                    // its own exact-or-refuse narrowing at the frozen boundary
-                    // (core_to_legacy.cpp NarrowOptionalText), so demanding an ANSI name
+                    // wchar_t* (plugins/shared/spl_arc.h:95), so demanding an ANSI name
                     // of them refused to pack into any path CP_ACP cannot spell on a
                     // volume with 8.3 disabled - with the ZIP plugin, which handles that
                     // path perfectly well.

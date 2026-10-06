@@ -1457,14 +1457,6 @@
 #define IDS_PLUGININVALID2           12025
 // error loading plug-in DLL: this plug-in (with unknown name) version is not supported (old plug-in)
 #define IDS_OLDPLUGINVERSION2        12026
-// legacy req==102 plugin: ask whether to allow loading anyway (name known)
-#define IDS_OLDPLUGINVERSION_CONFIRM 12027
-// legacy req==102 plugin: ask whether to allow loading anyway (name unknown)
-#define IDS_OLDPLUGINVERSION_CONFIRM2 12028
-// file-system plugin was built against the broken transitional SDK 104 ABI (name known)
-#define IDS_BROKENFSPLUGINVERSION    12029
-// file-system plugin was built against the broken transitional SDK 104 ABI (name unknown)
-#define IDS_BROKENFSPLUGINVERSION2   12030
 
 // edit or assoc from archive: update failed, do you want to try it again?
 #define IDS_UPDATEFAILED             12033
@@ -2416,11 +2408,6 @@
 #define IDS_MSGBOXBTN_SKIPALL           13736
 #define IDS_MSGBOXBTN_FOCUS             13737
 
-#define IDS_CANTLOADPLUGINSLG1          13740
-#define IDS_CANTLOADPLUGINSLG2          13741
-#define IDS_PLUGINSLGNOTFOUND           13742
-#define IDS_DONOTSHOWCANTLOADPLUGINSLG  13743
-
 // we have found out that configuration stored in registry is corrupted
 #define IDS_CORRUPTEDCONFIGFOUND        13750
 // current shutdown parameters (WaitToKillAppTimeout and AutoEndTasks) were changed, it probably causes problems with configuration (it was corrupted during last save)
@@ -2680,10 +2667,6 @@
 // salmon.exe is not running
 #define IDS_SALMON_NOT_RUNNING          14100
 
-// Translation of Open Salamander into your language is not finished. Please join the translation effort.
-#define IDS_SLGINCOMPLETE_TITLE         14150
-#define IDS_SLGINCOMPLETE_TEXT          14151
-
 // deleting to Recycle Bin does not support invalid names (names ending with space or dot), displaying invalid part of name, hint: rename it or delete permanently
 #define IDS_RECYCLEBINERROR             14155
 
@@ -2758,6 +2741,16 @@
 #define IDS_UNPACK_ANSI_ONLY            14227
 #define IDS_MASTERPASSWORD_TOO_LONG     14228
 #define IDS_FIND_HEX_INVALID            14229
+// Labels too long for dialog control text (rc.exe keeps at most 256 characters there); the
+// dialogs set them from these strings when they open.
+#define IDS_CFGSEC_MASTERPWD_INFO       14230
+#define IDS_EXITING_RUNNING_INFO        14231
+
+// About this translation, shown when choosing a language. They have a 16-string bundle of their
+// own (14240-14255): Sally lists its built-in languages by the language copies of this bundle.
+#define IDS_LANGMETA_AUTHOR             14240
+#define IDS_LANGMETA_WEB                14241
+#define IDS_LANGMETA_COMMENT            14242
 
 //#define CM_TEXTS_MAX                  18000    // maximal texts id
 

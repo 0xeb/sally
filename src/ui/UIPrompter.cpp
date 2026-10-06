@@ -135,10 +135,15 @@ public:
     PromptResult AskYesNoWithCheckbox(const wchar_t* title, const wchar_t* message,
                                       const wchar_t* checkboxText, bool* checkboxValue) override
     {
+        return AskYesNoWithCheckbox(NULL, title, message, checkboxText, checkboxValue);
+    }
 
+    PromptResult AskYesNoWithCheckbox(HWND parent, const wchar_t* title, const wchar_t* message,
+                                      const wchar_t* checkboxText, bool* checkboxValue) override
+    {
         MSGBOXEX_PARAMS params;
         memset(&params, 0, sizeof(params));
-        params.HParent = GetDefaultParentHWND();
+        params.HParent = ResolveParentHWND(parent);
         params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
         params.Caption = title;
         params.Text = message;
@@ -312,6 +317,13 @@ PromptResult IPrompter::AskYesNoCancel(HWND parent, const wchar_t* title, const 
 {
     (void)parent;
     return AskYesNoCancel(title, message);
+}
+
+PromptResult IPrompter::AskYesNoWithCheckbox(HWND parent, const wchar_t* title, const wchar_t* message,
+                                             const wchar_t* checkboxText, bool* checkboxValue)
+{
+    (void)parent;
+    return AskYesNoWithCheckbox(title, message, checkboxText, checkboxValue);
 }
 
 PromptResult IPrompter::AskRetryCancel(HWND parent, const wchar_t* title, const wchar_t* message)

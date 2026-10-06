@@ -1,0 +1,482 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for renamer. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/renamer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\renamer.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_RENAME DIALOGEX 9, 20, 433, 260
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Групповое переименование"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_MENUSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,433,1
+    LTEXT           "&Маска:",IDC_STATIC_1,16,11,48,8
+    COMBOBOX        IDC_MASK,66,9,160,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Вклю&чая вложенные папки",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,239,10,107,12
+    PUSHBUTTON      "Пе&реименовать",IDOK,351,9,75,14
+    CONTROL         "Ручно&й режим",IDC_MANUAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,27,63,12
+    CONTROL         "",IDS_MANSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,71,32,356,1
+    EDITTEXT        IDE_MANUAL,6,41,420,138,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "&Новое имя:",IDS_LABELNEWNAME,16,43,42,8
+    COMBOBOX        IDC_NEWNAME,66,41,341,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_NEWNAME,414,41,12,12
+    LTEXT           "Замена",IDS_LABELREPLACE,6,60,28,8
+    CONTROL         "",IDS_REPLACESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,36,64,391,1
+    LTEXT           "И&скать:",IDS_LABELSEARCHFOR,16,77,29,8
+    COMBOBOX        IDC_SEARCH,66,75,341,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_SEARCH,414,75,12,12
+    LTEXT           "Замени&ть на:",IDS_LABELREPLACEWITH,16,94,49,8
+    COMBOBOX        IDC_REPLACE,66,92,341,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_REPLACE,414,92,12,12
+    CONTROL         "С &учетом регистра",IDC_CASESENSITIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,66,109,76,12
+    CONTROL         "Однокр&атно в каждом имени",IDC_GLOBAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,66,123,114,12
+    CONTROL         "С&лова целиком",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,186,109,66,12
+    CONTROL         "Регулярное выра&жение",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,186,123,95,12
+    CONTROL         "Н&е обрабатывать расширение",IDC_EXCLUDEEXT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,289,109,119,12
+    LTEXT           "Смена регистра",IDS_LABELCASE,6,139,58,8
+    CONTROL         "",IDS_CHANGECASESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,66,143,361,1
+    LTEXT           "Им&я файла:",IDS_LABELNAME,16,155,44,8
+    COMBOBOX        IDC_NAMECASE,66,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Рас&ширение:",IDS_LABELEXT,186,155,48,8
+    COMBOBOX        IDC_EXTCASE,236,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Вкл&ючая путь",IDC_PATHPART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,66,170,62,12
+    LTEXT           "Предпр&осмотр:",IDS_PREVIEW,6,182,56,8
+    RTEXT           "",IDS_COUNT,100,182,326,8
+    CONTROL         "",IDL_PREVIEW,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,0,192,433,68
+END
+
+IDD_CUT DIALOGEX 9, 20, 249, 88
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Добавить подстроку"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Подстрока от:",IDC_STATIC_1,7,9,55,8
+    COMBOBOX        IDC_CUTFROM,85,7,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Начать с позиции",IDC_STATIC_2,7,28,65,8
+    EDITTEXT        IDE_START,85,26,48,12,ES_AUTOHSCROLL
+    LTEXT           "относительно",IDC_STATIC_3,141,28,50,8
+    COMBOBOX        IDC_START,194,26,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Закончить в позиции",IDC_STATIC_4,7,47,77,8
+    EDITTEXT        IDE_END,85,45,48,12,ES_AUTOHSCROLL
+    LTEXT           "относительно",IDC_STATIC_5,141,47,50,8
+    COMBOBOX        IDC_END,194,45,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "ОК",IDOK,72,67,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,126,67,50,14
+END
+
+IDD_COUNTER DIALOGEX 9, 20, 167, 130
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Добавить счетчик"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Начало:",IDC_STATIC_1,7,9,36,8
+    EDITTEXT        IDE_START,70,7,90,12,ES_AUTOHSCROLL
+    LTEXT           "Ш&аг:",IDC_STATIC_2,7,25,36,8
+    EDITTEXT        IDE_STEP,70,23,90,12,ES_AUTOHSCROLL
+    LTEXT           "&Основание:",IDC_STATIC_3,7,41,42,8
+    COMBOBOX        IDC_BASE,70,39,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Миним. &ширина:",IDC_STATIC_4,7,57,62,8
+    EDITTEXT        IDE_MINWIDTH,70,55,90,12,ES_AUTOHSCROLL
+    LTEXT           "&Заполнить:",IDC_STATIC_5,7,73,61,8
+    COMBOBOX        IDC_FILL,70,71,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Выравнивание по левому краю",IDC_LEFT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,90,122,12
+    DEFPUSHBUTTON   "ОК",IDOK,31,109,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,85,109,50,14
+END
+
+IDD_DEFINESET DIALOGEX 9, 20, 275, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Определение набора символов"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Набор символов:",IDC_STATIC_1,7,7,73,8
+    EDITTEXT        IDE_SET,7,17,261,12,ES_AUTOHSCROLL
+    LTEXT           "Советы:\n\nИспользуйте ""-"" (дефис) для указания набора символов (например A-Z).\n\nДля включения в набор символа ""-"", введите его в начале или конце (например -AZ).",IDC_STATIC_2,7,36,261,48
+    LTEXT           "Для включения в набор символа ""]"", введите его в начале набора.\n\nДля включения в набор символов знака ""^"", введите его в любом месте, кроме начала набора.",IDC_STATIC_3,7,92,261,32
+    LTEXT           "Для включения символьного класса POSIX используйте [:class:], где ""class"" один из: alpha, alnum, ascii, blank, cntrl, digit, graph, lower, print, punct, space, upper, word, xdigit.\n\nДля включения обратной косой черты, используйте \\\\.",IDC_STATIC_4,7,132,261,40
+    DEFPUSHBUTTON   "ОК",IDOK,85,179,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,139,179,50,14
+END
+
+IDD_SUBEXPRESSION DIALOGEX 9, 20, 249, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Укажите подвыражение"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Номер подвыражения:",IDC_STATIC_1,7,9,83,8
+    COMBOBOX        IDC_NUMBER,91,7,151,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Совет: введите 0, чтобы задать все выражение целиком.",IDC_STATIC_2,7,23,205,8
+    LTEXT           "&Регистр:",IDC_STATIC_3,7,37,32,8
+    COMBOBOX        IDC_CASE,91,35,151,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "ОК",IDOK,72,57,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,126,57,50,14
+END
+
+IDD_PROGRESS DIALOGEX 6, 15, 194, 60
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Групповое переименование"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDS_MESSAGE,7,7,180,8
+    LTEXT           "",IDS_PROGRESS,7,22,180,10,0,WS_EX_STATICEDGE
+    DEFPUSHBUTTON   "Отмена",IDCANCEL,72,39,50,14
+END
+
+IDD_COMMAND DIALOGEX 9, 20, 368, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Выполнить команду в консоли"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Команда:",IDC_STATIC_1,7,7,82,8
+    COMBOBOX        IDC_COMMAND,7,17,354,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "ОК",IDOK,257,37,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,311,37,50,14
+END
+
+IDD_ERROR DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ошибка командной строки"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Команда, возможно, выполнена с ошибкой.",IDC_STATIC_1,7,7,156,8
+    LTEXT           "Командная строка:",IDC_STATIC_2,7,22,68,8
+    EDITTEXT        IDE_COMMAND,75,22,286,8,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    LTEXT           "Код завершения:",IDC_STATIC_3,7,34,68,8
+    LTEXT           "",IDS_EXITCODE,77,34,284,8
+    LTEXT           "&Ошибка:",IDC_STATIC_4,7,46,33,8
+    EDITTEXT        IDE_STDERR,7,56,354,176,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON   "Пропустить",IDOK,247,239,55,14
+    PUSHBUTTON      "Отмена",IDCANCEL,306,239,55,14
+END
+
+IDD_CONFIG DIALOGEX 45, 31, 257, 160
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Дополнительные параметры переименования"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Настройка внешнего редактора для ручного режима:",IDC_STATIC_1,7,7,240,8
+    LTEXT           "&Команда:",IDC_STATIC_2,14,21,52,8
+    EDITTEXT        IDE_COMMAND,70,19,164,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_BROWSE,237,19,13,12,WS_GROUP
+    LTEXT           "&Параметры:",IDC_STATIC_3,14,37,52,8
+    EDITTEXT        IDE_ARGUMENTS,70,35,164,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ARGHELP,237,35,13,12,WS_GROUP
+    LTEXT           "Рабо&чая папка:",IDC_STATIC_4,14,53,55,8
+    EDITTEXT        IDE_INITDIR,70,51,164,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_INITDIRHELP,237,51,13,12,WS_GROUP
+    LTEXT           "Шрифт в ручном режиме:",IDC_STATIC_5,7,74,94,8
+    PUSHBUTTON      "&Изменить",IDB_FONT,14,84,50,14,WS_GROUP
+    LTEXT           "Подтверждение:",IDC_STATIC_6,7,109,62,8
+    CONTROL         "При &закрытии главного окна клавишей Esc.",IDC_CONFIRMESCCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,118,167,12
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,7,138,243,1
+    DEFPUSHBUTTON   "ОК",IDOK,92,142,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,146,142,50,14
+    PUSHBUTTON      "Справка",IDHELP,200,142,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Переименование"
+  IDS_DESCRIPTION, "Групповое переименование с предпросмотром в реальном времени."
+  IDS_ABOUT, "О модуле"
+  IDS_RENAMERERR, "Ошибка переименования"
+  IDS_LOWMEM, "Недостаточно памяти."
+  IDS_PLUGMENU_RENAME, "&Групповое переименование..."
+  IDS_PLUGMENU_UNDO, "&Отмена..."
+  IDS_RENAME, "&Переименовать"
+  IDS_VALIDATE, "&Проверить"
+  IDS_ORIGNAME_COLUMN, "Исходное имя"
+  IDS_NEWNAME_COLUMN, "Новое имя"
+  IDS_SIZE_COLUMN, "Размер"
+  IDS_DATE_COLUMN, "Дата"
+  IDS_TIME_COLUMN, "Время"
+  IDS_PATH_COLUMN, "Путь"
+
+  // menu
+  IDS_MENU_FILE, "&Команды"
+  IDS_MENU_VIEW, "В&ид"
+  IDS_MENU_OPTIONS, "Параметр&ы"
+  IDS_MENU_HELP, "Спра&вка"
+  IDS_MENU_RENAME, "П&ереименовать\tAlt+R"
+  IDS_MENU_VALIDATE, "Про&верить\tCtrl+I"
+  IDS_MENU_EXIT, "В&ыход\tAlt+F4"
+  IDS_MENU_SORTOLD, "Упорядочить по исходно&му имени\tCtrl+F1"
+  IDS_MENU_SORTNEW, "Упорядочить по &новому имени\tCtrl+F1"
+  IDS_MENU_SORTSIZE, "Упорядочить по &размеру\tCtrl+F2"
+  IDS_MENU_SORTTIME, "&Упорядочить по времени\tCtrl+F3"
+  IDS_MENU_SORTPATH, "Упор&ядочить по пути\tCtrl+F4"
+  IDS_MENU_FILENAMES, "Переименовать ф&айлы\tCtrl+N"
+  IDS_MENU_RELATIVEPATH, "Переименовать &относительный путь\tCtrl+R"
+  IDS_MENU_FULLPATH, "П&ереименовать полный путь\tCtrl+F"
+  IDS_MENU_FONT, "Шрифт в &ручном режиме..."
+  IDS_MENU_LAST, "&Последние использованные\tCtrl+L"
+  IDS_MENU_RESET, "Сб&росить\tCtrl+D"
+  IDS_MENU_REGEXP, "Регулярные &выражения"
+  IDS_MENU_CUSTOMFONT, "Использовать &пользовательские шрифты..."
+  IDS_MENU_AUTOFONT, "Использовать шрифт по &умолчанию"
+  IDS_MENU_REMOVESOURCEPATH, "Удалить папки, &ставшие пустыми"
+  IDS_MENU_UNDO, "&Отмена\tCtrl+U"
+  IDS_MENU_EDIT, "&Правка"
+  IDS_MENU_STORELIST, "&Скопировать список в буфер\tF2"
+  IDS_MENU_LOADLIST, "&Загрузить список из буфера\tF3"
+  IDS_MENU_EDITLIST, "От&крыть список во внешнем редакторе...\tF4"
+  IDS_MENU_FILTER, "От&фильтровать список командой оболочки...\tF5"
+  IDS_MENU_ALLFILES, "&Все файлы\tF6"
+  IDS_MENU_RENAMED, "Успешно переименованные фа&йлы\tF7"
+  IDS_MENU_NOTRENAMED, "&Непереименованные файлы\tF8"
+  IDS_MENU_ADVANCED, "&Дополнительно..."
+  IDS_MENU_BATCHRENDLG, "&Работа с модулем\tF1"
+
+  IDS_VAR_ORIGNAME, "$(ИсходноеИмя)"
+  IDS_CASE_DONTCHANGE, "Не изменять"
+  IDS_CASE_LOWER, "Нижний регистр"
+  IDS_CASE_UPPER, "Верхний регистр"
+  IDS_CASE_MIXED, "Смешанный регистр"
+  IDS_INVALIDMASK, "Некорректная маска."
+  IDS_TOOLONGPATH, "Не удается выполнить чтение папки из-за слишком длинного путевого имени"
+  IDS_ERRREADDIR, "Не удается выполнить чтение папки."
+  IDS_ERROR, "Ошибка"
+  IDS_DIRTEXT, "ПАПКА"
+  IDS_CANCELCNFRM, "Вы действительно хотите отменить эту операцию?"
+  IDS_QUESTION, "Запрос"
+  IDS_VAR_ORIGINALNAME, "Исходное имя"
+  IDS_VAR_DRIVE, "Диск"
+  IDS_VAR_PATH, "Путь"
+  IDS_VAR_RELATIVEPATH, "Относительный путь"
+  IDS_VAR_NAME, "Имя"
+  IDS_VAR_NAMEPART, "Только имя"
+  IDS_VAR_EXTPART, "Только расширение"
+  IDS_VAR_SIZE, "Размер"
+  IDS_VAR_TIME, "Время"
+  IDS_VAR_DATE, "Дата"
+  IDS_VAR_COUNTER, "Счетчик..."
+  IDS_VAR_LOWER, "Нижний регистр"
+  IDS_VAR_UPPER, "Верхний регистр"
+  IDS_VAR_MIXED, "Смешанный регистр"
+  IDS_VAR_STRIPDIA, "Раздельная диакритика"
+  IDS_VAR_CUT, "Подстрока..."
+  IDS_LEFT, "начала"
+  IDS_RIGHT, "конца"
+  IDS_BADCUTOFFSET, "Введите положительное значение."
+  IDS_DECIMAL, "Десятичное"
+  IDS_HEX_LOWER, "16-ричное (abcdef)"
+  IDS_HEX_UPPER, "16-ричное (ABCDEF)"
+  IDS_FILL_SPACES, "Пробелами"
+  IDS_FILL_ZEROS, "Нолями"
+  IDS_FILL_UNDERSCORES, "Подчеркиванием"
+
+  IDS_EXP_UNMATCHEDPAR, "Переменная должна завершаться скобкой "")""."
+  IDS_EXP_VARNOTFOUND, "Переменная не найдена."
+  IDS_EXP_UNEXPECTEDCHAR, "Ожидается имя переменной в круглых скобках, либо символ ""$""."
+  IDS_EXP_SMALLBUFFER, "Расширенная строка превышает предельный размер."
+  IDS_EXP_TRAILINGDOLLAR, "Неожиданный конец строки: после символа ""$"" должно следовать имя переменной либо символ ""$""."
+  IDS_EXP_EMPTYSTR, "Необходимо ввести значение."
+  IDS_EXP_UNEXPECTARG, "Здесь не требуется вводить параметр."
+  IDS_EXP_EXPECTCUTORCASE, "Следует указать регистр (""нижний"", ""верхний"", ""смешанный"", или ""раздельная диакритика""), либо параметры вырезания из имени (два целых числа)."
+  IDS_EXP_EXPECTENDCUT, "Следует указать параметр вырезания из имени (целое число)."
+  IDS_EXP_UNEXPECTEDARGUMENT, "Неожиданный параметр."
+  IDS_EXP_MISTIMEFORMAT, "Формат времени не указан."
+  IDS_EXP_INVALIDTIMEFMT, "Некорректный формат времени."
+  IDS_EXP_MISDATEFORMAT, "Формат даты не указан"
+  IDS_EXP_INVALIDDATEFMT, "Некорректный формат даты."
+  IDS_EXP_TOOMUCHARGUMENTS, "Слишком много параметров."
+  IDS_EXP_EXPECTSTART, "Следует указать начальное значение счетчика (целое число)."
+  IDS_EXP_EXPECTSTEP, "Следует указать шаг счетчика (число с плавающей запятой)."
+  IDS_EXP_EXPECTBASEALIGNWIDTH, "Следует указать основание (выбрать между ""dxX""), выравнивание (""l"") или ширину (положительное целое число)."
+  IDS_EXP_EXPECTALIGNWIDTH, "Следует указать выравнивание (""l"") либо ширину (положительное целое число)."
+  IDS_EXP_EXPECTWIDTH, "Следует указать ширину (положительное целое число)"
+  IDS_EXP_EXPECTFILL, "Следует указать фильтр (одну букву)"
+
+  IDS_NEWNAMEERR, "<Ошибка в новом имени: %s>"
+  IDS_TRANSFERERROR, "<Одно из полей ввода содержит некорректное значение>"
+  IDS_REGEXPERR, "<Ошибка регулярного выражения: %s>"
+  IDS_BMERR, "<Ошибка Бойера-Мура: %s>"
+  IDS_GENERICERR, "<Ошибка: %s>"
+  IDS_REPLACEERR, "<Ошибка шаблона замены: %s>"
+
+  IDS_REP_EXPCLOSEPAR1, "Следует ввести закрывающие скобки либо указать регистр (""нижний"", ""верхний"", ""смешанный"", или ""раздельная диакритика"")."
+  IDS_REP_EXPCLOSEPAR2, "Следует ввести закрывающие скобки."
+  IDS_REP_EXPCLOSEPAR3, "После типа регистра (""нижний"", ""верхний"", ""смешанный"", или ""раздельная диакритика"") следует ввести закрывающие скобки либо символ "":""."
+  IDS_REP_BADREF, "Ссылка на неопределенное подвыражение."
+  IDS_EXP_EXPECTSUBNUM1, "Следует указать номер подвыражения"
+  IDS_EXP_EXPECTSUBNUM2, "Следует ввести номер подвыражения, номер подвыражения в круглых скобках, либо символ ""$""."
+  IDS_EXP_TRAILINGBACKSLASH, "Неожиданный конец строки, обратная косая черта не может ее завершать."
+
+  IDS_REENOERROR, "Ошибки отсутствуют."
+  IDS_REELOWMEMORY, "Недостаточно памяти."
+  IDS_REEEMPTY, "Регулярное выражение пусто."
+  IDS_REETOOBIG, "Регулярное выражение слишком велико."
+  IDS_REETOOMANYPARENTHESISES, "Слишком много скобок ()."
+  IDS_REEUNMATCHEDPARENTHESIS, "Незакрытые скобки ()."
+  IDS_REEOPERANDCOULDBEEMPTY, "Операнд *+ может быть пустым."
+  IDS_REENESTED, "Вложенные *?+."
+  IDS_REEUNMATCHEDBRACKET, "Незакрытые скобки []."
+  IDS_REEFOLLOWSNOTHING, "Отсутствует аргумент ?+*."
+  IDS_REETRAILINGBACKSLASH, "Завершающая \\."
+  IDS_REEINTERNALDISASTER, "Внутренний сбой."
+  IDS_REEINVALIDPOSIXCLASS, "Неизвестный символьный класс POSIX."
+  IDS_REEEXPECTINGXDIGIT, "Необходимо ввести две шестнадцатеричные цифры после \\x."
+  IDS_REESTACKOVERFLOW, "Переполнение стека"
+  IDS_REENOPATTERN, "Требуется составленное выражение."
+  IDS_REEERRORSTARTINGTHREAD, "Не удается начать новый поток."
+  IDS_REEEXPECTINGEXTENDEDPATTERN1, "Необходимо ввести один из символов :=!< после (?"
+  IDS_REEEXPECTINGEXTENDEDPATTERN2, "Необходимо ввести один из символов =! после (?<"
+  IDS_REEBADFIXEDWIDTHLOOKBEHIND, "Ширина для шаблона ""Просмотр-Назад"" не зафиксирована."
+
+  IDS_RE_POSIX_ALPHA, "Алфавитные символы (alpha)"
+  IDS_RE_POSIX_ALNUM, "Алфавитно-цифровые символы (alnum)"
+  IDS_RE_POSIX_ASCII, "ASCII-символы (ascii)"
+  IDS_RE_POSIX_CNTRL, "Управляющие символы (cntrl)"
+  IDS_RE_POSIX_DIGIT, "Десятичные цифры (digit)"
+  IDS_RE_POSIX_GRAPH, "Печатаемые символы, кроме пробела (graph)"
+  IDS_RE_POSIX_LOWER, "Символы в нижнем регистре (lower)"
+  IDS_RE_POSIX_PRINT, "Печатаемые символы (print)"
+  IDS_RE_POSIX_PUNCT, "Символы пунктуации (punct)"
+  IDS_RE_POSIX_SPACE, "Пробелы (space)"
+  IDS_RE_POSIX_UPPER, "Символы в верхнем регистре (upper)"
+  IDS_RE_POSIX_WORD, "Алфавитно-цифровые символы и ""_"" (word)"
+  IDS_RE_POSIX_XDIGIT , "Шестнадцатеричные цифры (xdigit)"
+  IDS_RE_LEFTPAREN, "Левая круглая скобка ""("""
+  IDS_RE_RIGHTPAREN, "Правая круглая скобка "")"""
+  IDS_RE_LEFTBRACKET, "Левая квадратная скобка ""["""
+  IDS_RE_CIRCUMFLEX,  "Циркумфлекс ""^"""
+  IDS_RE_DOLLAR, "Доллар ""$"""
+  IDS_RE_DOT, "Точка ""."""
+  IDS_RE_PIPE, "Вертикальная черта ""|"""
+  IDS_RE_ASTERISK, "Звездочка ""*"""
+  IDS_RE_PLUS, "Плюс ""+"""
+  IDS_RE_QUESTIONMARK, "Вопросительный знак ""?"""
+  IDS_RE_BACKSLASH, "Обратная косая черта ""\\"""
+  IDS_RE_ANYCHAR, "Любой символ"
+  IDS_RE_ANYFROM, "Любой из набора символов"
+  IDS_RE_ANYBUT, "Любой, кроме набора символов"
+  IDS_RE_ANYFROMPOSIX, "Символьный класс POSIX"
+  IDS_RE_ANYBUTPOSIX, "Символьный класс POSIX"
+  IDS_RE_BOL, "Начало имени"
+  IDS_RE_EOL, "Конец имени"
+  IDS_RE_OR, "Или"
+  IDS_RE_ITERATION, "0 или более совпадений"
+  IDS_RE_POSITIVEITERATION, "1 или более совпадений"
+  IDS_RE_ITERATION_GREEDY, "Максимум совпадений"
+  IDS_RE_ITERATION_UNGREEDY, "Минимум совпадений"
+  IDS_RE_ONEORZERO, "1 или 0 совпадений"
+  IDS_RE_ZEROORONE, "0 или 1 совпадений"
+  IDS_RE_SUBEXPRESSION, "Подвыражение"
+  IDS_RE_NOTCAPTURESUBEXP, "Неохватывающее подвыражение"
+  IDS_RE_LITERALS, "Специальный символ как литерал"
+  IDS_RE_WORDCHAR, "Буква"
+  IDS_RE_NONWORDCHAR, "Небуквенный символ"
+  IDS_RE_SPACE, "Пробел"
+  IDS_RE_NONSPACE, "Не пробел"
+  IDS_RE_DIGIT, "Цифра"
+  IDS_RE_NONDIGIT, "Нецифровой знак"
+  IDS_RE_WORDB, "Словораздел"
+  IDS_RE_NONWORDB, "Не-(словораздел)"
+  IDS_RE_NUMBER, "Десятичное число"
+  IDS_RE_HEXNUMBER, "Шестнадцатеричное число"
+  IDS_RE_WORD, "Слово"
+  IDS_RE_PATHCOMPONENT, "Путь без имени"
+  IDS_RE_FILENAME, "Имя файла (имя в $1, расш. в $2)"
+  IDS_RE_DEFINESET, "Определить набор..."
+  IDS_RE_MATCHEDEXPR, "Подходящее регулярное выражение"
+  IDS_RE_MATCHEDSUBEXP, "Подходящее подвыражение..."
+  IDS_RE_PLOOKA, "Положительный Просмотр-Вперед"
+  IDS_RE_NLOOKA, "Отрицательный Просмотр-Вперед"
+  IDS_RE_PLOOKB, "Положительный Просмотр-Назад"
+  IDS_RE_NLOOKB, "Отрицательный Просмотр-Назад"
+  IDS_RE_ZEROWIDTHASSERT, "Утверждение нулевой ширины"
+
+  IDS_EMPTYSTR, "Необходимо ввести значение."
+  IDS_EMPTYMSG_DEF, "В списке нет объектов."
+  IDS_EMPTYMSG_NOMATCH, "Файлы, удовлетворяющие введенной маске, отсутствуют."
+  IDS_EMPTYMSG_BADMASK, "Некорректная маска."
+  IDS_EMPTYMSG_GENERATING, "Выполняется создание списка файлов. Нажмите Esc для отмены"
+  IDS_EMPTYMSG_ERROR, "При создании списка файлов произошла ошибка."
+  IDS_CNFRM_CLOSE, "Вы действительно хотите закрыть групповое переименование?"
+  IDS_CNFRM_ESC_CLOSE2, "&Больше не показывать это сообщение"
+
+  IDS_CANCELING, "Выполняется отмена операции. Пожалуйста, подождите..."
+  IDS_NOTVALID_FILENAME, "Недопустимое имя файла."
+  IDS_NOTVALID_RELATIVEPATH, "Недопустимый относительный путь."
+  IDS_NOTVALID_FULLPATH, "Недопустимый полный путь."
+  IDS_DUPLICATENAME, "Повторяющееся имя."
+  IDS_DEPENDENCE, "Циклическая зависимость имени файла/папки или зависимость от имени файла, который не может быть переименован."
+
+  IDS_RENAMING, "Выполняется переименование файлов, нажмите ESC для отмены..."
+  IDS_PREPARING, "Подготовка данных для операции переименования..."
+  IDS_DIRNOTSAMEROOT, "Перемещение папки на другой диск не поддерживается."
+  IDS_DIRDIR, "Папка с таким именем уже существует."
+  IDS_FILEDIR, "Данное имя уже используется для папки."
+  IDS_CNFRM_SHOVERWRITE, "Вы действительно хотите перезаписать файл с атрибутом ""системный"" или ""скрытый""?"
+  IDS_OVEWWRITETITLE, "Подтверждение перезаписи файла"
+  IDS_OVERWRITEERROR, "Не удается перезаписать файл: "
+  IDS_MOVEERROR, "Не удается переименовать файл: "
+  IDS_DELETEERROR, "Не удается удалить файл: "
+  IDS_WRITEERROR, "Не удается записать файл: "
+  IDS_READERROR, "Не удается прочесть файл: "
+  IDS_OPENFILEERROR, "Не удается открыть файл: "
+  IDS_DIRCASEERROR, "Не удается изменить регистр имени папки: "
+  IDS_CREATEDIR, "Не удается создать папку: "
+  IDS_UNDOING, "Отмена операции переименования..."
+  IDS_REMOVEDIR,"Не удается удалить папку: "
+  IDS_UNDOQUEST, "Отменить операцию переименования?"
+  IDS_SOMEERRORS, "Часть файлов не переименована. Сейчас будет отображен их список, чтобы вы смогли исправить ошибки и вновь попытаться переименовать файлы.\n\nДля отображения успешно переименованных файлов, воспользуйтесь меню ""Вид""."
+  IDS_VALIDATEOK, "Проверка успешно выполнена."
+  IDS_NOTTODO, "Действий не выбрано."
+  IDS_WAITINGFORWINDOWS, "Ожидание закрытия всех окон модуля группового переименования..."
+  IDS_MISLINES, "Недостаточное количество строк."
+  IDS_BADLINECOUNT, "Количество введенных строк должно совпадать с количеством выделенных файлов для операции переименования."
+  IDS_CREATETEMP, "Не удается создать временный файл. "
+  IDS_WRITETEMP, "Не удается записать во временный файл. "
+  IDS_OPENTEMP, "Не удается открыть временный файл. "
+  IDS_SIZEOFTEMP, "Не удается определить размер временного файла. "
+  IDS_READTEMP, "Не удается прочесть из временного файла. "
+  IDS_PROCESS, "Не удается запустить новый процесс: "
+  IDS_ERRLAUNCHEDIT, "Не удается запустить внешний редактор. Проверьте его параметры в настройках модуля. "
+  IDS_LONGDATA, "Не удается завершить операцию из-за слишком большого объема данных."
+  IDS_EXTEDIT, "По завершении редактирования и сохранения сделанных вами изменений во внешнем редакторе, нажмите ""OK"" для обновления списка имен из отредактированного файла.\n\nНажмите ""Отмена"" для возврата без изменения списка имен."
+  IDS_CREATEPIPE, "Не удается создать конвейер (pipe): "
+  IDS_WRITEPIPE, "Не удается произвести запись в конвейер (pipe). "
+  IDS_EXEFILES, "Исполняемые (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tВсе файлы (*.*)\t*.*\t\t"
+  IDS_EXP_FULLNAME, "Полное имя"
+  IDS_EXP_DRIVE, "Диск"
+  IDS_EXP_PATH, "Путь"
+  IDS_EXP_NAME, "Имя"
+  IDS_EXP_NAMEPART, "Имя без расширения"
+  IDS_EXP_EXTPART, "Только расширение"
+  IDS_EXP_FULLPATH, "Полный путь"
+  IDS_EXP_WINDIR, "Папка Windows"
+  IDS_EXP_SYSDIR, "Папка System"
+  IDS_EXP_DOSFULLNAME, "Полное имя DOS"
+  IDS_EXP_DOSDRIVE, "Привод DOS"
+  IDS_EXP_DOSPATH, "Путь DOS"
+  IDS_EXP_DOSNAME, "Имя DOS"
+  IDS_EXP_DOSNAMEPART, "Имя DOS без расширения"
+  IDS_EXP_DOSEXTPART, "Только расширение DOS"
+  IDS_EXP_DOSFULLPATH, "Полный путь DOS"
+  IDS_EXP_DOSWINDIR, "Путь DOS к папке Windows"
+  IDS_EXP_DOSSYSDIR, "Путь DOS к папке System"
+  IDS_EXP_ENVVAR, "Переменная окружения"
+  IDS_EXP_BROWSE, "Обзор..."
+  IDS_EXP_SALDIR, "Папка Sally"
+  IDS_CFG_CONFLICT, "Настройки уже открыты."
+  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
+  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+}

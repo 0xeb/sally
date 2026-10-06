@@ -24,6 +24,7 @@
 #include "common/Win32TextCodec.h"
 #include "common/DiagnosticTextEncoding.h"
 #include "common/unicode/helpers.h"
+#include "common/BuiltinLanguages.h"
 #include "common/IEnvironment.h"
 #include "common/ExternalToolRunner.h"
 #include "common/IRegistry.h"
@@ -299,8 +300,6 @@ BOOL ChangeRightPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is curren
 BOOL ChangeRightPanelToFixedWhenIdle = FALSE;
 BOOL OpenCfgToChangeIfPathIsInaccessibleGoTo = FALSE; // TRUE = in idle opens configuration to Drives and focuses "If path in panel is inaccessible, go to:"
 
-wchar_t IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // if the string is empty, SLG is completely translated; otherwise contains URL to forum section for the given language
-
 UINT TaskbarBtnCreatedMsg = 0;
 
 // ****************************************************************************
@@ -333,8 +332,8 @@ HINSTANCE NtDLL = NULL;             // handle to ntdll.dll
 HINSTANCE Shell32DLL = NULL;        // handle to shell32.dll (icons)
 HINSTANCE ImageResDLL = NULL;       // handle to imageres.dll (icons - Vista)
 HINSTANCE User32DLL = NULL;         // handle to user32.dll (DisableProcessWindowsGhosting)
-HINSTANCE HLanguage = NULL;         // handle to language-dependent resources (.SPL file)
-WORD LanguageID = 0;                // language-id of .SPL file
+HINSTANCE HLanguage = NULL;         // module with language-dependent resources: sally.exe once the UI language is applied
+WORD LanguageID = 0;                // LANGID of the UI language
 
 std::wstring OpenReadmeInNotepad; // used only when launched from installer: filename to open in notepad during IDLE (start notepad)
 
@@ -3732,7 +3731,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     // try to extract the language-determining key from current configuration
     LoadSaveToRegistryMutex.Enter();
     HKEY hSalamander;
-    DWORD langChanged = FALSE; // TRUE = we're starting Salamander for the first time with a different language (we'll load all plugins to verify we have this language version for them too, or let user decide which alternative versions to use)
+    DWORD langChanged = FALSE; // TRUE = we're starting Salamander for the first time with a different language (we'll load all plugins so the names and menus they leave in the configuration are in the new language)
     if (OpenKeyW(HKEY_CURRENT_USER, configKey, hSalamander))
     {
         HKEY actKey;
@@ -3748,9 +3747,6 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
             OpenKeyW(hSalamander, SALAMANDER_CONFIG_REG, actKey))
         {
             GetStringValueW(actKey, CONFIG_LANGUAGE_REG, Configuration.SLGName);
-            GetValueW(actKey, CONFIG_USEALTLANGFORPLUGINS_REG, REG_DWORD,
-                      &Configuration.UseAsAltSLGInOtherPlugins, sizeof(DWORD));
-            GetStringValueW(actKey, CONFIG_ALTLANGFORPLUGINS_REG, Configuration.AltPluginSLGName);
             GetValueW(actKey, CONFIG_LANGUAGECHANGED_REG, REG_DWORD, &langChanged, sizeof(DWORD));
             CloseKey(actKey);
         }
@@ -3758,96 +3754,85 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     }
     LoadSaveToRegistryMutex.Leave();
 
-FIND_NEW_SLG_FILE:
-
-    // if key doesn't exist, we'll show selection dialog
-    BOOL newSLGFile = FALSE; // TRUE if .SLG was selected during this Salamander launch
-    if (Configuration.SLGName.empty())
+    // every language is built into sally.exe; the configuration names one by its persisted name
+    // (e.g. czech.slg, see common/BuiltinLanguages.h)
+    const std::vector<LANGID> builtinLanguages = GetBuiltinLanguageIDs(HInstance);
+    if (builtinLanguages.empty())
     {
-        CLanguageSelectorDialog slgDialog(NULL, Configuration.SLGName, NULL);
-        slgDialog.Initialize();
-        if (slgDialog.GetLanguagesCount() == 0)
-        {
-            // wide: same MessageBoxW/SALAMANDER_TEXT_VERSIONW() pairing already
-            // used a few lines below in this same function (the "not a valid language file" path).
-            MessageBoxW(NULL, L"Unable to find any language file (.SLG) in subdirectory LANG.\n"
-                              L"Please reinstall Open Salamander.",
-                        SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
-            goto EXIT_1a;
-        }
-        Configuration.UseAsAltSLGInOtherPlugins = FALSE;
-        Configuration.AltPluginSLGName.clear();
+        MessageBoxW(NULL, L"This copy of Sally contains no languages.\n"
+                          L"Please reinstall Sally.",
+                    SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
+        goto EXIT_1a;
+    }
+    LANGID langID = sally::languages::LangIdFromPersistedName(Configuration.SLGName.c_str());
+    if (!sally::languages::Contains(builtinLanguages, langID))
+        langID = 0;
 
+    // if the configuration names no language we know, we'll pick one or let the user choose
+    if (langID == 0)
+    {
         std::wstring prevVerSLGName;
-        if (!autoImportConfig &&                            // during UPGRADE this doesn't make sense (language is read a few lines above, this routine would just re-read it)
-            FindLanguageFromPrevVerOfSal(prevVerSLGName) && // we'll import language from previous version, it's quite probable user wants to use it again (it's about importing old Salamander configuration)
-            slgDialog.SLGNameExists(prevVerSLGName.c_str()))
+        LANGID prevVerLangID = 0;
+        if (!autoImportConfig &&                          // during UPGRADE this doesn't make sense (language is read a few lines above, this routine would just re-read it)
+            FindLanguageFromPrevVerOfSal(prevVerSLGName)) // we'll import language from previous version, it's quite probable user wants to use it again (it's about importing old Salamander configuration)
         {
-            Configuration.SLGName = prevVerSLGName;
+            prevVerLangID = sally::languages::LangIdFromPersistedName(prevVerSLGName.c_str());
+            if (!sally::languages::Contains(builtinLanguages, prevVerLangID))
+                prevVerLangID = 0;
         }
+        if (prevVerLangID != 0)
+            langID = prevVerLangID;
         else
         {
-            int langIndex = slgDialog.GetPreferredLanguageIndex(NULL, TRUE);
-            if (langIndex == -1) // this installation doesn't contain language matching current user-locale in Windows
+            // the language closest to the user's Windows display languages
+            std::vector<std::wstring> userLanguages;
+            ULONG userLanguagesCount = 0;
+            ULONG userLanguagesSize = 0;
+            if (GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &userLanguagesCount, NULL, &userLanguagesSize) &&
+                userLanguagesSize > 0)
             {
-
-// if this is commented out, we won't send people to look for other language versions on the web (e.g. when there are none)
-#define OFFER_OTHERLANGUAGE_VERSIONS
-
-#ifndef OFFER_OTHERLANGUAGE_VERSIONS
-                if (slgDialog.GetLanguagesCount() == 1)
-                    slgDialog.GetSLGName(Configuration.SLGName); // if only one language exists, we'll use it
-                else
-                {
-#endif // OFFER_OTHERLANGUAGE_VERSIONS
-
-                    // we'll open language selection dialog, so user can download and install other languages
-                    if (slgDialog.Execute() == IDCANCEL)
-                        goto EXIT_1a;
-
-#ifndef OFFER_OTHERLANGUAGE_VERSIONS
-                }
-#endif // OFFER_OTHERLANGUAGE_VERSIONS
+                std::vector<wchar_t> buffer(userLanguagesSize, L'\0');
+                if (GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &userLanguagesCount, buffer.data(), &userLanguagesSize))
+                    userLanguages = sally::languages::SplitMultiString(buffer.data(), buffer.size());
             }
-            else
+            bool matched = false;
+            langID = sally::languages::ChooseDefault(builtinLanguages, userLanguages, &matched);
+            if (!matched)
             {
-                slgDialog.GetSLGName(Configuration.SLGName, langIndex); // if language matching current user-locale in Windows exists, we'll use it
+                // none of the user's languages is built in: let the user choose, in English (the
+                // default just chosen)
+                ULONG count = 0;
+                const std::wstring preferred = sally::languages::PreferredUILanguagesList(langID, &count);
+                SetProcessPreferredUILanguages(MUI_LANGUAGE_NAME, preferred.c_str(), &count);
+
+                std::wstring selectedSLGName = sally::languages::PersistedNameFromLangId(langID);
+                CLanguageSelectorDialog slgDialog(NULL, selectedSLGName);
+                slgDialog.Initialize();
+                if (slgDialog.Execute() == IDCANCEL)
+                    goto EXIT_1a;
+                const LANGID selectedLangID = sally::languages::LangIdFromPersistedName(selectedSLGName.c_str());
+                if (sally::languages::Contains(builtinLanguages, selectedLangID))
+                    langID = selectedLangID;
             }
         }
-        newSLGFile = TRUE;
         langChanged = TRUE;
     }
+    Configuration.SLGName = sally::languages::PersistedNameFromLangId(langID);
 
-    std::wstring pathW;
-    BuildModuleRelativePathW(NULL, (L"lang\\" + Configuration.SLGName).c_str(), pathW);
-    HLanguage = pathW.empty() ? NULL : HANDLES(LoadLibraryW(pathW.c_str()));
-    LanguageID = 0;
-    if (HLanguage == NULL || !IsSLGFileValid(HInstance, HLanguage, LanguageID, IsSLGIncomplete))
+    // from now on the Win32 resource loader picks this language's copy of every string, dialog
+    // and menu - in sally.exe and in every plugin DLL, on every thread - with English for anything
+    // a translation lacks
     {
-        if (HLanguage != NULL)
-            HANDLES(FreeLibrary(HLanguage));
-        if (!newSLGFile) // remembered .SLG file probably stopped existing, we'll try to find another one
-        {
-            std::wstring errorText = FormatStrW(L"File %s was not found or is not valid language file.\nSally "
-                                                L"will try to search for some other language file (.SLG).",
-                                                pathW.c_str());
-            MessageBoxW(NULL, errorText.c_str(), SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
-            Configuration.SLGName.clear();
-            goto FIND_NEW_SLG_FILE;
-        }
-        else // shouldn't happen at all - .SLG file was already tested
-        {
-            std::wstring errorText = FormatStrW(L"File %s was not found or is not valid language file.\n"
-                                                L"Please run Sally again and try to choose some other language file.",
-                                                pathW.c_str());
-            MessageBoxW(NULL, errorText.c_str(), L"Sally", MB_OK | MB_ICONERROR);
-            goto EXIT_1a;
-        }
+        ULONG count = 0;
+        const std::wstring preferred = sally::languages::PreferredUILanguagesList(langID, &count);
+        if (!SetProcessPreferredUILanguages(MUI_LANGUAGE_NAME, preferred.c_str(), &count))
+            TRACE_EW(L"SetProcessPreferredUILanguages() failed for " << Configuration.SLGName << L", error " << GetLastError());
     }
-
+    HLanguage = HInstance; // every call site loads language-dependent resources through HLanguage
+    LanguageID = langID;
     Configuration.LoadedSLGName = Configuration.SLGName;
 
-    // let already running salmon load the selected SLG (it was using some provisional one so far)
+    // let already running salmon know the selected language (it was using some provisional one so far)
     SalmonSetSLG(Configuration.SLGName.c_str());
 
     // set localized messages into ALLOCHAN module (ensures reporting to user when memory is low + Retry button + if all fails then Cancel to terminate the software)
@@ -3863,8 +3848,6 @@ FIND_NEW_SLG_FILE:
         gPrompter->ShowError(SALAMANDER_TEXT_VERSIONW(), LoadStrW(IDS_INVALIDCMDLINE));
 
     EXIT_2:
-        if (HLanguage != NULL)
-            HANDLES(FreeLibrary(HLanguage));
         goto EXIT_1a;
     }
 
@@ -4292,12 +4275,6 @@ FIND_NEW_SLG_FILE:
                 if (Configuration.ReloadEnvVariables)
                     InitEnvironmentVariablesDifferences();
 
-                if (newSLGFile)
-                {
-                    Plugins.ClearLastSLGNames(); // so that potentially new alternative language selection can occur for all plugins
-                    Configuration.ShowSLGIncomplete = TRUE;
-                }
-
                 MainMenu.SetSkillLevel(CfgSkillLevelToMenu(Configuration.SkillLevel));
 
                 if (!MainWindow->IsGood())
@@ -4354,8 +4331,8 @@ FIND_NEW_SLG_FILE:
                             saveNewConfig = TRUE; // new configuration must be saved (so this doesn't repeat on next launch)
                         // load plugins that have load-on-start flag set
                         Plugins.HandleLoadOnStartFlag(MainWindow->HWindow);
-                        // if we're starting for the first time with changed language, we'll load all plugins to show
-                        // if they have this language version + potentially let user choose alternative languages
+                        // if we're starting for the first time with changed language, we'll load all plugins so
+                        // the names, descriptions and menus they store in the configuration follow the new language
                         if (langChanged)
                             Plugins.LoadAll(MainWindow->HWindow);
 
@@ -4413,9 +4390,6 @@ FIND_NEW_SLG_FILE:
 
                     // ask Salmon to check if there are old bug reports on disk that need to be sent
                     SalmonCheckBugs();
-
-                    if (IsSLGIncomplete[0] != 0 && Configuration.ShowSLGIncomplete)
-                        PostMessage(MainWindow->HWindow, WM_USER_SLGINCOMPLETE, 0, 0);
 
                     //--- application loop
                     CALL_STACK_MESSAGE1("WinMainBody::message_loop");
@@ -4739,8 +4713,7 @@ FIND_NEW_SLG_FILE:
     ReleaseGraphics(FALSE);
     ReleaseConstGraphics();
 
-    HANDLES(FreeLibrary(HLanguage));
-    HLanguage = NULL;
+    HLanguage = NULL; // sally.exe itself, nothing to free
 
     if (NtDLL != NULL)
     {

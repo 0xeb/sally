@@ -1,0 +1,123 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for uncab. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uncab/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uncab.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 11, 21, 226, 122
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Další svazek cabinetu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_TEXT,12,9,203,32
+    LTEXT           "Název disku:",IDC_STATIC_1,12,48,45,8
+    LTEXT           "",IDC_DISKNAME,58,48,157,8
+    LTEXT           "Název CABu:",IDC_STATIC_2,12,59,45,8
+    LTEXT           "",IDC_CABNAME,58,59,157,8
+    LTEXT           "&Cesta:",IDC_STATIC_3,12,70,24,8
+    EDITTEXT        IDC_FILENAME,12,80,187,12
+    PUSHBUTTON      "...",IDC_BROWSE,202,80,13,12
+    DEFPUSHBUTTON   "OK",IDOK,111,103,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,165,103,50,14
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,6,97,214,1
+END
+
+IDD_ERROR DIALOGEX 15, 34, 350, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Chyba"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Název:",IDC_STATIC_1,4,10,26,8
+    LTEXT           "",IDS_FILENAME,34,10,309,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Chyba:",IDC_STATIC_2,4,23,26,8,NOT WS_GROUP
+    LTEXT           "Soubor nemůže být extrahován, protože je pokračující z předchozího svazku. Pro extrahování tohoto souboru musíte začít svazkem, v kterém soubor začíná.",IDC_STATIC_3,34,23,309,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&Příště nezobrazovat.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,34,44,183,12
+    DEFPUSHBUTTON   "Přes&kočit",IDSKIP,86,63,55,14,WS_GROUP
+    PUSHBUTTON      "Přeskočit &vše",IDALL,147,63,55,14
+    PUSHBUTTON      "Storno",IDCANCEL,208,63,55,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 225, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnCAB - Konfigurace"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "z předchozího svazku.",IDC_STATIC_1,23,22,154,8
+    CONTROL         "&Při extrahování automaticky přeskočit soubory pokračující",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,10,203,12
+    LTEXT           "obsah archivu.",IDC_STATIC_2,23,44,111,8
+    CONTROL         "&Nezobrazovat upozornění, pokud nemůže být vypsán celý",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,205,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,213,1
+    DEFPUSHBUTTON   "OK",IDOK,60,66,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,115,66,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 223, 108
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnCAB - Upozornění"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ne všechny soubory ve více-svazkovém archivu můžou být vypsány (a zobrazeny v panelu), protože nelze nalézt některý svazek archivu.",IDC_STATIC_1,11,9,203,24
+    LTEXT           "Pro výpis celého obsahu archivu zkopírujte všechny svazky archivu do stejného adresáře a otevřete první svazek.",IDC_STATIC_2,11,40,203,16
+    CONTROL         "&Příště nezobrazovat",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,65,157,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,83,212,1
+    DEFPUSHBUTTON   "OK",IDOK,164,90,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnCAB"
+  IDS_PLUGIN_DESCRIPTION, "Prohlíží a extrahuje CAB archivy."
+  IDS_ABOUT, "O pluginu"
+  IDS_LOWMEM, "Nedostatek paměti."
+  IDS_UNKNOWN, "Vyskytla se neznámá chyba."
+  IDS_BROWSEARCHIVETITLE, "Vyberte adresář"
+  IDS_LIST, "Položku z archivu nelze přidat do výpisu souborů."
+  IDS_EXTRPROGTITLE, "Extrahování CAB archivu - %s"
+  IDS_PREPAREDATA, "připravuji data a vytvářím adresáře..."
+  IDS_EXTRACTFILES, "extrahuji..."
+  IDS_EXTRACTING, "extrahuji: "
+  IDS_UNABLEGETFIELPOS, "Nelze získat ukazatel souboru: "
+  IDS_UNABLEWRITE, "Nelze zapsat soubor:"
+  IDS_UNABLESEEK, "Nelze nastavit ukazatel souboru: "
+  IDS_TOOLONGNAME, "Nelze dokončit operaci, kvůli příliš dlouhému názvu cesty."
+  IDS_TOOLONGMASK, "Nelze dokončit operaci, kvůli příliš dlouhé masce."
+  IDS_EXPIRE, "Promiňte, plugin vypršel. Prosím prohlédněte naší web stránku pro novější verzi."
+  IDS_UNABLECREATE, "Nelze vytvořit nebo otevřít soubor."
+  IDS_UNABLEREAD, "Nelze číst soubor."
+  IDS_BROWSEFOLDERTEXT, "Vybraný adresář obsahuje '%s'."
+  IDS_NOTFOUND, "Soubor nenalezen."
+  IDS_SKIPPING, "přeskakuji soubor"
+  IDS_NEXTVOLTEXT, "Prosím vložte disketu se svazkem cabinetu číslo %d nebo najděte příslušný cabinet soubor na disku.\n\nKlikněte na OK, pokud je připraven."
+
+  // FDIERROR - Error codes returned in erf.erfOper field
+  IDS_CABINET_NOT_FOUND, "Cabinet nenalezen."
+  IDS_NOT_A_CABINET, "Cabinet nemá správný formát."
+  IDS_UNKNOWN_CABINET_VERSION, "Cabinet má neznámé číslo verze."
+  IDS_CORRUPT_CABINET, "Cabinet je poškozený."
+  IDS_BAD_COMPR_TYPE, "Neznámý typ komprimace v cabinet adresáři."
+  IDS_MDI_FAIL, "Selhala dekomprimace dat z cabinet souboru."
+  IDS_RESERVE_MISMATCH, "Cabinety nemají nastavenu stejnou rezervní velikost."
+  IDS_WRONG_CABINET, "Neplatný cabinet soubor."
+  IDS_USER_ABORT, "Přerušeno uživatelem."
+  IDS_ERROR, "Chyba"
+}

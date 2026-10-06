@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for tar. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/tar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\tar.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "Feuilleter et extraire les archives Unix."
+ IDS_ABOUT, "À propos du module"
+ IDS_TARERR_TITLE, "Erreur du module TAR"
+ IDS_TARERR_UNKNOWN, "Format d'archive non reconnu."
+ IDS_TARERR_HEADER, "Données invalides dans l'en-tête du fichier TAR - archive altérée."
+ IDS_TARERR_CHECKSUM, "Contrôle par redondance cyclique négatif du fichier ou de son en-tête - archive altérée."
+ IDS_TARERR_FDATA, "Erreur interne : la structure du fichier de données est altérée."
+ IDS_TARERR_BADSIG, "Signature de bloc inconnue - je passe."
+ IDS_TARERR_NOTFOUND, "Le fichier requis n'est pas dans le fichier d'archive."
+ IDS_TARERR_MEMORY, "Erreur de réservation de mémoire."
+ IDS_UNPACKPROGRESS_TITLE, "Décompresser"
+ IDS_UNPACKPROGRESS_TEXT, "Extraction "
+ IDS_SKIPPROGRESS_TEXT, "On passe "
+ IDS_GZERR_TITLE, "Erreur GZip"
+ IDS_GZERR_BADMETHOD, "Extraction impossible : méthode de compression inconnue."
+ IDS_GZERR_ENCRYPTED, "Ce fichier est chiffré. Or, le chiffrement n'est pas prévu dans les archives GZip."
+ IDS_GZERR_MULTIPART, "Ce fichier est l'un des fichiers d'une archive en comportant plusieurs. Or, les archives GZip n'en comportent qu'un seul."
+ IDS_GZERR_BADFLAGS, "Extraction impossible : fanions inconnus dans l'en-tête GZip."
+ IDS_GZERR_FOPEN, "Erreur lors de l'ouvertureor du fichier d'archive: "
+ IDS_ERR_FREAD, "Erreur de lecture du fichier d'archive: "
+ IDS_TARERR_FWRITE, "Erreur d'écriture dans le fichier de sortie: "
+ IDS_TARERR_WRSIZE, "Impossible à la fonction WriteFile d'écrire l'ensemble des données spécifées."
+ IDS_GZERR_BADBLOCKTYPE, "Bloc altéré dans le flux GZip : impossible de l'extraire."
+ IDS_ERR_INTERNAL, "Erreur interne dans le module TAR, veuillez la signaler sur https://github.com/0xeb/sally/issues."
+ IDS_ERR_MEMORY, "Erreur de réservation de mémoire."
+ IDS_GZERR_CRC, "Erreur de CRC."
+ IDS_ERR_CORRUPT, "Données non prévues dans le flux de décompression, archive altérée."
+ IDS_ERR_EOF, "Fin de fichier prématurée."
+ IDS_GZERR_SEEK, "Erreur lors de la recherche dans le fichier d'archive: "
+ IDS_RPM_VIEWTITLE, "Visionneur RPM"
+ IDS_ERR_RPMTITLE, "Erreur RPM"
+ IDS_RPMERR_TMPNAME, "Erreur à la création du nom de fichier temporaire."
+ IDS_RPMERR_TMPFILE, "Erreur lors de la création du fichier temporaire."
+ IDS_ERR_NORPM, "Il ne s'agit pas d'une archive RPM."
+ IDS_ERR_BADRPMVERSION, "Cette archive suppose une version de RPM qui n'est pas encore prise en charge."
+ IDS_ERR_BADSIGNATURE, "Signature inconnue de l'archive RPM."
+ IDS_CPIOERR_BADSIG, "Mauvaise signature d'un enregistrement du fichier."
+ IDS_CPIOERR_HEADER, "En-tête du fichier altéré."
+ IDS_CPIOERR_FORMAT, "Format inconnu de l'en-tête cpio."
+ IDS_LZH_NOT_IMPLEMENTED, "Impossible de traiter pour le moment les archives LZH."
+}

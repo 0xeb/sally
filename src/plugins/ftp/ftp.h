@@ -61,7 +61,7 @@
 
 // global data
 extern HINSTANCE DLLInstance; // handle to the SPL - language-independent resources
-extern HINSTANCE HLanguage;   // handle to the SLG - language-dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 extern HICON FTPIcon;         // (16x16) FTP icon
 extern HICON FTPLogIcon;      // (16x16) icon of the FTP Logs dialog
 extern HICON FTPLogIconBig;   // large (32x32) icon of the FTP Logs dialog

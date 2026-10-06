@@ -1,0 +1,482 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for renamer. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/renamer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\renamer.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_RENAME DIALOGEX 9, 20, 376, 260
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Bulk hernoemen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_MENUSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,376,1
+    LTEXT           "&Masker:",IDC_STATIC_1,16,11,59,8
+    COMBOBOX        IDC_MASK,78,9,95,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Inclusief submappen",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,182,10,86,12
+    PUSHBUTTON      "Naam &veranderen",IDOK,292,9,77,14
+    CONTROL         "Han&dmatigemodus",IDC_MANUAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,27,76,12
+    CONTROL         "",IDS_MANSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,84,32,286,1
+    EDITTEXT        IDE_MANUAL,6,41,363,138,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "&Nieuwe naam:",IDS_LABELNEWNAME,16,43,59,8
+    COMBOBOX        IDC_NEWNAME,78,41,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_NEWNAME,357,41,12,12
+    LTEXT           "Vervangen",IDS_LABELREPLACE,6,60,38,8
+    CONTROL         "",IDS_REPLACESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,46,64,324,1
+    LTEXT           "&Zoeken naar:",IDS_LABELSEARCHFOR,16,77,59,8
+    COMBOBOX        IDC_SEARCH,78,75,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_SEARCH,357,75,12,12
+    LTEXT           "Vervangen d&oor:",IDS_LABELREPLACEWITH,16,94,59,8
+    COMBOBOX        IDC_REPLACE,78,92,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_REPLACE,357,92,12,12
+    CONTROL         "Hoofdle&ttergevoelig",IDC_CASESENSITIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,78,109,78,12
+    CONTROL         "Eén kee&r in elke naam",IDC_GLOBAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,78,123,94,12
+    CONTROL         "Hele &woorden",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,182,109,60,12
+    CONTROL         "Re&guliere expressie",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,182,123,77,12
+    CONTROL         "Exten&sie uitsluiten",IDC_EXCLUDEEXT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,282,109,73,12
+    LTEXT           "Hoofdlettergebruik",IDS_LABELCASE,6,139,65,8
+    CONTROL         "",IDS_CHANGECASESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,73,143,297,1
+    LTEXT           "Best&andsnaam:",IDS_LABELNAME,16,155,59,8
+    COMBOBOX        IDC_NAMECASE,78,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "E&xtensie:",IDS_LABELEXT,194,155,38,8
+    COMBOBOX        IDC_EXTCASE,244,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Incl&usief pad onderdeel",IDC_PATHPART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,78,170,92,12
+    LTEXT           "Voorb&eeld:",IDS_PREVIEW,6,182,51,8
+    RTEXT           "",IDS_COUNT,100,182,269,8
+    CONTROL         "",IDL_PREVIEW,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,0,192,376,68
+END
+
+IDD_CUT DIALOGEX 9, 20, 227, 88
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Subtekenreeks toevoegen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Subtekenreeks:",IDC_STATIC_1,7,9,55,8
+    COMBOBOX        IDC_CUTFROM,69,7,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "S&tartpositie",IDC_STATIC_2,7,28,55,8
+    EDITTEXT        IDE_START,69,26,48,12,ES_AUTOHSCROLL
+    LTEXT           "relatief aan",IDC_STATIC_3,126,28,40,8
+    COMBOBOX        IDC_START,172,26,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Eindpositie",IDC_STATIC_4,7,47,55,8
+    EDITTEXT        IDE_END,69,45,48,12,ES_AUTOHSCROLL
+    LTEXT           "relatief aan",IDC_STATIC_5,126,47,40,8
+    COMBOBOX        IDC_END,172,45,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,61,67,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,115,67,50,14
+END
+
+IDD_COUNTER DIALOGEX 9, 20, 163, 130
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Teler toevoegen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "S&tart van:",IDC_STATIC_1,7,9,36,8
+    EDITTEXT        IDE_START,61,7,95,12,ES_AUTOHSCROLL
+    LTEXT           "&Stap:",IDC_STATIC_2,7,25,36,8
+    EDITTEXT        IDE_STEP,61,23,95,12,ES_AUTOHSCROLL
+    LTEXT           "&Basis:",IDC_STATIC_3,7,41,36,8
+    COMBOBOX        IDC_BASE,61,39,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Kl. Breedte:",IDC_STATIC_4,7,57,53,8
+    EDITTEXT        IDE_MINWIDTH,61,55,95,12,ES_AUTOHSCROLL
+    LTEXT           "&Vultekens:",IDC_STATIC_5,7,73,52,8
+    COMBOBOX        IDC_FILL,61,71,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Links uitlijnen",IDC_LEFT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,90,76,12
+    DEFPUSHBUTTON   "OK",IDOK,29,109,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,83,109,50,14
+END
+
+IDD_DEFINESET DIALOGEX 9, 20, 269, 192
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Bepaal tekenset"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Tekens in &set:",IDC_STATIC_1,7,7,65,8
+    EDITTEXT        IDE_SET,7,17,255,12,ES_AUTOHSCROLL
+    LTEXT           "Tip:\n\nGebruik '-' voor toevoegen tekenreeks (vb. A-Z).\n\nOm '-' teken toe te voegen, schrijf aan begin of einde van de set (vb. -AZ).",IDC_STATIC_2,7,36,255,40
+    LTEXT           "Om het ']' teken toe te voegen schrijft het aan het begin van de set.\n\nOm het '^' teken toe te voegen inde positief tekenreeks schrijf het ergens maar niet in het begin van de set.",IDC_STATIC_3,7,84,255,32
+    LTEXT           "Om een POSIX tekenklasse toe te voegen [:class:], waar klasse is een alpha, alnum, ascii, blank, cntrl, digit, graph, lower, print, punct, space, upper, word, xdigit.\n\nInclusief backslash gebruik \\\\.",IDC_STATIC_4,7,124,255,40
+    DEFPUSHBUTTON   "OK",IDOK,82,171,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,136,171,50,14
+END
+
+IDD_SUBEXPRESSION DIALOGEX 9, 20, 195, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Subexpressie opgeven"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Subexpressie getal:",IDC_STATIC_1,7,9,82,8
+    COMBOBOX        IDC_NUMBER,95,7,93,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Tip: Gebruik 0 voor overeenkomende expressie.",IDC_STATIC_2,7,23,180,8
+    LTEXT           "&Keuze:",IDC_STATIC_3,7,37,75,8
+    COMBOBOX        IDC_CASE,95,35,93,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,45,57,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,99,57,50,14
+END
+
+IDD_PROGRESS DIALOGEX 6, 15, 194, 60
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Hernoemen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDS_MESSAGE,7,7,180,8
+    LTEXT           "",IDS_PROGRESS,7,22,180,10,0,WS_EX_STATICEDGE
+    DEFPUSHBUTTON   "Annuleren",IDCANCEL,72,39,50,14
+END
+
+IDD_COMMAND DIALOGEX 9, 20, 368, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Shell-opdracht uitvoeren"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Opdracht:",IDC_STATIC_1,7,7,82,8
+    COMBOBOX        IDC_COMMAND,7,17,354,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,257,37,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,311,37,50,14
+END
+
+IDD_ERROR DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Shell-opdracht fout"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "De opdracht is mogelijk onjuist beëindigd.",IDC_STATIC_1,7,7,218,8
+    LTEXT           "Opdrachtregel:",IDC_STATIC_2,7,22,56,8
+    EDITTEXT        IDE_COMMAND,63,22,298,8,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    LTEXT           "Foutcode:",IDC_STATIC_3,7,34,56,8
+    LTEXT           "",IDS_EXITCODE,65,34,296,8
+    LTEXT           "&Standaard fout:",IDC_STATIC_4,7,46,82,8
+    EDITTEXT        IDE_STDERR,7,56,354,176,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON   "Negeren",IDOK,257,239,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,311,239,50,14
+END
+
+IDD_CONFIG DIALOGEX 45, 31, 257, 160
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Hernoemer geavanceerde opties"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Externe editor instellingen voor handmatige modus:",IDC_STATIC_1,7,7,240,8
+    LTEXT           "&Opdracht:",IDC_STATIC_2,14,21,36,8
+    EDITTEXT        IDE_COMMAND,60,19,174,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_BROWSE,237,19,13,12,WS_GROUP
+    LTEXT           "&Parameters:",IDC_STATIC_3,14,37,43,8
+    EDITTEXT        IDE_ARGUMENTS,60,35,174,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ARGHELP,237,35,13,12,WS_GROUP
+    LTEXT           "&Beginmap:",IDC_STATIC_4,14,53,39,8
+    EDITTEXT        IDE_INITDIR,60,51,174,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_INITDIRHELP,237,51,13,12,WS_GROUP
+    LTEXT           "Lettertype handmatige modus:",IDC_STATIC_5,7,74,113,8
+    PUSHBUTTON      "Wijzi&gen",IDB_FONT,14,84,50,14,WS_GROUP
+    LTEXT           "Bevestigingen:",IDC_STATIC_6,7,109,60,8
+    CONTROL         "Hoofdvenster sluiten met de &ESC toets.",IDC_CONFIRMESCCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,118,201,12
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,7,138,243,1
+    DEFPUSHBUTTON   "OK",IDOK,92,142,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,146,142,50,14
+    PUSHBUTTON      "Help",IDHELP,200,142,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Hernoemer"
+  IDS_DESCRIPTION, "Krachtige bulk hernoemer met real-time voorbeeld."
+  IDS_ABOUT, "Over plugin"
+  IDS_RENAMERERR, "Hernoemer - Fout"
+  IDS_LOWMEM, "Onvoldoende geheugen."
+  IDS_PLUGMENU_RENAME, "&Bulk hernoemen..."
+  IDS_PLUGMENU_UNDO, "&Ongedaan maken..."
+  IDS_RENAME, "&Hernoemen"
+  IDS_VALIDATE, "&Valideren"
+  IDS_ORIGNAME_COLUMN, "Oorspronkelijke naam"
+  IDS_NEWNAME_COLUMN, "Nieuwe naam"
+  IDS_SIZE_COLUMN, "Grootte"
+  IDS_DATE_COLUMN, "Datum"
+  IDS_TIME_COLUMN, "Tijd"
+  IDS_PATH_COLUMN, "Pad"
+
+  // menu
+  IDS_MENU_FILE, "Opdra&chten"
+  IDS_MENU_VIEW, "Bee&ld"
+  IDS_MENU_OPTIONS, "O&pties"
+  IDS_MENU_HELP, "&Help"
+  IDS_MENU_RENAME, "&Hernoemen\tAlt+R"
+  IDS_MENU_VALIDATE, "&Valideren\tCtrl+I"
+  IDS_MENU_EXIT, "Afslui&ten\tAlt+F4"
+  IDS_MENU_SORTOLD, "Sorteren op &oorspronkelijke naam\tCtrl+F1"
+  IDS_MENU_SORTNEW, "Sorteren op &nieuwe naam\tCtrl+F1"
+  IDS_MENU_SORTSIZE, "Sorteren op &grootte\tCtrl+F2"
+  IDS_MENU_SORTTIME, "Sorteren op &Tijd\tCtrl+F3"
+  IDS_MENU_SORTPATH, "Sorteren op &map\tCtrl+F4"
+  IDS_MENU_FILENAMES, "Hernoem besta&ndsnamen\tCtrl+N"
+  IDS_MENU_RELATIVEPATH, "Hernoem &relatieve pad\tCtrl+R"
+  IDS_MENU_FULLPATH, "Hernoem &volledige pad\tCtrl+F"
+  IDS_MENU_FONT, "&Lettertype handmatige modus..."
+  IDS_MENU_LAST, "&Laatst gebruikt\tCtrl+L"
+  IDS_MENU_RESET, "Begin&waarden\tCtrl+D"
+  IDS_MENU_REGEXP, "&Reguliere expressie"
+  IDS_MENU_CUSTOMFONT, "Gebruik &aangepast lettertype..."
+  IDS_MENU_AUTOFONT, "Gebruik &standaardlettertype"
+  IDS_MENU_REMOVESOURCEPATH, "L&eeggemaakte mappen verwijderen"
+  IDS_MENU_UNDO, "&Ongedaan maken\tCtrl+U"
+  IDS_MENU_EDIT, "&Bewerken"
+  IDS_MENU_STORELIST, "&Bewaar Lijst in het Klembord\tF2"
+  IDS_MENU_LOADLIST, "&Lijst van klembord laden\tF3"
+  IDS_MENU_EDITLIST, "L&ijst openen in externe editor...\tF4"
+  IDS_MENU_FILTER, "&Filter lijst door shell-opdracht...\tF5"
+  IDS_MENU_ALLFILES, "&Alle Bestanden\tF6"
+  IDS_MENU_RENAMED, "Successvol naam van &Bestanden gewijzigd\tF7"
+  IDS_MENU_NOTRENAMED, "&Naam van Bestanden niet gewijzigd\tF8"
+  IDS_MENU_ADVANCED, "&Geavanceerd..."
+  IDS_MENU_BATCHRENDLG, "&Bulk hernoemen dialoogvenster\tF1"
+
+  IDS_VAR_ORIGNAME, "$(OorspronkelijkeNaam)"
+  IDS_CASE_DONTCHANGE, "Niet wijzigen"
+  IDS_CASE_LOWER, "Kleine letters"
+  IDS_CASE_UPPER, "Hoofdletters"
+  IDS_CASE_MIXED, "Gemengde letters"
+  IDS_INVALIDMASK, "Ongeldig masker."
+  IDS_TOOLONGPATH, "Kan map niet lezen omdat padnaam te lang is"
+  IDS_ERRREADDIR, "Kan de map niet lezen."
+  IDS_ERROR, "Fout"
+  IDS_DIRTEXT, "DIR"
+  IDS_CANCELCNFRM, "Wilt u de opdracht annuleren?"
+  IDS_QUESTION, "Vraag"
+  IDS_VAR_ORIGINALNAME, "Oorspronkelijke naam"
+  IDS_VAR_DRIVE, "Schijf"
+  IDS_VAR_PATH, "Pad"
+  IDS_VAR_RELATIVEPATH, "Relatief pad"
+  IDS_VAR_NAME, "Naam"
+  IDS_VAR_NAMEPART, "Naamdeel"
+  IDS_VAR_EXTPART, "Extensiedeel"
+  IDS_VAR_SIZE, "Grootte"
+  IDS_VAR_TIME, "Tijd"
+  IDS_VAR_DATE, "Datum"
+  IDS_VAR_COUNTER, "Teller..."
+  IDS_VAR_LOWER, "Kleine letter"
+  IDS_VAR_UPPER, "Hoofdletter"
+  IDS_VAR_MIXED, "Gemengde grootte"
+  IDS_VAR_STRIPDIA, "Diakritische tekens ontleden"
+  IDS_VAR_CUT, "Subtekenreeks..."
+  IDS_LEFT, "start"
+  IDS_RIGHT, "einde"
+  IDS_BADCUTOFFSET, "Specificeer een niet-negatieve waarde."
+  IDS_DECIMAL, "Decimaal"
+  IDS_HEX_LOWER, "Hex (abcdef)"
+  IDS_HEX_UPPER, "Hex (ABCDEF)"
+  IDS_FILL_SPACES, "Spaties"
+  IDS_FILL_ZEROS, "Nullen"
+  IDS_FILL_UNDERSCORES, "Onderstrepingsteken"
+
+  IDS_EXP_UNMATCHEDPAR, "Variabele naam moet worden beëindigd met ')'."
+  IDS_EXP_VARNOTFOUND, "Variabele niet gevonden."
+  IDS_EXP_UNEXPECTEDCHAR, "Verwacht variabele naam tussen haken of '$' teken."
+  IDS_EXP_SMALLBUFFER, "Uitgebreide tekenreeks is te groot."
+  IDS_EXP_TRAILINGDOLLAR, "Onverwachte regeleinde, teken '$' moet worden gevolgd door een variabele naam of '$' teken."
+  IDS_EXP_EMPTYSTR, "Een lege regel is niet toegestaan."
+  IDS_EXP_UNEXPECTARG, "Argument is onverwacht hier."
+  IDS_EXP_EXPECTCUTORCASE, "Verwacht hoofdlettergevoeligheid specificatie ('klein', 'hoofd', 'gemengd', of naam deel specificatie (2 integer getallen)."
+  IDS_EXP_EXPECTENDCUT, "Verwacht eind of naam deel specificatie (integer getal)."
+  IDS_EXP_UNEXPECTEDARGUMENT, "Argument verwacht."
+  IDS_EXP_MISTIMEFORMAT, "Ontbrekende tijdnotatie."
+  IDS_EXP_INVALIDTIMEFMT, "Ongegldige tijdnotatie."
+  IDS_EXP_MISDATEFORMAT, "Ontbrekende datumnotatie"
+  IDS_EXP_INVALIDDATEFMT, "Ongeldige datumnotatie."
+  IDS_EXP_TOOMUCHARGUMENTS, "Te veel argumenten."
+  IDS_EXP_EXPECTSTART, "Teller start verwacht (integer getal)."
+  IDS_EXP_EXPECTSTEP, "Teller stap verwacht (drijvendekommagetal)."
+  IDS_EXP_EXPECTBASEALIGNWIDTH, "Verwacht getalsysteem ('dxX'), uitlijning ('l') of breedte (positief geheel getal) specificatie."
+  IDS_EXP_EXPECTALIGNWIDTH, "Verwacht uitlijning ('l') of breedte (positief geheel getal) specificatie."
+  IDS_EXP_EXPECTWIDTH, "Verwacht breedte (positief geheel getal) specificatie"
+  IDS_EXP_EXPECTFILL, "Verwacht opvulteken specificatie (een letter)"
+
+  IDS_NEWNAMEERR, "<Nieuwe naam fout: %s>"
+  IDS_TRANSFERERROR, "<Ongeldige waarde in een ingvoerveld>"
+  IDS_REGEXPERR, "<Reguliere expressie fout: %s>"
+  IDS_BMERR, "<Boyer-Moore fout: %s>"
+  IDS_GENERICERR, "<Fout: %s>"
+  IDS_REPLACEERR, "<Vervang patroon fout: %s>"
+
+  IDS_REP_EXPCLOSEPAR1, "Verwacht sluitende aanhalingstekens of hoofd/klein letter specificatie ('klein', 'hoofd', 'gemixt', of 'stripdia')."
+  IDS_REP_EXPCLOSEPAR2, "Verwacht sluitende aanhalingstekens."
+  IDS_REP_EXPCLOSEPAR3, "Verwacht sluitende aanhalingstekens of een dubbele punt ':' gevolgd door hoofd/klein letter specificatie ('klein', 'hoofd', 'gemixt', or 'stripdia')."
+  IDS_REP_BADREF, "Referentie naar ongedefinieerde sub expressie."
+  IDS_EXP_EXPECTSUBNUM1, "Verwacht een sub expressie getal"
+  IDS_EXP_EXPECTSUBNUM2, "Verwacht een sub-expressie getal, sub-expressie getal tussen haakjes of het teken '$'."
+  IDS_EXP_TRAILINGBACKSLASH, "Onverwacht einde van tekenreeks, backslash mag niet aan het eind van de tekenreeks."
+
+  IDS_REENOERROR, "Geen fout."
+  IDS_REELOWMEMORY, "Weinig geheugen."
+  IDS_REEEMPTY, "Reguliere expressie is leeg."
+  IDS_REETOOBIG, "Reguliere expressie is te groot."
+  IDS_REETOOMANYPARENTHESISES, "Te veel ()."
+  IDS_REEUNMATCHEDPARENTHESIS, "Niet overrkomende ()."
+  IDS_REEOPERANDCOULDBEEMPTY, "*+ operand zou leeg kunnen zijn."
+  IDS_REENESTED, "Geneste *?+."
+  IDS_REEUNMATCHEDBRACKET, "Niet overeenkomende []."
+  IDS_REEFOLLOWSNOTHING, "?+* wordt door niets gevolgd."
+  IDS_REETRAILINGBACKSLASH, "Afsluitende \\."
+  IDS_REEINTERNALDISASTER, "Interne ramp."
+  IDS_REEINVALIDPOSIXCLASS, "Onbekende POSIX klasse naam."
+  IDS_REEEXPECTINGXDIGIT, "Verwachte twee hexadecimal getallen na \\x."
+  IDS_REESTACKOVERFLOW, "Stack overloop"
+  IDS_REENOPATTERN, "Gecompileerde expressie vereist."
+  IDS_REEERRORSTARTINGTHREAD, "Kan geen nieuwe thread starten."
+  IDS_REEEXPECTINGEXTENDEDPATTERN1, "Verwacht een van :=!< na (?"
+  IDS_REEEXPECTINGEXTENDEDPATTERN2, "Verwacht een van =! na (?<"
+  IDS_REEBADFIXEDWIDTHLOOKBEHIND, "Kijk-achterwaarts patroon heeft geen vaste lengte."
+
+  IDS_RE_POSIX_ALPHA, "Alphabetische Tekens (alpha)"
+  IDS_RE_POSIX_ALNUM, "Alphanumerische Tekens (alnum)"
+  IDS_RE_POSIX_ASCII, "ASCII Tekens (ascii)"
+  IDS_RE_POSIX_CNTRL, "Control Tekens (cntrl)"
+  IDS_RE_POSIX_DIGIT, "Decimale cijfers (digit)"
+  IDS_RE_POSIX_GRAPH, "Afdrukbare Tekens anders dan Spatie (graph)"
+  IDS_RE_POSIX_LOWER, "Kleine letters (lower)"
+  IDS_RE_POSIX_PRINT, "Afdrukbare Tekens (print)"
+  IDS_RE_POSIX_PUNCT, "Interpunctie Tekens (punct)"
+  IDS_RE_POSIX_SPACE, "Spaties (space)"
+  IDS_RE_POSIX_UPPER, "Hoofd letters (upper)"
+  IDS_RE_POSIX_WORD, "Alphanumerische Tekens + '_' (word)"
+  IDS_RE_POSIX_XDIGIT , "Hexadecimale Cijfers (xdigit)"
+  IDS_RE_LEFTPAREN, "Haakje links '('"
+  IDS_RE_RIGHTPAREN, "Haakje Rechts ')'"
+  IDS_RE_LEFTBRACKET, "Vierkant haakje links '['"
+  IDS_RE_CIRCUMFLEX,  "Circumflex '^'"
+  IDS_RE_DOLLAR, "Dollar '$'"
+  IDS_RE_DOT, "Punt '.'"
+  IDS_RE_PIPE, "Pipe '|'"
+  IDS_RE_ASTERISK, "Asterisk '*'"
+  IDS_RE_PLUS, "Plus '+'"
+  IDS_RE_QUESTIONMARK, "Vraagteken '?'"
+  IDS_RE_BACKSLASH, "Backslash '\\'"
+  IDS_RE_ANYCHAR, "Wilekeurig Teken"
+  IDS_RE_ANYFROM, "Willekeurig Teken uit een Reeks"
+  IDS_RE_ANYBUT, "Willekeurig Teken behalve uit een Reeks"
+  IDS_RE_ANYFROMPOSIX, "POSIX Teken Klasse"
+  IDS_RE_ANYBUTPOSIX, "POSIX Teken Klasse"
+  IDS_RE_BOL, "Begin van Naam"
+  IDS_RE_EOL, "Eind van Naam"
+  IDS_RE_OR, "Of"
+  IDS_RE_ITERATION, "0 of meer Overeenkomsten"
+  IDS_RE_POSITIVEITERATION, "1 of meer Overeenkomsten"
+  IDS_RE_ITERATION_GREEDY, "Zo veel mogelijk Overeenkomsten"
+  IDS_RE_ITERATION_UNGREEDY, "Zo weinig Overeenkomsten als nodig"
+  IDS_RE_ONEORZERO, "1 or 0 Overeenkomsten"
+  IDS_RE_ZEROORONE, "0 or 1 Overeenkomsten"
+  IDS_RE_SUBEXPRESSION, "Subexpressie"
+  IDS_RE_NOTCAPTURESUBEXP, "Niet vastleggende sub expressie"
+  IDS_RE_LITERALS, "Letterlijk Speciaal Teken"
+  IDS_RE_WORDCHAR, "Woord Teken"
+  IDS_RE_NONWORDCHAR, "Non-Woord Teken"
+  IDS_RE_SPACE, "Spatie"
+  IDS_RE_NONSPACE, "Non Spatie"
+  IDS_RE_DIGIT, "Cijfer"
+  IDS_RE_NONDIGIT, "Non-Cijfer Teken"
+  IDS_RE_WORDB, "Woord grens"
+  IDS_RE_NONWORDB, "Non-(Woord Grens)"
+  IDS_RE_NUMBER, "Decimaal Getal"
+  IDS_RE_HEXNUMBER, "Hexadecimaal Getal"
+  IDS_RE_WORD, "Woord"
+  IDS_RE_PATHCOMPONENT, "Pad Component"
+  IDS_RE_FILENAME, "Bestandnaam (Naam in $1, Ext in $2)"
+  IDS_RE_DEFINESET, "Definieer Set..."
+  IDS_RE_MATCHEDEXPR, "Overeenkomende Reguliere Expressie"
+  IDS_RE_MATCHEDSUBEXP, "Overeenkomende Subexpressie..."
+  IDS_RE_PLOOKA, "Positieve Kijk-Voorwaarts"
+  IDS_RE_NLOOKA, "Negatieve Kijk-Voorwaarts"
+  IDS_RE_PLOOKB, "Positieve Kijk-Achterwaarts"
+  IDS_RE_NLOOKB, "Negatieve Kijk-Achterwaarts"
+  IDS_RE_ZEROWIDTHASSERT, "Nul-Lengte Assertie"
+
+  IDS_EMPTYSTR, "Lege Tekenreeks hier niet geoorloofd."
+  IDS_EMPTYMSG_DEF, "Er zijn geen items in de lijst."
+  IDS_EMPTYMSG_NOMATCH, "Geen bestanden komen met het masker overeen."
+  IDS_EMPTYMSG_BADMASK, "Ongeldig masker."
+  IDS_EMPTYMSG_GENERATING, "Lijst van bestanden wordt aangemaakt. Druk ESC om af te breken"
+  IDS_EMPTYMSG_ERROR, "Een fout is opgretreden tijdens het maken van de bestandslijst."
+  IDS_CNFRM_CLOSE, "Wilt u Batch Rename sluiten?"
+  IDS_CNFRM_ESC_CLOSE2, "&Sluit bulkhernoemen zonder opnieuw te vragen"
+
+  IDS_CANCELING, "Operatie wordt geannuleerd, wachten aub..."
+  IDS_NOTVALID_FILENAME, "Ongeldige bestandsnaam."
+  IDS_NOTVALID_RELATIVEPATH, "Ongeldig relatief pad."
+  IDS_NOTVALID_FULLPATH, "Ongeldig volledig pad."
+  IDS_DUPLICATENAME, "Dubbele naam."
+  IDS_DEPENDENCE, "Wederkerende naams afhankelijkheid van bestand kan niet gewijzigd worden."
+
+  IDS_RENAMING, "Naam van bestanden wordt gewijzigd, druk ESC om af te breken..."
+  IDS_PREPARING, "Data voor naamswijziging wordt voorbereid..."
+  IDS_DIRNOTSAMEROOT, "Map naar ander station verplaatsen wordt niet ondersteund."
+  IDS_DIRDIR, "Pad met dezelfde naam bestaat al."
+  IDS_FILEDIR, "Deze naam is al in gebruik voor een map."
+  IDS_CNFRM_SHOVERWRITE, "Wilt u het bestand met SYSTEEM of VERBORGEN attribuut overschrijven?"
+  IDS_OVEWWRITETITLE, "Bevestig bestand overschrijven"
+  IDS_OVERWRITEERROR, "Kan bestand niet overschrijven: "
+  IDS_MOVEERROR, "Kan naam van bestand niet wijzigen: "
+  IDS_DELETEERROR, "Kan bestand niet wissen: "
+  IDS_WRITEERROR, "Kan bestand niet schrijven: "
+  IDS_READERROR, "Kan bestand niet lezen: "
+  IDS_OPENFILEERROR, "Kan bestand niet openen: "
+  IDS_DIRCASEERROR, "Kan Hoofd/Klein letter van mapnaam niet veranderen: "
+  IDS_CREATEDIR, "Kan map niet aanmaken: "
+  IDS_UNDOING, "naam wijzigen operatie ongedaan maken..."
+  IDS_REMOVEDIR,"Kan map niet verwijderen: "
+  IDS_UNDOQUEST, "Naam wijzigen operatie ongedaan maken?"
+  IDS_SOMEERRORS, "Naamswijziging van enige bestanden niet succesvol. Deze bestanden worden nu getoond om u in de gelegenheid te stellen om de fouten te korrigeren.\n\nOm de succesvolle wijzigingen te zien, gebruik de opties in het 'weergeven' menu."
+  IDS_VALIDATEOK, "Validatie successvol beeindigd."
+  IDS_NOTTODO, "Nks te doen."
+  IDS_WAITINGFORWINDOWS, "Wachten totdat alle Batch naamswijzigings vensters gesloten zijn..."
+  IDS_MISLINES, "Te weinig regels."
+  IDS_BADLINECOUNT, "Aantal ingegeven regels moet overeenkomen met het aantal bestanden voor de naams wijzigen operatie."
+  IDS_CREATETEMP, "Kan tijdelijk bestand niet maken. "
+  IDS_WRITETEMP, "Kan tijdelijkbestand niet schrijven. "
+  IDS_OPENTEMP, "Kan tijdelijkbestand niet openen. "
+  IDS_SIZEOFTEMP, "Kan grootte van tijdelijkbestand niet opvragen. "
+  IDS_READTEMP, "Kan niet lezen van tijdelijkbestand. "
+  IDS_PROCESS, "Kan nieuw proces niet starten: "
+  IDS_ERRLAUNCHEDIT, "Kan de externe editor niet starten. Verifieer de Renamer Plugin configuratie voor externe editor. "
+  IDS_LONGDATA, "Kan bewerking niet beeindigen door te lang gegevens."
+  IDS_EXTEDIT, "Als u klaar bent met bewerken en de veranderingen in de externe editor opgeslagen zijn, druk OK om de lijst met namen te aktualiseren.\n\nDruk Annuleren om terug te gaan zonder de lijst te verandern."
+  IDS_CREATEPIPE, "Kan pijp niet maken: "
+  IDS_WRITEPIPE, "Kan niet naar de pipe schrijven. "
+  IDS_EXEFILES, "Uitvoerbare bestanden (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tAlle bestanden (*.*)\t*.*\t\t"
+  IDS_EXP_FULLNAME, "Volledige naam"
+  IDS_EXP_DRIVE, "Schijf"
+  IDS_EXP_PATH, "Pad"
+  IDS_EXP_NAME, "Naam"
+  IDS_EXP_NAMEPART, "Naamdeel"
+  IDS_EXP_EXTPART, "Extentie deel"
+  IDS_EXP_FULLPATH, "Volledig pad"
+  IDS_EXP_WINDIR, "Windows map"
+  IDS_EXP_SYSDIR, "Systeemmap"
+  IDS_EXP_DOSFULLNAME, "DOS volledige naam"
+  IDS_EXP_DOSDRIVE, "DOS schijf"
+  IDS_EXP_DOSPATH, "DOS pad"
+  IDS_EXP_DOSNAME, "DOS naam"
+  IDS_EXP_DOSNAMEPART, "DOS Naamdeel"
+  IDS_EXP_DOSEXTPART, "DOS Extensie deel"
+  IDS_EXP_DOSFULLPATH, "DOS volledig pad"
+  IDS_EXP_DOSWINDIR, "DOS Windows map"
+  IDS_EXP_DOSSYSDIR, "DOS Systeemmap"
+  IDS_EXP_ENVVAR, "Omgevingsvariabele"
+  IDS_EXP_BROWSE, "Bladeren..."
+  IDS_EXP_SALDIR, "Sally map"
+  IDS_CFG_CONFLICT, "De configuratie is reeds geopend."
+  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
+  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+}

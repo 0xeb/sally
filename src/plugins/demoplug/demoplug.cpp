@@ -25,7 +25,7 @@ CPluginInterfaceForFS InterfaceForFS;
 CPluginInterfaceForThumbLoader InterfaceForThumbLoader;
 
 // global data
-const wchar_t* PluginNameEN = L"DemoPlug"; // untranslated plugin name, used before the language module loads and for debugging
+const wchar_t* PluginNameEN = L"DemoPlug"; // untranslated plugin name, used before the translated resources are needed and for debugging
 const wchar_t* PluginNameShort = L"DEMOPLUG"; // plugin name (short form, without spaces)
 
 std::wstring Str(L"default");
@@ -79,7 +79,7 @@ unsigned char* LowerCase = NULL;
 unsigned char* UpperCase = NULL;
 
 HINSTANCE DLLInstance = NULL; // handle to the SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to the SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 // Salamander general interface - valid from startup until the plugin shuts down
 CSalamanderGeneralAbstract* SalamanderGeneral = NULL;
@@ -104,8 +104,8 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
         initCtrls.dwICC = ICC_BAR_CLASSES;
         if (!InitCommonControlsEx(&initCtrls))
         {
-            // wide: English-only diagnostic, no LangStr involved (language module
-            // isn't even loaded yet at DllMain time) - same shape as undelete.cpp's fix (208).
+            // wide: English-only diagnostic, no LangStr involved (HLanguage
+            // isn't set yet at DllMain time) - same shape as undelete.cpp's fix (208).
             MessageBoxW(NULL, L"InitCommonControlsEx failed!", L"Error", MB_OK | MB_ICONERROR);
             return FALSE; // DLL won't start
         }
@@ -400,10 +400,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), PluginNameEN);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // obtain the general Salamander interface
     SalamanderGeneral = salamander->GetSalamanderGeneral();

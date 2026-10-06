@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for unlha. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Blader en LHA archieven uitpakken."
+ IDS_ABOUT, "Over deze plugin"
+ IDS_FILECORRUPT, "Ongeldig LZH bestand of onbekend bestandsformaat."
+ IDS_CHECKSUMERROR, "Fout in het controletotaal van dit bestand.\nHet archiefbestand is beschadigd - niet alle bestanden kunnen weergegeven worden."
+ IDS_LOWMEM, "Onvoldoende geheugen."
+ IDS_WRITEERROR, "Schrijffout"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "Er is een fout bij het openen van het archief."
+ IDS_LIST, "Niet is staat om toevoegingen aan het archiefbestand toe te voegen."
+ IDS_SYMLINK, "Archief bevat één of meerdere UNIX symbolische links die niet getoond worden."
+ IDS_UNPACKERROR, "Kan bestand niet uitpakken."
+ IDS_CRCERROR, "Fout in gecomprimeerde data. CRC komt niet overeen."
+ IDS_READERROR, "Er is een fout bij het in lezen van het archief."
+ IDS_EXTRPROGTITLE, "Uitpakken LHA archief - %s"
+ IDS_PREPAREDATA, "voorbereiding data en mappen aanmaken..."
+ IDS_UNPACKING, "uitpakken: "
+ IDS_EXTRACTFILES, "uitpakken..."
+ IDS_TOOLONGNAME, "Kan operatie niet afmaken vanwege te lange padnaam."
+ IDS_TOOLONGMASK, "Kan operatie niet afmaken vanwege te lange mask."
+ IDS_METHOD, "Onbekende compressie methode. Het bestand kan niet worden uitgepakt."
+ IDS_METHOD2, "onbekende methode overgeslagen..."
+}

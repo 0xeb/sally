@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for pak. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 223, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Optimalizácia PAK archívu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Veľkosť platných dát:",IDC_STATIC_1,8,9,75,8
+    LTEXT           "",IDC_VALIDSIZE,93,9,118,8
+    LTEXT           "Celková veľkosť súboru:",IDC_STATIC_2,8,20,84,8
+    LTEXT           "",IDC_TOTALSIZE,93,20,118,8
+    LTEXT           "Prebytočné miesto:",IDC_STATIC_3,8,31,66,8
+    LTEXT           "",IDC_WASTEDSPACE,93,31,118,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,207,1
+    DEFPUSHBUTTON   "Optimalizovať",IDOK,48,53,60,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,114,53,60,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "Nie je možné otvoriť súbor: %s"
+ IDS_PAK_ERRINIT, "Nie je možné inicializovať paklib rozhranie. Jeden súbor je už otvorený."
+ IDS_PAK_ERROPEN2, "Nie je možné otvoriť súbor. Jeden súbor je už otvorený."
+ IDS_PAK_ERRGETFILESIZE, "Nie je možné zistiť veľkosť súboru: %s"
+ IDS_PAK_INVLAIDDATA, "Neplatný formát dát."
+ IDS_PAK_LOWMEMORY, "Nedostatok pamäti."
+ IDS_PAK_CENTRDIR, "aktuálny hlavný PAK adresár"
+ IDS_PAK_ERRSETFILEPTR, "Nie je možné nastaviť ukazovateľ súboru: %s"
+ IDS_PAK_ERRREADFILE, "Nie je možné čítať zo súboru: %s"
+ IDS_PAK_ERRGETFILEPTR, "Nie je možné získať ukazovateľ súboru: %s"
+ IDS_PAK_ERRWRITEFILE, "Nie je možné zapisovať do súboru: %s"
+ IDS_PAK_TOOLONGNAME, "Nie je možné pridať súbor, kvôli príliš dlhému názvu."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Prehliada a extrahuje Quake PAK archívy."
+ IDS_ABOUT, "O plugine"
+ IDS_LOWMEM, "Nedostatok pamäti."
+ IDS_ERRLIST, "Nie je možné pridať súbor do výpisu."
+ IDS_ERRLOADPAKLIB, "Nie je možné načítať paklib.dll alebo získať procesnú adresu: "
+ IDS_EXTRPROGTITLE, "Extrahovanie PAK archívu - %s"
+ IDS_PREPAREDATA, "pripravujem dáta..."
+ IDS_EXTRACTFILES, "extrahujem..."
+ IDS_EXTRACTING, "extrahujem: "
+ IDS_TOOLONGNAME, "Nie je možné dokončiť operáciu, kvôli príliš dlhému názvu cesty."
+ IDS_UNABLESEEK, "Nie je možné nastaviť ukazovateľ súboru: "
+ IDS_UNABLEGETFIELPOS, "Nie je možné získať ukazovateľ súboru: "
+ IDS_UNABLEWRITE, "Nie je možné zapisovať do súboru:"
+ IDS_ERROPEN, "Nie je možné otvoriť súbor: "
+ IDS_TOOLONGMASK, "Nie je možné dokončiť operáciu, kvôli príliš dlhej maske."
+ IDS_DELPROGTITLE, "Odstraňujem z PAK archívu - %s"
+ IDS_DELFILES, "odstraňujem..."
+ IDS_DELETING, "odstraňujem: "
+ IDS_CANCELING, "rušenie operácie, čakajte prosím..."
+ IDS_ADDPROGTITLE, "Komprimácia PAK archívu - %s"
+ IDS_TOOLARGE, "Nie je možné pridať súbor: Súbor je príliš veľký."
+ IDS_ADDFILES, "Komprimujem..."
+ IDS_TOOLONGNAME2, "Nie je možné pridať súbor, kvôli príliš dlhému názvu."
+ IDS_PACKING, "komprimujem: "
+ IDS_UNABLEREAD, "Nie je možné čítať zo súboru: "
+ IDS_ERRCONNECT, "Nie je možné pripojiť plugin k Sally."
+ IDS_OPTIMIZING, "optimalizácia, čakajte prosím..."
+ IDS_OPTPROGTITLE, "Optimalizácia PAK archívu - %s"
+ IDS_NEEDOPT, "Odstránenie súborov bolo úspešne dokončené. Môže byť potrebné spustiť PAK optimalizáciu z ponuky PAK pluginu, aby nedošlo k plytvaniu miestom na disku."
+ IDS_MENUOPTIMIZE, "&Optimalizovať PAK"
+ IDS_EXPIRE, "Ľutujeme, plugin vypršal. Prosím skontrolujte našu webovú stránku kvôli novšej verzii."
+}

@@ -1,0 +1,126 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for checksum. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checksum/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checksum.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CALCULATE DIALOGEX 0, 0, 344, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+CAPTION "计算校验和"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,334,54
+    LTEXT           "正在计算:",IDC_LABEL,5,68,40,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,48,68,107,8
+    PUSHBUTTON      "配置(&F)...",IDC_BUTTON_CONFIGURE,162,65,55,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "保存(&S)...",IDC_BUTTON_SAVE,223,65,55,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "停止(&S)",IDC_BUTTON_CLOSE,284,65,55,14,WS_CLIPSIBLINGS
+    LTEXT           "剪贴板提示",IDC_LABEL_HINT,5,68,45,8,WS_CLIPSIBLINGS
+END
+
+IDD_VERIFY DIALOGEX 0, 0, 260, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,250,54
+    LTEXT           "正在验证:",IDC_LABEL,5,68,40,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,48,68,95,8
+    LTEXT           "",IDC_LABEL_RESULT,5,68,140,8,WS_CLIPSIBLINGS
+    PUSHBUTTON      "焦点(&F)",IDC_BUTTON_FOCUS,149,65,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "停止(&S)",IDC_BUTTON_CLOSE,205,65,50,14,WS_CLIPSIBLINGS
+END
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 189, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "校验和配置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " 计算校验和 ",IDC_STATIC_1,8,5,174,76,WS_GROUP
+    CONTROL         "&CRC/SFV",IDC_CFG_CRC,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,15,16,105,10
+    CONTROL         "&MD5",IDC_CFG_MD5,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,28,105,10
+    CONTROL         "SHA-&1",IDC_CFG_SHA1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,40,105,10
+    CONTROL         "SHA-&256",IDC_CFG_SHA256,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,52,105,10
+    CONTROL         "SHA-&512",IDC_CFG_SHA512,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,64,105,10
+    DEFPUSHBUTTON   "确定",IDOK,14,88,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,69,88,50,14
+    PUSHBUTTON      "帮助",IDHELP,124,88,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "校验和"
+ IDS_ABOUTTITLE "关于插件"
+ IDS_PLUGIN_DESCRIPTION "SFV, MD5, SHA-1, SHA-256, 及 SHA-512 校验和验证器和计算器。"
+ IDS_OUTOFMEM "内存溢出"
+ IDS_ERROROPENING, "打开文件错误"
+ IDS_READERROR "读取错误"
+ IDS_WRITEERROR "写入错误"
+ IDS_SKIPPED "跳过的"
+ IDS_CALCULATING "正在计算..."
+ IDS_CANCELED "取消的"
+ IDS_HINT "右键点击项目来复制校验和到剪贴板。"
+ IDS_COPYTOCBOARD_CRC "复制 &CRC 值到剪贴板\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "复制 &MD5 校验和到剪贴板\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "复制 SHA-&1 校验和到剪贴板\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "复制 SHA-&256 校验和到剪贴板\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "复制 SHA-&512 校验和到剪贴板\tCtrl+5"
+ IDS_REMOVEITEM "移除项目(&R)\tDelete"
+ IDS_SAVE_TITLE  "保存校验和文件"
+ IDS_SAVE_FILTER_CRC  "SFV 文件 (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "MD5 文件 (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "SHA-1 文件 (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "SHA-256 文件 (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "SHA-512 文件 (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "文件 '%s' 已经存在。\n你想覆盖它吗？"
+ IDS_ERRORCREATINGFILE "创建文件错误。"
+ IDS_SKIPPEDFILES "计算未保存的过程中跳过或取消的文件。"
+ IDS_ERROROPENING2 "打开文件 '%s' 错误。"
+ IDS_MISSING "丢失"
+ IDS_BADEXT "选定的文件既没有 SFV, MD5, SHA1, SHA256, 或 SHA512 扩展名。无论如何你都想继续吗？"
+ IDS_BADFILE "选定的文件不是有效的 SFV, MD5, SHA-1, SHA-256, 或 SHA-512 文件。"
+ IDS_VERIFYING "正在验证..."
+ IDS_OK "确定"
+ IDS_CORRUPT "已损坏"
+ IDS_MENU_CALCULATE "计算校验和(&C)..."
+ IDS_MENU_VERIFY "验证校验和(&V)..."
+ IDS_CONFIG_CONFLICT "配置已经打开。"
+ IDS_CONFIG_CHANGES_EFFECT "当下次打开""计算校验和""窗口时，改变将生效。"
+ IDS_ALLOK "所有文件 OK"
+ IDS_RESULT "%d 损坏, %d 丢失, %d 跳过"
+ IDS_BUSY "Sally 正忙。不能完成请求的命令，请稍后重试。"
+ IDS_CLOSE "关闭(&C)"
+ IDS_READINGTREE "正在读取目录树，请稍候..."
+ IDS_ERRORREADINGDIR "读取目录错误"
+ IDS_NOFILES "没有文件"
+ IDS_VERIFYTITLE "验证校验和"
+ IDS_VERIFY_CRC "验证 CRC"
+ IDS_VERIFY_MD5 "验证 MD5"
+ IDS_VERIFY_SHA1 "验证 SHA-1"
+ IDS_VERIFY_SHA256 "验证 SHA-256"
+ IDS_VERIFY_SHA512 "验证 SHA-512"
+ IDS_COLUMN_FILE "文件"
+ IDS_COLUMN_SIZE "大小"
+ IDS_COLUMN_STATUS "状态"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "无法完成操作，因为名称太长。"
+}

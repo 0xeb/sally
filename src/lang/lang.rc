@@ -20,8 +20,7 @@
 // Neutral resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
-LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
-
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -140,9 +139,6 @@ BEGIN
     LTEXT           "To view or change conversion tables used in viewers and Convert command, click Details.",IDC_STATIC_3,8,91,220,16
     PUSHBUTTON      "&Details...",IDB_CONVERSION,237,93,52,14,WS_GROUP
     LTEXT           "Choose a language for Sally. The setting affects the language for text that appears in dialog boxes, menus, toolbars, and helps.",IDC_STATIC_4,8,17,281,16
-    LTEXT           "",IDC_CFGREG_INCOMPLETE_TITLE,5,153,287,8
-    LTEXT           "",IDC_CFGREG_INCOMPLETE_TEXT,5,165,287,16
-    LTEXT           "",IDC_CFGREG_INCOMPLETE_URL,5,185,287,8
 END
 
 IDD_CFGPAGE_SYSTEM DIALOGEX 71, 58, 299, 231
@@ -1505,49 +1501,23 @@ BEGIN
     PUSHBUTTON      "&Help",IDHELP,241,130,50,14
 END
 
-IDD_SLGSELECTORPLUG DIALOGEX 107, 84, 284, 220
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Select Language"
-FONT 8, "MS Shell Dlg", 400, 0, 0x1
-BEGIN
-    LTEXT           "Select one of the installed languages.",IDC_STATIC_1,5,7,240,8
-    CONTROL         "",IDC_SLG_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,274,101
-    GROUPBOX        "About language version",IDC_STATIC_2,5,124,274,69,WS_GROUP
-    LTEXT           "Authors:",IDC_STATIC_3,13,138,30,8
-    EDITTEXT        IDC_SLG_AUTHOR,64,138,206,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
-    LTEXT           "Web:",IDC_STATIC_5,13,166,22,8
-    LTEXT           "",IDC_SLG_WEB,66,166,204,8,WS_TABSTOP
-    LTEXT           "Comment:",IDC_STATIC_6,13,177,37,8
-    LTEXT           "",IDC_SLG_COMMENT,66,177,204,8
-    CONTROL         "&Use as alternate language also in other plugins (if needed)",IDC_USESAMESLGINOTHERPLUGINS,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,200,209,12
-    DEFPUSHBUTTON   "OK",IDOK,228,199,50,14,WS_GROUP
-    LTEXT           "Language",IDC_SLG_DESCR,19,31,46,8
-    LTEXT           "Path",IDC_SLG_PATH,92,31,26,8
-END
-
-IDD_SLGSELECTOR DIALOGEX 107, 84, 276, 251
+IDD_SLGSELECTOR DIALOGEX 107, 84, 276, 220
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Select Language"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Select one of the installed languages.",IDC_STATIC_1,5,7,240,8
     CONTROL         "",IDC_SLG_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,266,101
-    PUSHBUTTON      "Get More &Languages...",IDB_GETMORELANGS,127,125,87,14,WS_GROUP
-    PUSHBUTTON      "&Refresh",IDB_REFRESHLANGS,220,125,50,14
-    GROUPBOX        "About language version",IDC_STATIC_2,5,144,266,80,WS_GROUP
-    LTEXT           "Authors:",IDC_STATIC_3,13,158,30,8
-    EDITTEXT        IDC_SLG_AUTHOR,66,158,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
-    LTEXT           "Web:",IDC_STATIC_5,13,186,22,8
-    LTEXT           "",IDC_SLG_WEB,68,186,194,8,WS_TABSTOP
-    LTEXT           "Comment:",IDC_STATIC_6,13,197,37,8
-    LTEXT           "",IDC_SLG_COMMENT,68,197,194,8
-    LTEXT           "Help Directory:",IDC_STATIC_7,13,208,53,8
-    LTEXT           "",IDC_SLG_HELPDIR,68,208,194,8
-    DEFPUSHBUTTON   "OK",IDOK,164,230,50,14,WS_GROUP
-    PUSHBUTTON      "Cancel",IDCANCEL,220,230,50,14
+    GROUPBOX        "About language version",IDC_STATIC_2,5,124,266,69,WS_GROUP
+    LTEXT           "Authors:",IDC_STATIC_3,13,138,30,8
+    EDITTEXT        IDC_SLG_AUTHOR,66,138,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Web:",IDC_STATIC_5,13,166,22,8
+    LTEXT           "",IDC_SLG_WEB,68,166,194,8,WS_TABSTOP
+    LTEXT           "Comment:",IDC_STATIC_6,13,177,37,8
+    LTEXT           "",IDC_SLG_COMMENT,68,177,194,8
+    DEFPUSHBUTTON   "OK",IDOK,164,199,50,14,WS_GROUP
+    PUSHBUTTON      "Cancel",IDCANCEL,220,199,50,14
     LTEXT           "Language",IDC_SLG_DESCR,19,31,46,8
-    LTEXT           "Path",IDC_SLG_PATH,92,31,26,8
 END
 
 IDD_SKILLLEVEL DIALOGEX 137, 77, 239, 132
@@ -1750,7 +1720,7 @@ CAPTION "Exiting Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "Cancel",IDCANCEL,195,67,50,14
-    LTEXT           "Unable to exit Sally until all disk operations are finished. Please wait until these operations are finished or cancel them now. If you do not want to exit Sally now, press the Cancel button.",IDC_STATIC_1,8,9,244,32
+    LTEXT           "",IDC_STATIC_1,8,9,244,32
     LTEXT           "Number of running operations:",IDC_STATIC_2,8,45,107,8
     LTEXT           "",IDT_RUNNINGOPERS,116,45,60,8
     PUSHBUTTON      "Cancel &All Operations",IDB_CANCELALLOPERS,13,67,86,14,WS_GROUP
@@ -1999,7 +1969,7 @@ CAPTION "Security"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        " Master Password ",IDC_STATIC_1,1,4,293,77
-    LTEXT           "A Master Password is used to protect sensitive information like FTP or WinSCP passwords by strong AES cipher. If you create a Master Password you will be asked to enter it once per session when Sally retrieves protected information.",IDC_STATIC_2,9,20,267,32
+    LTEXT           "",IDC_STATIC_2,9,20,267,32
     CONTROL         "&Use Master Password",IDC_SEC_ENABLE_MASTERPWD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,60,168,12
     PUSHBUTTON      "Change &Master Password...",IDC_SEC_CHANGE_MASTERPWD,180,59,104,14
 END
@@ -2410,7 +2380,7 @@ END
 // Generated from the TEXTINCLUDE 3 resource.
 //
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
-LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #include "lang.rc2"   // non-Microsoft Visual C++ edited resources
 #endif
 

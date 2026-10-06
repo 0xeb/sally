@@ -1,0 +1,123 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for uncab. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uncab/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uncab.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 11, 21, 221, 122
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Urmatorul volum cabinet"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_TEXT,12,9,198,32
+    LTEXT           "Nume disc:",IDC_STATIC_1,12,48,40,8
+    LTEXT           "",IDC_DISKNAME,54,48,156,8
+    LTEXT           "Nume CAB:",IDC_STATIC_2,12,59,41,8
+    LTEXT           "",IDC_CABNAME,54,59,156,8
+    LTEXT           "&Cale:",IDC_STATIC_3,12,70,19,8
+    EDITTEXT        IDC_FILENAME,12,80,182,12
+    PUSHBUTTON      "...",IDC_BROWSE,197,80,13,12
+    DEFPUSHBUTTON   "OK",IDOK,106,103,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,160,103,50,14
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,6,97,209,1
+END
+
+IDD_ERROR DIALOGEX 15, 34, 352, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Eroare"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Nume:",IDC_STATIC_1,6,10,26,8
+    LTEXT           "",IDS_FILENAME,36,10,309,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Eroare:",IDC_STATIC_2,6,23,26,8,NOT WS_GROUP
+    LTEXT           "Fisierul nu poate fi extras deoarece continua din volumul precedent. Ca sa extragi acest fisier, trebuie sa pornesti cu volumul de unde incepe fisierul.",IDC_STATIC_3,36,23,309,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "Nu mai afisa acest mesaj alta &data.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,36,44,183,12
+    DEFPUSHBUTTON   "S&ari Peste",IDSKIP,78,63,60,14,WS_GROUP
+    PUSHBUTTON      "Sari Peste &Tot",IDALL,146,63,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,214,63,60,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 210, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configurare UnCAB"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "precedent cand dezarhivezi.",IDC_STATIC_1,23,22,154,8
+    CONTROL         "&Automat sari peste fisierele continuate din volumul",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,10,181,12
+    LTEXT           "nu poate fi listat.",IDC_STATIC_2,23,44,111,8
+    CONTROL         "Nu afisa atentionare can&d tot continutul arhivei",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,170,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,198,1
+    DEFPUSHBUTTON   "OK",IDOK,52,66,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,107,66,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 108
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnCAB - Atentie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nu toate fisierele din arhiva multi-volum pot fi listate (si vazute in panou), deoarece unele volume ale arhivei nu pot fi gasite.",IDC_STATIC_1,11,9,193,24
+    LTEXT           "Ca sa listezi tot continutul arhivei, copie toate volumele in acelasi director si deschide PRIMUL volum al archivei.",IDC_STATIC_2,11,40,193,16
+    CONTROL         "Nu mai afisa acest mesaj alta &data",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,65,157,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,83,202,1
+    DEFPUSHBUTTON   "OK",IDOK,154,90,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnCAB"
+  IDS_PLUGIN_DESCRIPTION, "Rasfoieste si extrage archive CAB."
+  IDS_ABOUT, "Despre Plugin"
+  IDS_LOWMEM, "Memorie insuficienta."
+  IDS_UNKNOWN, "A aparut o eroare necunoscuta."
+  IDS_BROWSEARCHIVETITLE, "Selecteaza Director"
+  IDS_LIST, "Nu pot adauga la lista de fisiere intrare arhiva."
+  IDS_EXTRPROGTITLE, "Dezarhivez Arhiva CAB - %s"
+  IDS_PREPAREDATA, "pregatire date si creare directoare..."
+  IDS_EXTRACTFILES, "dezarhivez..."
+  IDS_EXTRACTING, "dezarhivez: "
+  IDS_UNABLEGETFIELPOS, "Nu pot obtine pointer fisier: "
+  IDS_UNABLEWRITE, "Nu pot scrie in fisier:"
+  IDS_UNABLESEEK, "Nu pot seta pointer fisier: "
+  IDS_TOOLONGNAME, "Nu pot termina operatiuneadin cauza ca nume cale prea lung."
+  IDS_TOOLONGMASK, "Nu pot termina operatiunea, masca prea lunga."
+  IDS_EXPIRE, "Ne pare rau, plugin a expirat. Va rugam cautati pe web site-ul nostru o versiune mai noua."
+  IDS_UNABLECREATE, "Nu pot crea sau deschide fisier."
+  IDS_UNABLEREAD, "Nu pot citi fisierul."
+  IDS_BROWSEFOLDERTEXT, "Selecteaza un director ce contine '%s'."
+  IDS_NOTFOUND, "Nu gasesc fisierul."
+  IDS_SKIPPING, "sar peste fisier"
+  IDS_NEXTVOLTEXT, "Introdu discul cu numarul de volum cabinet %d sau localizeaza fisierul cabinet potrivit pe disc.\n\nApasa OK cand sunteti gata."
+
+  // FDIERROR - Error codes returned in erf.erfOper field
+  IDS_CABINET_NOT_FOUND, "Nu gasesc cabinet."
+  IDS_NOT_A_CABINET, "Fisierul cabinet nu are format corect."
+  IDS_UNKNOWN_CABINET_VERSION, "Fisierul cabinet are un numar de versiune necunoscut."
+  IDS_CORRUPT_CABINET, "Fisierul cabinet este corupt."
+  IDS_BAD_COMPR_TYPE, "Tip de compresie necunoscut in directorul cabinet."
+  IDS_MDI_FAIL, "Esec de decompresie date din fisierul cabinet."
+  IDS_RESERVE_MISMATCH, "Cabinetele din set nu au aceasi marime RESERVE."
+  IDS_WRONG_CABINET, "Fisier cabinet incorect."
+  IDS_USER_ABORT, "Pauza utilizator."
+  IDS_ERROR, "Eroare"
+}

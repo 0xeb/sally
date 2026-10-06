@@ -10,7 +10,7 @@
 // ****************************************************************************
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 BOOL WindowsVistaAndLater;
 
 // plug-in interface object whose methods Salamander calls
@@ -272,10 +272,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Registry Editor" /* neprekladat! */);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // obtain Salamander's general interface
     SG = salamander->GetSalamanderGeneral();

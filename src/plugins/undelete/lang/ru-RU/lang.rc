@@ -1,0 +1,213 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for undelete. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/undelete/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\undelete.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Восстановление файлов"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,13,12,323,8
+    LTEXT           "",IDC_PROGRESSBAR,38,32,289,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Отмена",IDCANCEL,144,54,50,14
+    LTEXT           "Всего:",IDC_STATIC_1,13,33,23,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Восстановление файлов"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Выберите &диск",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "&Образ диска",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,56,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,361,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "О&бзор...",IDC_BUTTON_BROWSE,379,178,50,14,WS_GROUP
+    CONTROL         "&Проверять свободные кластеры на разделах FAT",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,186,10
+    CONTROL         "Отображать &существующие файлы и папки",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "Отображать файлы &нулевого размера",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "Отображать п&устые папки",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "Отображать &метафайлы",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "О&ценить повреждения файлов",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "ОК",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "Справка",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 383, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Восстановление файлов"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Восстанавливается",IDC_LABEL_UNDELETING,3,11,70,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,77,11,301,8
+    RTEXT           "в",IDC_STATIC_1,3,23,70,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,77,23,301,8
+    RTEXT           "Файл:",IDC_STATIC_2,3,41,70,8
+    LTEXT           "",IDC_PROGRESS_FILE,77,40,293,12,NOT WS_GROUP
+    RTEXT           "Всего:",IDC_STATIC_3,3,56,70,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,77,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Отмена",IDCANCEL,166,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 213, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Имя файла повреждено"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Первая буква имени файла утрачена. Пожалуйста, введите исходный символ.",IDC_STATIC_1,7,7,199,16
+    EDITTEXT        IDC_EDIT_FILENAME,7,27,199,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "ОК",IDOK,44,53,50,14
+    PUSHBUTTON      "&Все",IDC_BUTTON_ALL,100,53,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,156,53,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 407, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка восстановления файлов"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Дополнительная &временная папка для просмотра файлов:",IDC_STATIC_1,7,7,211,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,372,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,385,17,16,14,WS_GROUP
+    CONTROL         "&Кэшировать информацию о кластерах FAT",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,162,10
+    CONTROL         "Не показывать предупреждение при восстановлении на &тот же логический диск",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,299,10
+    CONTROL         "Не показывать предупреждение при восстановлении &зашифрованных файлов на разделы FAT или exFAT",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,390,10
+    DEFPUSHBUTTON   "ОК",IDOK,241,80,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,296,80,50,14
+    PUSHBUTTON      "Справка",IDHELP,351,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 276, 103
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Восстановление зашифрованных файлов из резервной копии"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Данная функция извлечет из резервной копии зашифрованные файлы, ранее восстановленные на раздел, файловая система которого не поддерживает шифрование (EFS), например, FAT. Обычные файлы (кроме *.bak) будут скопированы без изменений.",IDC_STATIC_1,7,7,262,32
+    LTEXT           "&Восстановить %s в:",IDC_LABEL_SOURCE,7,49,262,8
+    EDITTEXT        IDC_EDIT_TARGET,7,59,243,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,254,59,15,14,WS_GROUP
+    DEFPUSHBUTTON   "ОК",IDOK,57,82,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,113,82,50,14
+    PUSHBUTTON      "Справка",IDHELP,169,82,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_LOWMEM, "Недостаточно памяти."
+  IDS_ERRORREADINGMFT, "Ошибка чтения кластеров главной файловой таблицы (MFT)."
+  IDS_MFTRECORDDAMAGED, "Ошибка чтения главной файловой таблицы (MFT): первая запись повреждена."
+  IDS_ROOTNOTFOUND, "Невозможно найти корневую папку."
+  IDS_VDIRECTORY, "Папка%06d"
+  IDS_ALLDELETEDFILES, "{Все удаленные файлы}"
+  IDS_ERRORNOTNTFS, "Внутренняя ошибка: не NTFS-том."
+  IDS_ERRORNOTOPEN, "Внутренняя ошибка: том не открыт."
+  IDS_ERROROPENINGVOLUME, "Ошибка открытия тома."
+  IDS_ERRORREADINGBOOT, "Ошибка чтения загрузочного сектора."
+  IDS_ERRORVOLUMETYPE, "Неизвестный тип тома. Поддерживаются тома FAT 12, 16, 32 и NTFS."
+  IDS_READINGMFT, "Чтение MFT..."
+  IDS_ERRORREADINGFAT, "Ошибка чтения FAT."
+  IDS_ERRORREADINGDIRCLUSTERS, "Ошибка чтения кластеров папки."
+  IDS_ERRORNOTFAT, "Внутренняя ошибка: не FAT-том."
+  IDS_LOADINGFAT, "Чтение FAT..."
+  IDS_READINGDIRS, "Чтение папок..."
+  IDS_READINGEXISTINGDIRS, "Чтение существующих папок..."
+  IDS_READINGDELETEDDIRS, "Чтение удаленных папок..."
+  IDS_SCANNINGVACANTCLUSTERS, "Чтение свободных кластеров..."
+  IDS_REUSESCANNEDINFO, "Использовать ранее полученные данные о структуре кластеров из кэша?"
+  IDS_RELOADINGCLUSTERS, "Загрузка ранее найденных кластеров..."
+  IDS_FLOPPY350, "Диск 3,5"
+  IDS_FLOPPY525, "Диск 5,25"
+  IDS_FLOPPY800, "Диск 8,0"
+  IDS_COMPACT_DISK, "Компакт-диск"
+  IDS_LOCAL_DISK, "Локальный диск"
+  IDS_REMOVABLE_DISK, "Сменный диск"
+  IDS_ANALYZINGDIRS, "Обработка папок..."
+  IDS_INCOMPLETEMFT, "Не удалось полностью прочитать главную файловую таблицу (MFT). Отобразить частичные данные?"
+  IDS_BITMAPNOTFOUND, "Файл ""$Bitmap"" не обнаружен на данном разделе. Оценка повреждений удаленных файлов невозможна."
+  IDS_BITMAPNOSTREAM, "Отсутствует основной поток файла ""$Bitmap"". Оценка повреждений удаленных файлов невозможна."
+  IDS_LOWMEMBITMAP, "Недостаточно памяти для загрузки данных о кластерах файлов. Оценка повреждений удаленных файлов будет пропущена."
+  IDS_ERRORREADINGBMP, "Ошибка чтения файла ""$Bitmap"". Оценка повреждений удаленных файлов невозможна."
+  IDS_BITMAPISEMPTY, "Файл ""$Bitmap"" пуст. Оценка повреждений удаленных файлов будет пропущена."
+}
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "Восстановление файлов"
+  IDS_DESCRIPTION, "Восстановление удаленных файлов на разделах FAT и NTFS."
+  IDS_ABOUTTITLE, "О модуле"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{Метафайлы}"
+  IDS_PATHDISK, "Путь должен включать диск."
+  IDS_PATHFILE, "Путь указывает файл. Невозможно открыть файл."
+  IDS_PATHNOTFOUND, "Путь не найден."
+  IDS_IMAGENOTFOUND, "Указанный файл не найден."
+  IDS_ERROROPENINGPROGRESS, "Ошибка открытия диалога отображения выполнения операции."
+  IDS_VOLENUMERATE, "Ошибка перечисления системных томов."
+  IDS_OPENINGVOLUME, "Открытие тома..."
+  IDS_SCANNINGFOUND, "{!}Чтение свободных кластеров... (найдено %d кластер{|1|а|4|ов} папок)"
+  IDS_ALWAYSCHOOSEYES, "Всегда использовать кэшированные данные (Вы можете изменить этот параметр в настройках модуля)"
+  IDS_PATHTOOLONG, "Путь назначения слишком длинный"
+  IDS_QUESTION, "Запрос"
+  IDS_WANTCANCEL, "Вы действительно хотите отменить операцию?"
+  IDS_BADPATH, "Восстановление в архивы и виртуальные файловые системы модулей не поддерживается."
+  IDS_ERROR, "Ошибка" // title of error messages
+  IDS_VIEW, "Просмотр" // the function "F3"
+  IDS_TEMPDIR, "Для просмотра файлов на диске %c: выберите дополнительную временную папку на другом диске кроме %c:"
+  IDS_WAIT, "Восстановление файла во временную папку, пожалуйста, подождите"
+  IDS_ENCRYPTEDWARNING, "Том назначения не поддерживает шифрование файловой системы (EFS).\n\nЗашифрованные файлы будут сохранены в специальном формате резервных копий. В дальнейшем Вы сможете извлечь файлы из резервных копий и сохранить их на раздел NTFS при помощи команды меню ""Модули - Восстановление файлов - Восстановить зашифрованные файлы из резервной копии""."
+  IDS_DONTSHOWAGAIN, "Больше не показывать это сообщение"
+  IDS_CHOOSETEMPDIR, "Выберите дополнительную временную папку:"
+  IDS_SAMEPARTITION, "Вы выполняете восстановление файла на тот же логический диск, где находится исходный восстанавливаемый файл. Следует восстанавливать файлы на другой раздел, иначе при восстановлении файла может произойти перезапись данных файла своими собственными данными, либо могут быть утрачены другие удаленные файлы.\n\nСовет: при отсутствии нескольких локальных дисков возможно выполнить восстановление файлов на сменный носитель."
+  IDS_UNDELETECMD, "&Восстановить удаленные файлы и папки..."
+  IDS_ERRORENCRYPTED, "Не удалось восстановить зашифрованный файл: "
+  IDS_RESTORECMD, "Восстановить за&шифрованные файлы из резервной копии..."
+  IDS_CANNOTVIEW, "Невозможно просмотреть файл, так как том, на котором находится временная папка, не поддерживает шифрование файловой системы (EFS)"
+  IDS_CHOOSETARGET, "Выберите целевую папку"
+  IDS_RESTORE, "Восстановление файлов" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "Восстановление" // label inside the progress dialog
+  IDS_READINGTREE, "Чтение структуры папок..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "Том назначения не поддерживает шифрование файловой системы (EFS)."
+  IDS_VOLUME_MOUNT, "Точка монтирования"
+  IDS_VOLUME_NAME, "Имя"
+  IDS_VOLUME_FORMAT, "Формат"
+  IDS_VOLUME_SIZE, "Размер"
+  IDS_VOLUME_FREE, "Свободно"
+  IDS_VOLUME_FREEPROC, "% Свободно"
+  IDS_VOLUME_VOLID, "Путь GUID"
+  IDS_CONDITION, "Состояние"
+  IDS_CONDITIONDESC, "Оценка повреждения файла"
+  IDS_CONDITION_GOOD, "Хорошее"
+  IDS_CONDITION_FAIR, "Среднее"
+  IDS_CONDITION_POOR, "Плохое"
+  IDS_CONDITION_LOST, "Утрачен"
+  IDS_CONDITION_UNKNOWN, "Неизвестно"
+  IDS_UNDELETEINCHDRVMENU, "\tВосстановление файлов"
+  IDS_PARTIALRECOVER, "Следующий файл не может быть полностью восстановлен: %s\n\nВы хотите восстановить его частично?"
+  IDS_PARTIALRECOVER_DONTASK, "Применить ко всем последующим файлам"
+  IDS_ERRORRECOVER, "Ошибка восстановления файла %s"
+}

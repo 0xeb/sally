@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for tar. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/tar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\tar.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "Hojear y extraer archivos Unix."
+ IDS_ABOUT, "Acerca del Plugin"
+ IDS_TARERR_TITLE, "Error del plugin TAR"
+ IDS_TARERR_UNKNOWN, "Formato de archivo no reconocido o no soportado."
+ IDS_TARERR_HEADER, "Datos inválidos en cabecera TAR - archivo corrupto."
+ IDS_TARERR_CHECKSUM, "Suma de control incorrecta en fichero o cabecera - archivo corrupto."
+ IDS_TARERR_FDATA, "Error interno: estructura de datos del fichero corrupta."
+ IDS_TARERR_BADSIG, "Firma de bloque desconocida - saltando."
+ IDS_TARERR_NOTFOUND, "Fichero requertido no encontrado en el archivo."
+ IDS_TARERR_MEMORY, "Error de asignación de memoria."
+ IDS_UNPACKPROGRESS_TITLE, "Desempaquetar"
+ IDS_UNPACKPROGRESS_TEXT, "Extrayendo "
+ IDS_SKIPPROGRESS_TEXT, "Saltando "
+ IDS_GZERR_TITLE, "Error GZip"
+ IDS_GZERR_BADMETHOD, "Usado método de compresión desconocido, imposible extraer."
+ IDS_GZERR_ENCRYPTED, "Este fichero está encriptado. No se admite encriptación en archivos GZip."
+ IDS_GZERR_MULTIPART, "Este fichero es parte de un archivo en varias partes. Archivos GZip multiparte no son admitidos."
+ IDS_GZERR_BADFLAGS, "Marcas desconocidas en cabecera GZip; imposible extraer."
+ IDS_GZERR_FOPEN, "Error abriendo el archivo: "
+ IDS_ERR_FREAD, "Error leyendo el archivo: "
+ IDS_TARERR_FWRITE, "Error grabando al fichero de salida: "
+ IDS_TARERR_WRSIZE, "La función WriteFile rehusó escribir todos los datos pedidos."
+ IDS_GZERR_BADBLOCKTYPE, "Encontrado un bloque inválido en corriente GZip; imposible extraer."
+ IDS_ERR_INTERNAL, "Error interno en plugin TAR; por favor, notifíquelo en https://github.com/0xeb/sally/issues."
+ IDS_ERR_MEMORY, "Error de asignación de memoria."
+ IDS_GZERR_CRC, "Error CRC."
+ IDS_ERR_CORRUPT, "Datos inesperados en corriente comprimida; archivo corrupto."
+ IDS_ERR_EOF, "Se encontró un final de fichero prematuro."
+ IDS_GZERR_SEEK, "Error buscando en el archivo: "
+ IDS_RPM_VIEWTITLE, "Visor RPM"
+ IDS_ERR_RPMTITLE, "Error RPM"
+ IDS_RPMERR_TMPNAME, "Error creando nombre de fichero temporal."
+ IDS_RPMERR_TMPFILE, "Error creando fichero temporal."
+ IDS_ERR_NORPM, "El fichero no fue reconocido como archivo RPM."
+ IDS_ERR_BADRPMVERSION, "La versión de RPM demandada por este archivo no es admitida."
+ IDS_ERR_BADSIGNATURE, "Encontrada una firma desconocida de archivo RPM."
+ IDS_CPIOERR_BADSIG, "El registro del fichero tiene una firma inválida."
+ IDS_CPIOERR_HEADER, "Registro de cabecera de fichiero corrupto."
+ IDS_CPIOERR_FORMAT, "Formato desconocido de cabecera cpio."
+ IDS_LZH_NOT_IMPLEMENTED, "No se admiten por ahora archivos LZH."
+}

@@ -1,0 +1,122 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for uniso. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uniso/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uniso.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 220, 83
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnISO 配置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "当从压缩包中复制时清除只读属性(&C)",IDC_CFG_READONLY,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,11,188,10
+    CONTROL         "显示会话为目录(允许访问所有会话)(&S)",IDC_CFG_SESSIONASDIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,23,198,10
+    CONTROL         "显示启动镜像磁盘为文件(&H)",IDC_CFG_BOOTIMAGEASFILE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,35,118,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,2,58,216,1
+    DEFPUSHBUTTON   "确定",IDOK,108,64,50,14
+    PUSHBUTTON      "取消",IDCANCEL,163,64,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "不能打开文件。"
+    IDS_UNKNOW_ERROR            "未指定的错误。"
+    IDS_UNPACKING_ARCHIVE       "解压 ISO 压缩包"
+    IDS_ERROR_UNPACKING         "解压压缩包错误。"
+    IDS_CANT_HANDLE_FILE        "不能处理此文件。"
+    IDS_INSUFFICIENT_MEMORY     "内存不足。"
+    IDS_ERR_TOO_LONG_NAME       "无法完成操作，因为名称太长。"
+    IDS_ABOUT                   "关于插件"
+    IDS_PLUGIN_DESCRIPTION      "浏览并提取 CD/DVD ISO 镜像文件。"
+    IDS_CANT_CREATE_TEMP        "不能创建临时目录。"
+    IDS_CANT_DELETE_TEMP_FILE   "不能删除临时文件。"
+    IDS_UNKNOWN_FILE_FORMAT     "未知文件格式或不是有效的 ISO 镜像。\n\n如果你确定这是有效的 ISO 镜像，请在 https://github.com/0xeb/sally/issues 提交问题并帮助我们支持此格式。"
+    IDS_CANT_OPEN_FILE          "不能打开文件 '%s'。"
+    IDS_ERR_TMP                 "创建临时文件失败。"
+    IDS_CANT_SET_ATTRS          "不能设置文件属性。"
+    IDS_CANT_CREATE_DIR         "不能创建目录 '%s'。"
+    IDS_YES                     "是"
+    IDS_NO                      "否"
+    IDS_ERROR                   "错误"
+    IDS_WARNING                 "警告"
+    IDS_ERROR_OPENING_MULTISESSION  "当读取多区段镜像时发生一些错误。\n\n只显示正确读取的区段。"
+    IDS_UNKNOWN_TRACK_TYPE      "未知轨道类型。"
+    IDS_READERROR               "读取错误"
+    IDS_WRITEERROR              "写入错误"
+    IDS_CCD_BAD_FORMAT          "错误格式的 .CCD 文件。\n\n显示的镜像可能不完整。"
+    IDS_CCD_MISSING             "缺少 .CCD 文件。\n\n显示的镜像可能不完整。"
+    IDS_ERROR_READING_SECTOR    "不能读取扇区 #%08X."
+    IDS_ERROR_LISTING_IMAGE     "读取扇区 #%08X 位置的目录结构错误。\n\nISO 镜像内容不完整。"
+    IDS_INTERNAL_PLUGIN_ERROR   "内部插件错误。"
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "未知的分配策略 (%d)。\n\n请在 https://github.com/0xeb/sally/issues 提交问题来帮助我们修复这个问题。"
+    IDS_UDF_INVALID_TAG_ID      "无效的 UDF 标签 ID."
+    IDS_UDF_ERROR_READING_VAT   "读取 #%08X 位置的虚拟分配表错误。"
+    IDS_UDF_MISSING_VAT         "缺少虚拟分配表。"
+    IDS_UDF_BAD_ROOT_ICB        "坏的 ICB.\n\n不能读取目录结构。"
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "不能提取文件 ""%s""。\n\n文件大小和 ICB 块之间不匹配。"
+    IDS_CANT_OPEN_TRACK         "不能打开轨道 #%d。"
+    IDS_BOOT_OR_MBR             "此文件似乎是软盘或硬盘或硬盘分区镜像。\n尝试重命名文件为 .ima 以激活 UnFAT 插件。"
+    IDS_UNSUPPORTED_APFS        "此磁盘镜像包含 APFS 文件系统。\n此文件系统暂不受支持。"
+
+    IDS_ERR_HFS_READ            "不能读取分区头部。文件太小。"
+    IDS_ERR_HFS_INVALID_PARTITION "损坏的分区管理结构。"
+    IDS_ERR_HFS_UNRECOGNIZED    "此磁盘镜像不包含 HFS Plus 分区。"
+    IDS_ERR_HFS_ORIGINAL_HFS    "此磁盘镜像包含 HFS 但不包含 HFS Plus 文件系统。\nHFS 不被支持。"
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "不能寻找到块 #%08X.\n将不会提取文件 %s。"
+    IDS_ERR_HFS_SEEK            "不能寻找到块 #%08X."
+    IDS_ERR_HFS_BTREE_NODETYPE  "不支持目录文件中的B树根节点类型。"
+    IDS_ERR_HFS_BTREE_FRAGMENTED "不支持目录文件被分成超过8个片段。"
+    IDS_ERR_HFS_FILE_FRAGMENTED "文件 '%s' 被分成超过8个片段，这不被支持。\n将不提取这个文件。"
+
+    IDS_ERR_TOO_LONG_PATH       "此磁盘镜像包含的路径太长，以至 Sally 无法处理。"
+
+    IDS_ERR_DMG_READ_HDR        "不能读取包头部。文件太小。"
+    IDS_ERR_DMG_ENCRYPTED       "这个包是加密的。\n不支持加密的包。"
+    IDS_ERR_DMG_NO_FOOTER       "此文件似乎不是 DMG 包或者不完整。\n它不包含有效的 DMG 页脚。"
+    IDS_ERR_DMG_PLIST           "此文件似乎不是有效的 DMG 包或者不完整。\n它不包含有效的属性列表。"
+    IDS_ERR_DMG_BLOCK_UNDEFINED "这个包在 %I64u 位置不包含 HFS Plus 分区数据块。\n为正确处理包，这个块是不可缺少的。"
+
+    IDS_ERR_BF_READ             "不能从磁盘镜像 %I64u 位置读取数据。"
+    IDS_ERR_BF_SEEK             "不能在磁盘镜像中搜索到位置 %I64u。"
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "内部错误: 不支持的搜索方法。"
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "这个磁盘镜像包含用未知方法压缩的块。\n不支持这样的磁盘镜像。"
+    IDS_ERR_BF_ZLIB             "解压 ZLIB-压缩的块失败。磁盘镜像好像已损坏。"
+    IDS_ERR_BF_BZIP2            "解压 BZIP2-压缩的块失败。磁盘镜像好像已损坏。"
+
+    IDS_ERR_ISZ_NO_HEADER       "此文件似乎不是压缩的 ISZ 镜像或不完整。\n它不包含有效的 ISZ 头部。"
+    IDS_ERR_ISZ_READ_HDR        "不能读取压缩的镜像头部。文件太小。"
+    IDS_ERR_ISZ_SEGMENTED       "这个镜像是分段的。\n不支持分段的镜像。"
+    IDS_ERR_ISZ_ENCRYPTED       "这个镜像是加密的。\n不支持加密镜像。"
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "不能提取音频轨道。"
+
+    IDS_CANCELING_OPERATION     "正在取消操作，请稍等..."
+
+    IDS_INFO_LABEL              "镜像上的信息\n\n"
+    IDS_INFO_LABEL_LABEL        "镜像 ""%s"" 上的信息\n\n"
+    IDS_INFO_CNT_SESSIONS       "区段数: %d"
+    IDS_INFO_SESSION_NUM        "\n区段 %d\n"
+    IDS_INFO_CNT_TRACKS         "  轨道数: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  轨道: %d, %s, 大小: %d 千字节\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  轨道: %d, %s, 大小: %d 千字节 - ""%s""\n"
+}

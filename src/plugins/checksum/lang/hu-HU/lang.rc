@@ -1,0 +1,126 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for checksum. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checksum/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checksum.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CALCULATE DIALOGEX 0, 0, 344, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+CAPTION "Ellenőrzőösszeg számítása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,334,54
+    LTEXT           "Számítás:",IDC_LABEL,5,68,35,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,43,68,112,8
+    PUSHBUTTON      "&Beállítás...",IDC_BUTTON_CONFIGURE,162,65,55,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Menté&s...",IDC_BUTTON_SAVE,223,65,55,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Stop",IDC_BUTTON_CLOSE,284,65,55,14,WS_CLIPSIBLINGS
+    LTEXT           "vágólap tipp",IDC_LABEL_HINT,5,68,44,8,WS_CLIPSIBLINGS
+END
+
+IDD_VERIFY DIALOGEX 0, 0, 260, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,250,54
+    LTEXT           "Ellenőrzés:",IDC_LABEL,5,68,39,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,47,68,96,8
+    LTEXT           "",IDC_LABEL_RESULT,5,68,140,8,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Fókusz",IDC_BUTTON_FOCUS,149,65,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Stop",IDC_BUTTON_CLOSE,205,65,50,14,WS_CLIPSIBLINGS
+END
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 189, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ellenőrzőösszeg beállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Ellenőrzőösszegek számítása ",IDC_STATIC_1,8,5,174,76,WS_GROUP
+    CONTROL         "&CRC/SFV",IDC_CFG_CRC,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,15,16,105,10
+    CONTROL         "&MD5",IDC_CFG_MD5,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,28,105,10
+    CONTROL         "SHA-&1",IDC_CFG_SHA1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,40,105,10
+    CONTROL         "SHA-&256",IDC_CFG_SHA256,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,52,105,10
+    CONTROL         "SHA-&512",IDC_CFG_SHA512,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,64,105,10
+    DEFPUSHBUTTON   "OK",IDOK,14,88,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,69,88,50,14
+    PUSHBUTTON      "Súgó",IDHELP,124,88,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "Ellenőrzőösszeg"
+ IDS_ABOUTTITLE "Plugin névjegy"
+ IDS_PLUGIN_DESCRIPTION "SFV, MD5, SHA-1, SHA-256, és SHA-512 ellenőrzőösszeg vizsgálata és számítása."
+ IDS_OUTOFMEM "Kevés memória"
+ IDS_ERROROPENING, "Megnyitási hiba"
+ IDS_READERROR "Olvasási hiba"
+ IDS_WRITEERROR "Írási hiba"
+ IDS_SKIPPED "Kihagyva"
+ IDS_CALCULATING "Számítás..."
+ IDS_CANCELED "Megszakítva"
+ IDS_HINT "Jobb gombbal az ellenőrzőösszeg vágólapra másolható."
+ IDS_COPYTOCBOARD_CRC "&CRC érték vágólapra másolása\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "&MD5 ellenőrzőösszeg vágólapra másolása\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "SHA-&1 ellenőrzőösszeg vágólapra másolása\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "SHA-&256 ellenőrzőösszeg vágólapra másolása\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "SHA-&512 ellenőrzőösszeg vágólapra másolása\tCtrl+5"
+ IDS_REMOVEITEM "Az elem tö&rlése\tTörlés"
+ IDS_SAVE_TITLE  "Ellenőrzőösszeg mentése"
+ IDS_SAVE_FILTER_CRC  "SFV fájlok (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "MD5 fájlok (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "SHA-1 fájlok (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "SHA-256 fájlok (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "SHA-512 fájlok (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "A(z) '%s' fájl már létezik.\nFelül akarja írni?"
+ IDS_ERRORCREATINGFILE "Fájl létrehozási hiba."
+ IDS_SKIPPEDFILES "A számítás alatt kihagyott vagy megszakított fájlok nem lettek mentve."
+ IDS_ERROROPENING2 "A(z) '%s' fájl megnyitása sikertelen."
+ IDS_MISSING "Hiányzik"
+ IDS_BADEXT "A kijelölt fájl nem SFV, MD5, SHA1, SHA256 vagy SHA512 kiterjesztés. Ennek ellenére folytatja?"
+ IDS_BADFILE "A kijelölt fájl nem érvényes SFV, MD5, SHA-1, SHA-256, vagy SHA-512  fájl."
+ IDS_VERIFYING "Ellenőrzés..."
+ IDS_OK "OK"
+ IDS_CORRUPT "Sérült"
+ IDS_MENU_CALCULATE "Ellenőrtőösszeg számo&lása..."
+ IDS_MENU_VERIFY "Ellenőrzőösszegek &vizsgálata..."
+ IDS_CONFIG_CONFLICT "A beállítás már meg van nyitva."
+ IDS_CONFIG_CHANGES_EFFECT "A módosítások az 'Ellenőrzőösszeg számítása' ablak következő megnyitásakor lépnek életbe."
+ IDS_ALLOK "Minden fájl rendben"
+ IDS_RESULT "%d sérült, %d hiányzik, %d kihagyva"
+ IDS_BUSY "Az Sally elfoglalt. A kért parancs nincs befejezve, próbálja újra később."
+ IDS_CLOSE "Bezárá&s"
+ IDS_READINGTREE "Könyvtárfa olvasása, kérem várjon..."
+ IDS_ERRORREADINGDIR "Mappa olvasási hiba"
+ IDS_NOFILES "Nincs fájl"
+ IDS_VERIFYTITLE "Ellenőrzőösszegek vizsgálata"
+ IDS_VERIFY_CRC "CRC ellenőrzése"
+ IDS_VERIFY_MD5 "MD5 ellenőrzése"
+ IDS_VERIFY_SHA1 "SHA-1 ellenőrzése"
+ IDS_VERIFY_SHA256 "SHA-256 ellenőrzése"
+ IDS_VERIFY_SHA512 "SHA-512 ellenőrzése"
+ IDS_COLUMN_FILE "Fájl"
+ IDS_COLUMN_SIZE "Méret"
+ IDS_COLUMN_STATUS "Állapot"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "A művelet nem fejezhető be, mert a fájlnév túl hosszú."
+}

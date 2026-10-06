@@ -1,0 +1,482 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for renamer. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/renamer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\renamer.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_RENAME DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Redenumire in grup"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_MENUSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,368,1
+    LTEXT           "&Masca:",IDC_STATIC_1,16,11,51,8
+    COMBOBOX        IDC_MASK,70,9,95,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Include su&bdirectoarele",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,10,91,12
+    PUSHBUTTON      "&Redenumeste",IDOK,296,9,65,14
+    CONTROL         "Mod manua&l",IDC_MANUAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,27,54,12
+    CONTROL         "",IDS_MANSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,62,32,300,1
+    EDITTEXT        IDE_MANUAL,6,41,355,138,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Nume &nou:",IDS_LABELNEWNAME,16,43,51,8
+    COMBOBOX        IDC_NEWNAME,70,41,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_NEWNAME,349,41,12,12
+    LTEXT           "Inlocuire",IDS_LABELREPLACE,6,60,32,8
+    CONTROL         "",IDS_REPLACESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,40,64,322,1
+    LTEXT           "Cau&ta pentru:",IDS_LABELSEARCHFOR,16,77,51,8
+    COMBOBOX        IDC_SEARCH,70,75,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_SEARCH,349,75,12,12
+    LTEXT           "Inlocuieste c&u:",IDS_LABELREPLACEWITH,16,94,51,8
+    COMBOBOX        IDC_REPLACE,70,92,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_REPLACE,349,92,12,12
+    CONTROL         "Lit&ere mici sau mari",IDC_CASESENSITIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,70,109,78,12
+    CONTROL         "Do&ar odata in fiecare nume",IDC_GLOBAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,70,123,104,12
+    CONTROL         "Cuvinte &intregi",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,181,109,60,12
+    CONTROL         "Expresie re&gulata",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,181,123,77,12
+    CONTROL         "Exclude exten&sia",IDC_EXCLUDEEXT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,276,109,71,12
+    LTEXT           "Schimba litera",IDS_LABELCASE,6,139,50,8
+    CONTROL         "",IDS_CHANGECASESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,58,143,304,1
+    LTEXT           "Nume &fisier:",IDS_LABELNAME,16,155,51,8
+    COMBOBOX        IDC_NAMECASE,70,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "E&xtensie:",IDS_LABELEXT,186,155,38,8
+    COMBOBOX        IDC_EXTCASE,236,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "In&clude partea de cale",IDC_PATHPART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,70,170,92,12
+    LTEXT           "&Previzualizare:",IDS_PREVIEW,6,182,51,8
+    RTEXT           "",IDS_COUNT,100,182,261,8
+    CONTROL         "",IDL_PREVIEW,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,0,192,368,68
+END
+
+IDD_CUT DIALOGEX 9, 20, 225, 88
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Adauga subsir"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Subsir de:",IDC_STATIC_1,7,9,55,8
+    COMBOBOX        IDC_CUTFROM,69,7,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "St&art la pozitia",IDC_STATIC_2,7,28,55,8
+    EDITTEXT        IDE_START,69,26,48,12,ES_AUTOHSCROLL
+    LTEXT           "relativ la",IDC_STATIC_3,126,28,38,8
+    COMBOBOX        IDC_START,170,26,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "S&farsit la pozitia",IDC_STATIC_4,7,47,55,8
+    EDITTEXT        IDE_END,69,45,48,12,ES_AUTOHSCROLL
+    LTEXT           "relativ la",IDC_STATIC_5,126,47,38,8
+    COMBOBOX        IDC_END,170,45,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,69,67,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,123,67,50,14
+END
+
+IDD_COUNTER DIALOGEX 9, 20, 164, 130
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Adauga Contor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Start la:",IDC_STATIC_1,7,9,36,8
+    EDITTEXT        IDE_START,62,7,95,12,ES_AUTOHSCROLL
+    LTEXT           "&Pas:",IDC_STATIC_2,7,25,36,8
+    EDITTEXT        IDE_STEP,62,23,95,12,ES_AUTOHSCROLL
+    LTEXT           "&Baza:",IDC_STATIC_3,7,41,36,8
+    COMBOBOX        IDC_BASE,62,39,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Latime minima:",IDC_STATIC_4,7,57,54,8
+    EDITTEXT        IDE_MINWIDTH,62,55,95,12,ES_AUTOHSCROLL
+    LTEXT           "&Adauga cu:",IDC_STATIC_5,7,73,52,8
+    COMBOBOX        IDC_FILL,62,71,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Aliniament s&tanga",IDC_LEFT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,90,76,12
+    DEFPUSHBUTTON   "OK",IDOK,30,109,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,84,109,50,14
+END
+
+IDD_DEFINESET DIALOGEX 9, 20, 262, 192
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "DefinesteSetul de Caractere"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Caractere in &Set:",IDC_STATIC_1,7,7,65,8
+    EDITTEXT        IDE_SET,7,17,248,12,ES_AUTOHSCROLL
+    LTEXT           "Indicii:\n\nFoloseste '-' sa incluzi un interval de caractere (ex. A-Z).\n\nSa incluzi caracterul '-' scrie-l la inceputul sau la sfirsitul setului (ex. -AZ).",IDC_STATIC_2,7,36,248,40
+    LTEXT           "Sa incluzi caracterul ']' scrie-l la inceputul setului.\n\nSa incluzi caracterul '^' in setul de caractere pozitive scrie-l oriunde dar nu la inceputul setului.",IDC_STATIC_3,7,84,248,32
+    LTEXT           "Pentru a include un caracter din clasa POSIX foloseste [:class:], unde clasa e una din alpha, alnum, ascii, blank, cntrl, digit, graph, lower, print, punct, space, upper, word, xdigit.\n\nPentru a include backslash foloseste \\\\.",IDC_STATIC_4,7,124,248,40
+    DEFPUSHBUTTON   "OK",IDOK,79,171,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,133,171,50,14
+END
+
+IDD_SUBEXPRESSION DIALOGEX 9, 20, 207, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Specifica Subexpresia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Numar &subexpresie:",IDC_STATIC_1,7,9,70,8
+    COMBOBOX        IDC_NUMBER,78,7,122,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Sfat: Foloseste 0 ca sa specifici toate expresiile potrivite.",IDC_STATIC_2,7,23,190,8
+    LTEXT           "&Litera:",IDC_STATIC_3,7,37,66,8
+    COMBOBOX        IDC_CASE,78,35,122,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,51,57,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,105,57,50,14
+END
+
+IDD_PROGRESS DIALOGEX 6, 15, 194, 60
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Cel ce Redenumeste"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDS_MESSAGE,7,7,180,8
+    LTEXT           "",IDS_PROGRESS,7,22,180,10,0,WS_EX_STATICEDGE
+    DEFPUSHBUTTON   "Anuleaza",IDCANCEL,72,39,50,14
+END
+
+IDD_COMMAND DIALOGEX 9, 20, 368, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Executa Comanda Shell"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Comanda:",IDC_STATIC_1,7,7,82,8
+    COMBOBOX        IDC_COMMAND,7,17,354,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,257,37,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,311,37,50,14
+END
+
+IDD_ERROR DIALOGEX 9, 20, 378, 260
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Eroare Comanda Shell"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Comanda ar putea sa nu se termine bine.",IDC_STATIC_1,7,7,218,8
+    LTEXT           "Linie de comanda:",IDC_STATIC_2,7,22,64,8
+    EDITTEXT        IDE_COMMAND,71,22,300,8,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    LTEXT           "Code Iesire:",IDC_STATIC_3,7,34,64,8
+    LTEXT           "",IDS_EXITCODE,73,34,298,8
+    LTEXT           "&Std-Eroare:",IDC_STATIC_4,7,46,82,8
+    EDITTEXT        IDE_STDERR,7,56,364,176,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON   "Ignora",IDOK,267,239,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,321,239,50,14
+END
+
+IDD_CONFIG DIALOGEX 45, 31, 257, 160
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Cel ce Redenumeste Optiuni Avansate"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Setari editor extern pentru modul manual:",IDC_STATIC_1,7,7,240,8
+    LTEXT           "&Comanda:",IDC_STATIC_2,14,21,52,8
+    EDITTEXT        IDE_COMMAND,68,19,166,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_BROWSE,237,19,13,12,WS_GROUP
+    LTEXT           "&Argumente:",IDC_STATIC_3,14,37,52,8
+    EDITTEXT        IDE_ARGUMENTS,68,35,166,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ARGHELP,237,35,13,12,WS_GROUP
+    LTEXT           "Director &Initial:",IDC_STATIC_4,14,53,53,8
+    EDITTEXT        IDE_INITDIR,68,51,166,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_INITDIRHELP,237,51,13,12,WS_GROUP
+    LTEXT           "Font mod manual:",IDC_STATIC_5,7,74,113,8
+    PUSHBUTTON      "Sc&himba",IDB_FONT,14,84,50,14,WS_GROUP
+    LTEXT           "Confirmari:",IDC_STATIC_6,7,109,60,8
+    CONTROL         "Inchidere fereastra principala cu tasta &ESC.",IDC_CONFIRMESCCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,118,201,12
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,7,138,243,1
+    DEFPUSHBUTTON   "OK",IDOK,92,142,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,146,142,50,14
+    PUSHBUTTON      "Help",IDHELP,200,142,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Cel ce Redenumeste"
+  IDS_DESCRIPTION, "Pentru redenumire in grup complexa, cu verificare in timp real."
+  IDS_ABOUT, "Despre Plugin"
+  IDS_RENAMERERR, "CXel ce Redenumeste - Eroare"
+  IDS_LOWMEM, "Memorie insuficienta."
+  IDS_PLUGMENU_RENAME, "&Redenumire in Grup..."
+  IDS_PLUGMENU_UNDO, "&Revenire..."
+  IDS_RENAME, "&Redenumeste"
+  IDS_VALIDATE, "&Validare"
+  IDS_ORIGNAME_COLUMN, "Nume Original"
+  IDS_NEWNAME_COLUMN, "Nume Nou"
+  IDS_SIZE_COLUMN, "Marime"
+  IDS_DATE_COLUMN, "Data"
+  IDS_TIME_COLUMN, "Timp"
+  IDS_PATH_COLUMN, "Cale"
+
+  // menu
+  IDS_MENU_FILE, "Comen&zi"
+  IDS_MENU_VIEW, "&Vizualizare"
+  IDS_MENU_OPTIONS, "&Optiuni"
+  IDS_MENU_HELP, "&Help"
+  IDS_MENU_RENAME, "&Redenumeste\tAlt+R"
+  IDS_MENU_VALIDATE, "&Validare\tCtrl+I"
+  IDS_MENU_EXIT, "Ie&sire\tAlt+F4"
+  IDS_MENU_SORTOLD, "Sorteaza dupa Nume &Original\tCtrl+F1"
+  IDS_MENU_SORTNEW, "Sorteaza dupa Nume &Nou\tCtrl+F1"
+  IDS_MENU_SORTSIZE, "Sorteaza dupa &Marime\tCtrl+F2"
+  IDS_MENU_SORTTIME, "&Sorteaza dupa Timp\tCtrl+F3"
+  IDS_MENU_SORTPATH, "Sorteaza dupa &Cale\tCtrl+F4"
+  IDS_MENU_FILENAMES, "Redenumeste &Nume fisier\tCtrl+N"
+  IDS_MENU_RELATIVEPATH, "Redenumeste Calea &Relativa\tCtrl+R"
+  IDS_MENU_FULLPATH, "Redenumeste Calea &Intreaga\tCtrl+F"
+  IDS_MENU_FONT, "Font Mod &Manual..."
+  IDS_MENU_LAST, "&Ultimul folosit\tCtrl+L"
+  IDS_MENU_RESET, "Re&setare\tCtrl+D"
+  IDS_MENU_REGEXP, "Expresii &Regulate"
+  IDS_MENU_CUSTOMFONT, "&Foloseste font custom..."
+  IDS_MENU_AUTOFONT, "Foloseste fontul &implicit"
+  IDS_MENU_REMOVESOURCEPATH, "Elimina Directoarele &Goale"
+  IDS_MENU_UNDO, "An&ulare\tCtrl+U"
+  IDS_MENU_EDIT, "E&ditare"
+  IDS_MENU_STORELIST, "&Stocheaza Lisat in Clipboard\tF2"
+  IDS_MENU_LOADLIST, "&Incarca Lista din ClipBoard\tF3"
+  IDS_MENU_EDITLIST, "&Deschide Lista in Editorul Extern...\tF4"
+  IDS_MENU_FILTER, "Lista &filtrata Prin Comanda Shell...\tF5"
+  IDS_MENU_ALLFILES, "Toat&e Fisierele\tF6"
+  IDS_MENU_RENAMED, "Fisiere &Redenumite cu Succes\tF7"
+  IDS_MENU_NOTRENAMED, "Fisiere &Neredenumite\tF8"
+  IDS_MENU_ADVANCED, "&Avansat..."
+  IDS_MENU_BATCHRENDLG, "&Dialog Redenumire in Grup\tF1"
+
+  IDS_VAR_ORIGNAME, "$(NumeOriginal)"
+  IDS_CASE_DONTCHANGE, "Nu schimba"
+  IDS_CASE_LOWER, "Litera mica"
+  IDS_CASE_UPPER, "Litera majuscula"
+  IDS_CASE_MIXED, "Litere amestecate"
+  IDS_INVALIDMASK, "Masca invalida."
+  IDS_TOOLONGPATH, "Nu pot citi directorul pentru ca nume cale e prea lung"
+  IDS_ERRREADDIR, "Nu pot citi directorul."
+  IDS_ERROR, "Eroare"
+  IDS_DIRTEXT, "DIR"
+  IDS_CANCELCNFRM, "Doriti sa anulati aceasta operatiune?"
+  IDS_QUESTION, "Intrebare"
+  IDS_VAR_ORIGINALNAME, "Nume Original"
+  IDS_VAR_DRIVE, "Drive"
+  IDS_VAR_PATH, "Cale"
+  IDS_VAR_RELATIVEPATH, "Cale Relativa"
+  IDS_VAR_NAME, "Nume"
+  IDS_VAR_NAMEPART, "Parte Nume"
+  IDS_VAR_EXTPART, "Parte Extensie"
+  IDS_VAR_SIZE, "Marime"
+  IDS_VAR_TIME, "Timp"
+  IDS_VAR_DATE, "Data"
+  IDS_VAR_COUNTER, "Contor..."
+  IDS_VAR_LOWER, "Litere mici"
+  IDS_VAR_UPPER, "Litere Majuscule"
+  IDS_VAR_MIXED, "Litere Amestecate"
+  IDS_VAR_STRIPDIA, "Scoate Diacriticele"
+  IDS_VAR_CUT, "Subsir..."
+  IDS_LEFT, "start"
+  IDS_RIGHT, "sfarsit"
+  IDS_BADCUTOFFSET, "Va rugam specificati o valoare non-negativa."
+  IDS_DECIMAL, "Zecimal"
+  IDS_HEX_LOWER, "Hexazecimal (abcdef)"
+  IDS_HEX_UPPER, "Hexazecimal (ABCDEF)"
+  IDS_FILL_SPACES, "Spatii"
+  IDS_FILL_ZEROS, "Zero-uri"
+  IDS_FILL_UNDERSCORES, "Underscores"
+
+  IDS_EXP_UNMATCHEDPAR, "Numele variabil trebuie terminat cu ')'."
+  IDS_EXP_VARNOTFOUND, "Variabila nu a fost gasita."
+  IDS_EXP_UNEXPECTEDCHAR, "Astept nume variabila in paranteze sau cararacterul '$'."
+  IDS_EXP_SMALLBUFFER, "Sirul extins este prea mare."
+  IDS_EXP_TRAILINGDOLLAR, "Sfarsit neasteptat a sirului, caracterul '$' trebuie sa fie urmat de nume variabila sau de caracterul '$'."
+  IDS_EXP_EMPTYSTR, "Sir gol nu este permis aici."
+  IDS_EXP_UNEXPECTARG, "Argumentul nu este asteptat aici."
+  IDS_EXP_EXPECTCUTORCASE, "Specificatii asteptate litere ('mica', 'majuscula, 'mixta', sau 'fara diacritice') sau specificatii taiere nume (doua numere intregi)."
+  IDS_EXP_EXPECTENDCUT, "Astept sfarsit de nume specificatii taiere (numar intreg)."
+  IDS_EXP_UNEXPECTEDARGUMENT, "Argument neasteptat."
+  IDS_EXP_MISTIMEFORMAT, "Lipsa format timp."
+  IDS_EXP_INVALIDTIMEFMT, "Format timp invalid."
+  IDS_EXP_MISDATEFORMAT, "Lipsa format data"
+  IDS_EXP_INVALIDDATEFMT, "Format data invalid."
+  IDS_EXP_TOOMUCHARGUMENTS, "Prea multe argumente."
+  IDS_EXP_EXPECTSTART, "Astept start contor (numar intreg)."
+  IDS_EXP_EXPECTSTEP, "Astept pas contor (punct numar floating)."
+  IDS_EXP_EXPECTBASEALIGNWIDTH, "Astept specificatii baza (una din 'dxX'), aliniere ('l') sau latimea (numar intreg pozitiv)."
+  IDS_EXP_EXPECTALIGNWIDTH, "Astept specificatii aliniere ('l') sau latimea (numar intreg pozitiv)."
+  IDS_EXP_EXPECTWIDTH, "Astept specificatii latimea (numar intreg pozitiv)"
+  IDS_EXP_EXPECTFILL, "Astept specificatii umplere goluri (o litera)"
+
+  IDS_NEWNAMEERR, "<Eroare nume nou: %s>"
+  IDS_TRANSFERERROR, "<Valoare invalida in unele campuri introduse>"
+  IDS_REGEXPERR, "<Eroare expresie regulata: %s>"
+  IDS_BMERR, "<Eroare Boyer-Moore: %s>"
+  IDS_GENERICERR, "<Eroare: %s>"
+  IDS_REPLACEERR, "<Eroare model inlocuit: %s>"
+
+  IDS_REP_EXPCLOSEPAR1, "Astept paranteze ce se inchid sau specificarea literelor ('mica', 'majuscula', 'mixta', sau 'fara diacritice')."
+  IDS_REP_EXPCLOSEPAR2, "Astept paranteze inchise."
+  IDS_REP_EXPCLOSEPAR3, "Astept paranteze inchise sau caracter ':' urmat de specificatii litera ('mica', 'majuscula', 'mixta', sau 'fara diacritice')."
+  IDS_REP_BADREF, "Referinta pentru subexpresii nedefinita."
+  IDS_EXP_EXPECTSUBNUM1, "Astept numar sub-expresie"
+  IDS_EXP_EXPECTSUBNUM2, "Astept numar subexpresie, numar subexpresie in paranteze sau caracterul '$'."
+  IDS_EXP_TRAILINGBACKSLASH, "Sfarsit neasteptat a sirului, backslash nu poate fi la sfarsit de sir."
+
+  IDS_REENOERROR, "Fara eroare."
+  IDS_REELOWMEMORY, "Memorie mica."
+  IDS_REEEMPTY, "Expresia regulata este goala."
+  IDS_REETOOBIG, "Expresia regulata este prea mare."
+  IDS_REETOOMANYPARENTHESISES, "Prea multe ()."
+  IDS_REEUNMATCHEDPARENTHESIS, "Fara pereche ()."
+  IDS_REEOPERANDCOULDBEEMPTY, "*+ operandul poate fi gol."
+  IDS_REENESTED, "Grup la fel *?+."
+  IDS_REEUNMATCHEDBRACKET, "Fara pereche []."
+  IDS_REEFOLLOWSNOTHING, "?+* nu urmeaza nimic."
+  IDS_REETRAILINGBACKSLASH, "Decalaj \\."
+  IDS_REEINTERNALDISASTER, "Dezastru intern."
+  IDS_REEINVALIDPOSIXCLASS, "Nume clasa POSIX necunoscuta."
+  IDS_REEEXPECTINGXDIGIT, "Astept doi digiti hexazecimali dupa \\x."
+  IDS_REESTACKOVERFLOW, "Stack overflow"
+  IDS_REENOPATTERN, "Expresie compilata ceruta."
+  IDS_REEERRORSTARTINGTHREAD, "Nu pot porni noua insiruire."
+  IDS_REEEXPECTINGEXTENDEDPATTERN1, "Astept una din :=!< dupa (?"
+  IDS_REEEXPECTINGEXTENDEDPATTERN2, "Astept una din =! dupa (?<"
+  IDS_REEBADFIXEDWIDTHLOOKBEHIND, "Vezi dupa model - nu ara fixata largimea."
+
+  IDS_RE_POSIX_ALPHA, "Caractere Alfabetice (alfa)"
+  IDS_RE_POSIX_ALNUM, "Caractere Alfanumerice (alnum)"
+  IDS_RE_POSIX_ASCII, "Caractere ASCII (ascii)"
+  IDS_RE_POSIX_CNTRL, "Control Caractere (cntrl)"
+  IDS_RE_POSIX_DIGIT, "Digiti Zecimali (digit)"
+  IDS_RE_POSIX_GRAPH, "Caractere Printable Altele Decat Spatiu (graph)"
+  IDS_RE_POSIX_LOWER, "Caractere litera mica (mic)"
+  IDS_RE_POSIX_PRINT, "Caractere Printable (print)"
+  IDS_RE_POSIX_PUNCT, "Caractere de Punctatie (punct)"
+  IDS_RE_POSIX_SPACE, "Caractere Spatiu (space)"
+  IDS_RE_POSIX_UPPER, "Caracter majuscule (upper)"
+  IDS_RE_POSIX_WORD, "Caractere Alfanumerice + '_' (word)"
+  IDS_RE_POSIX_XDIGIT , "Digiti Hexazecimali (xdigit)"
+  IDS_RE_LEFTPAREN, "Paranteza Stanga '('"
+  IDS_RE_RIGHTPAREN, "Paranteza Dreapta ')'"
+  IDS_RE_LEFTBRACKET, "Paranteza Dreapta Stanga '['"
+  IDS_RE_CIRCUMFLEX,  "Circumflex '^'"
+  IDS_RE_DOLLAR, "Dolar '$'"
+  IDS_RE_DOT, "Punct '.'"
+  IDS_RE_PIPE, "Bara '|'"
+  IDS_RE_ASTERISK, "Asterisc '*'"
+  IDS_RE_PLUS, "Plus '+'"
+  IDS_RE_QUESTIONMARK, "Semnul Intrebarii '?'"
+  IDS_RE_BACKSLASH, "Backslash '\\'"
+  IDS_RE_ANYCHAR, "Orice Caracter"
+  IDS_RE_ANYFROM, "Orice din Setul de Caractere"
+  IDS_RE_ANYBUT, "Orice Exceptand Setul de Caractere"
+  IDS_RE_ANYFROMPOSIX, "Clasa Caracter POSIX"
+  IDS_RE_ANYBUTPOSIX, "Clasa Caracter POSIX"
+  IDS_RE_BOL, "Inceputul Numelui"
+  IDS_RE_EOL, "Sfarsitul Numelui"
+  IDS_RE_OR, "Sau"
+  IDS_RE_ITERATION, "0 sau Mai Multe Potriviri"
+  IDS_RE_POSITIVEITERATION, "1 sau Mai Multe Potriviri"
+  IDS_RE_ITERATION_GREEDY, "La Fel de Multe Potriviri Pe Cat e Posibil"
+  IDS_RE_ITERATION_UNGREEDY, "La Fel de Putine Potriviri Pe Cat Necesar"
+  IDS_RE_ONEORZERO, "1 sau 0 Potriviri"
+  IDS_RE_ZEROORONE, "0 sau 1 Potriviri"
+  IDS_RE_SUBEXPRESSION, "Subexpresie"
+  IDS_RE_NOTCAPTURESUBEXP, "Subexpresii Necapturate"
+  IDS_RE_LITERALS, "Caracter Special Ca Literal"
+  IDS_RE_WORDCHAR, "Caracter Cuvant"
+  IDS_RE_NONWORDCHAR, "Caracter Non-Cuvant"
+  IDS_RE_SPACE, "Caracter Spatiu"
+  IDS_RE_NONSPACE, "Caracter Non-Spatiu"
+  IDS_RE_DIGIT, "Caracter Digit"
+  IDS_RE_NONDIGIT, "Caracter Non-Digit"
+  IDS_RE_WORDB, "Limitare Cuvant"
+  IDS_RE_NONWORDB, "Non-(Limitare Cuvant)"
+  IDS_RE_NUMBER, "Numar Zecimal"
+  IDS_RE_HEXNUMBER, "Numar Hexazecimal"
+  IDS_RE_WORD, "Cuvant"
+  IDS_RE_PATHCOMPONENT, "Componenta Cale"
+  IDS_RE_FILENAME, "Nume Fisier (Nume in $1, Ext in $2)"
+  IDS_RE_DEFINESET, "Defineste Setul..."
+  IDS_RE_MATCHEDEXPR, "Potriviri Expresii Normale"
+  IDS_RE_MATCHEDSUBEXP, "Potriviri Subexpresii..."
+  IDS_RE_PLOOKA, "Pozitiv vezi inainte"
+  IDS_RE_NLOOKA, "Negativ vezi inainte"
+  IDS_RE_PLOOKB, "Pozitiv vezi in spate"
+  IDS_RE_NLOOKB, "Negativ vezi in spate"
+  IDS_RE_ZEROWIDTHASSERT, "Afirmatie de Largime Zero"
+
+  IDS_EMPTYSTR, "Sir gol nu este admis aici."
+  IDS_EMPTYMSG_DEF, "Nu sunt denumiri in lista."
+  IDS_EMPTYMSG_NOMATCH, "Masca introdusa nu a gasit potriviri de fisiere."
+  IDS_EMPTYMSG_BADMASK, "Masca invalida."
+  IDS_EMPTYMSG_GENERATING, "Creez lista de fisiere. Apasa ESC sa anulezi"
+  IDS_EMPTYMSG_ERROR, "Eroare aparuta la creerea listei de fisiere."
+  IDS_CNFRM_CLOSE, "Vrei sa inchizi Redenumire in Grup?"
+  IDS_CNFRM_ESC_CLOSE2, "In&chide Redenumire in Grup fara sa intrebi data viitoare"
+
+  IDS_CANCELING, "Anulez operatiunea, va rugam asteptati..."
+  IDS_NOTVALID_FILENAME, "Nume fisier invalid."
+  IDS_NOTVALID_RELATIVEPATH, "Calea relativa invalida."
+  IDS_NOTVALID_FULLPATH, "Calea intreaga invalida."
+  IDS_DUPLICATENAME, "Nume duplicat."
+  IDS_DEPENDENCE, "Dependenta de un nume ciclic sau dependenta de un fisier ce nu poate fi redenumit."
+
+  IDS_RENAMING, "Redenumesc fisiere, apasa ESC sa anulezi..."
+  IDS_PREPARING, "Pregatesc datele pentru operatiunea de redenumire..."
+  IDS_DIRNOTSAMEROOT, "Mutarea directorului pe alt disc diferit nu este suportata."
+  IDS_DIRDIR, "Directorul cu acelasi nume exista deja."
+  IDS_FILEDIR, "Acest nume a fost deja folosit pentru un director."
+  IDS_CNFRM_SHOVERWRITE, "Vrei sa suprascrii fisierul cu atribute SISTEM sau ASCUNSE?"
+  IDS_OVEWWRITETITLE, "Confirma Suprascriere Fisier"
+  IDS_OVERWRITEERROR, "Nu pot suprascrie fisier: "
+  IDS_MOVEERROR, "Nu pot redenumi fisier: "
+  IDS_DELETEERROR, "Nu pot sterge fisier: "
+  IDS_WRITEERROR, "Nu pot scrie fisier: "
+  IDS_READERROR, "Nu pot citi fisier: "
+  IDS_OPENFILEERROR, "Nu pot deschide fisier: "
+  IDS_DIRCASEERROR, "Nu pot modifica marimea literelor din numele directorului: "
+  IDS_CREATEDIR, "Nu pot crea director: "
+  IDS_UNDOING, "Anulez operatiunea de redenumire..."
+  IDS_REMOVEDIR,"Nu pot scoate directorul: "
+  IDS_UNDOQUEST, "Anulare operatie de redenumire?"
+  IDS_SOMEERRORS, "Unele fisiere nu au fost redenumite cu succes. Aceste fisiere vor fi listate acum sa poti corecta erorile si sa incerci sa le redenumesti din nou.\n\nCa sa vezi fisierele redenumite foloseste optiunile din meniul `Vizualizare'."
+  IDS_VALIDATEOK, "Validare completata cu succes."
+  IDS_NOTTODO, "Nimic de facut."
+  IDS_WAITINGFORWINDOWS, "Asteapta pana toate ferestrele de Redenumire in grup sunt inchise..."
+  IDS_MISLINES, "Prea putine linii."
+  IDS_BADLINECOUNT, "Numarul de linii introduse necesita un numar mai mare de fisiere selectate pentru operatia de redenumire."
+  IDS_CREATETEMP, "Nu pot crea fisier temporar. "
+  IDS_WRITETEMP, "Nu pot scrie in fisierul temporar. "
+  IDS_OPENTEMP, "Nu pot deschide fisierul temporar. "
+  IDS_SIZEOFTEMP, "Nu pot obtine marimea fisierului temporar. "
+  IDS_READTEMP, "Nu pot citi din fisierul temporar. "
+  IDS_PROCESS, "Nu pot porni procesul nou: "
+  IDS_ERRLAUNCHEDIT, "Nu pot porni editorul extern. Verifica configurarea in Plugin Renamer pentru setarile editorului extern. "
+  IDS_LONGDATA, "Nu pot termina operatia din cauza datelor prea lungi."
+  IDS_EXTEDIT, "Cand ai terminat editarea si salvarea modificarilor in editorul extern apasa OK ca sa actualizezi lista de nume din fisierul editat.\n\nApasa Anuleaza sa iesi fara modificarea listei de nume."
+  IDS_CREATEPIPE, "Nu pot crea bare: "
+  IDS_WRITEPIPE, "Nu pot scrie in bara. "
+  IDS_EXEFILES, "Executabile (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tToate fisierele (*.*)\t*.*\t\t"
+  IDS_EXP_FULLNAME, "Nume Intreg"
+  IDS_EXP_DRIVE, "Drive"
+  IDS_EXP_PATH, "Cale"
+  IDS_EXP_NAME, "Nume"
+  IDS_EXP_NAMEPART, "Parte Nume"
+  IDS_EXP_EXTPART, "Parte Extensie"
+  IDS_EXP_FULLPATH, "Cale Intreaga"
+  IDS_EXP_WINDIR, "Director Windows"
+  IDS_EXP_SYSDIR, "Director Sistem"
+  IDS_EXP_DOSFULLNAME, "DOS Nume Intreg"
+  IDS_EXP_DOSDRIVE, "Drive DOS"
+  IDS_EXP_DOSPATH, "Cale DOS"
+  IDS_EXP_DOSNAME, "Nume DOS"
+  IDS_EXP_DOSNAMEPART, "DOS Parte Nume"
+  IDS_EXP_DOSEXTPART, "DOS Parte Extensie"
+  IDS_EXP_DOSFULLPATH, "DOS Cale Intreaga"
+  IDS_EXP_DOSWINDIR, "DOS Directorul Windows"
+  IDS_EXP_DOSSYSDIR, "DOS Directorul Sistem"
+  IDS_EXP_ENVVAR, "Mediu Variabil"
+  IDS_EXP_BROWSE, "Rasfoieste..."
+  IDS_EXP_SALDIR, "Directorul Sally"
+  IDS_CFG_CONFLICT, "Configuratia este deja deschisa."
+  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
+  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+}

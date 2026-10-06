@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for unlha. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "LHA archívumok böngészése és kibontása."
+ IDS_ABOUT, "Plugin névjegy"
+ IDS_FILECORRUPT, "Érvénytelen LZH fájl vagy ismeretlen formátumú."
+ IDS_CHECKSUMERROR, "Fejléc ellenőrzési hiba.\nAz archívum sérült - nem minden fájl listázható ki."
+ IDS_LOWMEM, "Kevés memória."
+ IDS_WRITEERROR, "Írási hiba"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "Archívum megnyitási hiba."
+ IDS_LIST, "Nem adható archívum bejegyzés a fájl listához."
+ IDS_SYMLINK, "Az archívum egy vagy több UNIX szimbolikus linket tartalmaz, melyen nem jeleníthetők meg."
+ IDS_UNPACKERROR, "A fájl nem tömöríthető ki."
+ IDS_CRCERROR, "Hiba a tömörített adatban. A CRC nem egyezik."
+ IDS_READERROR, "Archívum olvasási hiba."
+ IDS_EXTRPROGTITLE, "LHA archívum kibontása - %s"
+ IDS_PREPAREDATA, "adat előkészítése és mappák létrehozása..."
+ IDS_UNPACKING, "kibontás: "
+ IDS_EXTRACTFILES, "kibontás..."
+ IDS_TOOLONGNAME, "A művelet nem fejezhető be, mert az elérés túl hosszú."
+ IDS_TOOLONGMASK, "A művelet nem fejezhető be, mert a maszk túl hosszú."
+ IDS_METHOD, "Ismeretlen tömörítési mód. A fájl nem tömöríthető ki."
+ IDS_METHOD2, "ismeretlen mód, kihagyva..."
+}

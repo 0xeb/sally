@@ -1,0 +1,116 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for unarj. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unarj/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unarj.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 6, 15, 223, 110
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Следующий том архива"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Пожалуйста, вставьте диск со следующим томом архива или выберите соответствующий файл на диске.\n\nНажмите ""OK"" для продолжения.",IDC_STATIC_1,12,9,199,32
+    LTEXT           "Предыдущий том:",IDC_STATIC_2,12,48,66,8
+    EDITTEXT        IDC_PREVVOL,79,48,132,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "&Следующий том:",IDC_STATIC_3,12,62,61,8
+    EDITTEXT        IDC_FILENAME,12,72,184,12
+    PUSHBUTTON      "...",IDC_BROWSE,199,72,13,12
+    DEFPUSHBUTTON   "ОК",IDOK,55,91,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,118,91,50,14
+END
+
+IDD_ERROR DIALOGEX 15, 34, 360, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ошибка"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Имя:",IDC_STATIC_1,8,10,31,8
+    LTEXT           "",IDS_FILENAME,43,10,311,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Ошибка:",IDC_STATIC_2,8,23,31,8,NOT WS_GROUP
+    LTEXT           "Файл не может быть извлечен, так как его начальная часть содержится в предыдущем томе. Для извлечения файла следует начать его извлечение из предыдущего тома.",IDC_STATIC_3,43,23,311,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&Больше не показывать это сообщение.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,43,44,150,12
+    DEFPUSHBUTTON   "ОК",IDOK,125,63,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,185,63,50,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 220, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка UnARJ"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "содержится в предыдущем томе.",IDC_STATIC_1,23,22,154,8
+    CONTROL         "&При распаковке пропускать файлы, начало которых",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,10,197,12
+    LTEXT           "отобразить содержимое архива полностью.",IDC_STATIC_2,23,44,157,8
+    CONTROL         "&Не показывать предупреждение о невозможности",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,189,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,208,1
+    DEFPUSHBUTTON   "ОК",IDOK,57,66,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,112,66,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 107
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ - Предупреждение"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Невозможно отобразить полный перечень файлов многотомного архива, так как некоторые тома не были найдены.",IDC_STATIC_1,11,10,194,24
+    LTEXT           "Для просмотра полного перечня файлов необходимо поместить все тома в одну папку.",IDC_STATIC_2,11,41,192,16
+    CONTROL         "&Больше не показывать это сообщение",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,66,157,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,83,203,1
+    DEFPUSHBUTTON   "ОК",IDOK,153,89,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnARJ"
+  IDS_PLUGIN_DESCRIPTION, "Просмотр и извлечение архивов ARJ."
+  IDS_ABOUT, "О модуле"
+  IDS_LOWMEM, "Недостаточно памяти."
+  IDS_ARCEOF, "Неожиданно достигнут конец архивного файла."
+  IDS_BADDATA, "Архив поврежден."
+  IDS_BADARC, "Неизвестный формат файла или файл не является архивом ARJ."
+  IDS_ERROPENARC, "Не удалось открыть архивный файл."
+  IDS_UNKNOWN, "Произошла неизвестная ошибка."
+  IDS_ERRACCESSARC, "Не удалось получить доступ к архивному файлу."
+  IDS_ARJARCHIVES, "Архивы ARJ (*.A*)"
+  IDS_ALLFILES, "Все файлы (*.*)"
+  IDS_BROWSEARCHIVETITLE, "Выберите архивный файл"
+  IDS_CRC, "Ошибка в сжатых данных. Контрольная сумма CRC не совпадает."
+  IDS_LIST, "Не удалось включить элемент архива в перечень файлов."
+  IDS_EXTRPROGTITLE, "Распаковка архива ARJ - %s"
+  IDS_PREPAREDATA, "подготовка данных и создание папок..."
+  IDS_EXTRACTFILES, "распаковка..."
+  IDS_EXTRACTING, "распаковка: "
+  IDS_UNABLEGETFIELPOS, "Не удалось определить позицию в файле: "
+  IDS_UNABLEWRITE, "Не удалось выполнить запись в файл:"
+  IDS_UNABLESEEK, "Не удалось установить позицию в файле: "
+  IDS_TOOLONGNAME, "Невозможно завершить операцию, путь слишком длинный."
+  IDS_TOOLONGMASK, "Невозможно завершить операцию, длина маски превышает предел."
+  IDS_VERSION, "Неизвестная версия сжатого файла."
+  IDS_TYPE, "Неизвестный тип сжатого файла."
+  IDS_METHOD,  "Метод сжатия файла не поддерживается модулем UnARJ."
+  IDS_ENCRYPT, "Зашифрованные файлы не поддерживаются."
+  IDS_BADVOL, "Некорректный том или неизвестная структура архива."
+  IDS_EXPIRE, "Срок действия модуля истек. Пожалуйста, посетите наш сайт для обновления версии модуля."
+  IDS_NOTFOUND, "Файл не найден."
+  IDS_ERROR, "Ошибка"
+}

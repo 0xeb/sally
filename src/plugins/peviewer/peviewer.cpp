@@ -21,7 +21,7 @@ CPluginInterface PluginInterface;
 CPluginInterfaceForViewer InterfaceForViewer;
 
 HINSTANCE DLLInstance = NULL; // handle to the SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to the SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 // Salamander general interface - valid from launch until the plugin shuts down.
 CSalamanderGeneralAbstract* SalGeneral = NULL;
@@ -108,10 +108,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // Load the language module (.slg).
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Portable Executable Viewer" /* do not translate! */);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     if (!InitializeWinLib(L"PEVIEWER" /* do not translate! */, DLLInstance))
     {

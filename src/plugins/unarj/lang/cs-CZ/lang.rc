@@ -1,0 +1,116 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for unarj. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unarj/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unarj.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 6, 15, 194, 110
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Další svazek archivu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Prosím vložte disketu s dalším svazkem archivu nebo najděte příslušný soubor na disku.\n\nKlikněte na OK, pokud je připraven.",IDC_STATIC_1,12,9,170,32
+    LTEXT           "Předchozí svazek:",IDC_STATIC_2,12,48,60,8
+    EDITTEXT        IDC_PREVVOL,73,48,109,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "&Další svazek:",IDC_STATIC_3,12,62,49,8
+    EDITTEXT        IDC_FILENAME,12,72,155,12
+    PUSHBUTTON      "...",IDC_BROWSE,170,72,13,12
+    DEFPUSHBUTTON   "OK",IDOK,39,91,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,102,91,50,14
+END
+
+IDD_ERROR DIALOGEX 15, 34, 350, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Chyba"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Název:",IDC_STATIC_1,4,10,26,8
+    LTEXT           "",IDS_FILENAME,34,10,309,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Chyba:",IDC_STATIC_2,4,23,26,8,NOT WS_GROUP
+    LTEXT           "Soubor nemůže být extrahován, protože je pokračující z předchozího svazku. Pro extrahování tohoto souboru musíte začít svazkem, v kterém soubor začíná.",IDC_STATIC_3,34,23,309,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&Příště nezobrazovat.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,34,44,183,12
+    DEFPUSHBUTTON   "OK",IDOK,120,63,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,180,63,50,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 225, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ - Konfigurace"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "z předchozího svazku.",IDC_STATIC_1,23,22,154,8
+    CONTROL         "&Při extrahování automaticky přeskočit soubory pokračující",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,10,203,12
+    LTEXT           "obsah archivu.",IDC_STATIC_2,23,44,111,8
+    CONTROL         "&Nezobrazovat upozornění, pokud nemůže být vypsán celý",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,205,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,213,1
+    DEFPUSHBUTTON   "OK",IDOK,60,66,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,115,66,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 107
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ - Upozornění"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ne všechny soubory ve více-svazkovém archivu můžou být vypsány (a zobrazeny v panelu), protože nelze nalézt některý svazek archivu.",IDC_STATIC_1,11,10,194,24
+    LTEXT           "Pro výpis celého obsahu archivu zkopírujte všechny svazky archivu do stejného adresáře.",IDC_STATIC_2,11,41,192,16
+    CONTROL         "&Příště nezobrazovat",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,66,157,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,83,203,1
+    DEFPUSHBUTTON   "OK",IDOK,153,89,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnARJ"
+  IDS_PLUGIN_DESCRIPTION, "Prohlíží a extrahuje ARJ archivy."
+  IDS_ABOUT, "O pluginu"
+  IDS_LOWMEM, "Nedostatek paměti."
+  IDS_ARCEOF, "Neočekávaný konec archivu."
+  IDS_BADDATA, "Archiv je poškozen."
+  IDS_BADARC, "Soubor má neznámý formát nebo není platným ARJ archivem."
+  IDS_ERROPENARC, "Nelze otevřít archiv."
+  IDS_UNKNOWN, "Vyskytla se neznámá chyba."
+  IDS_ERRACCESSARC, "Nelze zpřístupnit archiv."
+  IDS_ARJARCHIVES, "Soubory ARJ archivu (*.A*)"
+  IDS_ALLFILES, "Všechny soubory (*.*)"
+  IDS_BROWSEARCHIVETITLE, "Výběr komprimovaného souboru"
+  IDS_CRC, "Chyba v komprimovaných datech. CRC nesouhlasí."
+  IDS_LIST, "Nelze přidat záznam archivu do výpisu souborů."
+  IDS_EXTRPROGTITLE, "Extrahování ARJ archivu - %s"
+  IDS_PREPAREDATA, "připravuji data a vytvářím adresáře..."
+  IDS_EXTRACTFILES, "extrahuji..."
+  IDS_EXTRACTING, "extrahuji: "
+  IDS_UNABLEGETFIELPOS, "Nelze získat ukazatel souboru: "
+  IDS_UNABLEWRITE, "Nelze zapsat do souboru:"
+  IDS_UNABLESEEK, "Nelze nastavit ukazatel souboru: "
+  IDS_TOOLONGNAME, "Nelze dokončit operaci, kvůli příliš dlouhému názvu cesty."
+  IDS_TOOLONGMASK, "Nelze dokončit operaci, kvůli příliš dlouhé masce."
+  IDS_VERSION, "Neznámá verze komprimovaného souboru."
+  IDS_TYPE, "Neznámý typ komprimovaného souboru."
+  IDS_METHOD,  "Soubor je komprimovaný metodou, která není podporovaná UnARJ pluginem."
+  IDS_ENCRYPT, "Promiňte, šifrované soubory nejsou podporovány."
+  IDS_BADVOL, "Neplatný svazek nebo neznámá struktura archivu."
+  IDS_EXPIRE, "Promiňte, plugin vypršel. Prosím prohlédněte naší web stránku pro novější verzi."
+  IDS_NOTFOUND, "Soubor nenalezen."
+  IDS_ERROR, "Chyba"
+}

@@ -779,7 +779,7 @@ CCallStack::ThreadBugReportF(void* param)
             // save the error records to disk
             BOOL ret = CreateBugReportFile(data->Exception, data->CurrentThreadID, data->ShellExtCrashID, data->BugReportPath);
 
-            if (HLanguage != NULL) // we need the SLG module already loaded to display the message box
+            if (HLanguage != NULL) // the UI language must be applied already to display the message box
             {
                 if (data->IconOvrlsHanName != NULL)
                     InformAboutIconOvrlsHanCrash(data->IconOvrlsHanName);

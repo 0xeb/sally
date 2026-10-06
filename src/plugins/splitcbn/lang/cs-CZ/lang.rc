@@ -1,0 +1,166 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for splitcbn. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/splitcbn/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\splitcbn.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 53, 55, 220, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Rozdělení a spojení souborů - Konfigurace"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Zahrnout původní příponu do výstupního názvu souboru",IDC_CHECK_INCLUDE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,6,202,10
+    CONTROL         "Vytvořit &dávkový soubor pro spojení",IDC_CHECK_CREATE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,19,131,10
+    CONTROL         "Rozdělit do druhéh&o panelu",IDC_CHECK_SPLITOTHER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,32,105,10
+    CONTROL         "&Rozdělit do podadresáře s názvem zdrojového souboru",IDC_CHECK_SPLITSUB,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,45,196,10
+    CONTROL         "&Spojit do druhého panelu",IDC_CHECK_COMBINEOTHER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,58,98,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,4,76,212,1
+    DEFPUSHBUTTON   "OK",IDOK,48,83,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,105,83,50,14
+    PUSHBUTTON      "Nápověda",IDHELP,162,83,50,14
+END
+
+IDD_SPLIT DIALOGEX 32, 33, 253, 125
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Rozdělit"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_SPLIT_ICON,6,7,20,20,WS_GROUP
+    CONTROL         "",IDC_STATIC_TITLE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,35,9,206,8
+    EDITTEXT        IDC_EDIT_DIR,35,19,193,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,232,19,14,14,WS_GROUP
+    CONTROL         "&Velikost částí:",IDC_RADIO_SIZE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,35,43,71,10
+    CONTROL         "&Počet částí:",IDC_RADIO_NUMBER,"Button",BS_AUTORADIOBUTTON,35,60,68,10
+    COMBOBOX        IDC_COMBO_SIZE,110,42,137,83,CBS_DROPDOWN | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDC_EDIT_NUMBER,110,59,65,14,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Poslední část:",IDC_STATIC_1,47,79,56,8
+    EDITTEXT        IDC_EDIT_LASTPART,108,79,138,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,7,97,240,1
+    PUSHBUTTON      "&Konfigurace...",IDC_BUTTON_CONFIG,7,105,60,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,82,105,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,139,105,50,14
+    PUSHBUTTON      "Nápověda",IDHELP,196,105,50,14
+END
+
+IDD_COMBINE DIALOGEX 30, 28, 270, 194
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Spojení"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Dí&lčí soubory:",IDC_STATIC_1,7,9,47,8
+    LISTBOX         IDC_LIST_FILES,7,19,200,108,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_WANTKEYBOARDINPUT | WS_VSCROLL | WS_HSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Nahoru",IDC_BUTTON_UP,214,20,50,14,WS_GROUP
+    PUSHBUTTON      "&Dolů",IDC_BUTTON_DOWN,214,43,50,14
+    PUSHBUTTON      "&Přidat...",IDC_BUTTON_ADD,214,66,50,14
+    PUSHBUTTON      "&Odstranit",IDC_BUTTON_REMOVE,214,89,50,14
+    PUSHBUTTON      "&CRC...",IDC_BUTTON_CRC,214,112,50,14
+    LTEXT           "&Spojit do:",IDC_STATIC_2,7,136,51,8
+    EDITTEXT        IDC_EDIT_TARGET,7,146,237,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE2,250,146,14,14,WS_GROUP
+    LTEXT           "",IDC_STATIC_3,7,166,258,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,100,176,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,157,176,50,14
+    PUSHBUTTON      "Nápověda",IDHELP,214,176,50,14
+END
+
+IDD_CRC DIALOGEX 39, 34, 162, 106
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "CRC Test"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Zavřít",IDCANCEL,105,85,50,14
+    LTEXT           "Vypočítaný CRC:",IDC_STATIC_1,7,7,57,8
+    EDITTEXT        IDC_EDIT_CRC1,21,23,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC2,86,23,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "Původní CRC:",IDC_STATIC_2,7,44,48,8
+    EDITTEXT        IDC_EDIT_CRC3,21,61,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC4,86,61,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,66,10,90,1
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,57,48,99,1
+    ICON            "",IDC_ICON_WARN,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+    ICON            "",IDC_ICON_OK,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "Rozdělení a spojení souborů"
+ IDS_PLUGIN_DESCRIPTION, "Rozdělení a spojení souborů."
+ IDS_OPENERROR, "Chyba při otevírání souboru."
+ IDS_SELECTDIR, "Vyberte cílový adresář."
+ IDS_ZEROSIZE, "Soubor není dostatečně velký pro rozdělení."
+ IDS_INSERTDISK, "Vložte naformátovaný disk s dostatečným volným místem."
+ IDS_FIXEDNOSENSE, "Použití Autodetekce na pevný disk nemá žádný smysl.\nChcete pokračovat?"
+ IDS_OUTOFSPACE, "Nedostatek volného místa na cílovém disku."
+ IDS_OUTOFMEM, "Mimo paměť."
+ IDS_READERROR, "Chyba při čtení"
+ IDS_WRITEERROR, "Chyba při zápisu"
+ IDS_INSERTNEXT, "Vložte další disk a klikněte na OK."
+ IDS_SPLIT, "Rozdělit"
+ IDS_COMBINE, "Spojení"
+ IDS_TOOMANYPARTS, "Počet částí je větší než 100.\nOpravdu chcete pokračovat?"
+ IDS_WRITING, "Zapisuji"
+ IDS_TOOLONGNAME, "Původní název souboru je příliš dlouhý a výsledný dávkový soubor nemusí fungovat na některých systémech. Chcete pokračovat?"
+ IDS_ADDFILTER, "Všechny soubory (*.*)"
+ IDS_ADDTITLE, "Přidat dílčí soubory"
+ IDS_BROWSETITLE, "Vybrat cílový soubor"
+ IDS_CRCERROR, "Poškozený CRC.\n\nDílčí soubory jsou poškozené, jsou nekompletní nebo byli spojeny\nv neplatném pořadí. Výstupní soubor je pravděpodobně poškozený."
+ IDS_PROCESSING, "Zpracovávám"
+ IDS_ZEROFILES, "Není co spojit."
+ IDS_CANCEL, "Chcete ukončit tuto operaci?"
+ IDS_CRCTITLE, "CRC Test"
+ IDS_CRCDEC, "%lu (dec)"
+ IDS_CRCHEX, "%X (hex)"
+ IDS_CRCNOTFOUND, "NENALEZEN"
+ IDS_CALCCRC, "Počítám CRC"
+ IDS_SPLITTITLE, "Rozdělit ""%%s"" (%s bajtů) do:"
+ IDS_144FLOPPY, "1.44 MB (3.5"" Disketa)"
+ IDS_720FLOPPY, "720 KB (3.5"" Disketa)"
+ IDS_12FLOPPY, "1.2 MB (5.25"" Disketa)"
+ IDS_360FLOPPY, "360 KB (5.25"" Disketa)"
+ IDS_AUTODETECT, "Autodetekce"
+ IDS_FILECRCTITLE, "CRC32 souboru ""%s"" je:"
+ IDS_BATTOOLONG, "Chyba při vytváření dávkového souboru."
+ IDS_BYTES, "bajtů"
+ IDS_BYTE, "bajt"
+ IDS_PATHERROR, "Chyba cesty"
+ IDS_TARGETPATHEXIST, "Cílová cesta neexistuje. Chcete cestu vytvořit?"
+ IDS_WINPATH, "Nelze spojit do ne-Windows cesty."
+ IDS_SPECIFYFILE, "Zadaná cesta neobsahuje soubor."
+ IDS_MENU1 "&Rozdělit soubor..."
+ IDS_MENU2 "&Spojit soubory..."
+ IDS_ABOUTTITLE "O pluginu"
+ IDS_BATFILE_GENBYSAL, "Vytvořeno v Sally"
+ IDS_BATFILE_CTRL_C_TO_QUIT, "Stiskněte Ctrl-C pro ukončení."
+ IDS_BATFILE_DESCR, "Tento dávkový soubor obnoví soubor '%s'."
+ IDS_SIZE_B, "B"
+ IDS_SIZE_KB, "KB"
+ IDS_SIZE_K, "K"
+ IDS_SIZE_MB, "MB"
+ IDS_SIZE_GB, "GB"
+ IDS_100MB_ZIP, "100 MB (ZIP)"
+ IDS_250MB_ZIP, "250 MB (ZIP)"
+ IDS_120MB_LS120, "120 MB (LS-120)"
+ IDS_650MB_CDR, "650 MB (CD-R)"
+ IDS_700MB_CDR, "700 MB (CD-R)"
+ IDS_TOOLONGNAME2, "Nelze dokončit operaci kvůli příliš dlouhému názvu."
+}

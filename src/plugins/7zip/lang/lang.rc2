@@ -10,7 +10,6 @@
 // Add manually edited resources here...
 
 #include "..\versinfo.rh2"
-#include "versinfo.rc2"
 
 // dialogs
 IDD_ENTERPASSWORD DIALOGEX 6, 15, 257, 87

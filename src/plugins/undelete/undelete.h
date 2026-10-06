@@ -5,7 +5,7 @@
 #pragma once
 
 extern HINSTANCE DLLInstance; // handle for SPL - language independent resources
-extern HINSTANCE HLanguage;   // handle for SLG - language dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderDebugAbstract* SalamanderDebug;

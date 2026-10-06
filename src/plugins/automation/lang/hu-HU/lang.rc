@@ -1,0 +1,110 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for automation. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/automation/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_INPUTBOX DIALOGEX 75, 140, 205, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Beviteli ablak"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Parancs:",IDC_PROMPT,8,8,189,8
+    EDITTEXT        IDC_INPUTBOX,8,18,189,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",1,48,42,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",2,107,42,50,14
+END
+
+IDD_CONFIG DIALOGEX 75, 140, 332, 143
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Automatizálási beállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Szkript mappák:",IDC_DIRLISTHEADER,8,9,67,8
+    CONTROL         "",IDC_DIRLIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,8,19,316,73
+    CONTROL         "Sz&kript hibakeresés",IDC_ENABLEDBG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,102,105,10
+    DEFPUSHBUTTON   "OK",IDOK,75,121,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,141,121,50,14
+    PUSHBUTTON      "Sú&gó",IDHELP,207,121,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_BROWSE MENU
+BEGIN
+    POPUP "[POPUP]"
+    BEGIN
+        MENUITEM "Tallóz…",                     ID_BROWSE
+        MENUITEM SEPARATOR
+        MENUITEM "Sally mappa",        ID_SALDIR
+        MENUITEM "Környezeti változó",        ID_ENVVAR
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+BEGIN
+    IDS_SCRIPTERROR         "Automation szkript hiba"
+    IDS_LINE                "Sor:\t%u\r\n"
+    IDS_COLUMN              "Oszlop:\t%u\r\n"
+    IDS_ERROR               "Hiba:\t%s"
+    IDS_RUNFOCUSED          "Kijelölt szkript futtatása"
+    IDS_PROGRESSTITLE       "Művelet folyamata"
+    IDS_SOURCE              "Forrás:\t%s\r\n"
+    IDS_SCRIPTPOPUPMENU     "Szkript menü megnyitása"
+    IDS_MENUEMPTY           "(nincs szkript)"
+    IDS_LOADERRFMT          "Szkript futtatása sikertelen: '%s'.\r\n%s"
+    IDS_UNKERROR            "Ismeretlen hiba."
+    IDS_ABORT               "1\tMegsz&akít"
+    IDS_DEBUGABORT          "1\tHi&bakeresés\t2\tMegsz&akít"
+    IDS_ADDDIRTITLE         "Szkript mappa"
+    IDS_ADDDIRDESCR         "Válassza ki a szkripteket tároló mappát."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGINNAME          "Automation"
+    IDS_DESCRIPTION         "Általános feladatok szkriptes automatizálása."
+    IDS_ABOUT               "Plugin névjegy"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_E_INVALIDARCHIVE    "Érvénytelen archívum."
+    IDS_E_CANNOTCLOSEPATH   "Az elérési út nem zárható le."
+    IDS_E_SHORTERPATH       "Az elérési út csonka."
+    IDS_E_READONLYWHILEPROGRESSSHOWN 
+                            "A tulajdonság és a(z) %s  mód nem módosítható, amíg az ablak látszik."
+    IDS_E_READONLYWHILEPROGRESSHIDDEN 
+                            "A tulajdonság és a(z) %s  mód nem módosítható, amíg az ablak rejtett."
+    IDS_E_PLUGLOADFAIL      "A plugin betöltése sikertelen."
+    IDS_E_PLUGERROR         "Plugin hiba."
+    IDS_E_CACHEERROR        "Nem sikerült a fájlt a lemez cache-be helyezni."
+    IDS_E_FILEMASKSYNTAX    "Fájl-maszk szintaktikai hiba."
+    IDS_E_NOTCOMPONENT      "Csak komponensek adhatóak a tárolóhoz."
+    IDS_E_FORMPUT           "Form-ok nem adhatóak a tárolóhoz."
+    IDS_E_SCRIPTABORTED     "A szkript futtatását megszakította a felhasználó."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABORTCAPTION        "Szkript megszakítása"
+    IDS_ABORTTIP            "Szkript futásának megszakítása\tCtrl+Break"
+    IDS_MAINWINDOWLOCKED    "Az Sally ablakot lezárta az Automation plugin. Fejezze be a szkript futtatását."
+    IDS_ENGINECREATEFAIL    "A parancsértelmező inicializálása sikertelen."
+END

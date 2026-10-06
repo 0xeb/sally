@@ -1,0 +1,116 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for unarj. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unarj/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unarj.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 6, 15, 199, 110
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nächstes Teilarchiv"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Legen Sie bitte den Datenträger mit dem nächsten Teilarchiv ein oder wählen Sie die passende Datei.\n\nDrücken Sie 'OK', wenn Sie bereit sind.",IDC_STATIC_1,12,9,175,32
+    LTEXT           "Vorheriger Teil:",IDC_STATIC_2,12,48,60,8
+    EDITTEXT        IDC_PREVVOL,73,48,114,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "&Nächster Teil:",IDC_STATIC_3,12,62,49,8
+    EDITTEXT        IDC_FILENAME,12,72,160,12
+    PUSHBUTTON      "...",IDC_BROWSE,175,72,13,12
+    DEFPUSHBUTTON   "OK",IDOK,43,91,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,106,91,50,14
+END
+
+IDD_ERROR DIALOGEX 15, 34, 350, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fehler"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Name:",IDC_STATIC_1,4,10,26,8
+    LTEXT           "",IDS_FILENAME,34,10,309,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Fehler:",IDC_STATIC_2,4,23,26,8,NOT WS_GROUP
+    LTEXT           "Die Datei kann nicht entpackt werden, da es sich um die Fortsetzung eines vorangehenden Teilarchivs handelt. Beginnen Sie mit dem ersten Teilarchiv, um die Datei zu entpacken.",IDC_STATIC_3,34,23,309,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&Diesen Hinweis in Zukunft nicht mehr anzeigen.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,34,44,183,12
+    DEFPUSHBUTTON   "OK",IDOK,120,63,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,180,63,50,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 232, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ - Konfiguration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "von einem vorangegangenen Teilarchiv fortgesetzt werden.",IDC_STATIC_1,23,22,202,8
+    CONTROL         "Beim Entpacken &Dateien automatisch überspringen, die",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,10,199,12
+    LTEXT           "Archivinhalt nicht aufgelistet werden kann.",IDC_STATIC_2,23,44,146,8
+    CONTROL         "Keinen &Warnhinweis zeigen, wenn der gesamte",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,189,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,220,1
+    DEFPUSHBUTTON   "OK",IDOK,63,66,50,14
+    PUSHBUTTON      "Abbrechen",IDCANCEL,118,66,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 107
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ - Achtung"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Es können nicht alle Dateien des mehrteiligen Archivs aufgelistet (und im Dateifenster gezeigt) werden, da einige Teilarchive nicht gefunden wurden.",IDC_STATIC_1,11,10,194,24
+    LTEXT           "Um den gesamten Archivinhalt aufzulisten, kopieren Sie bitte alle Teilarchive in dasselbe Verzeichnis.",IDC_STATIC_2,11,41,192,16
+    CONTROL         "&Diesen Hinweis in Zukunft nicht mehr anzeigen",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,66,171,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,83,203,1
+    DEFPUSHBUTTON   "OK",IDOK,153,89,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnARJ"
+  IDS_PLUGIN_DESCRIPTION, "Durchsucht und entpackt ARJ-Archive."
+  IDS_ABOUT, "Über Plugin"
+  IDS_LOWMEM, "Nicht genügend Speicher."
+  IDS_ARCEOF, "Unerwartetes Ende der Archivdatei."
+  IDS_BADDATA, "Archiv ist beschädigt."
+  IDS_BADARC, "Datei hat ein unbekanntes Format oder ist kein gültiges ARJ-Archiv."
+  IDS_ERROPENARC, "Öffnen der Archivdatei nicht möglich."
+  IDS_UNKNOWN, "Unbekannter Fehler aufgetreten."
+  IDS_ERRACCESSARC, "Zugriff auf Archivdatei nicht möglich."
+  IDS_ARJARCHIVES, "ARJ-Archivdateien (*.A*)"
+  IDS_ALLFILES, "Alle Dateien (*.*)"
+  IDS_BROWSEARCHIVETITLE, "Wählen Sie die Archivdatei"
+  IDS_CRC, "Fehler in den komprimierten Daten. CRC stimmt nicht überein."
+  IDS_LIST, "Kann den Archiveintrag nicht zur Dateiliste hinzufügen."
+  IDS_EXTRPROGTITLE, "Entpacke ARJ-Archiv - %s"
+  IDS_PREPAREDATA, "Daten werden vorbereitet und Verzeichnisse erstellt..."
+  IDS_EXTRACTFILES, "Entpacke..."
+  IDS_EXTRACTING, "Entpacke: "
+  IDS_UNABLEGETFIELPOS, "Kann den Dateizeiger nicht ermitteln: "
+  IDS_UNABLEWRITE, "Kann nicht in die Datei schreiben:"
+  IDS_UNABLESEEK, "Kann den Dateizeiger nicht setzen: "
+  IDS_TOOLONGNAME, "Kann den Vorgang nicht beenden da der Pfadname zu lang ist."
+  IDS_TOOLONGMASK, "Kann den Vorgang nicht beenden da die Maske zu lang ist."
+  IDS_VERSION, "Unbekannte Version einer komprimierten Datei."
+  IDS_TYPE, "Unbekannter Typ einer komprimierten Datei."
+  IDS_METHOD,  "Datei ist mit einer Methode komprimiert, die vom UnARJ-Plugin nicht unterstützt wird."
+  IDS_ENCRYPT, "Verschlüsselte Dateien werden nicht unterstützt."
+  IDS_BADVOL, "Ungültiges Teilarchiv oder unbekannte Archivstruktur."
+  IDS_EXPIRE, "Das Plugin ist abgelaufen. Bitte überprüfen Sie auf unserer Webseite, ob eine neuere Version vorhanden ist."
+  IDS_NOTFOUND, "Datei nicht gefunden."
+  IDS_ERROR, "Fehler"
+}

@@ -230,7 +230,6 @@ struct CConfiguration
         ThumbnailSize,          // square dimensions of thumbnails in points
                                 //      PanelTooltip,         // shortened texts in panels get tooltips
         KeepPluginsSorted,      // plugins will be sorted alphabetically (plugins manager, menu)
-        ShowSLGIncomplete,      // TRUE = if IsSLGIncomplete is not empty, show message about incomplete translation (we are looking for a translator)
 
         // Confirmation
         CnfrmFileDirDel,         // files or directory delete
@@ -448,12 +447,10 @@ struct CConfiguration
     int FindColNameWidth; // width of the Name column in the Find dialog
 
     // Language
-    std::wstring LoadedSLGName;       // xxxxx.slg that was loaded at Salamander start
-    std::wstring SLGName;             // xxxxx.slg to use next time Salamander starts
-    int DoNotDispCantLoadPluginSLG;  // TRUE = suppress warning that an SLG with the same name cannot be loaded into the plugin as in Salamander
-    int DoNotDispCantLoadPluginSLG2; // TRUE = suppress warning that the SLG plugin used last time (either user-selected or auto-selected) cannot be loaded
-    int UseAsAltSLGInOtherPlugins;   // TRUE = try to use AltSLGName for plugins
-    std::wstring AltPluginSLGName; // fallback SLG module for plugins
+    // persisted name of the UI language, e.g. czech.slg (an identifier; no file), see
+    // common/BuiltinLanguages.h
+    std::wstring LoadedSLGName; // the language Sally started in
+    std::wstring SLGName;       // the language to use next time Sally starts
 
     // Directory name convert\\XXX\\convert.cfg from which convert.cfg is loaded
     std::wstring ConversionTable;
@@ -525,7 +522,7 @@ protected:
 class CCfgPageRegional : public CCommonPropSheetPage
 {
 public:
-    std::wstring SLGName;
+    std::wstring SLGName; // persisted name of the chosen UI language, e.g. czech.slg (no file)
     std::wstring DirName;
 
 public:

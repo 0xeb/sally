@@ -1280,10 +1280,6 @@ STRINGTABLE
  IDS_PLUGININVALID2, "This plugin (%s) has not been loaded. Plugin is not valid Sally Plugin or some plugin internal error has occurred."
 IDS_OLDPLUGINVERSION, "%s plugin (%s) is not supported by this version of Sally. Please get updated version of this plugin."
 IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Sally. Please get updated version of this plugin."
-IDS_OLDPLUGINVERSION_CONFIRM, "%s plugin (%s) targets legacy commercial SDK version 4.0 (required version 102).\nIt may be ABI-incompatible with this Sally build and can be unstable.\n\nDo you want to load this plugin anyway?\nChoosing YES permanently trusts this plugin path."
-IDS_OLDPLUGINVERSION_CONFIRM2, "The plugin (%s) targets legacy commercial SDK version 4.0 (required version 102).\nIt may be ABI-incompatible with this Sally build and can be unstable.\n\nDo you want to load this plugin anyway?\nChoosing YES permanently trusts this plugin path."
-IDS_BROKENFSPLUGINVERSION, "%s plugin (%s) targets broken Sally SDK version 104 for file-system plugins.\nThis transitional FS ABI is unsafe and is no longer supported.\n\nPlease rebuild or reinstall an updated version of this plugin."
-IDS_BROKENFSPLUGINVERSION2, "The plugin (%s) targets broken Sally SDK version 104 for file-system plugins.\nThis transitional FS ABI is unsafe and is no longer supported.\n\nPlease rebuild or reinstall an updated version of this plugin."
 
  IDS_UPDATEFAILED, "Packing of updated file(s) into archive has failed. Do you want to try it again? If you choose NO, you'll get back to the Archive Update dialog, so you'll be able to copy updated file(s) to chosen disk folder (for later packing into the archive)."
 
@@ -1791,10 +1787,6 @@ IDS_BROKENFSPLUGINVERSION2, "The plugin (%s) targets broken Sally SDK version 10
  IDS_MSGBOXBTN_SKIPALL, "S&kip All"
  IDS_MSGBOXBTN_FOCUS, "&Focus"
 
- IDS_CANTLOADPLUGINSLG1, "Unable to load this plugin in currently used language. Plugin language file %s was not found or is not valid. Sally will try to search for some other plugin language file (.SLG)."
- IDS_CANTLOADPLUGINSLG2, "Unable to load plugin language module which was formerly used by this plugin. Plugin language file %s was not found or is not valid. Sally will try to search for some other plugin language file (.SLG)."
- IDS_PLUGINSLGNOTFOUND, "It seems that you have no language modules (.SLG) for this plugin (see plugin's subdirectory LANG)."
- IDS_DONOTSHOWCANTLOADPLUGINSLG, "&Do not show this message for other plugins"
 
  IDS_CORRUPTEDCONFIGFOUND, "Configuration stored in registry is corrupted, so it cannot be loaded. Sally was probably terminated during saving configuration. This happens mainly when Sally is still running when you shutdown system (or log off). To prevent this problem, close Sally before shutdown (or log off).\n\nYou can backup corrupted configuration now (run RegEdit.exe, rename key HKEY_CURRENT_USER\\%s). Later you can try to get some settings from this backup (User Menu, Hotpaths, FTP bookmarks, etc.), visit github.com/0xeb/sally/discussions for details.\n\nCorrupted configuration must be removed from registry before starting Sally."
  IDS_CORRUPTEDCONFIGREMOVEBTN, "&Remove Configuration"
@@ -1970,8 +1962,6 @@ IDS_BROKENFSPLUGINVERSION2, "The plugin (%s) targets broken Sally SDK version 10
 // IDS_SALMON_FAILED, "Starting of Bug Reporter failed. Please pack the following bug report using 7-Zip and attach it to a new issue at https://github.com/0xeb/sally/issues.\n\nThank you for helping us improve Sally."
  IDS_SALMON_NOT_RUNNING, "Sally Bug Reporter (salmon.exe) is not running. Sally will not be able to handle potential crashes. Please restart Sally."
 
- IDS_SLGINCOMPLETE_TITLE, "Unfinished Translation of Sally"
- IDS_SLGINCOMPLETE_TEXT, "Translation of Sally into your language is not finished. Please consider visiting our discussion forum and joining the translation effort:"
  
  IDS_RECYCLEBINERROR, "Unable to send file or directory to the Recycle Bin because it has invalid name.\n\nInvalid part of name: ""%s""\n\nHint: Try to rename it before sending to the Recycle Bin or delete it permanently (try Shift+Delete key)."
  
@@ -1988,4 +1978,9 @@ IDS_BROKENFSPLUGINVERSION2, "The plugin (%s) targets broken Sally SDK version 10
  IDS_FORCEDSHUTDOWN, "Windows is rejecting to abort shutdown. This message will block it temporarily. Please wait to abort shutdown manually before you close this message, otherwise Sally will be terminated without saving configuration."
  IDS_FORCEDSHUTDOWNDISKOPER, "Windows is rejecting to abort shutdown. This message will block it temporarily.\n\nYou have some disk operations in progress. Do you want to cancel them now? Click No only if you have aborted shutdown manually, otherwise you risk having unfinished files on your disk.\n\nPlease wait to abort shutdown manually before you answer this question, otherwise Sally will be terminated without saving configuration."
  IDS_CLOSINGFINDWINDOWS, "Closing Find windows, please wait..."
+ IDS_LANGMETA_AUTHOR, "Sally"
+ IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
+ IDS_LANGMETA_COMMENT, "English version"
+ IDS_EXITING_RUNNING_INFO, "Unable to exit Sally until all disk operations are finished. Please wait until these operations are finished or cancel them now. If you do not want to exit Sally now, press the Cancel button."
+ IDS_CFGSEC_MASTERPWD_INFO, "A Master Password is used to protect sensitive information like FTP or WinSCP passwords by strong AES cipher. If you create a Master Password you will be asked to enter it once per session when Sally retrieves protected information."
 }

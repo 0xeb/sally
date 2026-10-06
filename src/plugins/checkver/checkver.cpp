@@ -16,7 +16,7 @@ CPluginInterface PluginInterface;
 CPluginInterfaceForMenuExt InterfaceForMenuExt;
 
 HINSTANCE DLLInstance = NULL; // handle to the SPL - language independent resources
-HINSTANCE HLanguage = NULL;   // handle to the SLG - language dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 HWND HMainDialog = NULL;
 
@@ -141,10 +141,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Check Version" /* do not translate! */);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // get Salamander's general interface
     SalGeneral = salamander->GetSalamanderGeneral();

@@ -1,0 +1,166 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for splitcbn. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/splitcbn/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\splitcbn.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 53, 55, 230, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuration de Scinder & Combiner"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Inclure l'extension originale aux noms de fichiers résultants",IDC_CHECK_INCLUDE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,6,210,10
+    CONTROL         "Créer un fichier &batch pour la combinaison",IDC_CHECK_CREATE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,19,156,10
+    CONTROL         "Scinder vers l'&autre panneau",IDC_CHECK_SPLITOTHER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,32,109,10
+    CONTROL         "Scinder vers le &sous-répertoire nommé par le fichier source",IDC_CHECK_SPLITSUB,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,45,211,10
+    CONTROL         "&Combiner vers l'autre panneau",IDC_CHECK_COMBINEOTHER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,58,116,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,4,76,222,1
+    DEFPUSHBUTTON   "OK",IDOK,58,83,50,14,WS_GROUP
+    PUSHBUTTON      "Annuler",IDCANCEL,115,83,50,14
+    PUSHBUTTON      "Aide",IDHELP,172,83,50,14
+END
+
+IDD_SPLIT DIALOGEX 32, 33, 269, 125
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Scinder"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_SPLIT_ICON,6,7,20,20,WS_GROUP
+    CONTROL         "",IDC_STATIC_TITLE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,35,9,222,8
+    EDITTEXT        IDC_EDIT_DIR,35,19,209,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,248,19,14,14,WS_GROUP
+    CONTROL         "&Taille de chaque partie:",IDC_RADIO_SIZE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,35,43,92,10
+    CONTROL         "&Nombre de parties:",IDC_RADIO_NUMBER,"Button",BS_AUTORADIOBUTTON,35,60,78,10
+    COMBOBOX        IDC_COMBO_SIZE,131,42,132,83,CBS_DROPDOWN | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDC_EDIT_NUMBER,131,59,60,14,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Taille de la dernière partie:",IDC_STATIC_1,35,79,93,8
+    EDITTEXT        IDC_EDIT_LASTPART,129,79,133,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,7,97,256,1
+    PUSHBUTTON      "&Configurer...",IDC_BUTTON_CONFIG,7,105,60,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,98,105,50,14
+    PUSHBUTTON      "Annuler",IDCANCEL,155,105,50,14
+    PUSHBUTTON      "Aide",IDHELP,212,105,50,14
+END
+
+IDD_COMBINE DIALOGEX 30, 28, 277, 194
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Combiner"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Fichiers &partiels:",IDC_STATIC_1,7,9,57,8
+    LISTBOX         IDC_LIST_FILES,7,19,207,108,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_WANTKEYBOARDINPUT | WS_VSCROLL | WS_HSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Monter",IDC_BUTTON_UP,221,20,50,14,WS_GROUP
+    PUSHBUTTON      "&Descendre",IDC_BUTTON_DOWN,221,43,50,14
+    PUSHBUTTON      "&Ajouter...",IDC_BUTTON_ADD,221,66,50,14
+    PUSHBUTTON      "&Supprimer",IDC_BUTTON_REMOVE,221,89,50,14
+    PUSHBUTTON      "&CRC...",IDC_BUTTON_CRC,221,112,50,14
+    LTEXT           "Combiner &vers:",IDC_STATIC_2,7,136,53,8
+    EDITTEXT        IDC_EDIT_TARGET,7,146,244,14,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE2,257,146,14,14,WS_GROUP
+    LTEXT           "",IDC_STATIC_3,7,166,265,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,107,176,50,14,WS_GROUP
+    PUSHBUTTON      "Cancel",IDCANCEL,164,176,50,14
+    PUSHBUTTON      "Help",IDHELP,221,176,50,14
+END
+
+IDD_CRC DIALOGEX 39, 34, 162, 106
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Test de CRC"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Fermer",IDCANCEL,105,85,50,14
+    LTEXT           "CRC calculé:",IDC_STATIC_1,7,7,44,8
+    EDITTEXT        IDC_EDIT_CRC1,21,23,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC2,86,23,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "CRC originel:",IDC_STATIC_2,7,44,46,8
+    EDITTEXT        IDC_EDIT_CRC3,21,61,62,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    EDITTEXT        IDC_EDIT_CRC4,86,61,69,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,53,10,103,1
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,55,48,101,1
+    ICON            "",IDC_ICON_WARN,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+    ICON            "",IDC_ICON_OK,7,22,20,20,SS_REALSIZEIMAGE | NOT WS_VISIBLE
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "Scinder & Combiner"
+ IDS_PLUGIN_DESCRIPTION, "Scinde et combine des fichiers."
+ IDS_OPENERROR, "Erreur à l'ouverture du fichier."
+ IDS_SELECTDIR, "Sélectionner le répertoire cible."
+ IDS_ZEROSIZE, "Le fichier n'est pas assez grand pour être scindé."
+ IDS_INSERTDISK, "Insérez un disque formaté avec suffisamment d'espace libre."
+ IDS_FIXEDNOSENSE, "L'utilisation de la détection auto sur un disque fixe n'a pas de sens.\nVoulez-vous continuer?"
+ IDS_OUTOFSPACE, "Espace insuffisant sur le disque cible."
+ IDS_OUTOFMEM, "Mémoire insuffisante."
+ IDS_READERROR, "Erreur en lecture"
+ IDS_WRITEERROR, "Erreur en écriture"
+ IDS_INSERTNEXT, "Insérez le disque suivant et cliquez sur OK."
+ IDS_SPLIT, "Scinder"
+ IDS_COMBINE, "Combiner"
+ IDS_TOOMANYPARTS, "Le nombre de parties est supérieur à 100.\nVoulez-vous vraiment continuer?"
+ IDS_WRITING, "Ecriture en cours"
+ IDS_TOOLONGNAME, "Le nom du fichier originel est trop long et le fichier batch résultant peut ne peut fonctionner sur certains systèmes. Voulez-vous continuer?"
+ IDS_ADDFILTER, "Tous les fichiers (*.*)"
+ IDS_ADDTITLE, "Ajouter des fichiers partiels"
+ IDS_BROWSETITLE, "Choisissez le fichier cible"
+ IDS_CRCERROR, "Echec du CRC.\n\nLes fichiers partiels sont endommagés, ne sont pas complets ou ont été combinés\ndans le mauvais ordre. Le fichier résultant est probablement invalide."
+ IDS_PROCESSING, "Traitement en cours"
+ IDS_ZEROFILES, "Rien à combiner."
+ IDS_CANCEL, "Voulez-vous annuler cette opération?"
+ IDS_CRCTITLE, "Test du CRC"
+ IDS_CRCDEC, "%lu (déc)"
+ IDS_CRCHEX, "%X (hex)"
+ IDS_CRCNOTFOUND, "NON TROUVE"
+ IDS_CALCCRC, "CRC calculé"
+ IDS_SPLITTITLE, "Scinde ""%%s"" (%s octets) vers:"
+ IDS_144FLOPPY, "1.44 Mo (disquette 3.5"")"
+ IDS_720FLOPPY, "720 Ko (disquette 3.5"")"
+ IDS_12FLOPPY, "1.2 Mo (disquette 5.25"")"
+ IDS_360FLOPPY, "360 Ko (disquette 5.25"")"
+ IDS_AUTODETECT, "Détection auto"
+ IDS_FILECRCTITLE, "Le CRC32 du fichier ""%s"" est:"
+ IDS_BATTOOLONG, "Erreur à la création du fichier batch."
+ IDS_BYTES, "octets"
+ IDS_BYTE, "octet"
+ IDS_PATHERROR, "Erreur de chemin"
+ IDS_TARGETPATHEXIST, "Le chemin de destination n'existe pas. Voulez-vous le créer?"
+ IDS_WINPATH, "Impossible de combiner vers un chemin non-Windows."
+ IDS_SPECIFYFILE, "Le chemin saisi ne spécifie pas de fichier."
+ IDS_MENU1 "&Scission du fichier en cours..."
+ IDS_MENU2 "&Combinaison de fichiers..."
+ IDS_ABOUTTITLE "A propos du module"
+ IDS_BATFILE_GENBYSAL, "Généré par Sally"
+ IDS_BATFILE_CTRL_C_TO_QUIT, "Faites Ctrl-C pour quitter."
+ IDS_BATFILE_DESCR, "Ce fichier batch va recréer le fichier '%s'."
+ IDS_SIZE_B, "octets"
+ IDS_SIZE_KB, "Ko"
+ IDS_SIZE_K, "K"
+ IDS_SIZE_MB, "Mo"
+ IDS_SIZE_GB, "Go"
+ IDS_100MB_ZIP, "100 Mo (ZIP)"
+ IDS_250MB_ZIP, "250 Mo (ZIP)"
+ IDS_120MB_LS120, "120 Mo (LS-120)"
+ IDS_650MB_CDR, "650 Mo (CD-R)"
+ IDS_700MB_CDR, "700 Mo (CD-R)"
+ IDS_TOOLONGNAME2, "Impossible de terminer l'opération en raison d'un nom trop long."
+}

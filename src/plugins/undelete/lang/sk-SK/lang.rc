@@ -1,0 +1,213 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for undelete. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/undelete/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\undelete.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Obnovenie súborov a adresárov"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,12,12,323,8
+    LTEXT           "",IDC_PROGRESSBAR,42,32,285,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Zrušiť",IDCANCEL,145,54,50,14
+    LTEXT           "Celkom:",IDC_STATIC_1,12,33,29,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Obnovenie súborov a adresárov"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Výber &disku na analýzu",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "&Obraz disku",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,51,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,352,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Prechádzať...",IDC_BUTTON_BROWSE,370,178,59,14,WS_GROUP
+    CONTROL         "&Skenovať prázdne clustery na FAT oddieloch",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,184,10
+    CONTROL         "&Zobraziť existujúce súbory a adresáre",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "Zo&braziť súbory s nulovou veľkosťou",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "Zob&raziť prázdne adresáre",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "Zobraziť &metasúbory",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "Od&hadnúť poškodenie súborov",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "OK",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Obnovenie súborov a adresárov"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Obnovenie",IDC_LABEL_UNDELETING,3,11,40,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,47,11,301,8
+    RTEXT           "do",IDC_STATIC_1,3,23,40,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,47,23,301,8
+    RTEXT           "Súbor:",IDC_STATIC_2,3,41,40,8
+    LTEXT           "",IDC_PROGRESS_FILE,47,40,293,12,NOT WS_GROUP
+    RTEXT           "Celkom:",IDC_STATIC_3,3,56,40,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,47,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Zrušiť",IDCANCEL,151,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 213, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Poškodený názov súboru"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Prvý znak nasledujúceho názvu súboru nie je možné obnoviť. Prosím zadajte pôvodný znak.",IDC_STATIC_1,7,7,199,16
+    EDITTEXT        IDC_EDIT_FILENAME,7,27,199,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,44,53,50,14
+    PUSHBUTTON      "&Všetko",IDC_BUTTON_ALL,100,53,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,156,53,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 297, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Obnovenie súborov a adresárov - Konfigurácia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Alternatívny &dočasný adresár pre zobrazované súbory:",IDC_STATIC_1,7,7,184,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,262,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,275,17,16,14,WS_GROUP
+    CONTROL         "&Vždy použiť predchádzajúci cluster skenovaných informácií na FAT",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,235,10
+    CONTROL         "Nezobraziť upozornenie pri obnovení do &rovnakého logického disku",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,237,10
+    CONTROL         "Nezobraziť upozornenie pri obnovení š&ifrovaného súboru na FAT alebo exFAT",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,272,10
+    DEFPUSHBUTTON   "OK",IDOK,131,80,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,186,80,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,241,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 276, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Obnovenie šifrovaného súboru zo zálohy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Táto funkcia obnoví šifrované súbory, pred obnovou zmazaných, do oddielu bez podpory Šifrovaného systému súborov (EFS), ako napr.: FAT. Bežné súbory (iné ako *.bak) budú kopírované bez zmeny.",IDC_STATIC_1,7,7,262,24
+    LTEXT           "&Obnoviť %s do:",IDC_LABEL_SOURCE,7,41,262,8
+    EDITTEXT        IDC_EDIT_TARGET,7,51,244,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,255,51,14,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,57,74,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,113,74,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,169,74,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_LOWMEM, "Nedostatok pamäti."
+  IDS_ERRORREADINGMFT, "Chyba načítania MFT clusterov."
+  IDS_MFTRECORDDAMAGED, "Chyba načítania MFT: prvý záznam je poškodený."
+  IDS_ROOTNOTFOUND, "Nie je možné nájsť koreňový adresár."
+  IDS_VDIRECTORY, "Adresár%06d"
+  IDS_ALLDELETEDFILES, "{Všetky vymazané súbory}"
+  IDS_ERRORNOTNTFS, "Interná chyba: zväzok nie je NTFS."
+  IDS_ERRORNOTOPEN, "Interná chyba: zväzok nie je otvorený."
+  IDS_ERROROPENINGVOLUME, "Chyba otvárania zväzku."
+  IDS_ERRORREADINGBOOT, "Chyba načítania boot sektoru."
+  IDS_ERRORVOLUMETYPE, "Neznámy typ zväzku, podporované sú len FAT 12, 16, 32 a NTFS zväzky."
+  IDS_READINGMFT, "Čítanie MFT..."
+  IDS_ERRORREADINGFAT, "Chyba načítania FAT."
+  IDS_ERRORREADINGDIRCLUSTERS, "Chyba načítania clustera adresára."
+  IDS_ERRORNOTFAT, "Interná chyba: zväzok nie je FAT."
+  IDS_LOADINGFAT, "Načítavam FAT..."
+  IDS_READINGDIRS, "Načítavam adresáre..."
+  IDS_READINGEXISTINGDIRS, "Čítanie existujúcich adresárov..."
+  IDS_READINGDELETEDDIRS, "Čítanie vymazaných adresárov..."
+  IDS_SCANNINGVACANTCLUSTERS, "Skenujem prázdne clustery..."
+  IDS_REUSESCANNEDINFO, "Chcete použiť informáciu z predchádzajúceho skenovaného clustera?"
+  IDS_RELOADINGCLUSTERS, "Znova nahrávam predchádzajúce nájdené clustery..."
+  IDS_FLOPPY350, "3.5 Disketa"
+  IDS_FLOPPY525, "5.25 Disketa"
+  IDS_FLOPPY800, "8.0 Disketa"
+  IDS_COMPACT_DISK, "Kompaktný disk"
+  IDS_LOCAL_DISK, "Lokálny disk"
+  IDS_REMOVABLE_DISK, "Vymeniteľný disk"
+  IDS_ANALYZINGDIRS, "Analyzujem adresáre..."
+  IDS_INCOMPLETEMFT, "Obnovenie súborov a adresárov nebolo schopné naskenovať celý MFT (Hlavná tabuľka súborov). Chcete zobraziť neúplný výsledok?"
+  IDS_BITMAPNOTFOUND, "Zlyhalo umiestnenie $Bitmap na tomto zväzku. Odhad poškodenia súboru bol zrušený."
+  IDS_BITMAPNOSTREAM, "Zlyhalo umiestnenie štandardného streamu $Bitmap súboru. Odhad poškodenia súboru bol zrušený."
+  IDS_LOWMEMBITMAP, "Nedostatok pamäti na zavedenie cluster bitmap súboru. Odhad poškodenia súboru sa nevykoná."
+  IDS_ERRORREADINGBMP, "Chyba načítania $Bitmap súboru. Odhad poškodenia súbory bol zrušený."
+  IDS_BITMAPISEMPTY, "$Bitmap má nulovú veľkosť. Odhad poškodenia súboru sa nevykoná."
+}
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "Obnovenie súborov a adresárov"
+  IDS_DESCRIPTION, "Obnoví vymazané súbory z FAT alebo NTFS oddielu."
+  IDS_ABOUTTITLE, "O plugine"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{Metasúbory}"
+  IDS_PATHDISK, "Cesta musí obsahovať disk."
+  IDS_PATHFILE, "Cesta vedie k súboru. Nie je možné otvoriť súbor."
+  IDS_PATHNOTFOUND, "Cesta nenájdená."
+  IDS_IMAGENOTFOUND, "Zadaný súbor nebol nájdený."
+  IDS_ERROROPENINGPROGRESS, "Chyba otvárania dialógu procesu."
+  IDS_VOLENUMERATE, "Chyba vyčíslenia systémových zväzkov."
+  IDS_OPENINGVOLUME, "Otváram zväzok..."
+  IDS_SCANNINGFOUND, "{!}Skenujem prázdne clustery... (nájden{ý|1|e|4|ých} %d adresárov{1:ý|1|é|4|ých} cluster{1:|1|y|4|ov})"
+  IDS_ALWAYSCHOOSEYES, "Vždy vyberte Áno (toto môžete resetovať v dialógu Konfigurácia)"
+  IDS_PATHTOOLONG, "Cieľová cesta je príliš duhá"
+  IDS_QUESTION, "Otázka"
+  IDS_WANTCANCEL, "Chcete zrušiť túto operáciu?"
+  IDS_BADPATH, "Obnovenie z archívov alebo pluginových systémov súborov nie je podporované."
+  IDS_ERROR, "Chyba" // title of error messages
+  IDS_VIEW, "Zobraziť" // the function "F3"
+  IDS_TEMPDIR, "Na zobrazenie súboru na %c: potrebujete zadať alternatívny dočasný adresár na inom logickom disku ako na %c:"
+  IDS_WAIT, "Obnovujem súbory do dočasného adresára, čakajte prosím"
+  IDS_ENCRYPTEDWARNING, "Cieľový zväzok nepodporuje Šifrovaný systém súborov (EFS).\n\nŠifrované súbory budú obnovené do záložného formátu, ktorý neskôr môžete použiť na obnovenie na NTFS zväzku použitím príkazu ""Pluginy/Obnovenie súborov a adresárov/Obnoviť šifrované súbory zo zálohy""."
+  IDS_DONTSHOWAGAIN, "Nabudúce nezobrazovať"
+  IDS_CHOOSETEMPDIR, "Vyberte alternatívny dočasný adresár:"
+  IDS_SAMEPARTITION, "Zdá sa, že ste obnovili na rovnaký logický disk, kde sú umiestnené vymazané súbory. Mali by ste vždy obnovovať do iného oddielu, inak môžete obnovené súbory získať prepísaním do seba alebo môžete stratiť ďalšie vymazané súbory.\n\nTip: ak nemáte viacnásobné oddiely, môžete obnoviť aj na disketu alebo USB disk."
+  IDS_UNDELETECMD, "&Obnoviť vymazané súbory a adresáre..."
+  IDS_ERRORENCRYPTED, "Nie je možné obnoviť šifrovaný súbor: "
+  IDS_RESTORECMD, "Obnoviť šifrované súbory zo &zálohy..."
+  IDS_CANNOTVIEW, "Nie je možné zobraziť súbor - dočasný adresár nepodporuje šifrovaný systém súborov (EFS)"
+  IDS_CHOOSETARGET, "Výber cieľového adresára"
+  IDS_RESTORE, "Obnoviť" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "Obnovujem" // label inside the progress dialog
+  IDS_READINGTREE, "Čítanie stromu adresárov..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "Cieľový zväzok nepodporuje šifrovaný systém súborov (EFS)."
+  IDS_VOLUME_MOUNT, "Disk"
+  IDS_VOLUME_NAME, "Názov"
+  IDS_VOLUME_FORMAT, "Formát"
+  IDS_VOLUME_SIZE, "Veľkosť"
+  IDS_VOLUME_FREE, "Voľných"
+  IDS_VOLUME_FREEPROC, "% Voľných"
+  IDS_VOLUME_VOLID, "GUID cesta"
+  IDS_CONDITION, "Stav"
+  IDS_CONDITIONDESC, "Odhad poškodenia súboru"
+  IDS_CONDITION_GOOD, "Dobrý"
+  IDS_CONDITION_FAIR, "Zachovaný"
+  IDS_CONDITION_POOR, "Neplatný"
+  IDS_CONDITION_LOST, "Stratený"
+  IDS_CONDITION_UNKNOWN, "Neznámy"
+  IDS_UNDELETEINCHDRVMENU, "\tObnovenie súborov a adresárov"
+  IDS_PARTIALRECOVER, "Nasledovný súbor nie je možné kompletne obnoviť: %s\n\nChcete obnoviť aspoň časť súboru?"
+  IDS_PARTIALRECOVER_DONTASK, "Nabudúce zvoliť rovnakú odpoveď"
+  IDS_ERRORRECOVER, "Chyba pri obnovovaní súboru %s"
+}

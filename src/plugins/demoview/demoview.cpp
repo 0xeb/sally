@@ -23,7 +23,7 @@ CPluginInterfaceForMenuExt InterfaceForMenuExt;
 CPluginInterfaceForThumbLoader InterfaceForThumbLoader;
 
 // global data
-const wchar_t* PluginNameEN = L"DemoView"; // untranslated plugin name, used before loading the language module and for debugging
+const wchar_t* PluginNameEN = L"DemoView"; // untranslated plugin name, used before the translated resources are needed and for debugging
 const wchar_t* PluginNameShort = L"DEMOVIEW"; // plugin name (short, without spaces)
 
 BOOL CfgSavePosition = FALSE;             // whether to store the window position / align with the main window
@@ -42,7 +42,7 @@ int ConfigVersion = 0;           // configuration version loaded from the regist
 const wchar_t* CONFIG_VERSION = L"Version";
 
 HINSTANCE DLLInstance = NULL; // handle to the SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to the SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 // general Salamander interface - valid from startup until the plugin is unloaded
 CSalamanderGeneralAbstract* SalamanderGeneral = NULL;
@@ -151,10 +151,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), PluginNameEN);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // obtain the general Salamander interface
     SalamanderGeneral = salamander->GetSalamanderGeneral();

@@ -1,0 +1,140 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for unrar. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unrar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unrar.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 6, 15, 194, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Urmatorul volum disk"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Va rugam introduceti disk cu urmatorul volum disk sau localizati fisierul corect pe disk.\n\nApasati OK cand sunteti gata.",IDS_NEXTDISK,12,9,170,32
+    LTEXT           "Nume &fiser:",IDC_STATIC_1,12,48,42,8
+    EDITTEXT        IDC_FILENAME,12,58,155,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,170,58,13,12
+    DEFPUSHBUTTON   "OK",IDOK,39,76,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,102,76,50,14
+END
+
+IDD_ERROR DIALOGEX 15, 34, 352, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Eroare"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Nume:",IDC_STATIC_1,6,10,26,8
+    LTEXT           "",IDS_FILENAME,36,10,309,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Eroare:",IDC_STATIC_2,6,23,26,8,NOT WS_GROUP
+    LTEXT           "Fisierul nu poate fi extras pentru ca este continuat de pe un volum anterior. Pentru a extrage acest fisier, trebuie sa incepeti cu volumul de unde incepe fisierul.",IDC_STATIC_3,36,23,309,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&Nu mai arata acest mesaj in viitor.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,36,44,183,12
+    DEFPUSHBUTTON   "OK",IDOK,121,63,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,181,63,50,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 220, 115
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configurare UnRAR"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Sari a&utomat peste fisierele continuate din volumele",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,10,195,12
+    CONTROL         "&Nu arata atentionare cand tot continutul arhivei",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,189,12
+    LTEXT           "anterioare cand dezarhivezi.",IDC_STATIC_1,23,22,154,8
+    LTEXT           "nu poate fi listat.",IDC_STATIC_2,23,44,111,8
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,208,1
+    CONTROL         "Arata coloana ""A&rhivat"" cand listezi arhiva",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,70,200,12
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,6,90,208,1
+    DEFPUSHBUTTON   "OK",IDOK,57,96,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,112,96,50,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 350, 80
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Introdu Parola"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,18,18,18,20
+    LTEXT           "Acest fisier e criptat. Va rugam introduceti parola pentru decriptare.",IDC_STATIC_1,57,10,230,8
+    LTEXT           "Fisier:",IDC_STATIC_2,57,25,22,8
+    CONTROL         "",IDS_FILENAME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,87,25,250,8
+    LTEXT           "&Parola:",IDC_STATIC_3,57,38,25,8
+    EDITTEXT        IDC_PASSWORD,87,36,167,12,ES_PASSWORD | ES_AUTOHSCROLL
+    PUSHBUTTON      "O&K",IDOK,15,58,60,14,WS_GROUP
+    DEFPUSHBUTTON   "Tot &z",IDALL,80,58,60,14
+    PUSHBUTTON      "S&ari Peste",IDSKIP,145,58,60,14
+    PUSHBUTTON      "Sari Peste &Tot",IDSKIPALL,210,58,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,275,58,60,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 105
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Atentie - UnRAR"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nu toate fisierele in o arhiva multi-volum pot fi listate (si aratate in panou), pentru ca cateva din volumele arhivei nu pot fi gasite.",IDC_STATIC_1,11,8,194,24
+    LTEXT           "Pentru a lista tot continutul arhivei copie toate volumele arhivei in acelasi director.",IDC_STATIC_2,11,39,194,16
+    CONTROL         "&Nu mai arata acest mesaj pe viitor",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,64,157,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,81,202,1
+    DEFPUSHBUTTON   "OK",IDOK,155,87,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnRAR"
+  IDS_PLUGIN_DESCRIPTION, "Rasfoiti si extrageti arhivele RAR."
+  IDS_ABOUT, "Despre Plugin"
+  IDS_LOWMEM, "Memorie insuficienta."
+  IDS_ERRMODULEFN, "Nu pot obtine nume fisier modul."
+  IDS_ERRLOADLIB, "Nu pot incarca libraria '%s'."
+  IDS_ERRGETPROCADDR, "Nu pot obtine adresa procedurii."
+  IDS_BADDATA, "Arhiva e corupta. (Parola gresita?)"
+  IDS_BADPASSWORD, "Parola e incorecta. Literele din parola trebuie sa fie tastate folosind exact aceleasi caractere. Asigurati-va ca CapsLock nu e aprins (ON) din greseala."
+  IDS_BADARC, "Fisierul este de un format necunoscut sau nu este o ahiva valida RAR. (Parola gresita?)"
+  IDS_ERROPENARC, "Nu pot deschide fisierul arhiva."
+  IDS_UNKNOWN, "O eroare necunoscuta a avut loc."
+  IDS_VOLUMEERR, "Nu pot deschide volumul arhivei."
+  IDS_ERRREADARC, "Nu pot citi fisierul arhiva."
+  IDS_RARARCHIVES, "Fisiere Arhiva RAR (*.R*)"
+  IDS_BROWSEARCHIVETITLE, "Selecteaza Fisierul Arhiva"
+  IDS_CRC, "Eroare in data comprimata. CRC nu se potriveste. (Parola gresita?)"
+  IDS_LIST, "Nu pot adauga intrare arhiva la lista fisier."
+  IDS_EXTRPROGTITLE, "Dezarhivez Arhiva RAR - %s"
+  IDS_PREPAREDATA, "pregatesc data si creez directoarele..."
+  IDS_EXTRACTFILES, "dezarhivez..."
+  IDS_EXTRACTING, "dezarhivez: "
+  IDS_UNABLEGETFIELPOS, "Nu pot obtine pointer de fisier: "
+  IDS_UNABLEWRITE, "Nu pot scrie in fisierul:"
+  IDS_UNABLESEEK, "Nu pot seta pointerul de fisier: "
+  IDS_TOOLONGNAME, "Nu pot termina operatiunea pentru ca nume calea prea lung."
+  IDS_TOOLONGMASK, "Nu pot termina opeartiunea pentru ca masca prea lunga."
+  IDS_ENTERPWD, "Va rugam introduceti cel putin un caracter."
+  IDS_ALLFILES, "Toate Fisierele (*.*)"
+  IDS_ERROR, "Eroare"
+  IDS_NOTFOUND, "Fisier negasit"
+  IDS_BADDLL, "Versiune incorecta a unrar.dll. Va rugam reinstalati plugin UnRAR."
+  IDS_SELECTFIRST, "Se pare ca aceasta este o arhiva multi-volum. Daca e asa, va rugam selectati primul volum din arhiva si apasati OK.\n\nDaca nu e arhiva multi-volum, apasati Anuleazal."
+  IDS_SELECTFIRSTTITLE, "Selectati Primul Volum"
+  IDS_FILENOTFOUND "Fisier negasit in arhiva."
+  IDS_LISTINFO_PAKEDSIZE      "Arhivat"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Arhivat masrimea fisierului"
+}

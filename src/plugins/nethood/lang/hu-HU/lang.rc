@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for nethood. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/nethood/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\nethood.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 22, 38, 235, 127
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Hálózati beállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Adminisztratív megosztások megjelenítése",IDC_SYSSHARES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,7,154,10
+    CONTROL         "Adm&inisztratív megosztások megjelenítése rejtett elemként",IDC_HIDESYSSHARES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,22,210,10
+    CONTROL         "Hálózati helyek elemeinek &megjelenítése a legfelső mappánál",IDC_NETSHORTCUTS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,37,216,10
+    CONTROL         "&Hálózati számítógépek megjelenítése a legfelső mappánál",IDC_SHOWWORKGRP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,52,204,10
+    CONTROL         "Távoli asztalon át kapcsoló&dó lemezek mutatása",IDC_SHOWTSC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,67,173,10
+    CONTROL         "Hálózat vizsgálta a Sally indítá&sakor",IDC_PRELOAD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,82,155,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,99,221,1
+    DEFPUSHBUTTON   "OK",IDOK,37,106,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,92,106,50,14
+    PUSHBUTTON      "Súgó",IDHELP,147,106,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_COLUMN_COMMENTS     "Megjegyzés"
+    IDS_INFOLINE_SELECTION_PLURAL "{!}<%d> kijelölt tárgy{|1|}"
+    IDS_MENUITEM            "Hálózat"
+    IDS_REFRESHING          "Hálózat vizsgálata…"
+    IDS_NETWORK_UNAVAILABLE "A hálózat nem érhető el."
+    IDS_ABOUT               "Plugin névjegy"
+    IDS_TSCLIENT            "%1 / %2"
+    IDS_TSFOLDER            "Helyi számítógép"
+    IDS_TSHOST              "Gazda számítógép"
+    IDS_TSFOLDERCOMMENT     "%s lemezei"
+END
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME         "Hálózat"
+    IDS_DESCRIPTION         "Hozzáférést biztosít a hálózati számítógépekhez."
+END

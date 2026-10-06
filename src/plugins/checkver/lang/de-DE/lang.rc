@@ -1,0 +1,148 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for checkver. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checkver/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checkver.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_MAIN DIALOGEX 30, 30, 338, 238
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU
+CAPTION "Auf neue Versionen prüfen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "&Jetzt prüfen",IDC_MAIN_CHECK,161,220,50,14
+    PUSHBUTTON      "&Schließen",IDCANCEL,220,220,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,279,220,50,14
+    CONTROL         "",IDC_MAIN_LOG,"CheckVerLogWindow",WS_VSCROLL | WS_GROUP,5,5,328,209
+    PUSHBUTTON      "&Konfigurieren...",IDC_MAIN_CFG,6,220,60,14,WS_GROUP
+END
+
+IDD_CONFIGURATION DIALOGEX 15, 39, 357, 144
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Versionsprüfung - Konfiguration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Interneteinstellungen:",IDC_STATIC_1,11,8,330,8
+    GROUPBOX        "Beim Start von &Sally die Versionsprüfung aufrufen",IDC_STATIC_2,5,21,347,74,WS_GROUP
+    CONTROL         "Niemals",IDC_CFG_NEVER,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,13,32,60,12
+    CONTROL         "Jeden Tag",IDC_CFG_DAY,"Button",BS_AUTORADIOBUTTON,107,32,60,12
+    CONTROL         "Jede Woche",IDC_CFG_WEEK,"Button",BS_AUTORADIOBUTTON,232,32,60,12
+    CONTROL         "Jeden Monat",IDC_CFG_MONTH,"Button",BS_AUTORADIOBUTTON,13,44,60,12
+    CONTROL         "Alle drei Monate",IDC_CFG_3MONTHS,"Button",BS_AUTORADIOBUTTON,107,44,104,12
+    CONTROL         "Alle sechs Monate",IDC_CFG_6MONTHS,"Button",BS_AUTORADIOBUTTON,232,44,75,12
+    CONTROL         "Fenster beim &Öffnen der Versionsprüfung minimieren und automatisch verbinden",IDC_CFG_AUTOCONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,62,325,12
+    CONTROL         "Fenster &nach Versionsprüfung schließen, falls keine neue Version gefunden wurde",IDC_CFG_AUTOCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,74,270,12
+    LTEXT           "Hinweis: Dieses Fenster kann vom Sally Menü 'Plugins/Versionsprüfung' aufgerufen werden.",IDC_STATIC_3,13,92,330,8
+    LTEXT           "&Filter",IDC_STATIC_4,13,104,330,8
+    PUSHBUTTON      "&Standard",IDC_CFG_DEFAULTS,6,123,60,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,183,123,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,242,123,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,301,123,50,14
+END
+
+IDD_INTERNET DIALOGEX 50, 20, 258, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Versionsprüfung - Interneteinstellungen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_INTERNET_ICON,8,8,20,20,WS_GROUP
+    LTEXT           "Das Versionsprüfungs-Plugin informiert Sie über die neuesten Versionen von Sally und seinen Plugins. Um diese Informationen zu ermitteln ist eine Internetverbindung notwendig.",IDC_STATIC_1,39,7,202,24
+    GROUPBOX        "Internetverbindung",IDC_STATIC_2,40,38,211,67,WS_GROUP
+    CONTROL         "Verbindung über eine &Telefonleitung und ein Modem",IDC_INET_PHONE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,47,51,166,12
+    CONTROL         "Verbindung über ein lokales &Netzwerk (LAN)",IDC_INET_LAN,
+                    "Button",BS_AUTORADIOBUTTON,47,63,164,12
+    CONTROL         "Keine Verbindung zum &Internet",IDC_INET_NONE,"Button",BS_AUTORADIOBUTTON,47,75,183,12
+    LTEXT           "(Automatischer Start der Versionsprüfung ausgeschaltet)",IDC_STATIC_3,59,87,188,8
+    GROUPBOX        "Internetprotokoll",IDC_STATIC_4,40,109,211,55,WS_GROUP
+    CONTROL         "&HTTP (empfohlen)",IDC_INET_HTTP,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,47,121,158,12
+    CONTROL         "&FTP",IDC_INET_FTP,"Button",BS_AUTORADIOBUTTON,47,133,158,12
+    CONTROL         "FT&P im passiven Transfermodus (hilfreich hinter Firewall)",IDC_INET_FTP_PASSIVE,
+                    "Button",BS_AUTORADIOBUTTON,47,145,188,12
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,3,174,250,1
+    DEFPUSHBUTTON   "OK",IDOK,85,181,50,14,WS_GROUP
+    PUSHBUTTON      "Abbrechen",IDCANCEL,142,181,50,14
+    PUSHBUTTON      "Hilfe",IDHELP,199,181,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Sucht nach Updates für Sally und den Plugins."
+ IDS_ABOUT, "Über Plugin"
+ IDS_CTXMENU_OPEN, "Öffnen"
+ IDS_CTXMENU_COPY, "URL in die Zwischenablage kopieren"
+ IDS_CTXMENU_FILTER, "%s ignorieren..."
+ IDS_PLUGINNAME, "Versionsprüfung"
+ IDS_FILTER_CONFIRM, "Möchten Sie %s ignorieren? Dieses Modul wird zu dem Filter hinzugefügt und alle seine Versionen werden ignoriert.\nHinweis: Dieses Modul kann aus dem Filter im Konfigurationsdialog des Versionsprüfungs-Plugin entfernt werden."
+ IDS_FILTERVER_CONFIRM, "Möchten Sie %s ignorieren? Diese Version des Moduls wird zu dem Filter hinzugefügt und nun ignoriert werden.\nHinweis: Diese Version des Moduls kann aus dem Filter im Konfigurationsdialog des Versionsprüfungs-Plugin entfernt werden."
+ IDS_REMOVE_CNFRM, "Möchten Sie %s aus dem Filter entfernen?"
+ IDS_SETDEF_CNFRM, "Das Listenfeld der Filter werden geleert.\n\nMöchten Sie die Standardwerte setzen?"
+ IDS_OPENED_WINDOWS, "Es sind mehrere Überprüfungsfenster geöffnet.\nMöchten Sie diese schließen?"
+ IDS_ABORT_DOWNLOAD, "Das Plugin verwendet eine Internetverbindung.\nMöchten Sie die Internetsitzung beenden?"
+ IDS_INET_INIT, "Initialisiere Internetverbindung..."
+ IDS_INET_INIT_FAILED, "Initialisierung fehlgeschlagen: %s"
+ IDS_INET_CONNECT, "Verbinde zu \tuGitHub Releases API\tlhttps://api.github.com/repos/0xeb/sally/releases/latest\tn..."
+ IDS_INET_CONNECT_FAILED, "Verbinden fehlgeschlagen: %s"
+ IDS_INET_READ, "Informationen über neue Versionen werden ermittelt..."
+ IDS_INET_READ_FAILED, "Fehler beim Lesen: %s"
+ IDS_INET_SUCCESS, "Informationen über neue Versionen wurden erfolgreich ermittelt."
+ IDS_INET_ABORTED, "Internetverbindung wurde abgebrochen"
+ IDS_CFG_CONFLICT1, "Die Konfiguration ist bereits geöffnet."
+ IDS_CFG_CONFLICT2, "Die Konfiguration ist geöffnet. Bitte schließen Sie diese zuerst."
+ IDS_CFG_CONFLICT3, "Plugin verbindet sich mit dem Internet. Die Konfiguration kann nicht geöffnet werden."
+ IDS_CLOSE_CONFLICT, "Plugin verbindet sich mit dem Internet. Bitte warten..."
+ IDS_PLUGIN_BUSY, "Die Aktion kann nicht ausgeführt werden, da das Plugin beschäftigt ist."
+ IDS_INFO_CORRUPTED, "Die heruntergeladenen Daten sind beschädigt. Versuchen Sie die Überprüfung später erneut zu starten."
+ IDS_FILTERED_MODULES, "Ignorierte Module:"
+ IDS_INSTALLED_MODULES, "Ältere oder bereits installierte Module:"
+ IDS_NEWREL_MODULES, "Neue Release-Module:"
+ IDS_NEWBETA_MODULES, "Neue Beta-Module:"
+ IDS_NEWPB_MODULES, "Neue Vorabversions-Module:"
+ IDS_NONEW_MODULES, "Keine neuen Module verfügbar."
+ IDS_BTN_CHECK, "&Jetzt prüfen"
+ IDS_BTN_STOP, "&Beenden"
+ IDS_COPYRIGHT1, "CheckVer %s - Suche nach den neuesten Versionen von Sally und Plugins."
+ IDS_COPYRIGHT2, "Klicken Sie auf 'Konfigurieren', um die Interneteinstellungen oder das Überprüfungsintervall zu ändern."
+ IDS_LAST_CHECK, "Datum der letzten Prüfung: %s."
+ IDS_SKIP_CHECK, "Drücken Sie 'Beenden', um die Überprüfung zu überspringen."
+ IDS_MENU_ABOUT, "Ü&ber Versionsprüfung..."
+ IDS_INTERNET_PHONE, "Verbindung über eine Telefonverbindung und ein Modem"
+ IDS_INTERNET_LAN, "Verbindung über das lokale Netzwerk (LAN)"
+ IDS_INTERNET_NONE, "Keine Verbindung zum Internet"
+ IDS_INET_PROTOCOL, "Klicken Sie auf 'Konfigurieren' und ändern Sie das Internetprotokoll, falls Sie keine Verbindung aufbauen können."
+ IDS_CHECK_FOR_NEW_VER, "&Auf neue Versionen prüfen..."
+ IDS_UPDATE_SCRIPT_LANG, "EN"
+ IDS_DONOTUSEFTP, "Sie haben das FTP-Protokoll ausgewählt. Das Versionsprüfung-Plugin kann über FTP keine Informationen über aktualisierte oder neue Plugins ermitteln. Die Verwendung von HTTP (falls möglich) wird dringend empfohlen.\n\nMöchten Sie das HTTP-Protokoll anstelle des FTPs verwenden?"
+ IDS_LOGWNDHELP1, "Klicken Sie auf den Modulnamen, um eine neue Version herunterzuladen."
+ IDS_LOGWNDHELP2, "Klicken Sie mit der rechten Maustaste auf den Modulnamen, um alle Aktionen anzuzeigen."
+ IDS_SHOWDETAILS, "Details anzeigen"
+ IDS_HIDEDETAILS, "Details ausblenden"
+ IDS_CTXMENU_DOWNLOAD, "Aktualisierte Version herunterladen"
+ IDS_FILTERTHISVER, "Version ignorieren"
+ IDS_MENU_OPENFILE, "&Datei öffnen..."
+ IDS_FILE_OPENERROR, "Fehler beim Öffnen der Datei '%s'."
+ IDS_FILE_READERROR, "Fehler beim Lesen der Datei '%s'."
+ IDS_FILE_OPENED, "Die Datei %s wurde erfolgreich gelesen."
+ IDS_CURRENT_VERSION, "Aktuelle Sally-Version: %s"
+ IDS_LATEST_VERSION, "Neueste GitHub-Version: %s"
+ IDS_DOWNLOAD_RELEASE, "Sally %s für %s herunterladen"
+ IDS_RELEASE_PAGE_LINK, "&GitHub-Release-Seite öffnen"
+ IDS_OPEN_RELEASE_PAGE, "Sally %s &Release-Seite öffnen"
+}

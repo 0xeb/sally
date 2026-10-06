@@ -1,0 +1,126 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for checksum. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checksum/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checksum.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CALCULATE DIALOGEX 0, 0, 359, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+CAPTION "Вычисление контрольных сумм"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,349,54
+    LTEXT           "Вычисляется:",IDC_LABEL,5,68,50,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,58,68,97,8
+    PUSHBUTTON      "Нас&тройка...",IDC_BUTTON_CONFIGURE,162,65,60,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Сохранить...",IDC_BUTTON_SAVE,228,65,60,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "Сто&п",IDC_BUTTON_CLOSE,294,65,60,14,WS_CLIPSIBLINGS
+    LTEXT           "использование буфера обмена",IDC_LABEL_HINT,5,68,111,8,WS_CLIPSIBLINGS
+END
+
+IDD_VERIFY DIALOGEX 0, 0, 270, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,260,54
+    LTEXT           "Проверено:",IDC_LABEL,5,68,44,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,52,68,91,8
+    LTEXT           "",IDC_LABEL_RESULT,5,68,140,8,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Перейти",IDC_BUTTON_FOCUS,149,65,55,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Стоп",IDC_BUTTON_CLOSE,210,65,55,14,WS_CLIPSIBLINGS
+END
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 189, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Настройка модуля"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Вычислять контрольные суммы ",IDC_STATIC_1,8,5,174,76,WS_GROUP
+    CONTROL         "&CRC/SFV",IDC_CFG_CRC,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,15,16,105,10
+    CONTROL         "&MD5",IDC_CFG_MD5,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,28,105,10
+    CONTROL         "SHA-&1",IDC_CFG_SHA1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,40,105,10
+    CONTROL         "SHA-&256",IDC_CFG_SHA256,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,52,105,10
+    CONTROL         "SHA-&512",IDC_CFG_SHA512,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,64,105,10
+    DEFPUSHBUTTON   "ОК",IDOK,14,88,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,69,88,50,14
+    PUSHBUTTON      "Справка",IDHELP,124,88,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "Контрольная сумма"
+ IDS_ABOUTTITLE "О модуле"
+ IDS_PLUGIN_DESCRIPTION "Вычисление и верификация контрольных сумм SFV, MD5, SHA-1, SHA-256, и SHA-512."
+ IDS_OUTOFMEM "Недостаточно памяти"
+ IDS_ERROROPENING, "Ошибка открытия файла"
+ IDS_READERROR "Ошибка чтения"
+ IDS_WRITEERROR "Ошибка записи"
+ IDS_SKIPPED "Пропущено"
+ IDS_CALCULATING "Вычисляется..."
+ IDS_CANCELED "Отменено"
+ IDS_HINT "Щелкните правой кнопкой мыши по пункту, чтобы скопировать контрольную сумму в буфер."
+ IDS_COPYTOCBOARD_CRC "Копировать значение &CRC в буфер\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "Копировать контрольную сумму &MD5 в буфер\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "Копировать контрольную сумму SHA-&1 в буфер\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "Копировать контрольную сумму SHA-&256 в буфер\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "Копировать контрольную сумму SHA-&512 в буфер\tCtrl+5"
+ IDS_REMOVEITEM "&Убрать пункт\tDelete"
+ IDS_SAVE_TITLE  "Сохранить файл контрольной суммы"
+ IDS_SAVE_FILTER_CRC  "Файлы SFV (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "Файлы MD5 (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "Файлы SHA-1 (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "Файлы SHA-256 (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "Файлы SHA-512 (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "Файл ""%s"" уже существует.\nПерезаписать его?"
+ IDS_ERRORCREATINGFILE "Ошибка создания файла."
+ IDS_SKIPPEDFILES "Файлы, пропущенные или отмененные во время вычисления, не были сохранены."
+ IDS_ERROROPENING2 "Ошибка при открытии файла ""%s""."
+ IDS_MISSING "Отсутствует"
+ IDS_BADEXT "Выбранный файл имеет расширение, отличное от SFV,  MD5, SHA1, SHA256 или SHA512. Продолжить?"
+ IDS_BADFILE "Выбранный файл не является рабочим SFV, MD5, SHA-1, SHA-256, или SHA-512 файлом."
+ IDS_VERIFYING "Проверяется..."
+ IDS_OK "ОК"
+ IDS_CORRUPT "Поврежден"
+ IDS_MENU_CALCULATE "&Вычислить контрольную сумму..."
+ IDS_MENU_VERIFY "&Проверить контрольную сумму..."
+ IDS_CONFIG_CONFLICT "Настройка уже открыта."
+ IDS_CONFIG_CHANGES_EFFECT "Изменения вступят в силу, когда окно ""Вычислить контрольные суммы"" будет открыто в следующий раз."
+ IDS_ALLOK "Все файлы OK"
+ IDS_RESULT "%d повреждено, %d отсутствует, %d пропущено"
+ IDS_BUSY "Sally не отвечает. Запрошенная команда не может быть завершена, повторите попытку позже."
+ IDS_CLOSE "&Закрыть"
+ IDS_READINGTREE "Чтение дерева каталогов, пожалуйста, подождите..."
+ IDS_ERRORREADINGDIR "Ошибка чтения каталога"
+ IDS_NOFILES "Файлы отсутствуют"
+ IDS_VERIFYTITLE "Проверить контрольные суммы"
+ IDS_VERIFY_CRC "Проверить CRC"
+ IDS_VERIFY_MD5 "Проверить MD5"
+ IDS_VERIFY_SHA1 "Проверить SHA-1"
+ IDS_VERIFY_SHA256 "Проверить SHA-256"
+ IDS_VERIFY_SHA512 "Проверить SHA-512"
+ IDS_COLUMN_FILE "Файл"
+ IDS_COLUMN_SIZE "Размер"
+ IDS_COLUMN_STATUS "Состояние"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "Невозможно завершить операцию. Слишком длинное имя файла."
+}

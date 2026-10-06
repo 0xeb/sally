@@ -1,0 +1,133 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for wmobile. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/wmobile/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\wmobile.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_PROGRESSDLG DIALOGEX 18, 80, 353, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,8,11,32,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,11,305,8
+    RTEXT           "总数:",IDC_STATIC_1,11,35,24,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,39,34,301,12
+    PUSHBUTTON      "取消",IDCANCEL,151,57,50,14
+END
+
+IDD_PROGRESS2DLG DIALOGEX 10, 30, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,3,11,37,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,11,305,8
+    RTEXT           "",IDT_OPERATION2,8,23,32,8
+    CONTROL         "",IDT_FILENAME2,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,23,305,8
+    RTEXT           "文件:",IDC_STATIC_1,18,41,22,8
+    CONTROL         "",IDP_PROGRESSBAR2,"Static",0,43,40,297,12
+    RTEXT           "总数:",IDC_STATIC_2,16,56,24,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,43,55,297,12
+    PUSHBUTTON      "取消",IDCANCEL,155,78,50,14
+END
+
+IDD_ATTRIBUTES DIALOGEX 30, 29, 181, 203
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "更改属性"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,48,12,127,1
+    LTEXT           "设置属性",IDC_STATIC_2,9,8,37,8
+    CONTROL         "归档(&A)",IDC_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,18,41,12
+    CONTROL         "隐藏(&H)",IDC_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,75,18,40,12
+    CONTROL         "只读(&R)",IDC_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,16,30,49,12
+    CONTROL         "系统(&Y)",IDC_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,75,30,40,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,73,58,102,1
+    LTEXT           "更改日期和时间",IDC_STATIC_4,9,54,62,8
+    LTEXT           "修改(&M)",IDC_STATIC_5,16,71,31,8
+    CONTROL         "",IDC_ATTR_MODIFIED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,51,69,66,12
+    CONTROL         "",IDC_ATTR_MODIFIED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,123,69,50,12
+    LTEXT           "创建(&T)",IDC_STATIC_6,16,87,30,8
+    CONTROL         "",IDC_ATTR_CREATED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,51,85,66,12
+    CONTROL         "",IDC_ATTR_CREATED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,123,85,50,12
+    LTEXT           "访问(&D)",IDC_STATIC_7,16,103,30,8
+    CONTROL         "",IDC_ATTR_ACCESSED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,51,101,66,12
+    CONTROL         "",IDC_ATTR_ACCESSED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,123,101,50,12
+    PUSHBUTTON      "设为当前(&U)",IDC_ATTR_CURRENT,116,118,57,14
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,31,141,144,1
+    LTEXT           "选项",IDC_STATIC_9,9,137,20,8
+    CONTROL         "包括子目录(&S)",IDC_RECURSESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,147,87,12
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,9,172,166,1
+    DEFPUSHBUTTON   "确定",IDOK,9,181,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,65,181,50,14
+    PUSHBUTTON      "帮助",IDHELP,121,181,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Windows Mobile"
+  IDS_PLUGIN_DESCRIPTION, "访问你 Windows Mobile 设备上的文件。"
+  IDS_ABOUT, "关于插件"
+}
+
+STRINGTABLE
+BEGIN
+  IDS_WMPLUGINTITLE          "Windows Mobile 插件"
+  IDS_WMPLUGINTITLE_ERROR    "Windows Mobile 插件错误"
+  IDS_WMPLUGINTITLE_QUESTION "Windows Mobile 插件问题"
+  IDS_ERR_CONNECTION         "无法连接到设备。\n\n请确保你已经安装了底层传输(例如 ActiveSync)并且已经连接设备。"
+  IDS_CONNECTING             "正在连接到设备，请等待..."
+  IDS_PATH_ERROR             "路径: %s\n错误: %s"
+  IDS_YESNO_CANCEL           "你要取消此操作吗？"
+  IDS_ERR_MEMORYLOW          "内存溢出。"
+  IDS_ERR_PATHTOOLONG        "由于路径太长无法完成操作。"
+  IDS_ERR_CREATEDIR          "无法创建目录 ""%s""。"
+  IDS_YESNO_CREATEDIR        "目录 ""%s"" 不存在。\n\n你要创建它吗？"
+  IDS_ERR_DIRNAMEISFILE      "名字 ""%s"" 已经被用于某个文件。"
+  IDS_ERR_INVALIDDATEFORMAT  "日期格式无效。"
+  IDS_ERR_NAMETOOLONG        "由于名字太长无法完成操作。"
+  IDS_ERR_FILEINPATH         "指定的路径包含指向文件的路径。无法打开文件。"
+  IDS_YESNO_CONNETCLOSEPLUGIN "不能连接到设备。\r\n\r\n你要关闭插件吗？"
+  IDS_SORRY_CREATEDIR1        "抱歉，但是此插件不能在磁盘或压缩包路径上创建目录。"
+  IDS_SORRY_CREATEDIR2        "抱歉，但是此插件不能在指定的文件系统上创建目录。"
+  IDS_SORRY_CREATEDIR3        "抱歉，但是此插件不能在当前打开的驱动器之外创建目录。"
+  IDS_ERR_INVALIDPATH         "指定的路径无效。"
+  IDS_READ                    "读取"
+  IDS_READING                 "正在读取"
+  IDS_WAIT_READINGDIRTREE     "正在读取目录树，请等待..."
+  IDS_DELETE                  "删除"
+  IDS_DELETING                "正在删除"
+  IDS_YESNO_DELETENOEMPTYDIR  "目录 ""%s"" 不是空的\n你要删除它吗？"
+  IDS_YESNO_DELETEHIDDENFILE  "你要删除有""系统""或""隐藏""属性的文件吗？"
+  IDS_YESNO_DELETEHIDDENDIR   "你要删除有""系统""或""隐藏""属性的目录吗？"
+  IDS_ERR_TARGETPATHNOEXISTS  "目标路径不存在。Windows Mobile 插件不支持创建目标路径。"
+  IDS_ERR_COPYTOOTHERFS       "Windows Mobile 插件不支持复制或移动到其它插件文件系统。"
+  IDS_ERR_COPYTOARCHIVES      "Windows Mobile 插件不支持复制或移动到压缩包。"
+  IDS_COPY                    "复制"
+  IDS_COPYING                 "正在复制"
+  IDS_MOVE                    "移动"
+  IDS_MOVING                  "正在移动"
+  IDS_TO                      "到"
+  IDS_ERR_COPYDIRTOITSELF     "不能复制目录到它自己。"
+  IDS_ERR_COPYFILETOITSELF    "不能复制文件到它自己。"
+  IDS_YESNO_OVERWRITEHIDDENFILE "你要覆盖有""系统""或""隐藏""属性的文件吗？"
+  IDS_ERR_MOVEDIRTOITSELF     "不能移动目录到它自己。"
+  IDS_ERR_MOVEFILETOITSELF    "不能移动文件到它自己。"
+  IDS_ATTRIBUTES              "属性"
+  IDS_CHANGING                "更改"
+END

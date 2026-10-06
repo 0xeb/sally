@@ -299,7 +299,7 @@ struct CSfxLang
 extern const CExtendedOptions DefOptions;
 
 extern HINSTANCE DLLInstance; // handle of the SPL - language-independent resources
-extern HINSTANCE HLanguage;   // handle of the SLG - language-dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 
 extern const CConfiguration DefConfig;
 extern CConfiguration Config;

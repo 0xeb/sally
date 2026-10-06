@@ -1,0 +1,50 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for peviewer. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/peviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\peviewer.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 0, 0, 346, 154
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Prehliadač spustitelných súborov - Konfigurácia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Do&stupné sekcie:",IDC_STATIC_1,7,7,64,8
+    LISTBOX         IDC_AVAILABLELB,7,17,105,130,LBS_SORT | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Pridať ->",IDC_ADD,119,17,50,14,WS_GROUP
+    PUSHBUTTON      "<- &Odobrať",IDC_REMOVE,119,35,50,14
+    LTEXT           "Vi&diteľné sekcie:",IDC_STATIC_2,176,7,58,8
+    LISTBOX         IDC_SELECTEDLB,176,17,105,130,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Hore",IDC_UP,289,17,50,14,WS_GROUP
+    PUSHBUTTON      "Dol&u",IDC_DOWN,289,35,50,14
+    DEFPUSHBUTTON   "OK",IDOK,289,97,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,289,115,50,14
+    PUSHBUTTON      "Pô&vodné",IDC_RESET,289,133,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_NAME, "Prehliadač spustitelných súborov"
+ IDS_PLUGIN_DESCRIPTION, "Zobrazí informácie o prenosných spustiteľných súboroch, napr.: EXE, DLL, atď."
+ IDS_ABOUT, "O plugine"
+ IDS_ERR_OPEN_FILE, "Nie je možné otvoriť súbor %s."
+ IDS_ERR_TMP, "Vytvorenie dočasného súboru zlyhalo."
+ IDS_EXCEPTION, "Vyskytla sa výnimka.\n\nPrehliadaný súbor: %s\n\nAk si myslíte, že prehliadaný súbor nie je poškodený, založte prosím issue na https://github.com/0xeb/sally/issues a priložte tento súbor.\nMy preveríme a opravíme chybu prehliadača. Ďakujeme za spoluprácu!"
+ IDS_HIDDEN_SECTIONS, "V konfiguráci pluginu sa nenašli žiadne viditeľné sekcie. Na výber\nviditeľných sekcií použite v hlavnom okne Sally ponuku\nMožnosti > Konfigurácia pluginov > Prehliadač spustiteľných súborov."
+}

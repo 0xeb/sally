@@ -1,0 +1,50 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for peviewer. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/peviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\peviewer.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 0, 0, 352, 154
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuración del visor de ejecutable portátil"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Secciones disponi&bles:",IDC_STATIC_1,7,7,76,8
+    LISTBOX         IDC_AVAILABLELB,7,17,105,130,LBS_SORT | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Añadir ->",IDC_ADD,119,17,53,14,WS_GROUP
+    PUSHBUTTON      "<- &Quitar",IDC_REMOVE,119,35,53,14
+    LTEXT           "Secciones &visibles:",IDC_STATIC_2,179,7,63,8
+    LISTBOX         IDC_SELECTEDLB,179,17,105,130,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Mover a&rriba",IDC_UP,292,17,53,14,WS_GROUP
+    PUSHBUTTON      "Mover aba&jo",IDC_DOWN,292,35,53,14
+    DEFPUSHBUTTON   "Aceptar",IDOK,292,97,53,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,292,115,53,14
+    PUSHBUTTON      "R&einiciar",IDC_RESET,292,133,53,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_NAME, "Visor de ejecutable portátil"
+ IDS_PLUGIN_DESCRIPTION, "Presenta información sobre ficheros ejecutables portátiles como EXE, DLL, etc."
+ IDS_ABOUT, "Acerca del Plugin"
+ IDS_ERR_OPEN_FILE, "Imposible abrir el fichero %s."
+ IDS_ERR_TMP, "Ha fallado la creación de un fichero temporal."
+ IDS_EXCEPTION, "Ha sucedido una excepción.\n\nFichero visto: %s\n\nSi cree que el fichero visto no está corrupto, abra una incidencia en https://github.com/0xeb/sally/issues y adjunte este fichero.\nLo reproduciremos y corregiremos el fallo. ¡Gracias por su cooperación!"
+ IDS_HIDDEN_SECTIONS, "No se encontró sección de ejecutable portátil en la configuración del plugin.\nUse menú Opciones > Configuración del plugin > Visor de ejecutable portátil\nen la ventana principal de Sally para configurar secciones visibles."
+}

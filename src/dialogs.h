@@ -1234,27 +1234,24 @@ class CHyperLink;
 class CLanguageSelectorDialog : public CCommonDialog
 {
 protected:
-    TDirectArray<CLanguage> Items;
+    std::vector<CLanguage> Items;
     CHyperLink* Web;
     std::wstring& SLGName;
     BOOL OpenedFromConfiguration;
-    BOOL OpenedForPlugin;
     HWND HListView;
-    const wchar_t* PluginName;
     std::wstring ExitButtonLabel;
 
 public:
-    CLanguageSelectorDialog(HWND hParent, std::wstring& slgName, const wchar_t* pluginName);
-    ~CLanguageSelectorDialog();
+    // 'slgName' is the persisted name of the selected language (e.g. czech.slg): it preselects
+    // and receives the choice
+    CLanguageSelectorDialog(HWND hParent, std::wstring& slgName);
 
     int Execute();
 
-    // scans the 'lang' directory and adds all valid SLG files to the array
-    BOOL Initialize(const wchar_t* slgSearchPath = NULL, HINSTANCE pluginDLL = NULL);
+    // lists the languages built into sally.exe
+    BOOL Initialize();
 
-    int GetLanguagesCount() { return Items.Count; }
-    BOOL GetSLGName(std::wstring& path, int index = 0); // returns xxxx.slg of the item at index 'index'
-    BOOL SLGNameExists(const wchar_t* slgName);    // checks whether 'slgName' exists in 'Items'
+    int GetLanguagesCount() { return (int)Items.size(); }
 
     void FillControls();
 
@@ -1262,11 +1259,9 @@ public:
 
     void Transfer(CTransferInfo& ti);
 
-    // returns the index into Items array; highest priority is 'selectSLGName' (if not NULL), then
-    // the Windows setting, and if 'exactMatch' is FALSE then english.slg or otherwise the first
-    // found .slg; if 'exactMatch' is TRUE, it returns the index of 'selectSLGName' (if not NULL)
-    // or the Windows setting or -1 (nothing found)
-    int GetPreferredLanguageIndex(const wchar_t* selectSLGName, BOOL exactMatch = FALSE);
+    // returns the index into Items of 'selectSLGName', or of the en-US language if that is not
+    // one of them
+    int GetPreferredLanguageIndex(const wchar_t* selectSLGName);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

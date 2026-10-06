@@ -1,0 +1,325 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for regedt. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/regedt/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\regedt.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CREATEKEY DIALOGEX 10, 24, 227, 75
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Vytvorenie kľúča"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Názov kľúča:",IDS_TEXT,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "&Poslať cestu priamo do pluginu",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    DEFPUSHBUTTON   "OK",IDOK,58,53,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,118,53,50,14
+END
+
+IDD_RENAME DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,58,43,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,118,43,50,14
+END
+
+IDD_COPY DIALOGEX 10, 24, 227, 76
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    COMBOBOX        IDE_NAME,10,20,208,106,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_TABSTOP
+    CONTROL         "&Poslať cestu priamo do pluginu",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,35,189,12
+    DEFPUSHBUTTON   "OK",IDOK,58,54,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,118,54,50,14
+END
+
+IDD_NEWVALUE DIALOGEX 14, 22, 227, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nová hodnota"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Názov hodnoty:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "&Poslať cestu priamo do pluginu",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    LTEXT           "&Typ hodnoty:",IDC_STATIC_2,10,53,56,8
+    COMBOBOX        IDC_TYPE,10,63,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,58,87,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,118,87,50,14
+END
+
+IDD_EDITVAL DIALOGEX 14, 22, 227, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Úprava hodnoty"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_DATA,10,79,208,12,ES_AUTOHSCROLL
+    LTEXT           "Základný:",IDS_BASE,124,69,60,8
+    CONTROL         "&Hexadecimálny",IDR_HEX,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,78,81,12
+    CONTROL         "De&siatkový",IDR_DEC,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,90,73,12
+    DEFPUSHBUTTON   "OK",IDOK,58,112,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,118,112,50,14
+    LTEXT           "Názov hodnoty:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "&Typ hodnoty:",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Dáta hodnoty:",IDC_STATIC_3,10,69,60,8
+END
+
+IDD_RAWEDITVAL DIALOGEX 14, 22, 227, 145
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Raw úprava hodnoty"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Názov hodnoty:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "&Typ hodnoty:",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Spustiť editor",IDB_EDIT,10,69,75,14
+    LTEXT           "Keď ukončíte úpravu a uložíte Vaše zmeny v externom editore, stlačte OK na uloženie zmien do registra alebo zvoľte Zrušiť na ukončenie bez uloženia.",IDS_MESSAGE,10,89,206,24,NOT WS_VISIBLE
+    DEFPUSHBUTTON   "OK",IDOK,58,123,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,118,123,50,14
+END
+
+IDD_SEARCH DIALOGEX 9, 20, 333, 240
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Hľadanie v registri"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "N&ájsť:",IDC_STATIC_1,6,10,41,8
+    COMBOBOX        IDC_PATTERN,61,8,197,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Nájs&ť teraz",IDOK,263,7,55,14,WS_GROUP
+    LTEXT           "Hľadať &v:",IDC_STATIC_2,6,27,41,8
+    COMBOBOX        IDC_LOOKIN,61,25,197,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Nápoveda",IDHELP,263,24,55,14,WS_GROUP
+    CONTROL         "Zobraziť &možnosti",IDC_OPTIONS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,244,42,74,12
+    CONTROL         "&Zahrnúť podkľúče",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,42,86,12
+    LTEXT           "Prehľadávať:",IDS_LOOKAT,6,60,46,8
+    CONTROL         "&Kľúče",IDC_KEYS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,58,55,12
+    CONTROL         "&Hodnoty",IDC_VALUES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,142,58,55,12
+    CONTROL         "Dá&ta",IDC_DATA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,217,58,55,12
+    LTEXT           "Možnosti:",IDS_OPTIONS,6,76,41,8
+    CONTROL         "HE&X-režim",IDC_HEX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,74,60,12
+    CONTROL         "&Rozlišovať veľkosť písmen",IDC_CASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,142,74,101,12
+    CONTROL         "Celé s&lová",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,87,60,12
+    CONTROL         "Re&gulárny výraz",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,142,87,75,12
+    LTEXT           "N&ovšie alebo rovné od:",IDS_NEWER,61,105,78,8
+    EDITTEXT        IDC_MINTIME,142,103,79,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.rrrr",IDS_FORMAT1,227,105,81,8
+    LTEXT           "&Staršie alebo rovné do:",IDS_OLDER,61,121,80,8
+    EDITTEXT        IDC_MAXTIME,142,119,79,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.rrrr",IDS_FORMAT2,227,121,81,8
+    LTEXT           "Náj&dené položky:",IDC_FOUND_FILES,6,132,109,8
+    CONTROL         "",IDC_RESULTS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,6,142,309,57
+END
+
+IDD_CONFIG DIALOGEX 86, 38, 290, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nastavenie Editora registra"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Externý editor sa používa na raw úpravu hodnôt registra.",IDC_STATIC_1,10,10,250,8
+    LTEXT           "&Príkaz:",IDC_STATIC_2,20,27,55,8
+    EDITTEXT        IDE_COMMAND,89,25,174,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_BROWSE,267,25,13,12
+    LTEXT           "&Argumenty:",IDC_STATIC_3,20,43,55,8
+    EDITTEXT        IDE_ARGUMENTS,89,41,174,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_ARGHELP,267,41,13,12
+    LTEXT           "Počiatočný a&dresár:",IDC_STATIC_4,20,59,68,8
+    EDITTEXT        IDE_INITDIR,89,57,174,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_INITDIRHELP,267,57,13,12
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,10,79,270,1
+    DEFPUSHBUTTON   "OK",IDOK,176,84,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,230,84,50,14
+END
+
+IDD_EXPORT DIALOGEX 14, 22, 227, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Exportovanie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Exportovaná cesta:",IDC_STATIC_1,10,10,83,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    LTEXT           "&Do súboru:",IDC_STATIC_2,10,39,56,8
+    EDITTEXT        IDE_FILE,10,49,191,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDB_BROWSE,205,49,13,12
+    DEFPUSHBUTTON   "OK",IDOK,58,72,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,118,72,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Editor registra"
+  IDS_DESCRIPTION, "Prehliada, zobrazuje a upravuje Register Windows."
+  IDS_ABOUT, "O plugine"
+  IDS_REGEDTERR, "Editor registra - Chyba"
+  IDS_LOWMEM, "Nedostatok pamäti."
+  IDS_DRIVEMENUTEXT, "\tRegister Windows"
+  IDS_DEFAULTVALUE, "(Predvolený)"
+  IDS_TYPE, "Typ/Dátum"
+  IDS_DATA, "Dáta/Čas"
+  IDS_SIZE, "Veľkosť"
+  IDS_KEY, "KĽÚČ"
+  IDS_EMPTY, "Prázdny reťazec tu nie je povolený."
+  IDS_ERROR, "Chyba"
+  IDS_NEWKEYINROOT, "Vytváranie nových kľúčov v koreni registra nie je možné."
+  IDS_LONGNAME, "Nie je možné dokončiť operáciu kvôli príliš dlhému názvu cesty."
+  IDS_NEWKEY, "Nie je možné vytvoriť nový kľúč: "
+  IDS_KEYEXISTS, "Kľúč už existuje."
+  IDS_DELVAL, "Chyba pri odstraňovaní hodnoty registra"
+  IDS_DELKEY, "Chyba pri odstraňovaní kľúča registra"
+  IDS_CONFIRNNONEMPTYDELETE, "Kľúč ""%s"" nie je prázdny.\nChcete ho odstrániť?"
+  IDS_QUESTION, "Otázka"
+  IDS_DELKEYINROOT, "Odstránenie kľúča v koreni registra nie je možné."
+  IDS_MENUNEWKEY, "Nový &kľúč..."
+  IDS_MENUNEWVAL, "&Nová hodnota..."
+  //IDS_MENUOPEN, "&Open\tEnter"
+  IDS_EDIT, "&Upraviť..."
+  IDS_RAWEDIT, "Ra&w upraviť..."
+  //IDS_MENUDELETE, "&Delete\tF8"
+  //IDS_MENURENAME, "&Rename\tF2"
+  IDS_NEWVAL, "Nie je možné vytvoriť novú hodnotu: "
+  IDS_REPLACEVAL, "Hodnota ""%s"" už existuje.\nChcete ju prepísať?"
+  IDS_INVALIDHEXVALUE, "Neplatná hexadecimálna hodnota."
+  IDS_INVALIDDECVALUE, "Neplatná desiatková hodnota."
+  IDS_QUERYVAL, "Nie je možné opýtať sa na hodnotu: "
+  IDS_SETVAL, "Nie je možné nastaviť hodnotu: "
+  IDS_BADPATH, "Neplatný názov cesty. "
+  IDS_NOTREGEDTPATH, "Tu nie sú podporované cesty do iných súborových systémov."
+  IDS_OPENKEY, "Nie je možné otvoriť kľúč registra ""%ls"". "
+  IDS_OPENKEY2, "Nie je možné otvoriť kľúč registra ""%ls\\%ls"". "
+  IDS_ENUMKEY, "Jeden alebo viac podkľúčov alebo hodnôt nemusí byť na výpise - %s\nPokračovať vo výpise?"
+  IDS_EXPORT, "&Exportovať..."
+  IDS_SEARCH, "Náj&sť..."
+  IDS_QUICKRENAMEKEY, "Premenovať kľúč ""%s"" na"
+  IDS_QUICKRENAMEVAL, "Premenovať hodnotu ""%s"" na"
+  IDS_QUICKRENAME, "Rýchle premenovanie"
+  IDS_COPY, "Kopírovať"
+  IDS_MOVE, "Presunúť"
+  IDS_COPYORMOVE1, "%s hodnota ""%s"" na"
+  IDS_COPYORMOVE2, "%s kľúč ""%s"" na"
+  IDS_COPYORMOVE3, "{!}%s %d hodnot{a|1|y|4|} na"
+  IDS_COPYORMOVE4, "{!}%s %d kľúč{|1|e|4|ov} na"
+  IDS_COPYORMOVE5, "{!}%s %d hodnot{a|1|y|4|} a %d kľúč{|1|e|4|ov} na"
+  IDS_MOVERENAME, "Presunúť/Premenovať"
+  IDS_SAMETARGET, "Táto operácia nemá žiadny zmysel. Všetky vybrané súbory a adresáre majú rovnaký cieľový názov (prepísali by sa navzájom)."
+  IDS_ACCESS, "Nie je možné sprístupniť kľúč registra ""%ls\\%ls"". "
+  IDS_CANTCOPYTOITSELF, "Nie je možné kopírovať kľúč alebo hodnotu do seba samého."
+  IDS_CANTMOVETOITSELF, "Nie je možné presunúť kľúč alebo hodnotu do seba."
+  IDS_CREATE, "Nie je možné vytvoriť kľúč registra. "
+  IDS_OPEN, "Nie je možné otvoriť kľúč registra. "
+  IDS_ACCESS2, "Nie je možné sprístupniť kľúč registra. "
+  IDS_DELETE, "Nie je možné odstrániť kľúč registra. "
+  IDS_COPYKEY, "Chyba pri kopírovaní kľúča registra"
+  IDS_MOVEKEY, "Chyba pri presune kľúča registra"
+  IDS_SETVAL2, "Nie je možné nastaviť hodnotu kľúča registra. "
+  IDS_REMOVESOURCE, "Nie je možné odstrániť pôvodný kľúč registra. "
+  IDS_COPYVALUE, "Chyba pri kopírovaní hodnoty kľúča registra"
+  IDS_MOVEVALUE, "Chyba pri presune hodnoty kľúča registra"
+  IDS_REMOVESOURCE2, "Nie je možné odstrániť hodnotu zo zdrojového kľúča. "
+  IDS_CANTCOPYTOITSELF2, "Názov:\t%ls\n\nChyba:\tNie je možné kopírovať kľúč sám do seba."
+  IDS_CANTMOVETOITSELF2, "Názov:\t%ls\n\nChyba:\tNie je možné presunúť kľúč do seba samého."
+  IDS_COPYCLASSNAME, "Názov triedy kľúča nemôže byť skopírovaný do cieľového kľúča.\nChcete pokračovať?"
+  IDS_WARNING, "Upozornenie"
+  IDS_CANNOTRENAME, "Nie je možné premenovať kľúč. Zadaný názov kľúča sa už používa."
+  IDS_RENAMEKEY, "Chyba pri premenovaní kľúča registra"
+  IDS_RENAMEVAL, "Chyba pri premenovaní kľúča registra"
+  IDS_SAMECASEKEY, "Nie je možné premenovať kľúč. Pôvodný a nový názov sa líši len veľkosťou písmen."
+  IDS_SAMECASEVAL, "Nie je možné premenovať hodnotu. Pôvodný a nový názov sa líši len veľkosťou písmen."
+  IDS_SYNTAX, "Syntax názvu kľúča nie je správna."
+  IDS_CREATETARGET, "Cieľový kľúč ""%ls\\%ls"" neexistuje. Chcete ho vytvoriť?"
+  IDS_COPYPROGRESS, "Kopírovanie položiek registra, čakajte prosím (stlačte ESC na prerušenie)..."
+  IDS_MOVEPROGRESS, "Presúvanie položiek registra, čakajte prosím (stlačte ESC na prerušenie)..."
+  IDS_DELETEPROGRESS, "Odstraňovanie položiek registra, čakajte prosím (stlačte ESC na prerušenie)..."
+  IDS_CANCEL, "Chcete prerušiť túto operáciu?"
+  IDS_COPYTOTROOT, "Kopírovanie kľúčov v koreni registra nie je možné."
+  //IDS_WINDOWSREGISTRY, "Windows Registry"
+  IDS_STOP, "&Zastaviť"
+  IDS_START, "Nájs&ť teraz"
+  IDS_FOUNDITEMS1, "Nájdené &položky:"
+  IDS_FOUNDITEMS2, "Nájdené &položky (%d):"
+  IDS_NOFILESFOUND, "Nenájdené žiadne súbory"
+  IDS_STOPPED, "Hľadanie zastavené"
+  IDS_NAME_COLUMN, "Názov"
+  IDS_TYPE_COLUMN, "Typ"
+  IDS_DATA_COLUMN, "Dáta"
+  IDS_PATH_COLUMN, "Cesta"
+  IDS_SIZE_COLUMN, "Veľkosť"
+  IDS_DATE_COLUMN, "Dátum"
+  IDS_TIME_COLUMN, "Čas"
+  IDS_FIND, "&Hľadať v Registri Windows..."
+  IDS_SEARCHERROR, "Chyba pri hľadaní vo Windows registri"
+  IDS_BADHEXSTRING, "Reťazec nemá platný hexadecimálny vzor."
+  IDS_REGEXPERR, "Chyba triedy regulárneho výrazu: %s"
+  IDS_SEARCHING, "Hľadám: %s\\"
+  IDS_SUBSTRINGHELP, "Zadajte reťazec, desiatkové číslo alebo hexadecimálne číslo s predponou 0x. Prázdny reťazec zodpovedá všetkým položkám."
+  IDS_HEXHELP, "Zadajte hexadecimálny vzorec vo formáte: 1a 2b ""foo"" 3c. Použite "" pre unicode a ' pre ASCII vzory reťazca."
+  IDS_REGEXPHELP, "Zadajte regulárny výraz. Pre detaily o regulárnych výrazoch sa pozrite do dokumentácia Sally."
+  IDS_LONGDATA, "Nie je možné dokončiť operáciu kvôli príliš dlhým dátam."
+  IDS_BADTIMEFORMAT, "Neplatný formát dátumu/času. Prosím zadajte dátum vo formáte dd.mm.rrrr alebo dátum a čas vo formáte hh:mm:ss dd.mm.rrrr."
+  IDS_CREATETEMP, "Nie je možné vytvoriť dočasný súbor. "
+  IDS_WRITETEMP, "Nie je možné zapísať do dočasného súboru. "
+  IDS_EXP_FULLNAME, "Úplný názov"
+  IDS_EXP_DRIVE, "Jednotka"
+  IDS_EXP_PATH, "Cesta"
+  IDS_EXP_NAME, "Názov"
+  IDS_EXP_NAMEPART, "Časť názov"
+  IDS_EXP_EXTPART, "Časť prípona"
+  IDS_EXP_FULLPATH, "Úplná cesta"
+  IDS_EXP_WINDIR, "Windows adresár"
+  IDS_EXP_SYSDIR, "Systémový adresár"
+  IDS_EXP_BROWSE, "Prechádzať..."
+  IDS_EXP_SALDIR, "Adresár Sally"
+  IDS_EXP_DOSFULLNAME, "DOS úplný názov"
+  IDS_EXP_DOSDRIVE, "DOS jednotka"
+  IDS_EXP_DOSPATH, "DOS cesta"
+  IDS_EXP_DOSNAME, "DOS názov"
+  IDS_EXP_DOSNAMEPART, "DOS časť názov"
+  IDS_EXP_DOSEXTPART, "DOS časť prípona"
+  IDS_EXP_DOSFULLPATH, "DOS úplná cesta"
+  IDS_EXP_DOSWINDIR, "DOS Windows adresár"
+  IDS_EXP_DOSSYSDIR, "DOS systémový adresár"
+  IDS_EXP_ENVVAR, "Premenná prostredia"
+  IDS_EXEFILES, "Spustiteľné (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tVšetky súbory (*.*)\t*.*\t\t"
+  IDS_OPENTEMP, "Nie je možné otvoriť dočasný súbor. "
+  IDS_SIZEOFTEMP, "Nie je možné získať veľkosť dočasného súboru. "
+  IDS_READTEMP, "Nie je možné čítať z dočasného súboru. "
+  IDS_PROCESS, "Nie je možné spustiť externý editor. Skontrolujte konfiguráciu Editora registra na nastavenie externého editora.\n"
+  IDS_NOTDWORD, "Číslo je príliš veľké na uloženie ako DWORD."
+  IDS_REGFILES, "Súbory registra (*.reg)\t*.reg\tVšetky súbory (*.*)\t*.*\t\t"
+  IDS_FILENAMEISDIR, "Názov cieľového súboru sa už používa pre adresár."
+  IDS_OVERWRITE, "Cieľový súbor už existuje. Chcete ho prepísať?"
+  IDS_OVERWRITETITLE, "Potvrdenie prepísania súboru"
+  IDS_REPLACEERROR, "Nie je možné prepísať existujúci súbor."
+  IDS_PROCESS2, "Nie je možné spustiť %s."
+  IDS_BADEXPORT, "Vyskytla sa chyba pri exportovaní dát registra."
+  IDS_EXPORTING, "Exportovanie dát registra, čakajte prosím..."
+  IDS_SELECTED1, "{!}%d vybran{á hodnota|1|é hodnoty|4|ých hodnôt}"
+  IDS_SELECTED2, "{!}%d vybran{ý kľúč|1|é kľúče|4|ých kľúčov}"
+  IDS_SELECTED3, "{!}%d vybran{á hodnota|1|é hodnoty|4|ých hodnôt} a %d vybran{ý kľúč|1|é kľúče|4|ých kľúčov}"
+  IDS_SELECTEDSIZE, "{!}<%d> bajt{|1|y|4|ov} v "
+  IDS_CANNOTRENAMEDEFVAL, "Nie je možné premenovať predvolenú hodnotu. Hodnota nie je zadaná."
+  IDS_COPYNAME, "Kopírovať názov ako text"
+  IDS_COPYFULLNAME, "Kopírovať plný názov ako text"
+  IDS_COPYPATH, "Kopírovať plnú cestu ako text"
+  IDS_BUSY, "Sally je zaneprázdnený. Požadovaný príkaz nie je možné vykonať, prosím skúste znova neskôr."
+}

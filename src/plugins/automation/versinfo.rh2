@@ -5,7 +5,7 @@
 	Copyright (c) 2010-2023 Open Salamander Authors
 	
 	versinfo.rh2
-	Defines for plugin.SPL and plugin.SLG VERSIONINFO look at shared\versinfo.rc2.
+	Defines for plugin.SPL VERSIONINFO look at shared\versinfo.rc2.
 */
 
 // WARNING: cannot be replaced by "#pragma once" because it is included from .rc file and it seems resource compiler does not support "#pragma once"
@@ -27,16 +27,7 @@
 
 #define VERSINFO_DESCRIPTION "Automation plugin for Sally"
 
-#ifdef _LANG
-#define VERSINFO_INTERNAL    "ENGLISH"
-#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
-#else
 #define VERSINFO_INTERNAL    "AUTOMATION"
 #define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SPL"
-#endif
-
-// for SLG translators
-#define VERSINFO_SLG_WEB     "https://github.com/0xeb/sally/discussions"
-#define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __AUTOMATION_VERSINFO_RH2

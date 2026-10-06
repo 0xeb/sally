@@ -37,7 +37,7 @@
 // absent in a fresh clone before configure. A plain header it can always read.
 #define VERSINFO_SALAMANDER_MAJOR 1
 #define VERSINFO_SALAMANDER_MINORA 0
-#define VERSINFO_SALAMANDER_MINORB 32
+#define VERSINFO_SALAMANDER_MINORB 33
 // Sally versions are three dotted parts (1.0.25). Open Salamander used "hundredths",
 // concatenating MINORB with no separator - 2,5,1 read as "2.51" - and suppressing a zero
 // MINORB so 2,5,0 read as "2.5". Under that scheme 1,0,25 would render as "1.025".
@@ -228,16 +228,12 @@
 //   105 - 5.0 + fixed optional wide plugin FS path ABI
 //   106 - 5.0 + plugin theme info API
 //   107 - 5.0 + plugin may set CFileData::NameW when listing an archive
-//   108 - Sally wide (Unicode) plugin ABI - plugins built for this
-//         version or later speak the native wide interfaces directly; anything
-//         reporting 107 or earlier is routed through the legacy ANSI adapter
-//         (see compat/plugin_abi_routing.h's kFirstWideAbiVersion). This was
-//         never bumped when the break landed, so every in-tree plugin using this
-//         shared header (all of which are wide-ABI-native) was silently
-//         misrouted through the adapter - never caught because nothing had
-//         actually loaded a plugin under this exact runtime path until now.
+//   108 - Sally wide (Unicode) plugin ABI. Since Sally 1.0.33 only plugins built for exactly
+//         LAST_VERSION_OF_SALAMANDER load; the adapter that served 107 and older ANSI plugins
+//         was removed, and anything else is refused with "get an updated version".
+//   109 - Sally 1.0.33: LoadLanguageModule removed; a plugin's resources (all languages) are in its own DLL.
 
-#define LAST_VERSION_OF_SALAMANDER 108
+#define LAST_VERSION_OF_SALAMANDER 109
 #define SALLY_PLUGIN_WIDE_ABI_VERSION 108
 #define SALLY_PLUGIN_BROKEN_WIDE_FS_VERSION 104
 #define SALLY_PLUGIN_WIDE_FS_VERSION 105

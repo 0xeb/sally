@@ -1,0 +1,48 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for unchm. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unchm/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unchm.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "Impossible d'ouvrir le fichier."
+    IDS_UNKNOW_ERROR            "Erreur non précisée."
+    IDS_UNPACKING_ARCHIVE       "Décompression d'archive CHM"
+    IDS_ERROR_UNPACKING         "Erreur à la décompression du fichier."
+    IDS_CANT_HANDLE_FILE        "Impossible de traiter ce fichier."
+    IDS_INSUFFICIENT_MEMORY     "Mémoire insuffisante."
+    IDS_ABOUT                   "A propos du module"
+    IDS_PLUGIN_DESCRIPTION      "Parcourt et extrait les fichiers CHM."
+    IDS_CANT_CREATE_TEMP        "Impossible de créer le répertoire temporaire."
+    IDS_CANT_DELETE_TEMP_FILE   "Impossible de supprimer le fichier temporaire."
+    IDS_UNKNOWN_FILE_FORMAT     "Format de fichier inconnu ou image CHM invalide.\n\nSi vous êtes sûr qu'il s'agit d'une image CHM valide, veuillez ouvrir un ticket sur https://github.com/0xeb/sally/issues pour nous permettre de supporter ce format."
+    IDS_CANT_OPEN_FILE          "Impossible d'ouvrir ce fichier."
+    IDS_ERR_TMP                 "La création du fichier temporaire a échoué."
+    IDS_CANT_SET_ATTRS          "Impossible de définir les attributs de fichier."
+    IDS_CANT_CREATE_DIR         "Impossible de créer le répertoire '%s'."
+    IDS_YES                     "Oui"
+    IDS_NO                      "Non"
+    IDS_ERROR                   "Erreur"
+    IDS_WARNING                 "Attention"
+    IDS_READERROR               "Erreur de lecture"
+    IDS_WRITEERROR              "Erreur d'écriture"
+    IDS_INTERNAL_PLUGIN_ERROR   "Erreur interne du module."
+    IDS_INVALIDNUMBER           "Nombre invalide."
+    IDS_CANCELOPER              "annulation en cours, veuillez patienter..."
+    IDS_CHMLIBCOPYRIGHT         "Bibliothèque CHMLIB Copyright © 2001-2010 Jed Wing"
+}

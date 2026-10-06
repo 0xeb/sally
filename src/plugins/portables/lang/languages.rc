@@ -1,0 +1,8 @@
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// The built-in languages of portables: English and every translation, each under its own
+// LANGUAGE. One resource script per module, so the build compiles them as one unit. To add a
+// language, add its <tag>/lang.rc here.
+
+#include "lang.rc"

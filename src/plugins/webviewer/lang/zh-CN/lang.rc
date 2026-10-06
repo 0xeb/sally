@@ -1,0 +1,27 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for webviewer. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/webviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\webviewer.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "基于 Microsoft Edge WebView2 的轻量级 HTML、XML 和 Markdown 查看器。"
+ IDS_ABOUT, "关于插件"
+ IDS_PLUGINNAME, "Web 查看器"
+ IDS_UNABLETOOPENIE, "无法打开 Web 查看器。\n请确认已安装 Microsoft Edge WebView2 Runtime。"
+ IDS_ERRORTITLE, "错误"
+}

@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "common/unicode/WideTextRange.h"
-#include "compat/legacy_host_api.h"
 
 // when changing this header search for "BuiltForVersion" - tests for older plugin versions will no longer make sense and should be removed
 #define PLUGIN_REQVER 103 // ("5.0") load only plugins that return at least this required Salamander version
@@ -1827,9 +1826,6 @@ protected:
     std::wstring HelpFileName; // if not empty, this is the name (without path) of the .chm help file used by this plugin (optimization only, not stored anywhere)
 
 public:
-    HINSTANCE LanguageModule; // if not NULL, it is the handle to the plugin's .SLG language module
-
-public:
     CSalamanderGeneral();
     ~CSalamanderGeneral();
 
@@ -2398,7 +2394,6 @@ public:
     BOOL SupportDynMenuExt;    // TRUE => menu is added in PluginIfaceForMenuExt::BuildMenu instead of PluginIface::Connect (menu is dynamic and rebuilt before each plugin menu open)
 
     BOOL LoadOnStart; // should the plugin load at every Salamander start?
-    BOOL LegacyCompatApproved; // TRUE => user approved loading a req==102 plugin for this plugin path
 
     std::wstring Version;             // plugin version (max length MAX_PATH - 1)
     std::wstring Copyright;           // manufacturer's copyright (max length MAX_PATH - 1)
@@ -2406,8 +2401,6 @@ public:
     std::wstring RegKeyName;          // registry key name for configuration (max length MAX_PATH - 1)
     std::wstring Extensions;          // archive extensions separated by ';' (max length MAX_PATH - 1)
     std::vector<std::wstring> FSNames; // array of plugin filesystem names (each max length MAX_PATH - 1)
-
-    std::wstring LastSLGName; // name of the last used .SLG file (empty = none yet or same language as Salamander)
 
     std::wstring PluginHomePageURL; // URL of the plugin home page (empty == no home page exists)
 
@@ -2475,7 +2468,6 @@ public:
 
 protected:
     HINSTANCE DLL;                                                         // handle of the plug-in’s DLL file
-    sally::compat::CLegacyPluginHostPtr LegacyHost;                        // legacy facade graph retained for this DLL's lifetime
     CPluginInterfaceEncapsulation PluginIface;                             // plugin interface (set to -1 during the entry point call)
     CPluginInterfaceForArchiverEncapsulation PluginIfaceForArchiver;       // plugin interface: archiver
     CPluginInterfaceForViewerEncapsulation PluginIfaceForViewer;           // plugin interface: viewer
@@ -2490,7 +2482,7 @@ public:
                 BOOL supportFS, BOOL supportDynMenuExt, const wchar_t* version,
                 const wchar_t* copyright, const wchar_t* description, const wchar_t* regKeyName,
                 const wchar_t* extensions, const std::vector<std::wstring>* fsNames, BOOL loadOnStart,
-                const wchar_t* lastSLGName, const wchar_t* pluginHomePageURL);
+                const wchar_t* pluginHomePageURL);
     ~CPluginData();
 
     // returns the plugin interface
@@ -2917,7 +2909,7 @@ public:
                    BOOL supportFS, BOOL supportDynMenuExt, const wchar_t* version,
                    const wchar_t* copyright, const wchar_t* description, const wchar_t* regKeyName,
                    const wchar_t* extensions, std::vector<std::wstring>* fsNames, BOOL loadOnStart,
-                   const wchar_t* lastSLGName, const wchar_t* pluginHomePageURL);
+                   const wchar_t* pluginHomePageURL);
 
     // adds a plugin; 'parent' is the parent message box window, 'fileName' is the DLL file name
     // of the plugin, returns TRUE if the plugin is added
@@ -3178,10 +3170,6 @@ public:
     // returns the number of loaded plugins that will save their configuration
     int GetPluginSaveCount();
 
-    // after changing Salamander's language clears LastSLGName for all plugins so a new fallback
-    // language is chosen for a plugin (used if the plug-in does not support the language currently selected in Salamander)
-    void ClearLastSLGNames();
-
     // returns the number of plugins that can be loaded (GetLoaded() returns TRUE)
     int GetNumOfPluginsToLoad();
 
@@ -3271,7 +3259,6 @@ public:
 
     virtual DWORD WINAPI GetLoadInformation() { return LoadInfo; }
 
-    virtual HINSTANCE WINAPI LoadLanguageModule(HWND parent, const wchar_t* pluginName);
     virtual WORD WINAPI GetCurrentSalamanderLanguageID() { return (WORD)LanguageID; }
 
     virtual CSalamanderGUIAbstract* WINAPI GetSalamanderGUI() { return &Plugin->SalamanderGUI; }

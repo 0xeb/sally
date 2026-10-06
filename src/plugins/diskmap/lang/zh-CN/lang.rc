@@ -1,0 +1,120 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for diskmap. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/diskmap/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#define SALAMANDER
+#include "..\..\DiskMap\Resources\DiskMap.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDC_ZAREVAKDISKMAP MENU 
+BEGIN
+    POPUP "文件(&F)"
+    BEGIN
+        MENUITEM "打开文件(&O)",                       IDM_FILE_OPEN
+        MENUITEM "在面板中获得焦点(&F)\tF",        IDM_FILE_FOCUSINSALAMANDER
+        MENUITEM SEPARATOR
+        MENUITEM "关于(&A)\tEsc",                      IDM_FILE_ABORT
+        MENUITEM "刷新(&R)\tCtrl+R",            IDM_FILE_REFRESH
+        MENUITEM SEPARATOR
+        MENUITEM "关闭(&C)\tAlt+F4",                      IDM_FILE_EXIT
+    END
+    POPUP "查看(&V)"
+    BEGIN
+        MENUITEM "放大(&I)\t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "缩小(&O)\t -",                IDM_VIEW_ZOOMOUT
+        MENUITEM "取消缩放(&U)\t Shift+Backspace",   IDM_VIEW_GOTOROOT
+        MENUITEM SEPARATOR
+        MENUITEM "日志窗口(&L)...\tCtrl+L",              IDM_VIEW_LOG
+    END
+
+    POPUP "选项(&O)"
+    BEGIN
+	MENUITEM "高亮文件夹(&H)",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
+	MENUITEM "显示工具提示(&D)\tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+        POPUP "工具提示路径格式(&F)"
+        BEGIN
+            MENUITEM "文件名(&F)",            IDM_PATHFORMAT_FILENAME
+            MENUITEM "相对的(&R)",            IDM_PATHFORMAT_RELATIVEVIEW
+//            MENUITEM "&Relative to Root",  IDM_PATHFORMAT_RELATIVEROOT
+            MENUITEM "绝对的(&A)",            IDM_PATHFORMAT_ABSOLUTE
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "按 ESC 时确认退出(&C)",       IDM_OPTIONS_CONSFIRMCLOSE, CHECKED
+    END
+    POPUP "帮助(&H)"
+    BEGIN
+//        POPUP "&Debug"
+//        BEGIN
+//            MENUITEM "&Export Directory Structure...", IDM_DEBUG_EXPORTDIR
+//        END
+//        MENUITEM SEPARATOR
+        MENUITEM "关于(&A)...",                  IDM_HELP_ABOUT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME,            "磁盘映像"
+    IDS_PLUGIN_DESCRIPTION,     "用树形图显示你的磁盘上的文件。"
+    IDS_PLUGIN_ABOUT,           "关于 Sally 磁盘映像插件"
+    IDS_PLUGIN_MENU,            "显示磁盘映像(&D)"
+    IDS_CLOSE_CONFIRMATION,     "你要关闭磁盘映像吗？"
+    IDS_CLOSE_CONFIRMATION_CHECKBOX, "不要再次显示此消息并关闭磁盘映像不再询问"
+
+    IDS_DISKMAP_TITLE,               "磁盘映像"
+    IDS_DISKMAP_TITLEPREFIX,         "磁盘映像 - "
+
+    IDS_DISKMAP_LOAD_TITLE,          "正在搜索文件..."
+    IDS_DISKMAP_LOAD_FOOTER,         "...按 ESC 键来中止"
+    IDS_DISKMAP_LOAD_HSIZE,          "大小:"
+    IDS_DISKMAP_LOAD_HFILE,          "文件:"
+    IDS_DISKMAP_LOAD_HDIRS,          "文件夹:"
+
+    IDS_DISKMAP_ABORT_TITLE,         "文件搜索被取消..."
+    IDS_DISKMAP_ABORT_FOOTER,        "...按 Ctrl+R 来刷新视图"
+
+    IDS_DISKMAP_LOG_TITLE,           "日志"
+    IDS_DISKMAP_LOG_HTYPE,           "类型"
+    IDS_DISKMAP_LOG_HTEXT,           "文本"
+    IDS_DISKMAP_LOG_HFILE,           "文件或目录"
+    IDS_DISKMAP_LOG_LINFO,           "信息"
+    IDS_DISKMAP_LOG_LWARN,           "警告"
+    IDS_DISKMAP_LOG_LERROR,          "错误"
+
+    IDS_DISKMAP_SHELL_FOCUS,         "在面板中获得焦点(&F)"
+    IDS_DISKMAP_SHELL_ZOOMIN,        "放大(&I)"
+    IDS_DISKMAP_SHELL_ZOOMOUT,       "缩小(&O)"
+    IDS_DISKMAP_SHELL_DIROPEN,       "在面板中打开(&O)"
+    IDS_DISKMAP_SHELL_DIRCHANGE,     "更改目录(&D)"
+
+    IDS_DISKMAP_TTIP_TIMECREATE,     "创建:"
+    IDS_DISKMAP_TTIP_TIMEMODIFY,     "修改:"
+    IDS_DISKMAP_TTIP_TIMEACCESS,     "访问:"
+    IDS_DISKMAP_TTIP_SIZEDATA,       "数据大小:"
+    IDS_DISKMAP_TTIP_SIZEREAL,       "实际大小:"
+    IDS_DISKMAP_TTIP_SIZEDISK,       "磁盘大小:"
+    IDS_DISKMAP_TTIP_COUNTFILE,      "文件:"
+    IDS_DISKMAP_TTIP_COUNTDIRS,      "文件夹:"
+
+    IDS_DISKMAP_FORMAT_BYTE0,        "字节"
+    IDS_DISKMAP_FORMAT_BYTE1,        "字节"
+    IDS_DISKMAP_FORMAT_BYTEN,        "字节"
+
+    IDS_DISKMAP_EMPTY_TITLE,         "无内容可显示..."
+    IDS_DISKMAP_EMPTY_FOOTER,        "...此文件夹不包含可映射的文件"
+END

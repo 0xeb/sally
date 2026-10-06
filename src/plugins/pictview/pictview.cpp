@@ -41,10 +41,10 @@ const wchar_t* SCAN_SOURCE = L"<<ScanSource>>";
 const wchar_t* SCANEXTRA = L"<<ScanExtra>>";
 const wchar_t* DELETED = L"<<Deleted>>";
 
-const wchar_t* PLUGIN_NAME_EN = L"PICTVIEW"; // non-translated plugin name, used before loading the language module + for debug stuff
+const wchar_t* PLUGIN_NAME_EN = L"PICTVIEW"; // non-translated plugin name, used before the translated resources are needed + for debug stuff
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 HACCEL HAccel = NULL;
 
 BOOL SalamanderRegistered = FALSE;
@@ -513,10 +513,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // let it load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), PLUGIN_NAME_EN);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // obtain the general Salamander interface
     SalamanderGeneral = salamander->GetSalamanderGeneral();

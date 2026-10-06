@@ -1,0 +1,213 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for undelete. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/undelete/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\undelete.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "取消删除"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,12,12,323,8
+    LTEXT           "",IDC_PROGRESSBAR,35,32,292,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "取消",IDCANCEL,144,54,50,14
+    LTEXT           "总数:",IDC_STATIC_1,12,33,22,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "取消删除"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "选择要分析的磁盘(&D)",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "磁盘镜像(&I)",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,56,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,361,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "浏览(&B)...",IDC_BUTTON_BROWSE,379,178,50,14,WS_GROUP
+    CONTROL         "显示 FAT 分区上的空白簇(&V)",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,184,10
+    CONTROL         "显示存在的文件和目录(&x)",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "显示0字节文件(&z)",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "显示空目录(&e)",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "显示图元文件(&w)",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "估计文件损坏(&f)",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "确定",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "帮助",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "取消删除"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "正在取消删除",IDC_LABEL_UNDELETING,3,11,54,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,61,11,287,8
+    RTEXT           "到",IDC_STATIC_1,3,23,40,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,61,23,287,8
+    RTEXT           "文件:",IDC_STATIC_2,3,41,40,8
+    LTEXT           "",IDC_PROGRESS_FILE,47,40,293,12,NOT WS_GROUP
+    RTEXT           "总数:",IDC_STATIC_3,3,56,40,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,47,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "取消",IDCANCEL,151,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 235, 66
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "损坏的文件名"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "以下文件名的第一个字母无法被恢复。请输入原始字符。",IDC_STATIC_1,7,9,221,8
+    EDITTEXT        IDC_EDIT_FILENAME,7,19,221,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "确定",IDOK,66,45,50,14
+    PUSHBUTTON      "全部(&A)",IDC_BUTTON_ALL,122,45,50,14
+    PUSHBUTTON      "取消",IDCANCEL,178,45,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 257, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "取消删除配置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "用于查看文件的备用临时目录(&T):",IDC_STATIC_1,7,7,163,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,222,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,235,17,16,14,WS_GROUP
+    CONTROL         "始终重复使用 FAT 上以前的簇扫描信息(&R)",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,194,10
+    CONTROL         "当取消删除到相同的逻辑磁盘时不警告(&S)",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,193,10
+    CONTROL         "反删除加密文件到 FAT 或 exFAT 之前不警告(&e)",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,223,10
+    DEFPUSHBUTTON   "确定",IDOK,91,80,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,146,80,50,14
+    PUSHBUTTON      "帮助",IDHELP,201,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 276, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "从备份中恢复加密文件"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "本功能将恢复之前取消删除的加密文件到不支持""加密文件系统(EFS)""的分区，例如 FAT。普通文件(除了 *.bak)将被复制且不改变。",IDC_STATIC_1,7,7,262,16
+    LTEXT           "恢复 %s 到(&R):",IDC_LABEL_SOURCE,7,33,262,8
+    EDITTEXT        IDC_EDIT_TARGET,7,43,244,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,255,43,14,14,WS_GROUP
+    DEFPUSHBUTTON   "确定",IDOK,57,66,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,113,66,50,14
+    PUSHBUTTON      "帮助",IDHELP,169,66,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_LOWMEM, "内存不足。"
+  IDS_ERRORREADINGMFT, "读取 MFT 簇错误。"
+  IDS_MFTRECORDDAMAGED, "读取 MFT 错误: 第一个记录已损坏。"
+  IDS_ROOTNOTFOUND, "找不到根目录。"
+  IDS_VDIRECTORY, "目录%06d"
+  IDS_ALLDELETEDFILES, "(所有删除的文件)"
+  IDS_ERRORNOTNTFS, "内部错误: 卷不是 NTFS。"
+  IDS_ERRORNOTOPEN, "内部错误: 卷没有打开。"
+  IDS_ERROROPENINGVOLUME, "打开卷错误。"
+  IDS_ERRORREADINGBOOT, "读取启动扇区错误。"
+  IDS_ERRORVOLUMETYPE, "不能识别的卷类型，只支持 FAT 12, 16, 32 和 NTFS 卷。"
+  IDS_READINGMFT, "正在读取 MFT..."
+  IDS_ERRORREADINGFAT, "读取 FAT 错误。"
+  IDS_ERRORREADINGDIRCLUSTERS, "读取目录簇错误。"
+  IDS_ERRORNOTFAT, "内部错误: 卷不是 FAT。"
+  IDS_LOADINGFAT, "正在读取 FAT..."
+  IDS_READINGDIRS, "正在读取目录..."
+  IDS_READINGEXISTINGDIRS, "正在读取存在的目录..."
+  IDS_READINGDELETEDDIRS, "正在读取删除的目录..."
+  IDS_SCANNINGVACANTCLUSTERS, "正在扫描空白簇..."
+  IDS_REUSESCANNEDINFO, "你想重新使用之前的簇搜索信息吗？"
+  IDS_RELOADINGCLUSTERS, "正在重新载入之前找到的簇..."
+  IDS_FLOPPY350, "3.5 软盘"
+  IDS_FLOPPY525, "5.25 软盘"
+  IDS_FLOPPY800, "8.0 软盘"
+  IDS_COMPACT_DISK, "光盘"
+  IDS_LOCAL_DISK, "本地磁盘"
+  IDS_REMOVABLE_DISK, "可移动磁盘"
+  IDS_ANALYZINGDIRS, "正在分析目录..."
+  IDS_INCOMPLETEMFT, "取消删除无法扫描整个 MFT (主文件表)。你想显示部分结果吗？"
+  IDS_BITMAPNOTFOUND, "无法在此卷上定位 $Bitmap.文件损坏估测中止。"
+  IDS_BITMAPNOSTREAM, "无法定位文件 $Bitmap 的默认流。文件损坏估测中止。"
+  IDS_LOWMEMBITMAP, "没有足够内存来加载簇位图文件。文件损坏估测将被中止。"
+  IDS_ERRORREADINGBMP, "读取 $Bitmap 文件错误。文件损坏估测中止。"
+  IDS_BITMAPISEMPTY, "$位图的大小为零。文件损坏评估中止。"
+}
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "取消删除"
+  IDS_DESCRIPTION, "恢复从 FAT 或 NTFS 分区删除的文件。"
+  IDS_ABOUTTITLE, "关于插件"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{图元文件}"
+  IDS_PATHDISK, "路径必须包含磁盘。"
+  IDS_PATHFILE, "路径指向文件。无法打开文件。"
+  IDS_PATHNOTFOUND, "路径未找到。"
+  IDS_IMAGENOTFOUND, "指定的文件未找到。"
+  IDS_ERROROPENINGPROGRESS, "打开进度对话框错误。"
+  IDS_VOLENUMERATE, "模拟系统卷错误。"
+  IDS_OPENINGVOLUME, "正在打开卷..."
+  IDS_SCANNINGFOUND, "{!}正在扫描空白簇... (%d 目录簇{}已找到)"
+  IDS_ALWAYSCHOOSEYES, "总是选择""是"" (如果有必要，你可以在""配置""对话框中重置此选项)"
+  IDS_PATHTOOLONG, "目标路径太长"
+  IDS_QUESTION, "总是"
+  IDS_WANTCANCEL, "你要取消此操作吗？"
+  IDS_BADPATH, "不支持取消删除到压缩包或插件文件系统。"
+  IDS_ERROR, "错误" // title of error messages
+  IDS_VIEW, "查看" // the function "F3"
+  IDS_TEMPDIR, "要查看 %c 上的文件: 你需要在 %c 以外的不同的逻辑磁盘上指定一个备用临时目录:"
+  IDS_WAIT, "正在取消删除文件到临时目录，请稍等"
+  IDS_ENCRYPTEDWARNING, "目标卷不支持加密文件系统(EFS)。\n\n加密文件将用备份格式反删除，今后可以用命令 ""插件/取消删除/从备份恢复加密文件"" 来恢复备份文件到 NTFS 分区。"
+  IDS_DONTSHOWAGAIN, "不要再次显示此消息"
+  IDS_CHOOSETEMPDIR, "选择备用临时目录:"
+  IDS_SAMEPARTITION, "似乎你正在取消删除到被删除文件相同的逻辑磁盘。你应该总是取消删除到不同的分区，否则你正在反删除的文件可能会被它们自己覆盖，或者你会丢失其它被删除的文件。\n\n提示: 如果你没有多个分区，你也可以取消删除到软盘或U盘。"
+  IDS_UNDELETECMD, "恢复删除的文件和目录(&R)..."
+  IDS_ERRORENCRYPTED, "不能取消删除加密文件: "
+  IDS_RESTORECMD, "从备份恢复加密文件(&E)..."
+  IDS_CANNOTVIEW, "不能查看文件 - 临时目录不支持加密文件系统(EFS)"
+  IDS_CHOOSETARGET, "选择目标目录"
+  IDS_RESTORE, "恢复" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "正在恢复" // label inside the progress dialog
+  IDS_READINGTREE, "正在读取目录树..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "目标卷不支持加密文件系统(EFS)。"
+  IDS_VOLUME_MOUNT, "挂载点"
+  IDS_VOLUME_NAME, "名称"
+  IDS_VOLUME_FORMAT, "格式"
+  IDS_VOLUME_SIZE, "大小"
+  IDS_VOLUME_FREE, "可用"
+  IDS_VOLUME_FREEPROC, "% 可用"
+  IDS_VOLUME_VOLID, "GUID 路径"
+  IDS_CONDITION, "条件"
+  IDS_CONDITIONDESC, "文件损坏估测"
+  IDS_CONDITION_GOOD, "好"
+  IDS_CONDITION_FAIR, "一般"
+  IDS_CONDITION_POOR, "差"
+  IDS_CONDITION_LOST, "丢失"
+  IDS_CONDITION_UNKNOWN, "未知"
+  IDS_UNDELETEINCHDRVMENU, "\t取消删除"
+  IDS_PARTIALRECOVER, "以下文件不能被完全恢复: %s\n\n你想只恢复文件的一部分吗?"
+  IDS_PARTIALRECOVER_DONTASK, "下次选择相同答案"
+  IDS_ERRORRECOVER, "恢复文件 %s 错误"
+}

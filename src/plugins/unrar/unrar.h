@@ -238,7 +238,7 @@ public:
 };
 
 extern HINSTANCE DLLInstance; // handle to SPL - language-independent resources
-extern HINSTANCE HLanguage;   // handle to SLG - language-dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 
 // this is sufficient for now instead of a configuration
 #define OP_SKIPCONTINUED 0x01    // should we skip all files that start on the previous volume?

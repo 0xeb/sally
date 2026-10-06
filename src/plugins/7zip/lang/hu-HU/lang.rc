@@ -1,0 +1,197 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for 7zip. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/7zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\7zip.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 23, 38, 220, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "7-Zip beállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Panel beállítások",IDC_STATIC_1,5,6,58,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,65,10,152,1
+    CONTROL         "Beállítás&ok ablak mutatása tömörítés előtt",IDC_CFG_SHOWEXTENDEDOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,19,196,10
+    CONTROL         "Kiegészítő &információ archívum listázásakor",IDC_CFG_EXTENDEDLISTINFO,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,31,157,10
+    CONTROL         "Tömörített",IDC_CFG_LISTINFOPACKEDSIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,43,60,10
+    CONTROL         "Mód",IDC_CFG_LISTINFOMETHOD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,55,38,10
+    LTEXT           "Alap tömörítési paraméterek",IDC_STATIC_3,5,70,97,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,104,74,113,1
+    LTEXT           "&Tömörítési szint:",IDC_STATIC_5,10,85,58,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,69,83,102,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Tömörítési &mód:",IDC_STATIC_6,10,103,57,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,69,101,102,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Szótár m&érete:",IDC_STATIC_7,10,121,52,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,69,119,102,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Szó mé&rete:",IDC_STATIC_8,10,139,56,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,69,137,102,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Tömör archívum létrehozá&sa",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,155,108,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,3,175,214,1
+    DEFPUSHBUTTON   "OK",IDOK,53,181,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,108,181,50,14
+    PUSHBUTTON      "Súgó",IDHELP,163,181,50,14
+END
+
+IDD_NEWARCHIVE DIALOGEX 27, 37, 276, 224
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Új archívum létrehozása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archívum:",IDC_STATIC_1,16,7,36,8
+    LTEXT           "",IDC_NA_ARCHIVE,53,7,214,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,8,21,260,1
+    CONTROL         "&Fájlok titkosítása",IDC_NA_ENCRYPTFILES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,28,70,10
+    LTEXT           "&Jelszó:",IDC_NA_PASSWORD_TXT,105,29,24,8
+    EDITTEXT        IDC_NA_PASSWORD,148,27,100,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Jelszó újr&a:",IDC_NA_CONFIRMPASSWORD_TXT,105,46,39,8
+    EDITTEXT        IDC_NA_CONFIRMPASSWORD,148,44,100,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Tömörítési paraméterek",IDC_STATIC_3,8,67,82,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,92,71,176,1
+    LTEXT           "&Tömörítési szint:",IDC_STATIC_5,16,85,58,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,79,83,104,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Tömörítési &mód:",IDC_STATIC_6,16,103,57,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,79,101,104,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Sz&ótár mérete:",IDC_STATIC_7,16,121,52,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,79,119,104,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Szó mérete:",IDC_STATIC_8,16,139,43,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,79,137,104,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "T&ömör archívum létrehozása",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,159,108,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,8,181,260,1
+    CONTROL         "Ne mutassa ezt az ablakot újból (a beállítások ablakban mó&dosítható)",IDC_NA_NOTAGAIN,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,187,246,12
+    PUSHBUTTON      "&Beállítás...",IDC_SHOW_CONFIG,10,204,50,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,106,204,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,161,204,50,14
+    PUSHBUTTON      "Súgó",IDHELP,216,204,50,14
+END
+
+IDD_ENTERPASSWORD DIALOGEX 6, 15, 257, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "7-Zip jelszó megadása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,16,12,20,20
+    LTEXT           "Titkosított fájl. Adja meg a dekódolás jelszavát.",IDC_STATIC_1,48,12,204,8
+/*    LTEXT           "File:",IDC_STATIC_2,48,26,17,8
+    LTEXT           "",IDC_FILE,65,26,175,8 */
+    LTEXT           "Jelszó:",IDC_STATIC_3,48,40,35,8
+    EDITTEXT        IDC_PASSWORD,87,38,151,12,ES_PASSWORD | ES_AUTOHSCROLL
+/*
+ // preparation for skip and skip all
+    DEFPUSHBUTTON   "OK",IDOK,12,63,50,14
+    PUSHBUTTON      "Skip",IDC_SKIP,72,63,50,14
+    PUSHBUTTON      "Skip all",IDC_SKIPALL,132,63,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,192,63,50,14
+*/    
+    DEFPUSHBUTTON   "OK",IDOK,132,63,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,192,63,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME,             "7-Zip"
+  IDS_ABOUT,                  "Plugin névjegy"
+  IDS_PLUGIN_DESCRIPTION,     "7-Zip archívumok létrehozása, böngészése és kibontása."
+  IDS_INSUFFICIENT_MEMORY,    "Kevés memória."
+  IDS_CANT_LOAD_LIBRARY,      "A 7za.dll nem tölthető be."
+  IDS_CANT_GET_CRATEOBJECT,   "A CreateObject metódus nem érhető el."
+  IDS_CANT_GET_CLASS_OBJECT,  "Az objektum osztály nem érhető el."
+  IDS_CANT_OPEN_ARCHIVE,      "A(z) '%s' archívum nem nyitható meg."
+  IDS_CANT_OPEN_ARCHIVE_PWD,  "A(z) '%s' archívum nem nyitható meg.\nTalán rossz jelszó lett megadva."
+  IDS_ERROR,                  "Belső hiba."
+  IDS_PACKING_ARCHIVE,        "7-Zip archívum tömörítése"
+  IDS_UNPACKING_ARCHIVE,      "7-Zip archívum kibontása"
+  IDS_UPDATING_ARCHIVE,       "7-Zip archívum frissítése"
+  IDS_TESTING_ARCHIVE,        "7-Zip archívum tesztelése"
+  IDS_TESTING_ARCHIVE_NAME    "'%s' archívum tesztelése..."
+  IDS_READING_DIRTREE,        "Könyvtárfa olvasása..."
+  IDS_CANT_CREATE_ARCHIVE,    "Az archívum nem hozható létre."
+  IDS_TESTARCHIVE,            "Archívum tesztelése"
+  IDS_TESTARCHIVECORRUPTED,   "A(z) '%s' archívum sérült."
+  IDS_TESTARCHIVEOK,          "A(z) '%s' archívum jó."
+  IDS_INCORRECTPASSWORD,      "Helytelen jelszó"
+  IDS_INCORRECTPASSWORDBODY,  "A jelszó helytelen. Adja meg újra. A jelszó betűit pontosan kell megadni. Nézze meg,\nhogy a CapsLock nincs-e véletlenül benyomva."
+  IDS_PASSWORDSNOTMATCH,      "A megadott jelszavak nem egyeznek."
+  IDS_EMPTYPASSWORD,          "A jelszónak legalább egy karakter hosszúnak kell lennie."
+  IDS_UPDATE_NOT_SUPPORTED,   "A frissítési művelet nem támogatott ennél az archívumnál."
+  IDS_CANT_MOVE_TMPARCHIVE,   "A(z) '%s' ideiglenes archívum nem helyezhető át."
+  IDS_CANT_DELETE_TMPARCHIVE, "A(z) '%s' ideiglenes archívum nem törölhető."
+  IDS_7Z_UPDATE_ERROR,        "Hiba lépett fel az archívum frissítésekor.\n\nA hiba nem az Sally 7zip plugin-ban van. A probléma a 7za.dll fájlban van,\nszóval NE küldjön hibajelentést, tudunk a problémáról."
+  IDS_7Z_SOLID_DELETE_UNSUP,  "A tömör archívumon belüli fájltörlés nem támogatott."
+  IDS_CANT_UPDATE_ARCHIVE,    "A(z) '%s' archívum nem frissíthető."
+  IDS_CANT_CREATE_TMPFILE,    "Az ideiglenes fájl nem hozható létre."
+//  IDS_CANT_CREATEMUTEX,       "Cannot create mutex."
+  IDS_ARCHIVE_CHANGED,        "A(z) '%s' archívum megváltozott. Az archívum újranyílik a panelen."
+  IDS_DELETE_ERROR,           "Törlési hiba"
+  IDS_ADD_FILES_TO_ARCHIVE,   "Fájl adása az archívumhoz"
+  IDS_CREATE_NEW_ARCHIVE,     "Új archívum létrehozása"
+  IDS_REMOVING_FILES,         "Fájlok törlése..."
+  IDS_READING_ARCHIVEITEMS,   "Archív elemek olvasása..."
+  IDS_UNPACKING,              "Kicsomagolás..."
+  IDS_PACKING,                "Tömörítés..."
+  IDS_REMOVING,               "Törlés..."
+  IDS_UPDATING,               "Frissítés..."
+  IDS_CANCELING_OPERATION,    "Művelet megszakítása, kérem várjon..."
+  IDS_UNSUPPORTED_METHOD,     "Nem támogatott mód."
+  IDS_CRC_FAILED,             "CRC hiba."
+  IDS_UNKNOWN_ERROR,          "Ismeretlen hiba."
+  IDS_DATA_ERROR,             "Adathiba lépett fel a(z) '%s' fájl kibontásakor."
+  IDS_DATA_ERROR_PWD,         "Adathiba lépett fel a(z) '%s' fájl kibontásakor.\nTalán rossz jelszót adott meg."
+  IDS_BTN_DELETE,             "&Törlés"
+  IDS_BTN_DELETE_ALL,         "Mind törö&l"
+  IDS_BTN_KEEP,               "Meg&hagy"
+  IDS_BTN_KEEP_ALL,           "Mind m&eghagy"
+  IDS_ERROR_PROCESSING_FILE,  "Hiba a(z) '%s' fájl feldolgozásakor.\n\nSzeretné törölni vagy meghagyja ezt a fájlt?"
+  IDS_ERROR_PROCESSING_FILE_PWD, "Hiba a fájl feldolgozásakor: '%s'.\nTalán rossz jelszó lett megadva.\n\nTörölni akarja vagy megtartja ezt a fájlt?"
+  IDS_OVERWRITE_FILE,         "Fájl felülírása";
+  IDS_READONLY_ARCHIVE,       "Az archívum írásvédett. Előbb szüntessem meg az írásvédettséget."
+  IDS_CANT_REMOVE_DIRECTORY,  "A mappa nem törölhető: '%s'"
+  IDS_CANT_READ_ARCHIVE       "Archívum olvasási hiba."
+  IDS_CANT_READ               "Bementi fájl olvasási hiba."
+  IDS_CANT_WRITE              "{!}Nem sikerült %d bájtot{|1|} írni."
+  IDS_BTN_RETRY               "Újra"
+  IDS_BTN_ABORT               "Megszakít"
+  IDS_STORE,                  "Raktár"
+  IDS_FASTEST,                "Leggyorsabb"
+  IDS_FAST,                   "Gyors"
+  IDS_NORMAL,                 "Normál"
+  IDS_MAXIMUM,                "Maximális"
+  IDS_ULTRA,                  "Ultra"
+  IDS_METHOD_LZMA,            "LZMA"
+  IDS_METHOD_LZMA2,           "LZMA2"
+  IDS_METHOD_PPMD,            "PPMd"
+  IDS_PACK_UPDATE_ERROR,      "Hiba lépett fel az archívum tömörítése/frissítése során."
+  IDS_UNPACK_ERROR,           "Hiba lépett fel az archívum frissítése során."
+  IDS_TEST_ERROR,             "Hiba lépett fel az archívum tesztelése során."
+  IDS_UNSUPPORTED_ARCHIVE,    "Nem támogatott vagy ismeretlen típusú archívum.\nA fájl talán komolyan megsérült."
+  IDS_7Z_FATAL_ERROR          "Az archívum végzetes hiba miatt nem hozható létre."
+  IDS_7Z_UPDATE_UNKNOWN_ERROR "Az archívum ismeretlen hiba miatt nem lett frissítve: %x."
+  IDS_7Z_CREATE_UNKNOWN_ERROR "Az archívum ismeretlen hiba miatt nem lett létrehozva: %x."
+//  IDS_7Z_SOLID_UPDATE_UNSUP   "Updating files in solid archives is not supported."
+  IDS_LISTINFO_PAKEDSIZE      "Tömörített"
+  IDS_LISTINFO_PAKEDSIZE_DESC "A fájl tömörített mérete"
+  IDS_LISTINFO_METHOD         "Mód"
+  IDS_LISTINFO_METHOD_DESC    "Tömörítési mód"
+  IDS_ARCLOCK_ERROR           "Archívumi zár hiba"
+  IDS_ERRADDFILE_TOOLONG,     "Egy vagy több fájl nem adható hozzá a listához. Túl hosszú a teljes elérési út.\nNéhány mappa vagy fájl talán hiányozni fog az archívum listájából."
+  IDS_ERRADDDIR_TOOLONG,      "Egy vagy több fájl nem adható hozzá a listához. Túl hosszú a teljes elérési út.\nNéhány mappa vagy fájl talán hiányozni fog az archívum listájából."
+  IDS_NAMEISTOOLONG,          "A(z) ""%s"" név túl hosszú a teljes elérési úttal.\n\nElérés: %s"
+}

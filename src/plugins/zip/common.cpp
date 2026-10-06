@@ -71,7 +71,7 @@ const CExtendedOptions DefOptions;
 CConfiguration Config;
 
 HINSTANCE DLLInstance = NULL; // handle of the SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle of the SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
 #ifndef SSZIP
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)

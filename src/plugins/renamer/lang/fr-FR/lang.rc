@@ -1,0 +1,482 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for renamer. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/renamer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\renamer.rh2"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_RENAME DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Renommer par lots"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_MENUSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,368,1
+    LTEXT           "Mas&que:",IDC_STATIC_1,16,11,51,8
+    COMBOBOX        IDC_MASK,72,9,93,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Inclure les sous-&dossiers",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,10,95,12
+    PUSHBUTTON      "&Renommer",IDOK,301,9,60,14
+    CONTROL         "Mode manue&l",IDC_MANUAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,27,58,12
+    CONTROL         "",IDS_MANSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,66,32,296,1
+    EDITTEXT        IDE_MANUAL,6,41,355,138,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Nou&veau nom:",IDS_LABELNEWNAME,16,43,51,8
+    COMBOBOX        IDC_NEWNAME,72,41,274,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_NEWNAME,349,41,12,12
+    LTEXT           "Remplacer",IDS_LABELREPLACE,6,60,38,8
+    CONTROL         "",IDS_REPLACESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,46,64,316,1
+    LTEXT           "Rec&hercher:",IDS_LABELSEARCHFOR,16,77,51,8
+    COMBOBOX        IDC_SEARCH,72,75,274,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_SEARCH,349,75,12,12
+    LTEXT           "Re&mplacer par:",IDS_LABELREPLACEWITH,16,94,54,8
+    COMBOBOX        IDC_REPLACE,72,92,274,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_REPLACE,349,92,12,12
+    CONTROL         "Sensi&ble à la casse",IDC_CASESENSITIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,72,109,76,12
+    CONTROL         "Une se&ule fois par nom",IDC_GLOBAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,72,123,92,12
+    CONTROL         "Mot&s entiers",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,109,60,12
+    CONTROL         "Expression ré&gulière",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,123,80,12
+    CONTROL         "&Inclure l'extension",IDC_EXCLUDEEXT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,274,109,73,12
+    LTEXT           "Changer la casse",IDS_LABELCASE,6,139,59,8
+    CONTROL         "",IDS_CHANGECASESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,67,143,295,1
+    LTEXT           "Nom du &fichier:",IDS_LABELNAME,16,155,55,8
+    COMBOBOX        IDC_NAMECASE,72,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "E&xtension:",IDS_LABELEXT,186,155,38,8
+    COMBOBOX        IDC_EXTCASE,236,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "I&nclure le chemin",IDC_PATHPART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,72,170,90,12
+    LTEXT           "&Prévisualiser:",IDS_PREVIEW,6,182,51,8
+    RTEXT           "",IDS_COUNT,100,182,261,8
+    CONTROL         "",IDL_PREVIEW,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,0,192,368,68
+END
+
+IDD_CUT DIALOGEX 9, 20, 254, 88
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ajouter une sous-chaîne"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Sous-chaîne de:",IDC_STATIC_1,7,9,57,8
+    COMBOBOX        IDC_CUTFROM,89,7,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Commencer en position",IDC_STATIC_2,7,28,81,8
+    EDITTEXT        IDE_START,89,26,48,12,ES_AUTOHSCROLL
+    LTEXT           "par rapport à",IDC_STATIC_3,146,28,47,8
+    COMBOBOX        IDC_START,199,26,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Terminer en position",IDC_STATIC_4,7,47,72,8
+    EDITTEXT        IDE_END,89,45,48,12,ES_AUTOHSCROLL
+    LTEXT           "par rapport à",IDC_STATIC_5,146,47,47,8
+    COMBOBOX        IDC_END,199,45,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,75,67,50,14
+    PUSHBUTTON      "Annuler",IDCANCEL,129,67,50,14
+END
+
+IDD_COUNTER DIALOGEX 9, 20, 174, 130
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ajouter un compteur"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Commencer à:",IDC_STATIC_1,7,9,52,8
+    EDITTEXT        IDE_START,72,7,95,12,ES_AUTOHSCROLL
+    LTEXT           "&Pas:",IDC_STATIC_2,7,25,17,8
+    EDITTEXT        IDE_STEP,72,23,95,12,ES_AUTOHSCROLL
+    LTEXT           "&Base:",IDC_STATIC_3,7,41,21,8
+    COMBOBOX        IDC_BASE,72,39,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Largeur &minimale:",IDC_STATIC_4,7,57,64,8
+    EDITTEXT        IDE_MINWIDTH,72,55,95,12,ES_AUTOHSCROLL
+    LTEXT           "Compléter a&vec:",IDC_STATIC_5,7,73,63,8
+    COMBOBOX        IDC_FILL,72,71,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Aligner à gauche",IDC_LEFT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,90,76,12
+    DEFPUSHBUTTON   "OK",IDOK,35,109,50,14
+    PUSHBUTTON      "Annuler",IDCANCEL,89,109,50,14
+END
+
+IDD_DEFINESET DIALOGEX 9, 20, 269, 192
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Définir un ensemble de caractères"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Saisissez les caractères de l'&ensemble:",IDC_STATIC_1,7,7,131,8
+    EDITTEXT        IDE_SET,7,17,255,12,ES_AUTOHSCROLL
+    LTEXT           "Astuce:\n\nUtilisez '-' afin de désigner une série de caractères (ex. A-Z).\n\nPour inclure le caractère '-' placez-le en premier (ex. -AZ).",IDC_STATIC_2,7,36,255,40
+    LTEXT           "Pour inclure le caractère ']' placez-le en premier.\n\nPour inclure le caractère '^' dans l'ensemble, placez-le n'importe où sauf en première position.",IDC_STATIC_3,7,84,255,32
+    LTEXT           "Pour inclure une classe de caractères POSIX utilisez [:classe:], en remplaçant ""classe"" par l'un des mots suivants: alpha, alnum, ascii, blank, cntrl, digit, graph, lower, print, punct, space, upper, word, xdigit.\n\nPour inclure des antislashs, utilisez \\\\.",IDC_STATIC_4,7,124,255,40
+    DEFPUSHBUTTON   "OK",IDOK,82,171,50,14
+    PUSHBUTTON      "Annuler",IDCANCEL,136,171,50,14
+END
+
+IDD_SUBEXPRESSION DIALOGEX 9, 20, 203, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Spécifier une sous-expression"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Numéro de sous-expression:",IDC_STATIC_1,7,9,98,8
+    COMBOBOX        IDC_NUMBER,106,7,90,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Astuce: utilisez 0 pour spécifier une expression entière.",IDC_STATIC_2,7,23,187,8
+    LTEXT           "&Casse:",IDC_STATIC_3,7,37,86,8
+    COMBOBOX        IDC_CASE,106,35,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,49,57,50,14
+    PUSHBUTTON      "Annuler",IDCANCEL,103,57,50,14
+END
+
+IDD_PROGRESS DIALOGEX 6, 15, 194, 60
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Renommage"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDS_MESSAGE,7,7,180,8
+    LTEXT           "",IDS_PROGRESS,7,22,180,10,0,WS_EX_STATICEDGE
+    DEFPUSHBUTTON   "Annuler",IDCANCEL,72,39,50,14
+END
+
+IDD_COMMAND DIALOGEX 9, 20, 368, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Execute une commande Shell"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Commande:",IDC_STATIC_1,7,7,82,8
+    COMBOBOX        IDC_COMMAND,7,17,354,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,257,37,50,14
+    PUSHBUTTON      "Annuler",IDCANCEL,311,37,50,14
+END
+
+IDD_ERROR DIALOGEX 9, 20, 386, 260
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Erreur lors de la commande Shell"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "La commande peut avoir échoué.",IDC_STATIC_1,7,7,218,8
+    LTEXT           "Ligne de commande:",IDC_STATIC_2,7,22,74,8
+    EDITTEXT        IDE_COMMAND,81,22,298,8,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    LTEXT           "Code de retour:",IDC_STATIC_3,7,34,74,8
+    LTEXT           "",IDS_EXITCODE,83,34,296,8
+    LTEXT           "&Sortie d'erreur:",IDC_STATIC_4,7,46,82,8
+    EDITTEXT        IDE_STDERR,7,56,372,176,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON   "Ignorer",IDOK,275,239,50,14
+    PUSHBUTTON      "Annuler",IDCANCEL,329,239,50,14
+END
+
+IDD_CONFIG DIALOGEX 45, 31, 257, 160
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Options avancées du renommeur"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Réglages de l'éditeur externe pour le mode manuel:",IDC_STATIC_1,7,7,240,8
+    LTEXT           "&Commande:",IDC_STATIC_2,14,21,52,8
+    EDITTEXT        IDE_COMMAND,70,19,164,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_BROWSE,237,19,13,12,WS_GROUP
+    LTEXT           "&Arguments:",IDC_STATIC_3,14,37,52,8
+    EDITTEXT        IDE_ARGUMENTS,70,35,164,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ARGHELP,237,35,13,12,WS_GROUP
+    LTEXT           "&Dossier initial:",IDC_STATIC_4,14,53,56,8
+    EDITTEXT        IDE_INITDIR,70,51,164,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_INITDIRHELP,237,51,13,12,WS_GROUP
+    LTEXT           "Police du mode manuel:",IDC_STATIC_5,7,74,113,8
+    PUSHBUTTON      "Chan&ger",IDB_FONT,14,84,50,14,WS_GROUP
+    LTEXT           "Confirmations:",IDC_STATIC_6,7,109,60,8
+    CONTROL         "Fermeture de la fenêtre principale avec la touche &Echap.",IDC_CONFIRMESCCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,118,204,12
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,7,138,243,1
+    DEFPUSHBUTTON   "OK",IDOK,92,142,50,14,WS_GROUP
+    PUSHBUTTON      "Annuler",IDCANCEL,146,142,50,14
+    PUSHBUTTON      "Aide",IDHELP,200,142,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Renamer"
+  IDS_DESCRIPTION, "Puissant outil de renommage par lots avec prévisualisation en temps-réel."
+  IDS_ABOUT, "À propos du plugin"
+  IDS_RENAMERERR, "Erreur du Renamer"
+  IDS_LOWMEM, "Mémoire insuffisante."
+  IDS_PLUGMENU_RENAME, "&Renommer par lots..."
+  IDS_PLUGMENU_UNDO, "&Annuler..."
+  IDS_RENAME, "&Renommer"
+  IDS_VALIDATE, "&Valider"
+  IDS_ORIGNAME_COLUMN, "Nom original"
+  IDS_NEWNAME_COLUMN, "Nouveau nom"
+  IDS_SIZE_COLUMN, "Taille"
+  IDS_DATE_COLUMN, "Date"
+  IDS_TIME_COLUMN, "Heure"
+  IDS_PATH_COLUMN, "Chemin"
+
+  // menu
+  IDS_MENU_FILE, "&Commandes"
+  IDS_MENU_VIEW, "Vu&e"
+  IDS_MENU_OPTIONS, "&Options"
+  IDS_MENU_HELP, "&Aide"
+  IDS_MENU_RENAME, "&Renommer\tAlt+R"
+  IDS_MENU_VALIDATE, "&Valider\tCtrl+I"
+  IDS_MENU_EXIT, "&Quitter\tAlt+F4"
+  IDS_MENU_SORTOLD, "Trier par Nom &original\tCtrl+F1"
+  IDS_MENU_SORTNEW, "Trier par &Nouveau nom\tCtrl+F1"
+  IDS_MENU_SORTSIZE, "Trier par &Taille\tCtrl+F2"
+  IDS_MENU_SORTTIME, "Trier par &Heure\tCtrl+F3"
+  IDS_MENU_SORTPATH, "Trier par &Chemin\tCtrl+F4"
+  IDS_MENU_FILENAMES, "Renommer les &noms de fichiers\tCtrl+N"
+  IDS_MENU_RELATIVEPATH, "&Renommer les chemins relatifs\tCtrl+R"
+  IDS_MENU_FULLPATH, "Renommer les chemins a&bsolus\tCtrl+F"
+  IDS_MENU_FONT, "Police du mode &manuel..."
+  IDS_MENU_LAST, "Dernière uti&lisation\tCtrl+L"
+  IDS_MENU_RESET, "Ré&initialiser\tCtrl+D"
+  IDS_MENU_REGEXP, "Expressions &régulières"
+  IDS_MENU_CUSTOMFONT, "Utiliser la fonte &personnelle..."
+  IDS_MENU_AUTOFONT, "Utiliser la police par &défaut"
+  IDS_MENU_REMOVESOURCEPATH, "Supprimer les répertoire &vides"
+  IDS_MENU_UNDO, "&Annuler\tCtrl+U"
+  IDS_MENU_EDIT, "Edi&ter"
+  IDS_MENU_STORELIST, "&Copier la liste dans le presse-papier\tF2"
+  IDS_MENU_LOADLIST, "C&harger la liste depuis le presse-papier\tF3"
+  IDS_MENU_EDITLIST, "&Ouvrir la liste dans l'éditeur externe...\tF4"
+  IDS_MENU_FILTER, "&Filtrer la liste avec une commande Shell...\tF5"
+  IDS_MENU_ALLFILES, "To&us les fichiers\tF6"
+  IDS_MENU_RENAMED, "Fichiers &renommés avec succès\tF7"
+  IDS_MENU_NOTRENAMED, "Fichiers &non renommés\tF8"
+  IDS_MENU_ADVANCED, "&Avancé..."
+  IDS_MENU_BATCHRENDLG, "&Dialogue de renommage par lots\tF1"
+
+  IDS_VAR_ORIGNAME, "$(NomOriginal)"
+  IDS_CASE_DONTCHANGE, "Ne pas changer"
+  IDS_CASE_LOWER, "Minuscules"
+  IDS_CASE_UPPER, "Majuscules"
+  IDS_CASE_MIXED, "Casse mixte"
+  IDS_INVALIDMASK, "Masque invalide."
+  IDS_TOOLONGPATH, "Impossible de lire le dossier: nom de chemin trop long"
+  IDS_ERRREADDIR, "Impossible de lire le dossier."
+  IDS_ERROR, "Erreur"
+  IDS_DIRTEXT, "DIR"
+  IDS_CANCELCNFRM, "Voulez-vous annuler cette opération ?"
+  IDS_QUESTION, "Question"
+  IDS_VAR_ORIGINALNAME, "Nom original"
+  IDS_VAR_DRIVE, "Lecteur"
+  IDS_VAR_PATH, "Chemin"
+  IDS_VAR_RELATIVEPATH, "Chemin relatif"
+  IDS_VAR_NAME, "Nom"
+  IDS_VAR_NAMEPART, "Nom de fichier"
+  IDS_VAR_EXTPART, "Extension"
+  IDS_VAR_SIZE, "Taille"
+  IDS_VAR_TIME, "Heure"
+  IDS_VAR_DATE, "Date"
+  IDS_VAR_COUNTER, "Compteur..."
+  IDS_VAR_LOWER, "Minuscules"
+  IDS_VAR_UPPER, "Majuscules"
+  IDS_VAR_MIXED, "Casse mixte"
+  IDS_VAR_STRIPDIA, "Supprimer les Diacritics"
+  IDS_VAR_CUT, "Sous-chaîne..."
+  IDS_LEFT, "début"
+  IDS_RIGHT, "fin"
+  IDS_BADCUTOFFSET, "Merci de spécifier une valeur positive."
+  IDS_DECIMAL, "Décimal"
+  IDS_HEX_LOWER, "Hexadécimal (abcdef)"
+  IDS_HEX_UPPER, "Hexadécimal (ABCDEF)"
+  IDS_FILL_SPACES, "Espaces"
+  IDS_FILL_ZEROS, "Zéros"
+  IDS_FILL_UNDERSCORES, "Sous-tirets"
+
+  IDS_EXP_UNMATCHEDPAR, "Un nom de variable doit terminer par ')'."
+  IDS_EXP_VARNOTFOUND, "Variable introuvable."
+  IDS_EXP_UNEXPECTEDCHAR, "Nom de variable attendu entre parenthèses ou précédé du caractère '$'."
+  IDS_EXP_SMALLBUFFER, "La chaîne étendue est trop large."
+  IDS_EXP_TRAILINGDOLLAR, "Fin de chaîne inattendue, le caractère '$' doit être suivi d'un nom de variable ou du caractère '$'."
+  IDS_EXP_EMPTYSTR, "Chaîne vide non autorisée ici."
+  IDS_EXP_UNEXPECTARG, "Argument non attendu ici."
+  IDS_EXP_EXPECTCUTORCASE, "Spécification de casse attentue ('minuscules', 'majuscules', 'casse mixe', ou 'diacritics') ou coupe de nom (deux nombres entiers)."
+  IDS_EXP_EXPECTENDCUT, "Spécification d'une coupe de nom attendue (nombre entier)."
+  IDS_EXP_UNEXPECTEDARGUMENT, "Argument inattendu."
+  IDS_EXP_MISTIMEFORMAT, "Format d'heure manquant."
+  IDS_EXP_INVALIDTIMEFMT, "Format d'heure incorrect."
+  IDS_EXP_MISDATEFORMAT, "Format de date manquant"
+  IDS_EXP_INVALIDDATEFMT, "Format de date incorrect."
+  IDS_EXP_TOOMUCHARGUMENTS, "Trop d'arguments."
+  IDS_EXP_EXPECTSTART, "Début de compteur attendu (nombre entier)."
+  IDS_EXP_EXPECTSTEP, "Pas du compteur attendu (nombre réel)."
+  IDS_EXP_EXPECTBASEALIGNWIDTH, "Spécification de base (parmis 'dxX'), alignment ('l') ou largeur (nombre entier naturel) attendue."
+  IDS_EXP_EXPECTALIGNWIDTH, "Spécification d'alignement ('l') ou de largeur (nombre entier positif) attendue."
+  IDS_EXP_EXPECTWIDTH, "Spécification de largeur attendue (nombre entier positif)"
+  IDS_EXP_EXPECTFILL, "Spécification du caractère de remplissage attendu"
+
+  IDS_NEWNAMEERR, "<Erreur de nouveau nom: %s>"
+  IDS_TRANSFERERROR, "<Valeur invalide dans certaines entrées>"
+  IDS_REGEXPERR, "<Erreur d'expression régulière: %s>"
+  IDS_BMERR, "<Erreur d'algorithme Boyer-Moore: %s>"
+  IDS_GENERICERR, "<Erreur: %s>"
+  IDS_REPLACEERR, "<Erreur de replacement de motif: %s>"
+
+  IDS_REP_EXPCLOSEPAR1, "Parenthèse fermante ou spécification de casse attendue ('minuscules', 'majuscules', 'casse mixe', ou 'diacritics')."
+  IDS_REP_EXPCLOSEPAR2, "Parenthèse fermante attendue."
+  IDS_REP_EXPCLOSEPAR3, "Parenthèse fermante ou caractère ':' suivi d'une spécification de casse attendu ('minuscules', 'majuscules', 'casse mixe', or 'diacritics')."
+  IDS_REP_BADREF, "Référence vers une sous-expression indéfinie."
+  IDS_EXP_EXPECTSUBNUM1, "Numéro de sous-expression attendu"
+  IDS_EXP_EXPECTSUBNUM2, "Numéro de sous-expression attendu, numéro de sous-expression entre parenthèses ou caractère '$'."
+  IDS_EXP_TRAILINGBACKSLASH, "Fin de chaîne inattendue, un anti-slash ne peut terminer une chaîne."
+
+  IDS_REENOERROR, "Pas d'erreur."
+  IDS_REELOWMEMORY, "Quantité de mémoire faible."
+  IDS_REEEMPTY, "L'expression régulière est vide."
+  IDS_REETOOBIG, "L'expression régulière est trop grande."
+  IDS_REETOOMANYPARENTHESISES, "Trop de ()."
+  IDS_REEUNMATCHEDPARENTHESIS, "Non apparié ()."
+  IDS_REEOPERANDCOULDBEEMPTY, "L'opérande *+ peut être vide."
+  IDS_REENESTED, "Imbrication de *?+."
+  IDS_REEUNMATCHEDBRACKET, "Non apparié []."
+  IDS_REEFOLLOWSNOTHING, "?+* non suivi."
+  IDS_REETRAILINGBACKSLASH, "\\ en fin de ligne."
+  IDS_REEINTERNALDISASTER, "Désastre complet."
+  IDS_REEINVALIDPOSIXCLASS, "Nom de classe POSIX inconnu."
+  IDS_REEEXPECTINGXDIGIT, "Deux chiffres attendus après \\x."
+  IDS_REESTACKOVERFLOW, "Débordement de la pile"
+  IDS_REENOPATTERN, "Expression compilée requise."
+  IDS_REEERRORSTARTINGTHREAD, "Impossible de démarrer un nouveau thread."
+  IDS_REEEXPECTINGEXTENDEDPATTERN1, "En attente d'un des caractères :=!< après (?"
+  IDS_REEEXPECTINGEXTENDEDPATTERN2, "En attente d'un des caractères =! après (?<"
+  IDS_REEBADFIXEDWIDTHLOOKBEHIND, "Le caractère de fin de motif n'a pas de taille fixe."
+
+  IDS_RE_POSIX_ALPHA, "Caractère alphabétique (alpha)"
+  IDS_RE_POSIX_ALNUM, "Caractère alphanumérique (alnum)"
+  IDS_RE_POSIX_ASCII, "Caractère ASCII (ascii)"
+  IDS_RE_POSIX_CNTRL, "Caractères de control (cntrl)"
+  IDS_RE_POSIX_DIGIT, "Chiffre décimal (digit)"
+  IDS_RE_POSIX_GRAPH, "Caractères imprimables autres qu'un espacement (graph)"
+  IDS_RE_POSIX_LOWER, "Caractères minuscules (lower)"
+  IDS_RE_POSIX_PRINT, "Caractères imprimables (print)"
+  IDS_RE_POSIX_PUNCT, "Caractères de ponctuation (punct)"
+  IDS_RE_POSIX_SPACE, "Caractères d'espacement (space)"
+  IDS_RE_POSIX_UPPER, "Caractères majuscules (upper)"
+  IDS_RE_POSIX_WORD, "Caractères alphanumériques + '_' (word)"
+  IDS_RE_POSIX_XDIGIT , "Chiffres héxadecimaux (xdigit)"
+  IDS_RE_LEFTPAREN, "Parenthèse gauche '('"
+  IDS_RE_RIGHTPAREN, "Parenthèse droite ')'"
+  IDS_RE_LEFTBRACKET, "Crochet gauche '['"
+  IDS_RE_CIRCUMFLEX,  "Circonflex '^'"
+  IDS_RE_DOLLAR, "Dollar '$'"
+  IDS_RE_DOT, "Point '.'"
+  IDS_RE_PIPE, "Barre verticale '|'"
+  IDS_RE_ASTERISK, "Astérisque '*'"
+  IDS_RE_PLUS, "Plus '+'"
+  IDS_RE_QUESTIONMARK, "Point d'interrogation '?'"
+  IDS_RE_BACKSLASH, "Antislash '\\'"
+  IDS_RE_ANYCHAR, "N'importe quel caractère"
+  IDS_RE_ANYFROM, "N'importe quel caractère de l'ensemble"
+  IDS_RE_ANYBUT, "N'importe quel caractère hors de l'ensemble"
+  IDS_RE_ANYFROMPOSIX, "Classe de caractères POSIX"
+  IDS_RE_ANYBUTPOSIX, "Classe de caractères POSIX"
+  IDS_RE_BOL, "Début du nom"
+  IDS_RE_EOL, "Fin du nom"
+  IDS_RE_OR, "Ou"
+  IDS_RE_ITERATION, "0 correspondance ou plus"
+  IDS_RE_POSITIVEITERATION, "1 correspondance ou plus"
+  IDS_RE_ITERATION_GREEDY, "Autant de correspondances que possible"
+  IDS_RE_ITERATION_UNGREEDY, "Le minimum de correspondances possible"
+  IDS_RE_ONEORZERO, "0 ou 1 correspondance"
+  IDS_RE_ZEROORONE, "0 ou 1 correspondance"
+  IDS_RE_SUBEXPRESSION, "Sous-expression"
+  IDS_RE_NOTCAPTURESUBEXP, "Sous-expression non capturante"
+  IDS_RE_LITERALS, "Caractère spécial de type littéral"
+  IDS_RE_WORDCHAR, "Caractère d'un mot"
+  IDS_RE_NONWORDCHAR, "Caractère non mot"
+  IDS_RE_SPACE, "Caractère espacement"
+  IDS_RE_NONSPACE, "Caractère non espacement"
+  IDS_RE_DIGIT, "Caractère chiffre"
+  IDS_RE_NONDIGIT, "Caractère non chiffre"
+  IDS_RE_WORDB, "Limité au mot"
+  IDS_RE_NONWORDB, "Non limité au mot"
+  IDS_RE_NUMBER, "Nombre décimal"
+  IDS_RE_HEXNUMBER, "Nombre hexadécimal"
+  IDS_RE_WORD, "mot"
+  IDS_RE_PATHCOMPONENT, "Chemin"
+  IDS_RE_FILENAME, "Nom de fichier (nom dans $1, extension dans $2)"
+  IDS_RE_DEFINESET, "Définir un ensemble..."
+  IDS_RE_MATCHEDEXPR, "Expression régulière avec correspondance"
+  IDS_RE_MATCHEDSUBEXP, "Sous-expression avec correspondance..."
+  IDS_RE_PLOOKA, "Caractère de début de motif positif"
+  IDS_RE_NLOOKA, "Caractère de début de motif négatif"
+  IDS_RE_PLOOKB, "Caractère de fin de motif positif"
+  IDS_RE_NLOOKB, "Caratère de fin de motif négatif"
+  IDS_RE_ZEROWIDTHASSERT, "Assertion de largeur nulle"
+
+  IDS_EMPTYSTR, "Chaîne vide non autorisée ici."
+  IDS_EMPTYMSG_DEF, "Aucun élément dans la liste."
+  IDS_EMPTYMSG_NOMATCH, "Aucun fichier ne correspond au masque saisi."
+  IDS_EMPTYMSG_BADMASK, "Masque invalide."
+  IDS_EMPTYMSG_GENERATING, "Création de la liste des fichiers. Tapez Echap pour annuler"
+  IDS_EMPTYMSG_ERROR, "Une erreur est survenue pendant la création de la liste de fichiers."
+  IDS_CNFRM_CLOSE, "Voulez-vous fermer le renommage par lot ?"
+  IDS_CNFRM_ESC_CLOSE2, "&Fermer le renommage par lot sans demander la prochaine fois"
+
+  IDS_CANCELING, "Annulation de l'opération en cours..."
+  IDS_NOTVALID_FILENAME, "Non de fichier invalid."
+  IDS_NOTVALID_RELATIVEPATH, "Chemin relatif invalide."
+  IDS_NOTVALID_FULLPATH, "Chemin complet invalide."
+  IDS_DUPLICATENAME, "Nom dupliqué."
+  IDS_DEPENDENCE, "Dépendance de nom cyclique ou dépendance sur fichier non renommable."
+
+  IDS_RENAMING, "Renommage des fichiers, tapez Echap pour annuler..."
+  IDS_PREPARING, "Préparation des données pour l'opération de renommage..."
+  IDS_DIRNOTSAMEROOT, "Déplacement de dossier sur un autre lecteur non géré."
+  IDS_DIRDIR, "Un répertoire avec le même nom existe déjà."
+  IDS_FILEDIR, "Ce nom est déjà utilisé pour un répertoire."
+  IDS_CNFRM_SHOVERWRITE, "Voulez-vous écraser le fichier avec attribut SYSTEME ou CACHE ?"
+  IDS_OVEWWRITETITLE, "Confirmer l'écrasement"
+  IDS_OVERWRITEERROR, "Impossible d'écraser le fichier: "
+  IDS_MOVEERROR, "Impossible de renommer le fichier: "
+  IDS_DELETEERROR, "Impossible de supprimer le fichier: "
+  IDS_WRITEERROR, "Impossible d'écrire le fichier: "
+  IDS_READERROR, "Impossible de lire le fichier: "
+  IDS_OPENFILEERROR, "Impossible d'ouvrir le fichier: "
+  IDS_DIRCASEERROR, "Impossible de changer la casse du nom de répertoire: "
+  IDS_CREATEDIR, "Impossible de créer le répertoire: "
+  IDS_UNDOING, "Annulation de l'opération de renommage..."
+  IDS_REMOVEDIR,"Impossible de supprimer le répertoire: "
+  IDS_UNDOQUEST, "Annuler l'opération de renommage ?"
+  IDS_SOMEERRORS, "Certains fichiers n'ont pu être renommés. La liste de ces fichiers va vous être affichée afin de vous permettre de corriger les erreurs.\n\nPour voir les fichiers renommés avec succès, utilisez les options du menu ""Vue""."
+  IDS_VALIDATEOK, "Validation terminée avec succès."
+  IDS_NOTTODO, "Rien à faire."
+  IDS_WAITINGFORWINDOWS, "En attente de la fermeture des fenêtres de renommage par lot..."
+  IDS_MISLINES, "Trop peu de lignes."
+  IDS_BADLINECOUNT, "Le nombre de lignes entré doit correspondre au nombre de fichiers sélectionnés pour l'opération de renommage."
+  IDS_CREATETEMP, "Impossible de créer un fichier temporaire. "
+  IDS_WRITETEMP, "Impossible d'écrire dans le fichier temporaire. "
+  IDS_OPENTEMP, "Impossible d'ouvrir le fichier temporaire. "
+  IDS_SIZEOFTEMP, "Impossible de récupérer la taille du fichier temporaire. "
+  IDS_READTEMP, "Impossible de lire le fichier temporaire. "
+  IDS_PROCESS, "Impossible de démarrer le processus: "
+  IDS_ERRLAUNCHEDIT, "Impossible de démarrer l'éditeur externe. Vérifiez la configuration de l'éditeur externe dans l'extension Renamer. "
+  IDS_LONGDATA, "Impossible de terminer l'opération pour cause d'excédent de données."
+  IDS_EXTEDIT, "Quand vous aurez terminé les modifications et enregistré vos changement dans l'éditeur externe, appuyez sur OK pour mettre à jour la liste des noms de fichiers.\n\nAppuyez sur Annuler pour revenir sans changer la liste."
+  IDS_CREATEPIPE, "Impossible de créer un canal nommé: "
+  IDS_WRITEPIPE, "Impossible d'écrire dans le canal nommé. "
+  IDS_EXEFILES, "Exécutables (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tTous les fichiers (*.*)\t*.*\t\t"
+  IDS_EXP_FULLNAME, "Nom complet"
+  IDS_EXP_DRIVE, "Lecteur"
+  IDS_EXP_PATH, "Chemin"
+  IDS_EXP_NAME, "Nom"
+  IDS_EXP_NAMEPART, "Nom de fichier"
+  IDS_EXP_EXTPART, "Extension"
+  IDS_EXP_FULLPATH, "Chemin complet"
+  IDS_EXP_WINDIR, "Répertoire Windows"
+  IDS_EXP_SYSDIR, "Répertoire système"
+  IDS_EXP_DOSFULLNAME, "Nom DOS complet"
+  IDS_EXP_DOSDRIVE, "Lecteur DOS"
+  IDS_EXP_DOSPATH, "Chemin DOS"
+  IDS_EXP_DOSNAME, "Nom DOS"
+  IDS_EXP_DOSNAMEPART, "Nom de fichier DOS"
+  IDS_EXP_DOSEXTPART, "Extension DOS"
+  IDS_EXP_DOSFULLPATH, "Chemin complet DOS"
+  IDS_EXP_DOSWINDIR, "Répertoire Windows DOS"
+  IDS_EXP_DOSSYSDIR, "Système de répertoire DOS"
+  IDS_EXP_ENVVAR, "Variable d'environnement"
+  IDS_EXP_BROWSE, "Parcourir..."
+  IDS_EXP_SALDIR, "Répertoire Sally"
+  IDS_CFG_CONFLICT, "La configuration est déjà ouverte."
+  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
+  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+}

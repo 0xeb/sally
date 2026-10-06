@@ -654,6 +654,7 @@ CCfgPageSecurity::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        SetDlgItemTextW(HWindow, IDC_STATIC_2, LoadStrW(IDS_CFGSEC_MASTERPWD_INFO));
         // bypass Transfer(); this is a special handling of a checkbox
         CheckDlgButton(HWindow, IDC_SEC_ENABLE_MASTERPWD, PasswordManager.IsUsingMasterPassword() ? BST_CHECKED : BST_UNCHECKED);
 

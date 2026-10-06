@@ -1,0 +1,213 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for undelete. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/undelete/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\undelete.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Herstellen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,12,12,323,8
+    LTEXT           "",IDC_PROGRESSBAR,39,32,288,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Annuleren",IDCANCEL,145,54,50,14
+    LTEXT           "Totaal:",IDC_STATIC_1,12,33,26,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Herstellen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Selecteer de &schijf welke u wilt analyseren",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "Schijf &Image",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,55,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,361,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Bladeren...",IDC_BUTTON_BROWSE,379,178,50,14,WS_GROUP
+    CONTROL         "Scannen van &vacante clusters op FAT partitie's",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,184,10
+    CONTROL         "Laat b&estaande bestanden en mappen zien",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "Laat bestanden met grootte van n&ul zien",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "&Laat lege mappen zien",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "Laat &metabestanden zien",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "S&chat beschadigde bestanden",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "OK",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "Help",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 363, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Herstellen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Herstellen van",IDC_LABEL_UNDELETING,3,11,50,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,57,11,301,8
+    RTEXT           "naar",IDC_STATIC_1,3,23,50,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,57,23,301,8
+    RTEXT           "Bestand:",IDC_STATIC_2,3,41,50,8
+    LTEXT           "",IDC_PROGRESS_FILE,57,40,293,12,NOT WS_GROUP
+    RTEXT           "Totaal:",IDC_STATIC_3,3,56,50,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,57,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Annuleren",IDCANCEL,156,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 213, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Beschadigde bestanden"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "De eerste letter van het volgende bestandsnaam kon niet worden hersteld. Gelieve het originele karakter in te vullen.",IDC_STATIC_1,7,7,199,16
+    EDITTEXT        IDC_EDIT_FILENAME,7,27,199,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,44,53,50,14
+    PUSHBUTTON      "&Alles",IDC_BUTTON_ALL,100,53,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,156,53,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 397, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Undelete configuratie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Alternatieve &tijdelijke map om bestanden te bekijken:",IDC_STATIC_1,7,7,180,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,362,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,375,17,16,14,WS_GROUP
+    CONTROL         "He&rgebruik altijd de eerder gebruikte cluster scan infomatie op FAT",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,238,10
+    CONTROL         "Geef geen waarschuwing wanneer er wordt hersteld naar &dezelfde logische schijf",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,286,10
+    CONTROL         "&Geef geen waarschuwing voordat het herstel plaatsvindt van de versleutelde bestanden op FAT of exFAT",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,364,10
+    DEFPUSHBUTTON   "OK",IDOK,231,80,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,286,80,50,14
+    PUSHBUTTON      "Help",IDHELP,341,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 286, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Herstel versleutelde bestande van een back-up"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Deze functie zal versleutelde bestanden herstellen, welke eerder zijn hersteld, naar een partitie zonder Encrypting File System (EFS) ondersteuning, zoals FAT. Gewone bestanden (anders dan *.bak) zullen ongewijzigd worden gekopieërd.",IDC_STATIC_1,7,7,272,24
+    LTEXT           "&Herstellen %s naar:",IDC_LABEL_SOURCE,7,41,272,8
+    EDITTEXT        IDC_EDIT_TARGET,7,51,254,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,265,51,14,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,62,74,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,118,74,50,14
+    PUSHBUTTON      "Help",IDHELP,174,74,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_LOWMEM, "Niet genoeg geheugen."
+  IDS_ERRORREADINGMFT, "Fout tijdens het lezen van de MFT clusters."
+  IDS_MFTRECORDDAMAGED, "Fout tijdens het lezen van de MFT: de eerste record is beschadigd."
+  IDS_ROOTNOTFOUND, "Kan de hoofdmap niet vinden."
+  IDS_VDIRECTORY, "Map%06d"
+  IDS_ALLDELETEDFILES, "{Alle verwijderde bestanden}"
+  IDS_ERRORNOTNTFS, "Interne fout: volume is geen NTFS."
+  IDS_ERRORNOTOPEN, "Interne fout: volume is niet open."
+  IDS_ERROROPENINGVOLUME, "Fout bij het openen van volume."
+  IDS_ERRORREADINGBOOT, "Fout bij het lezen van de boot sector."
+  IDS_ERRORVOLUMETYPE, "Niet-herkende volume type, alleen FAT 12, 16, 32 en NTFS volumes zijn ondersteund."
+  IDS_READINGMFT, "Lezen van MFT..."
+  IDS_ERRORREADINGFAT, "Fout bij het lezen van FAT."
+  IDS_ERRORREADINGDIRCLUSTERS, "Fout bij het lezen van mappen clusters."
+  IDS_ERRORNOTFAT, "Interne fout: volume is geen FAT."
+  IDS_LOADINGFAT, "FAT lezen..."
+  IDS_READINGDIRS, "Mappen lezen..."
+  IDS_READINGEXISTINGDIRS, "Leest bestaande mappen..."
+  IDS_READINGDELETEDDIRS, "Leest verwijderde mappen..."
+  IDS_SCANNINGVACANTCLUSTERS, "Scannen van vacante clusters..."
+  IDS_REUSESCANNEDINFO, "Wilt u eerdere informatie hergebruiken van de afgelopen cluster scan?"
+  IDS_RELOADINGCLUSTERS, "Herladen van eerder gevonden clusters..."
+  IDS_FLOPPY350, "3.5 Floppy"
+  IDS_FLOPPY525, "5.25 Floppy"
+  IDS_FLOPPY800, "8.0 Floppy"
+  IDS_COMPACT_DISK, "Compact Disk"
+  IDS_LOCAL_DISK, "Lokale schijf"
+  IDS_REMOVABLE_DISK, "Verwisselbare schijf"
+  IDS_ANALYZINGDIRS, "Analyseren van mappen..."
+  IDS_INCOMPLETEMFT, "Het herstel was niet in staat om de gehele MFT (Master File Table) te scannen. Wilt u gedeeltelijke resultaten weergeven?"
+  IDS_BITMAPNOTFOUND, "Localisatie van $Bitmap is mislukt op dit volume. Schade aan bestanden schatting is afgebroken."
+  IDS_BITMAPNOSTREAM, "Localisatie standaard stream van het bestand $Bitmap is mislukt. Schade aan bestanden schatting is afgebroken."
+  IDS_LOWMEMBITMAP, "Onvoldoende geheugen om het cluster bitmap bestande te laden. Schade aan bestanden schatting wordt overgeslagen."
+  IDS_ERRORREADINGBMP, "Fout bij het lezen van $Bitmap bestand. Schade aan bestanden schatting is afgebroken."
+  IDS_BITMAPISEMPTY, "$Bitmap heeft grootte van nul. Schade aan bestanden schatting wordt overgeslagen."
+}
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "Herstellen"
+  IDS_DESCRIPTION, "Hersteld verwijderde bestanden van FAT of NTFS partitie's."
+  IDS_ABOUTTITLE, "Over plugin"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{Metabestanden}"
+  IDS_PATHDISK, "In het pad moet zich een schijf bevinden."
+  IDS_PATHFILE, "Het pad leidt naar een bestand. Kan het bestand niet openen."
+  IDS_PATHNOTFOUND, "Pad niet gevonden."
+  IDS_IMAGENOTFOUND, "Het gespecificeerde bestand is niet gevonden."
+  IDS_ERROROPENINGPROGRESS, "Fout bij het openen van het status venster."
+  IDS_VOLENUMERATE, "Fout bij het opsommen van de systeemvolumes."
+  IDS_OPENINGVOLUME, "Openen van volume..."
+  IDS_SCANNINGFOUND, "{!}Scannen van vacante clusters... (%d mappen cluster{|1|s} gevonden)"
+  IDS_ALWAYSCHOOSEYES, "Kies altijd Ja (indien nodig is dit te wijzigen in het configuratie venster)"
+  IDS_PATHTOOLONG, "Doel pad is te lang"
+  IDS_QUESTION, "Vragen"
+  IDS_WANTCANCEL, "Wilt u deze operatie annuleren?"
+  IDS_BADPATH, "Herstellen naar archief-bestanden of plug-in; bestandssysteem wordt niet ondersteund."
+  IDS_ERROR, "Fout" // title of error messages
+  IDS_VIEW, "Bekijk" // the function "F3"
+  IDS_TEMPDIR, "Om de bestanden te bekijken op %c: moet u alternatieve tijdelijke map specificeren op een andere logische schijf dan %c:"
+  IDS_WAIT, "Herstellen van bestand naar een tijdelijke map, een ogenblik geduld alstublieft"
+  IDS_ENCRYPTEDWARNING, "Het doel volume ondersteunt geen Encrypting File System (EFS).\n\nVersleutelde bestanden worden hersteld in een back-up formaat, welke gebruikt kunnen worden om de bestanden later te herstellen op een NTFS partitie gebruik makende van het commando ""Plugins/Undelete/Herstel versleutelde bestanden van back-up""."
+  IDS_DONTSHOWAGAIN, "Niet meer tonen"
+  IDS_CHOOSETEMPDIR, "Kies een alternatieve tijdelijke map:"
+  IDS_SAMEPARTITION, "Het lijkt erop dat u probeert te herstellen naar dezelfde logische schijf als waar de verwijderde bestanden zijn gevestigd. U zou de opdracht tot het herstellen van bestanden, altijd naar een andere partitie laten verwijzen. Anders loopt u het risico dat deze bestanden zichzelf overschreven of u kunt hierdoor andere verwijderde bestanden verliezen..\n\nTip: als u niet over meerdere partitie's beschikt, kunt u altijd een ander medium gebruiken (bijv.: Floppy of USB-schijf)."
+  IDS_UNDELETECMD, "&Herstellen van verwijderde bestanden en mappen..."
+  IDS_ERRORENCRYPTED, "Kan het versleutelde bestand niet herstellen: "
+  IDS_RESTORECMD, "Herstel &versleutelde bestanden van back-up..."
+  IDS_CANNOTVIEW, "Kan het bestand niet bekijken - de tijdelijke map ondersteunt geen Encrypting File System (EFS)"
+  IDS_CHOOSETARGET, "Kies de doel map"
+  IDS_RESTORE, "Herstel" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "Herstellen van" // label inside the progress dialog
+  IDS_READINGTREE, "Lezen van map structuur..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "Het doel volume ondersteunt geen Encrypting File System (EFS)."
+  IDS_VOLUME_MOUNT, "Mount Point"
+  IDS_VOLUME_NAME, "Naam"
+  IDS_VOLUME_FORMAT, "Formaat"
+  IDS_VOLUME_SIZE, "Grootte"
+  IDS_VOLUME_FREE, "Vrij"
+  IDS_VOLUME_FREEPROC, "% Vrij"
+  IDS_VOLUME_VOLID, "GUID Pad"
+  IDS_CONDITION, "Conditie"
+  IDS_CONDITIONDESC, "Schatting van bestandsschade"
+  IDS_CONDITION_GOOD, "Goed"
+  IDS_CONDITION_FAIR, "Tamelijk"
+  IDS_CONDITION_POOR, "Slecht"
+  IDS_CONDITION_LOST, "Verloren"
+  IDS_CONDITION_UNKNOWN, "Onbekend"
+  IDS_UNDELETEINCHDRVMENU, "\tHerstellen"
+  IDS_PARTIALRECOVER, "Het volgende bstand kon niet compleet hersteld worden: %s\n\nWilt u het bestand gedeeltelijk herstellen?"
+  IDS_PARTIALRECOVER_DONTASK, "Kies de volgende keer hetzelfde antwoord"
+  IDS_ERRORRECOVER, "Fout bij herstellen bestand %s"
+}

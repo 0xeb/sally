@@ -17,9 +17,9 @@ Elias Bachaalany (0xeb), 2025-2026
   - Bundled archive, filesystem, viewer, comparison, checksum, automation, and
     system plugins, with dependency handling and automatic plugin discovery
   - Native x64, x86, and ARM64 packages and Wine compatibility
-  - Maintained language packs, Translator workspaces, and a reproducible
-    localization pipeline
-  - Modern CMake builds for Sally, plugins, tools, language files, and the shell
+  - Ten maintained translations built into Sally and its plugins, kept
+    structurally identical to the English resources
+  - Modern CMake builds for Sally, plugins, tools, languages, and the shell
     extension, including MSVC and clang-cl/xwin toolchains
   - GitHub release automation, update checks, runtime and symbol packages, and
     release artifact validation

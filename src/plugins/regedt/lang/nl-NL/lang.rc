@@ -1,0 +1,325 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for regedt. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/regedt/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\regedt.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CREATEKEY DIALOGEX 10, 24, 227, 75
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Sleutel maken"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Sleutelnaam:",IDS_TEXT,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "&Pad direct naar de plugin sturen",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    DEFPUSHBUTTON   "OK",IDOK,58,53,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,118,53,50,14
+END
+
+IDD_RENAME DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,58,43,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,118,43,50,14
+END
+
+IDD_COPY DIALOGEX 10, 24, 227, 76
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    COMBOBOX        IDE_NAME,10,20,208,106,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_TABSTOP
+    CONTROL         "&Pad direct naar plugin sturen",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,35,189,12
+    DEFPUSHBUTTON   "OK",IDOK,58,54,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,118,54,50,14
+END
+
+IDD_NEWVALUE DIALOGEX 14, 22, 227, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nieuwe waarde"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Waardenaam:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "&Pad direct naar de plugin sturen",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    LTEXT           "Waarde&type:",IDC_STATIC_2,10,53,56,8
+    COMBOBOX        IDC_TYPE,10,63,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,58,87,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,118,87,50,14
+END
+
+IDD_EDITVAL DIALOGEX 14, 22, 227, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Waarde wijzigen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_DATA,10,79,208,12,ES_AUTOHSCROLL
+    LTEXT           "Basis:",IDS_BASE,124,69,60,8
+    CONTROL         "&Hexadecimaal",IDR_HEX,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,78,81,12
+    CONTROL         "De&cimaal",IDR_DEC,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,90,73,12
+    DEFPUSHBUTTON   "OK",IDOK,58,112,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,118,112,50,14
+    LTEXT           "Waardenaam:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Waarde&type:",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Waar&degegevens:",IDC_STATIC_3,10,69,63,8
+END
+
+IDD_RAWEDITVAL DIALOGEX 14, 22, 247, 145
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Onbewerkte waarden wijzigen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Waardenaam:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,228,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Waarde&type:",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,228,115,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Start editor",IDB_EDIT,10,69,75,14
+    LTEXT           "Wanneer u gereed bent met bewerken en deze heeft opgeslagen in de externe editor, klik OK om de bewerkingen in het register op te slaan of kies Annuleren voor sluiten zonder opslaan.",IDS_MESSAGE,10,89,226,24,NOT WS_VISIBLE
+    DEFPUSHBUTTON   "OK",IDOK,68,123,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,128,123,50,14
+END
+
+IDD_SEARCH DIALOGEX 9, 20, 333, 240
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Windows register zoeken"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Zoeken naar:",IDC_STATIC_1,6,10,47,8
+    COMBOBOX        IDC_PATTERN,61,8,202,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "N&u zoeken",IDOK,268,7,50,14,WS_GROUP
+    LTEXT           "Zoe&ken in:",IDC_STATIC_2,6,27,38,8
+    COMBOBOX        IDC_LOOKIN,61,25,202,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "He&lp",IDHELP,268,24,50,14,WS_GROUP
+    CONTROL         "&Opties weergeven",IDC_OPTIONS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,248,42,73,12
+    CONTROL         "Su&bsleutels opnemen",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,42,86,12
+    LTEXT           "Zoeken naar:",IDS_LOOKAT,6,60,47,8
+    CONTROL         "&Sleutels",IDC_KEYS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,58,55,12
+    CONTROL         "&Waarden",IDC_VALUES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,58,55,12
+    CONTROL         "G&egevens",IDC_DATA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,217,58,55,12
+    LTEXT           "Opties:",IDS_OPTIONS,6,76,41,8
+    CONTROL         "HE&X-modus",IDC_HEX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,74,60,12
+    CONTROL         "Hoofdle&ttergevoelig",IDC_CASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,74,84,12
+    CONTROL         "&Hele woorden",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,87,60,12
+    CONTROL         "Re&guliere expressie",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,87,78,12
+    LTEXT           "&Nieuwe of gelijk aan:",IDS_NEWER,61,105,76,8
+    EDITTEXT        IDC_MINTIME,139,103,80,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.yyyy",IDS_FORMAT1,225,105,81,8
+    LTEXT           "Oude&r of gelijk aan:",IDS_OLDER,61,121,76,8
+    EDITTEXT        IDC_MAXTIME,139,119,80,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.yyyy",IDS_FORMAT2,225,121,81,8
+    LTEXT           "Gevonden &items:",IDC_FOUND_FILES,6,132,109,8
+    CONTROL         "",IDC_RESULTS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,6,142,309,57
+END
+
+IDD_CONFIG DIALOGEX 86, 38, 290, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Register editor configuratie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Externe editor instellingen. Wordt gebruikt voor bewerken van registerwaarden.",IDC_STATIC_1,10,10,270,8
+    LTEXT           "&Opdracht:",IDC_STATIC_2,20,27,55,8
+    EDITTEXT        IDE_COMMAND,77,25,186,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_BROWSE,267,25,13,12
+    LTEXT           "&Argumenten:",IDC_STATIC_3,20,43,55,8
+    EDITTEXT        IDE_ARGUMENTS,77,41,186,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_ARGHELP,267,41,13,12
+    LTEXT           "&Startmap:",IDC_STATIC_4,20,59,55,8
+    EDITTEXT        IDE_INITDIR,77,57,186,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_INITDIRHELP,267,57,13,12
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,10,79,270,1
+    DEFPUSHBUTTON   "OK",IDOK,176,84,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,230,84,50,14
+END
+
+IDD_EXPORT DIALOGEX 14, 22, 227, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Exporteren"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Export pad:",IDC_STATIC_1,10,10,83,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    LTEXT           "&Naar bestand:",IDC_STATIC_2,10,39,56,8
+    EDITTEXT        IDE_FILE,10,49,191,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDB_BROWSE,205,49,13,12
+    DEFPUSHBUTTON   "OK",IDOK,58,72,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,118,72,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Register Editor"
+  IDS_DESCRIPTION, "Bladeren, weergeven, en wijzigen Windows register."
+  IDS_ABOUT, "Over plugin"
+  IDS_REGEDTERR, "Register Editor - Fout"
+  IDS_LOWMEM, "Onvoldoende geheugen."
+  IDS_DRIVEMENUTEXT, "\tWindows register"
+  IDS_DEFAULTVALUE, "(Standaard)"
+  IDS_TYPE, "Type/Datum"
+  IDS_DATA, "Gegevens/Tijd"
+  IDS_SIZE, "Grootte"
+  IDS_KEY, "SLEUTEL"
+  IDS_EMPTY, "Lege tekenreeks is hier niet toegestaan."
+  IDS_ERROR, "Fout"
+  IDS_NEWKEYINROOT, "Kan geen nieuwe sleutels maken in de registerhoofdmap."
+  IDS_LONGNAME, "Kan de bewerking niet voltooien door een te lange padnaam."
+  IDS_NEWKEY, "Kan nieuwe sleutel niet maken: "
+  IDS_KEYEXISTS, "Sleutel bestaat al."
+  IDS_DELVAL, "Fout bij verwijderen registersleutel"
+  IDS_DELKEY, "Fout bij verwijderen registersleutel"
+  IDS_CONFIRNNONEMPTYDELETE, "De sleutel ""%s""is niet leeg.\nWilt u het verwijderen?"
+  IDS_QUESTION, "Vraag"
+  IDS_DELKEYINROOT, "Verwijderen van sleutels in het registerhoofdmap niet mogelijk."
+  IDS_MENUNEWKEY, "Nieuwe &sleutel..."
+  IDS_MENUNEWVAL, "Nieuwe &waarde..."
+  //IDS_MENUOPEN, "&Open\tEnter"
+  IDS_EDIT, "&Bewerken..."
+  IDS_RAWEDIT, "Ra&w Edit..."
+  //IDS_MENUDELETE, "&Delete\tF8"
+  //IDS_MENURENAME, "&Rename\tF2"
+  IDS_NEWVAL, "Kan geen nieuwe waarde maken: "
+  IDS_REPLACEVAL, "Waarde ""%s""bestaat al.\nWilt u het vervangen?"
+  IDS_INVALIDHEXVALUE, "Onjuiste hexadecimale waarde."
+  IDS_INVALIDDECVALUE, "Onjuiste decimale waarde."
+  IDS_QUERYVAL, "De waarde kan niet worden opgevraagd: "
+  IDS_SETVAL, "Kan waarde niet instellen: "
+  IDS_BADPATH, "Ongeldige padnaam. "
+  IDS_NOTREGEDTPATH, "Paden naar andere bestandssystemen worden hier niet ondersteund."
+  IDS_OPENKEY, "Kan registersleutel ""%ls"" niet openen. "
+  IDS_OPENKEY2, "Kan registersleutel ""%ls\\%ls"" niet openen. "
+  IDS_ENUMKEY, "Een of meerdere subsleutels of waarden kunnen niet worden weergegeven - %s\nDoorgaan met weergeven?"
+  IDS_EXPORT, "&Exporteren..."
+  IDS_SEARCH, "&Zoeken..."
+  IDS_QUICKRENAMEKEY, "Hernoem sleutel ""%s"" naar"
+  IDS_QUICKRENAMEVAL, "Hernoem waarde ""%s"" naar"
+  IDS_QUICKRENAME, "Snel hernoemen"
+  IDS_COPY, "Kopiëren"
+  IDS_MOVE, "Verplaatsen"
+  IDS_COPYORMOVE1, "%s waarde ""%s"" naar"
+  IDS_COPYORMOVE2, "%s sleutel ""%s"" naar"
+  IDS_COPYORMOVE3, "{!}%s %d waarden{} naar"
+  IDS_COPYORMOVE4, "{!}%s %d sleutels{} naar"
+  IDS_COPYORMOVE5, "{!}%s %d value{|1|s} and %d key{|1|s} to"
+  IDS_MOVERENAME, "Verplaatsen/Hernoemen"
+  IDS_SAMETARGET, "Deze bewerking heeft geen doel. Alle geselecteerde bestanden en mappen hebben dezelfde doelnaam (zij zullen elkaar overschrijven)."
+  IDS_ACCESS, "Kan geen toegang krijgen tot registersleutel ""%ls\\%ls"". "
+  IDS_CANTCOPYTOITSELF, "Kan geen sleutel of waarde naar zichzelf kopiëren."
+  IDS_CANTMOVETOITSELF, "Kan sleutel of waarde niet naar zichzelf verplaatsen."
+  IDS_CREATE, "Kan geen registersleutel maken. "
+  IDS_OPEN, "Kan registersleutel niet openen. "
+  IDS_ACCESS2, "Kan geen toegang krijgen tot een registersleutel. "
+  IDS_DELETE, "Kan registersleutel niet verwijderen. "
+  IDS_COPYKEY, "Fout tijdens kopiëren registersleutel"
+  IDS_MOVEKEY, "Fout tijdens verplaatsen registersleutel"
+  IDS_SETVAL2, "Kan registersleutel niet instellen. "
+  IDS_REMOVESOURCE, "Kan de oorspronkelijke registersleutel niet verwijderen. "
+  IDS_COPYVALUE, "Fout bij kopiëren van de registersleutelwaarde"
+  IDS_MOVEVALUE, "Fout bij verplaatsen van de registersleutelwaarde"
+  IDS_REMOVESOURCE2, "Kan waarde van de bronsleutel niet verwijderen. "
+  IDS_CANTCOPYTOITSELF2, "Naam:\t%ls\n\nFout:\tKan geen sleutel naar zichzelf kopiëren."
+  IDS_CANTMOVETOITSELF2, "Naam:\t%ls\n\nFout:\tKan sleutel niet naar zichzelf verplaatsen."
+  IDS_COPYCLASSNAME, "Kan klassenaam van de sleutel niet naar doel kopiëren.\nWilt u doorgaan?"
+  IDS_WARNING, "Waarschuwing"
+  IDS_CANNOTRENAME, "Kan sleutel niet hernoemen. Sleutelnaam is al ingebruik."
+  IDS_RENAMEKEY, "Fout bij hernoemen van registersleutel"
+  IDS_RENAMEVAL, "Fout bij hernoemen van registersleutel"
+  IDS_SAMECASEKEY, "Kan sleutel niet hernoemen. Oorspronkelijk en nieuwe naam verschilt in hoofdlettergebruik."
+  IDS_SAMECASEVAL, "Kan waarde niet hernoemen. Oospronkelijke en nieuwe naam verschilt alleen in hoofdlettergebruik."
+  IDS_SYNTAX, "De sleutelnaam syntaxis is onjuist."
+  IDS_CREATETARGET, "Doel sleutel ""%ls\\%ls""bestaat niet. Wilt u het maken?"
+  IDS_COPYPROGRESS, "Registervermeldingen kopiëren, ogenblik geduld (druk ESCvoor annuleren)..."
+  IDS_MOVEPROGRESS, "Registervermeldingen verplaatsen, ogenblik geduld (druk ESCvoor annuleren)..."
+  IDS_DELETEPROGRESS, "Registervermeldingen verwijderen, ogenblik geduld (druk ESCvoor annuleren)..."
+  IDS_CANCEL, "Wilt u deze bewerking annuleren?"
+  IDS_COPYTOTROOT, "Kopiëren van sleutels naar de registerhoofdmap is niet mogelijk."
+  //IDS_WINDOWSREGISTRY, "Windows Registry"
+  IDS_STOP, "Sto&ppen"
+  IDS_START, "&Nu zoeken"
+  IDS_FOUNDITEMS1, "Gevonden &items:"
+  IDS_FOUNDITEMS2, "Gevonden &items (%d):"
+  IDS_NOFILESFOUND, "Geen bestanden gevonden"
+  IDS_STOPPED, "Zoeken gestopt"
+  IDS_NAME_COLUMN, "Naam"
+  IDS_TYPE_COLUMN, "Type"
+  IDS_DATA_COLUMN, "Gegevens"
+  IDS_PATH_COLUMN, "Pad"
+  IDS_SIZE_COLUMN, "Grootte"
+  IDS_DATE_COLUMN, "Datum"
+  IDS_TIME_COLUMN, "Tijd"
+  IDS_FIND, "&Zoeken in Windows register..."
+  IDS_SEARCHERROR, "Fout bij zoeken Windows register"
+  IDS_BADHEXSTRING, "Tekenreeks is geen geldig hexadecimaal patroon."
+  IDS_REGEXPERR, "Reguliere expressie klasse fout: %s"
+  IDS_SEARCHING, "Zoeken: %s\\"
+  IDS_SUBSTRINGHELP, "Geef tekenreeks, decimaal- of hexadecimaalgetal voorafgegaan met 0x. Lege tekenreeks komt overeen met alle items."
+  IDS_HEXHELP, "Geen hexadecimaal patroon op met structuur: 1a 2b ""foo"" 3c. Gebruik "" voor unicode en ' voor ASCII tekenreekspatronen."
+  IDS_REGEXPHELP, "Geen reguliere expressie in. Voor meer details over reguliere expressies bekijk Sally documentatie."
+  IDS_LONGDATA, "Kan bewerking niet voltooien door te veel gegevens."
+  IDS_BADTIMEFORMAT, "Ongeldig datum/tijd formaat. Geef datum op in opmaak dd.mm.yyyy of datum en tijd in opmaak hh:mm:ss dd.mm.yyyy."
+  IDS_CREATETEMP, "Kan tijdelijkbestand niet maken. "
+  IDS_WRITETEMP, "Kan niet schrijven naar tijdelijkbestand. "
+  IDS_EXP_FULLNAME, "Volledige naam"
+  IDS_EXP_DRIVE, "Schijf"
+  IDS_EXP_PATH, "Pad"
+  IDS_EXP_NAME, "Naam"
+  IDS_EXP_NAMEPART, "Naamdeel"
+  IDS_EXP_EXTPART, "Extentie deel"
+  IDS_EXP_FULLPATH, "Volledig pad"
+  IDS_EXP_WINDIR, "Windows map"
+  IDS_EXP_SYSDIR, "Systeem map"
+  IDS_EXP_BROWSE, "Bladeren..."
+  IDS_EXP_SALDIR, "Sally map"
+  IDS_EXP_DOSFULLNAME, "DOS Volledige naam"
+  IDS_EXP_DOSDRIVE, "DOS Schijf"
+  IDS_EXP_DOSPATH, "DOS Pad"
+  IDS_EXP_DOSNAME, "DOS Naam"
+  IDS_EXP_DOSNAMEPART, "DOS Naamdeel"
+  IDS_EXP_DOSEXTPART, "DOS Extensie deel"
+  IDS_EXP_DOSFULLPATH, "DOS Volledig pad"
+  IDS_EXP_DOSWINDIR, "DOS Windows map"
+  IDS_EXP_DOSSYSDIR, "DOS Systeemmap"
+  IDS_EXP_ENVVAR, "Omgevingsvariabele"
+  IDS_EXEFILES, "Uitvoerbare bestanden (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tAlle bestanden (*.*)\t*.*\t\t"
+  IDS_OPENTEMP, "Kan tijdelijkbestand niet openen. "
+  IDS_SIZEOFTEMP, "Kan de grootte van tijdelijk bestand niet opvragen. "
+  IDS_READTEMP, "Kan tijdelijkbestand niet lezen. "
+  IDS_PROCESS, "Kan externe editor niet starten. Controleer de Register Editor configuratie voor externe editor instellingen\n"
+  IDS_NOTDWORD, "Getal is te groot om als DWORD op te slaan."
+  IDS_REGFILES, "Registerbestanden (*.reg)\t*.reg\tAlle bestanden (*.*)\t*.*\t\t"
+  IDS_FILENAMEISDIR, "Doel bestandsnaam is al in gebruik voor een map."
+  IDS_OVERWRITE, "Doelbestand bestaat al. Wilt u het bestaande bestand vervangen?"
+  IDS_OVERWRITETITLE, "Bevestig overschrijven bestand"
+  IDS_REPLACEERROR, "Kan bestaand bestand niet vervangen."
+  IDS_PROCESS2, "Kan %s niet starten."
+  IDS_BADEXPORT, "Er is een fout opgetreden tijdens exporteren van registergegevens."
+  IDS_EXPORTING, "Exporteren registergegevens, ogenblik geduld..."
+  IDS_SELECTED1, "{!}%d geselecteerde waarde{|1|n}"
+  IDS_SELECTED2, "{!}%d geselecteerde sleutel{|1|s}"
+  IDS_SELECTED3, "{!}%d geselecteerde waarde{|1|n} en %d geselecteerde sleutel{|1|s}"
+  IDS_SELECTEDSIZE, "{!}<%d> byte{s|0||1|s} in "
+  IDS_CANNOTRENAMEDEFVAL, "Kan standaardwaarde niet hernoemen. Waarde is niet gedefinieerd."
+  IDS_COPYNAME, "Kopieer naam als tekst"
+  IDS_COPYFULLNAME, "Kopieer volledige naam als tekst"
+  IDS_COPYPATH, "Kopieer volledig pad als tekst"
+  IDS_BUSY, "Sally is bezig. De aangevraagde opdracht kan niet worden uitgevoerd ,probeert u het later nog eens."
+}

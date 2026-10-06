@@ -1,0 +1,197 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for 7zip. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/7zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\7zip.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 23, 38, 231, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "7-Zip - Konfigurace"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Panel nastavení",IDC_STATIC_1,5,6,54,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,61,10,167,1
+    CONTROL         "Před komprimací zobrazit &okno dialogu rozšířených možností",IDC_CFG_SHOWEXTENDEDOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,19,213,10
+    CONTROL         "Zobrazit rozšířené &informace při výpisu archivu",IDC_CFG_EXTENDEDLISTINFO,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,31,168,10
+    CONTROL         "Komprimovaná velikost",IDC_CFG_LISTINFOPACKEDSIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,43,90,10
+    CONTROL         "Metoda",IDC_CFG_LISTINFOMETHOD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,55,38,10
+    LTEXT           "Výchozí parametry komprimace",IDC_STATIC_3,5,70,107,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,114,74,114,1
+    LTEXT           "Komprimační ú&roveň:",IDC_STATIC_5,10,85,76,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,87,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Komprimační &metoda:",IDC_STATIC_6,10,103,76,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,87,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Velikost slovníku:",IDC_STATIC_7,10,121,76,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,87,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Délka slov:",IDC_STATIC_8,10,139,76,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,87,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Vytvořit &solid archiv",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,155,78,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,3,175,225,1
+    DEFPUSHBUTTON   "OK",IDOK,64,181,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,119,181,50,14
+    PUSHBUTTON      "Nápověda",IDHELP,174,181,50,14
+END
+
+IDD_NEWARCHIVE DIALOGEX 27, 37, 276, 224
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Vytvoření nového archivu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archiv:",IDC_STATIC_1,16,7,28,8
+    LTEXT           "",IDC_NA_ARCHIVE,47,7,220,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,8,21,260,1
+    CONTROL         "Ši&frovat soubory",IDC_NA_ENCRYPTFILES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,28,66,10
+    LTEXT           "&Heslo:",IDC_NA_PASSWORD_TXT,105,29,60,8
+    EDITTEXT        IDC_NA_PASSWORD,170,27,78,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Potvrzení hes&la:",IDC_NA_CONFIRMPASSWORD_TXT,105,46,61,8
+    EDITTEXT        IDC_NA_CONFIRMPASSWORD,170,44,78,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Parametry komprimace",IDC_STATIC_3,8,67,80,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,90,71,178,1
+    LTEXT           "Komprimační ú&roveň:",IDC_STATIC_5,16,85,74,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,105,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Komprimační &metoda:",IDC_STATIC_6,16,103,76,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,105,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Velikost slovníku:",IDC_STATIC_7,16,121,59,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,105,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Délka slov:",IDC_STATIC_8,16,139,39,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,105,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Vytvořit &solid archiv",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,159,78,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,8,181,260,1
+    CONTROL         "&Příště nezobrazovat (můžete později změnit v dialogu Konfigurace)",IDC_NA_NOTAGAIN,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,187,246,12
+    PUSHBUTTON      "M&ožnosti...",IDC_SHOW_CONFIG,10,204,50,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,106,204,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,161,204,50,14
+    PUSHBUTTON      "Nápověda",IDHELP,216,204,50,14
+END
+
+IDD_ENTERPASSWORD DIALOGEX 6, 15, 271, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Vložení 7-Zip hesla"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,16,12,20,20
+    LTEXT           "Tento soubor je šifrovaný. Prosím zadejte heslo pro dešifrování.",IDC_STATIC_1,48,12,214,8
+/*    LTEXT           "File:",IDC_STATIC_2,48,26,17,8
+    LTEXT           "",IDC_FILE,65,26,175,8 */
+    LTEXT           "Heslo:",IDC_STATIC_3,48,40,35,8
+    EDITTEXT        IDC_PASSWORD,87,38,165,12,ES_PASSWORD | ES_AUTOHSCROLL
+/*
+ // preparation for skip and skip all
+    DEFPUSHBUTTON   "OK",IDOK,12,63,50,14
+    PUSHBUTTON      "Skip",IDC_SKIP,72,63,50,14
+    PUSHBUTTON      "Skip all",IDC_SKIPALL,132,63,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,192,63,50,14
+*/    
+    DEFPUSHBUTTON   "OK",IDOK,146,63,50,14
+    PUSHBUTTON      "Storno",IDCANCEL,206,63,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME,             "7-Zip"
+  IDS_ABOUT,                  "O pluginu"
+  IDS_PLUGIN_DESCRIPTION,     "Vytváří, prohlíží a extrahuje 7-Zip archivy."
+  IDS_INSUFFICIENT_MEMORY,    "Nedostatek paměti."
+  IDS_CANT_LOAD_LIBRARY,      "Nelze nahrát knihovnu 7za.dll."
+  IDS_CANT_GET_CRATEOBJECT,   "Nelze získat metodu VytvořitObjekt."
+  IDS_CANT_GET_CLASS_OBJECT,  "Nelze získat třídu objektu."
+  IDS_CANT_OPEN_ARCHIVE,      "Nelze otevřít archiv '%s'."
+  IDS_CANT_OPEN_ARCHIVE_PWD,  "Nelze otevřít archiv '%s'.\nMohlo být zadáno neplatné heslo archivu."
+  IDS_ERROR,                  "Interní chyba."
+  IDS_PACKING_ARCHIVE,        "Komprimace 7-Zip archivu"
+  IDS_UNPACKING_ARCHIVE,      "Extrahování 7-Zip archivu"
+  IDS_UPDATING_ARCHIVE,       "Aktualizace 7-Zip archivu"
+  IDS_TESTING_ARCHIVE,        "Testování 7-Zip archivu"
+  IDS_TESTING_ARCHIVE_NAME    "Testuji archiv '%s'..."
+  IDS_READING_DIRTREE,        "Čtení stromu adresáře..."
+  IDS_CANT_CREATE_ARCHIVE,    "Nelze vytvořit archiv."
+  IDS_TESTARCHIVE,            "Otestovat archiv"
+  IDS_TESTARCHIVECORRUPTED,   "Archiv '%s' je poškozený."
+  IDS_TESTARCHIVEOK,          "Archiv '%s' je OK."
+  IDS_INCORRECTPASSWORD,      "Neplatné heslo"
+  IDS_INCORRECTPASSWORDBODY,  "Neplatné heslo. Prosím zadejte heslo znovu. Písmena v hesle musí být\nnapsány správnou velikostí. Ujistěte se, že CapsLock není náhodně zapnut."
+  IDS_PASSWORDSNOTMATCH,      "Heslo, které jste zadali, není stejné."
+  IDS_EMPTYPASSWORD,          "Heslo by mělo být, alespoň jeden znak dlouhé."
+  IDS_UPDATE_NOT_SUPPORTED,   "Nové operace nejsou podporovány pro tento archiv."
+  IDS_CANT_MOVE_TMPARCHIVE,   "Nelze přesunout dočasný archiv '%s'."
+  IDS_CANT_DELETE_TMPARCHIVE, "Nelze vymazat dočasný archiv '%s'."
+  IDS_7Z_UPDATE_ERROR,        "Vyskytla se chyba při aktualizaci archivu.\n\nToto není chyba Sally 7zip pluginu. Problém je v 7za.dll,\ntak prosím NE zasílejte nám hlášení o chybě, my nic o problému nevíme."
+  IDS_7Z_SOLID_DELETE_UNSUP,  "Mazání souborů ze solid archivů není podporováno."
+  IDS_CANT_UPDATE_ARCHIVE,    "Nelze aktualizovat archiv '%s'."
+  IDS_CANT_CREATE_TMPFILE,    "Nelze vytvořit dočasný soubor."
+//  IDS_CANT_CREATEMUTEX,       "Cannot create mutex."
+  IDS_ARCHIVE_CHANGED,        "Archiv '%s' byl změněn. Archiv bude znovu otevřen v panelu."
+  IDS_DELETE_ERROR,           "Chyba při odstraňování"
+  IDS_ADD_FILES_TO_ARCHIVE,   "Přidat soubory do archivu"
+  IDS_CREATE_NEW_ARCHIVE,     "Vytváření nového archivu"
+  IDS_REMOVING_FILES,         "Odstraňuji soubory..."
+  IDS_READING_ARCHIVEITEMS,   "Čtení položky archivu..."
+  IDS_UNPACKING,              "Extrahuji..."
+  IDS_PACKING,                "Komprimuji..."
+  IDS_REMOVING,               "Odstraňuji..."
+  IDS_UPDATING,               "Aktualizuji..."
+  IDS_CANCELING_OPERATION,    "Stornování operace, čekejte prosím..."
+  IDS_UNSUPPORTED_METHOD,     "Nepodporovaná metoda."
+  IDS_CRC_FAILED,             "CRC nesouhlasí."
+  IDS_UNKNOWN_ERROR,          "Neznámá chyba."
+  IDS_DATA_ERROR,             "Vyskytla se chyba v datech při extrahování souboru '%s'."
+  IDS_DATA_ERROR_PWD,         "Vyskytla se chyba v datech při extrahování souboru '%s'.\nMohlo být zadáno neplatné heslo."
+  IDS_BTN_DELETE,             "&Odstranit"
+  IDS_BTN_DELETE_ALL,         "Odstranit &vše"
+  IDS_BTN_KEEP,               "&Přeskočit"
+  IDS_BTN_KEEP_ALL,           "Přes&kočit vše"
+  IDS_ERROR_PROCESSING_FILE,  "Chyba zpracování souboru '%s'.\n\nChcete odstranit nebo přeskočit tento soubor?"
+  IDS_ERROR_PROCESSING_FILE_PWD, "Chyba zpracování souboru '%s'.\nMůže být zadáno neplatné heslo.\n\nChcete odstranit nebo přeskočit tento soubor?"
+  IDS_OVERWRITE_FILE,         "Přepisuji soubor";
+  IDS_READONLY_ARCHIVE,       "Archiv je jen pro čtení. Prosím nejprve odstraňte atribut jen pro čtení."
+  IDS_CANT_REMOVE_DIRECTORY,  "Nelze odstranit adresář '%s'"
+  IDS_CANT_READ_ARCHIVE       "Chyba čtení z archivu."
+  IDS_CANT_READ               "Chyba čtení vstupního souboru."
+  IDS_CANT_WRITE              "{!}Nelze zapsat %d bajt{|1|y|4|ů}."
+  IDS_BTN_RETRY               "Obnovit"
+  IDS_BTN_ABORT               "Přerušit"
+  IDS_STORE,                  "Bez komprimace"
+  IDS_FASTEST,                "Nejrychlejší"
+  IDS_FAST,                   "Rychlá"
+  IDS_NORMAL,                 "Normální"
+  IDS_MAXIMUM,                "Maximální"
+  IDS_ULTRA,                  "Extrémní"
+  IDS_METHOD_LZMA,            "LZMA"
+  IDS_METHOD_LZMA2,           "LZMA2"
+  IDS_METHOD_PPMD,            "PPMd"
+  IDS_PACK_UPDATE_ERROR,      "Vyskytla se chyba při komprimaci/aktualizaci archivu."
+  IDS_UNPACK_ERROR,           "Vyskytla se chyba při extrahování archivu."
+  IDS_TEST_ERROR,             "Vyskytla se chyba při testování archivu."
+  IDS_UNSUPPORTED_ARCHIVE,    "Nepodporovaný nebo neznámý typ archivu.\nSoubor archivu může být silně poškozený."
+  IDS_7Z_FATAL_ERROR          "Archiv nebyl vytvořen kvůli závažné chybě."
+  IDS_7Z_UPDATE_UNKNOWN_ERROR "Archiv nebyl aktualizován díky neznámé chybě %x."
+  IDS_7Z_CREATE_UNKNOWN_ERROR "Archiv nebyl vytvořen díky neznámé chybě %x."
+//  IDS_7Z_SOLID_UPDATE_UNSUP   "Updating files in solid archives is not supported."
+  IDS_LISTINFO_PAKEDSIZE      "Komprimovaná"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Komprimovaná velikost souboru"
+  IDS_LISTINFO_METHOD         "Metoda"
+  IDS_LISTINFO_METHOD_DESC    "Metoda komprimace"
+  IDS_ARCLOCK_ERROR           "Chyba při zamykání archivu"
+  IDS_ERRADDFILE_TOOLONG,     "Nelze přidat 1 nebo více souborů do výpisu. Plná cesta je příliš dlouhá.\nVe výpisu archivu mohou chybět některé adresáře nebo soubory."
+  IDS_ERRADDDIR_TOOLONG,      "Nelze přidat 1 nebo více adresářů do výpisu. Plná cesta je příliš dlouhá.\nVe výpisu archivu mohou chybět některé adresáře nebo soubory."
+  IDS_NAMEISTOOLONG,          "Název ""%s"" s plnou cestou je příliš dlouhý.\n\nCesta: %s"
+}

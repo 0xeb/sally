@@ -1,0 +1,116 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for unarj. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unarj/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unarj.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 6, 15, 194, 110
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "下一个压缩卷"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "请插入带有下一个压缩卷的磁盘或在磁盘上定位合适的文件。\n\n当准备完成时点击""确定""。",IDC_STATIC_1,12,9,170,32
+    LTEXT           "上一卷:",IDC_STATIC_2,12,48,60,8
+    EDITTEXT        IDC_PREVVOL,73,48,109,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "下一卷(&N):",IDC_STATIC_3,12,62,49,8
+    EDITTEXT        IDC_FILENAME,12,72,155,12
+    PUSHBUTTON      "...",IDC_BROWSE,170,72,13,12
+    DEFPUSHBUTTON   "确定",IDOK,39,91,50,14
+    PUSHBUTTON      "取消",IDCANCEL,102,91,50,14
+END
+
+IDD_ERROR DIALOGEX 15, 34, 352, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "错误"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "名称:",IDC_STATIC_1,6,10,26,8
+    LTEXT           "",IDS_FILENAME,36,10,309,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "错误:",IDC_STATIC_2,6,23,26,8,NOT WS_GROUP
+    LTEXT           "无法解压文件，因为它是从上一个卷继续的。要提取这个文件，你必须从文件开头的卷开始解压。",IDC_STATIC_3,36,23,309,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "将来不要再次显示此消息(&D)。",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,36,44,183,12
+    DEFPUSHBUTTON   "确定",IDOK,121,63,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,181,63,50,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 167, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ 配置"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "继续的文件。",IDC_STATIC_1,23,22,61,8
+    CONTROL         "当解压缩时自动跳过从上一个卷(&A)",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,10,144,12
+    LTEXT           "不显示注意。",IDC_STATIC_2,23,44,61,8
+    CONTROL         "当无法列出整个压缩包内容时(&D)",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,136,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,155,1
+    DEFPUSHBUTTON   "确定",IDOK,31,66,50,14
+    PUSHBUTTON      "取消",IDCANCEL,86,66,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 99
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ - 注意"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "不是所有多卷压缩包中的文件都能被列出(并显示在面板中)，因为一些压缩包卷无法找到。",IDC_STATIC_1,11,10,194,16
+    LTEXT           "要列出整个压缩包内容，复制所有压缩卷到相同的目录。",IDC_STATIC_2,11,33,192,16
+    CONTROL         "将来不要再次显示此消息(&D)",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,58,157,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,75,203,1
+    DEFPUSHBUTTON   "确定",IDOK,153,81,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnARJ"
+  IDS_PLUGIN_DESCRIPTION, "浏览并解压 ARJ 压缩包。"
+  IDS_ABOUT, "关于插件"
+  IDS_LOWMEM, "内存不足。"
+  IDS_ARCEOF, "未预期的压缩文件结尾。"
+  IDS_BADDATA, "压缩包已损坏。"
+  IDS_BADARC, "文件格式未知或不是有效的 ARJ 压缩包。"
+  IDS_ERROPENARC, "无法打开压缩文件。"
+  IDS_UNKNOWN, "发生未知错误。"
+  IDS_ERRACCESSARC, "无法访问压缩文件。"
+  IDS_ARJARCHIVES, "ARJ 压缩文件 (*.A*)"
+  IDS_ALLFILES, "所有文件 (*.*)"
+  IDS_BROWSEARCHIVETITLE, "选择压缩文件"
+  IDS_CRC, "压缩的数据有错误。CRC 不匹配。"
+  IDS_LIST, "无法添加压缩包项到文件列表。"
+  IDS_EXTRPROGTITLE, "正在解压 ARJ 压缩包 - %s"
+  IDS_PREPAREDATA, "正在准备数据并创建目录..."
+  IDS_EXTRACTFILES, "正在解压..."
+  IDS_EXTRACTING, "正在解压: "
+  IDS_UNABLEGETFIELPOS, "无法获取文件指针: "
+  IDS_UNABLEWRITE, "无法写入文件:"
+  IDS_UNABLESEEK, "无法设置文件指针: "
+  IDS_TOOLONGNAME, "不能完成操作，因为路径名太长。"
+  IDS_TOOLONGMASK, "不能完成操作，因为掩码太长。"
+  IDS_VERSION, "未知的压缩文件版本。"
+  IDS_TYPE, "未知的压缩文件类型。"
+  IDS_METHOD,  "文件是用 UnARJ 插件不支持的方式压缩的。"
+  IDS_ENCRYPT, "抱歉，不支持加密文件。"
+  IDS_BADVOL, "无效的卷或未知的压缩包结构。"
+  IDS_EXPIRE, "抱歉，插件已经过期。请访问我们的网站获取新版本。"
+  IDS_NOTFOUND, "文件未找到。"
+  IDS_ERROR, "错误"
+}

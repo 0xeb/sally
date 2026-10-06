@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for tar. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/tar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\tar.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "Rasfoieste si extrage arhive Unix."
+ IDS_ABOUT, "Despre Plugin"
+ IDS_TARERR_TITLE, "Eroare Plugin TAR"
+ IDS_TARERR_UNKNOWN, "Format arhiva nerecunoscut sau nesuportat."
+ IDS_TARERR_HEADER, "Date invalide in inceputul de fisier TAR - arhiva corupta."
+ IDS_TARERR_CHECKSUM, "Fisier compromis sau CRC rau - arhiva corupta."
+ IDS_TARERR_FDATA, "Eroare interna : structura date fisier corupta."
+ IDS_TARERR_BADSIG, "Semnatura bloc necunoscuta - se sare peste."
+ IDS_TARERR_NOTFOUND, "Fisierul cautat nu se gaseste in arhiva."
+ IDS_TARERR_MEMORY, "Eroare alocare memorie."
+ IDS_UNPACKPROGRESS_TITLE, "Dezarhivare"
+ IDS_UNPACKPROGRESS_TEXT, "Extrag "
+ IDS_SKIPPROGRESS_TEXT, "Sar Peste "
+ IDS_GZERR_TITLE, "Eroare GZip"
+ IDS_GZERR_BADMETHOD, "Metoda de compresie folosita este necunoscuta, nu pot extrage."
+ IDS_GZERR_ENCRYPTED, "Acest fisier este criptat. Criptarea nu este suportata in arhivele GZip."
+ IDS_GZERR_MULTIPART, "Acest fisier este parte a unei arhive multi volum. Arhivele multi volum GZip nu sunt suportate."
+ IDS_GZERR_BADFLAGS, "Marcaj necunoscut intalnit la inceputul de fisier GZip, nu pot extrage."
+ IDS_GZERR_FOPEN, "Eroare deschidere fisier arhiva: "
+ IDS_ERR_FREAD, "Eroare citire fisier arhiva: "
+ IDS_TARERR_FWRITE, "Eroare scriere in fisierul de iesire: "
+ IDS_TARERR_WRSIZE, "Functia ScrieFisier refuza sa scrie toate datele cerute."
+ IDS_GZERR_BADBLOCKTYPE, "Bloc invalid in sirul GZip, nu pot extrage."
+ IDS_ERR_INTERNAL, "Eroare interna in plugin-ul TAR, va rugam raportati eroarea la https://github.com/0xeb/sally/issues."
+ IDS_ERR_MEMORY, "Eroare alocare memorie."
+ IDS_GZERR_CRC, "Eroare CRC."
+ IDS_ERR_CORRUPT, "Date neasteptate in sirul comprimat, arhiva corupta."
+ IDS_ERR_EOF, "Sfarsit prematur fisier intalnit."
+ IDS_GZERR_SEEK, "Eroare cautare in fisierul arhiva: "
+ IDS_RPM_VIEWTITLE, "Vizualizator RPM"
+ IDS_ERR_RPMTITLE, "Eroare RPM"
+ IDS_RPMERR_TMPNAME, "Eroare creare nume fisier temporar."
+ IDS_RPMERR_TMPFILE, "Eroare creare fisier temporar."
+ IDS_ERR_NORPM, "Fisierul nu a fost recunoscut ca arhiva RPM."
+ IDS_ERR_BADRPMVERSION, "Versiunea RPM ceruta de aceasta arhiva nu este suportata."
+ IDS_ERR_BADSIGNATURE, "Semnatura arhivei RPM intalnita e necunoscuta."
+ IDS_CPIOERR_BADSIG, "Fisierul inregistrat are semnatura compromisa."
+ IDS_CPIOERR_HEADER, "Inregistrarea capului de fisier e corupta."
+ IDS_CPIOERR_FORMAT, "Format necunoscut la inceputul de fisier cpio."
+ IDS_LZH_NOT_IMPLEMENTED, "Archivele LZH nu sunt inca suportate."
+}

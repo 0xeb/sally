@@ -1,0 +1,126 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for checksum. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checksum/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checksum.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CALCULATE DIALOGEX 0, 0, 350, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+CAPTION "Calculeaza Checksums"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,340,54
+    LTEXT           "Calculeaza:",IDC_LABEL,5,68,40,8,WS_CLIPSIBLINGS
+    CONTROL         "Progres1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,48,68,107,8
+    PUSHBUTTON      "Con&figureaza...",IDC_BUTTON_CONFIGURE,162,65,63,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Salveaza...",IDC_BUTTON_SAVE,230,65,55,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "S&top",IDC_BUTTON_CLOSE,290,65,55,14,WS_CLIPSIBLINGS
+    LTEXT           "indiciu clipboard",IDC_LABEL_HINT,5,68,57,8,WS_CLIPSIBLINGS
+END
+
+IDD_VERIFY DIALOGEX 0, 0, 260, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,250,54
+    LTEXT           "Verificare:",IDC_LABEL,5,68,37,8,WS_CLIPSIBLINGS
+    CONTROL         "Progres1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,45,68,98,8
+    LTEXT           "",IDC_LABEL_RESULT,5,68,140,8,WS_CLIPSIBLINGS
+    PUSHBUTTON      "&Focus",IDC_BUTTON_FOCUS,149,65,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "&Stop",IDC_BUTTON_CLOSE,205,65,50,14,WS_CLIPSIBLINGS
+END
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 189, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configurare Checksum"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Calculeaza checksums ",IDC_STATIC_1,8,5,174,76,WS_GROUP
+    CONTROL         "&CRC/SFV",IDC_CFG_CRC,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,15,16,105,10
+    CONTROL         "&MD5",IDC_CFG_MD5,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,28,105,10
+    CONTROL         "SHA-&1",IDC_CFG_SHA1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,40,105,10
+    CONTROL         "SHA-&256",IDC_CFG_SHA256,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,52,105,10
+    CONTROL         "SHA-&512",IDC_CFG_SHA512,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,64,105,10
+    DEFPUSHBUTTON   "OK",IDOK,14,88,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,69,88,50,14
+    PUSHBUTTON      "Help",IDHELP,124,88,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "Checksum"
+ IDS_ABOUTTITLE "Despre Plugin"
+ IDS_PLUGIN_DESCRIPTION "SFV, MD5, SHA-1, SHA-256, si SHA-512 checksum verificator si calculator."
+ IDS_OUTOFMEM "Fara memorie"
+ IDS_ERROROPENING, "Eroare la deschiderea fisierului"
+ IDS_READERROR "Eroare la citire"
+ IDS_WRITEERROR "Eroare la scriere"
+ IDS_SKIPPED "Sarit Peste"
+ IDS_CALCULATING "Calculez..."
+ IDS_CANCELED "Anulat"
+ IDS_HINT "Da click dreapta pe un obiect pentru a copia checksum in clipboard."
+ IDS_COPYTOCBOARD_CRC "Copie valoare &CRC in Clipboard\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "Copie &MD5 Checksum in Clipboard\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "Copie SHA-&1 Checksum in Clipboard\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "Copie SHA-&256 Checksum in Clipboard\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "Copie SHA-&512 Checksum in Clipboard\tCtrl+5"
+ IDS_REMOVEITEM "&Elimina obiect\tSterge"
+ IDS_SAVE_TITLE  "Salveaza fisier Checksum"
+ IDS_SAVE_FILTER_CRC  "Fisiere SFV (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "Fisiere MD5 (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "Fisiere SHA-1 (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "Fisiere SHA-256 (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "Fisiere SHA-512 (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "Fisierul '%s' exista deja.\nDoriti sa-l suprascrieti?"
+ IDS_ERRORCREATINGFILE "Eroare la crearea fisierului."
+ IDS_SKIPPEDFILES "Fisierele peste care s-a sarit sau au fost anulate in timpul calcularii nu au fost salvate."
+ IDS_ERROROPENING2 "Eroare in deschiderea fisierului '%s'."
+ IDS_MISSING "Lipsesc"
+ IDS_BADEXT "Fisierul selectat nu are extensie SFV, MD5, SHA1, SHA256, nici SHA512. Doriti sa continuati oricum?"
+ IDS_BADFILE "Fisierul selectat nu este un fisier valid SFV, MD5, SHA-1, SHA-256, sau SHA-512."
+ IDS_VERIFYING "Verific..."
+ IDS_OK "OK"
+ IDS_CORRUPT "Corupt"
+ IDS_MENU_CALCULATE "&Calculez Checksums..."
+ IDS_MENU_VERIFY "&Verific Checksums..."
+ IDS_CONFIG_CONFLICT "Configurarea e deja deschisa."
+ IDS_CONFIG_CHANGES_EFFECT "Schimbarile vor avea efect cand fereastra ""Calculeaza Checksums"" este deschisa data viitoare."
+ IDS_ALLOK "Toate fisierele OK"
+ IDS_RESULT "%d corupte, %d lipsa, %d sarite peste"
+ IDS_BUSY "Sally este ocupat. Comanda ceruta nu poate fi indeplinita, va rog incercati mai tarziu."
+ IDS_CLOSE "&Inchide"
+ IDS_READINGTREE "Citesc arborele director, va rugam asteptati..."
+ IDS_ERRORREADINGDIR "Eroare in citirea directorului"
+ IDS_NOFILES "Nu sunt fisiere"
+ IDS_VERIFYTITLE "Verific Checksums"
+ IDS_VERIFY_CRC "Verific CRC"
+ IDS_VERIFY_MD5 "Verific MD5"
+ IDS_VERIFY_SHA1 "Verific SHA-1"
+ IDS_VERIFY_SHA256 "Verific SHA-256"
+ IDS_VERIFY_SHA512 "Verific SHA-512"
+ IDS_COLUMN_FILE "Fisier"
+ IDS_COLUMN_SIZE "Marime"
+ IDS_COLUMN_STATUS "Status"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "Nu pot termina operatiunea din cauza numelui prea lung."
+}

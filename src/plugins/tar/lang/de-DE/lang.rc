@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for tar. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/tar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\tar.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "Durchsucht und entpackt Unix Archive."
+ IDS_ABOUT, "Über Plugin"
+ IDS_TARERR_TITLE, "Fehler im TAR-Plugin"
+ IDS_TARERR_UNKNOWN, "Archivformat wird nicht erkannt oder nicht unterstützt."
+ IDS_TARERR_HEADER, "Ungültige Daten im TAR-Kopf - Archiv beschädigt."
+ IDS_TARERR_CHECKSUM, "Fehlerhafte Datei- oder Kopfprüfsumme - Archiv beschädigt."
+ IDS_TARERR_FDATA, "Interner Fehler: Dateidatenstruktur beschädigt."
+ IDS_TARERR_BADSIG, "Unbekannte Blocksignatur - übersprungen."
+ IDS_TARERR_NOTFOUND, "Angeforderte Datei nicht im Archiv gefunden."
+ IDS_TARERR_MEMORY, "Speicherzuordnungsfehler."
+ IDS_UNPACKPROGRESS_TITLE, "Entpacke TAR-Archiv"
+ IDS_UNPACKPROGRESS_TEXT, "Entpacke "
+ IDS_SKIPPROGRESS_TEXT, "Überspringe "
+ IDS_GZERR_TITLE, "GZip Fehler"
+ IDS_GZERR_BADMETHOD, "Unbekanntes Kompressionsverfahren, kann die Daten nicht entpacken."
+ IDS_GZERR_ENCRYPTED, "Diese Datei ist verschlüsselt. Verschlüsselung wird in GZip-Archiven nicht unterstützt."
+ IDS_GZERR_MULTIPART, "Diese Datei ist Teil eines mehrteiligen Archivs. Mehrteilige GZip-Archive werden nicht unterstützt."
+ IDS_GZERR_BADFLAGS, "Unbekannte Kennung im GZip-Kopf gefunden, entpacken nicht möglich."
+ IDS_GZERR_FOPEN, "Fehler beim Öffnen der Archivdatei: "
+ IDS_ERR_FREAD, "Fehler beim Lesen der Archivdatei: "
+ IDS_TARERR_FWRITE, "Fehler beim Schreiben der Ausgabedatei: "
+ IDS_TARERR_WRSIZE, "Die Funktion 'WriteFile' hat nicht alle angeforderten Daten geschrieben."
+ IDS_GZERR_BADBLOCKTYPE, "Ungültiger Block im GZip-Strom gefunden, entpacken nicht möglich."
+ IDS_ERR_INTERNAL, "Interner Fehler im TAR-Plugin, bitte melden Sie ihn auf https://github.com/0xeb/sally/issues."
+ IDS_ERR_MEMORY, "Speicherzuordnungsfehler."
+ IDS_GZERR_CRC, "CRC Fehler."
+ IDS_ERR_CORRUPT, "Unerwartete Daten im Kompressionsstrom, Archiv beschädigt."
+ IDS_ERR_EOF, "Vorzeitiges Dateiende erreicht."
+ IDS_GZERR_SEEK, "Fehler beim Suchen in der Archivdatei: "
+ IDS_RPM_VIEWTITLE, "RPM-Betrachter"
+ IDS_ERR_RPMTITLE, "RPM Fehler"
+ IDS_RPMERR_TMPNAME, "Fehler beim Erstellen des temporären Dateinamens."
+ IDS_RPMERR_TMPFILE, "Fehler beim Erstellen der temporären Datei."
+ IDS_ERR_NORPM, "Die Datei wurde nicht als RPM-Archiv erkannt."
+ IDS_ERR_BADRPMVERSION, "Die von diesem Archiv verlangte RPM-Version wird nicht unterstützt."
+ IDS_ERR_BADSIGNATURE, "Unbekannte RPM-Archivsignatur gefunden."
+ IDS_CPIOERR_BADSIG, "Ein Dateisatz hat eine falsche Signatur."
+ IDS_CPIOERR_HEADER, "Fehlerhafter Dateikopfsatz."
+ IDS_CPIOERR_FORMAT, "Unbekanntes Format des Cpio-Kopfes."
+ IDS_LZH_NOT_IMPLEMENTED, "LZH-Archive werden zur Zeit nicht unterstützt."
+}

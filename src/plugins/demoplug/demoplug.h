@@ -22,9 +22,9 @@
 //#define ENABLE_DYNAMICMENUEXT
 
 // global data
-extern const wchar_t* PluginNameEN; // untranslated plugin name, used before the language module loads and for debug purposes
+extern const wchar_t* PluginNameEN; // untranslated plugin name, used before the translated resources are needed and for debug purposes
 extern HINSTANCE DLLInstance;    // handle to the SPL - language-independent resources
-extern HINSTANCE HLanguage;      // handle to the SLG - language-dependent resources
+extern HINSTANCE HLanguage;      // handle to the module with language-dependent resources (this DLL)
 
 // general Salamander interface - valid from startup until the plugin terminates
 extern CSalamanderGeneralAbstract* SalamanderGeneral;

@@ -1,0 +1,213 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for undelete. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/undelete/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\undelete.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Visszaállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,12,326,8
+    LTEXT           "",IDC_PROGRESSBAR,37,32,290,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Mégse",IDCANCEL,144,54,50,14
+    LTEXT           "Teljes:",IDC_STATIC_1,10,33,25,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Visszaállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Válasszon analizálan&dó lemezt",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "&Lemezkép",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,51,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,361,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Tallóz...",IDC_BUTTON_BROWSE,379,178,50,14,WS_GROUP
+    CONTROL         "Szabad klaszterek &vizsgálata a FAT partíciókon",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,184,10
+    CONTROL         "Lét&ező fájlok és mappák",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "&Nulla méretű fájlok",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "Ü&res mappák",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "&Metafájlok",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "Becsült &fájlsérülés",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "OK",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "Súgó",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 356, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Visszaállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Visszaállítás",IDC_LABEL_UNDELETING,3,11,43,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,50,11,301,8
+    RTEXT           "ide",IDC_STATIC_1,3,23,43,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,50,23,301,8
+    RTEXT           "Fájl:",IDC_STATIC_2,3,41,43,8
+    LTEXT           "",IDC_PROGRESS_FILE,50,40,293,12,NOT WS_GROUP
+    RTEXT           "Teljes:",IDC_STATIC_3,3,56,43,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,50,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Mégse",IDCANCEL,153,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 213, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Sérült fájlnév"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "A következő fájlnév első betűje nem állítható helyre. Adja meg az eredeti karaktert.",IDC_STATIC_1,7,7,199,16
+    EDITTEXT        IDC_EDIT_FILENAME,7,27,199,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,44,53,50,14
+    PUSHBUTTON      "&Mind",IDC_BUTTON_ALL,100,53,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,156,53,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 277, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Visszaállítási beállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Al&ternatív ideiglenes mappa fájlok megnézéséhez:",IDC_STATIC_1,7,7,169,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,242,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,255,17,16,14,WS_GROUP
+    CONTROL         "Mindig használja az előző klaszte&rből szerzett információt FAT-on",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,230,10
+    CONTROL         "Ne &szóljon, ugyanarra a logikai lemezre történő visszaállításkor",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,221,10
+    CONTROL         "N&e szóljon titkosított fájlok visszaállítása előtt FAT-ra vagy exFAT-ra",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,245,10
+    DEFPUSHBUTTON   "OK",IDOK,111,80,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,166,80,50,14
+    PUSHBUTTON      "Súgó",IDHELP,221,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 276, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Titkosított fájlok helyreállítása biztonsági mentésből"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "A funkció helyreállítja a korábban visszaállított titkosított fájlokat egy titkosított fájlrendszer (EFS) nélküli partícióra, mint a FAT. A szokásos fájlok (más mint *.bak) módosítatlanul átmásolódnak.",IDC_STATIC_1,7,7,262,24
+    LTEXT           "%s &visszaállítása ide:",IDC_LABEL_SOURCE,7,41,262,8
+    EDITTEXT        IDC_EDIT_TARGET,7,51,244,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,255,51,14,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,57,74,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,113,74,50,14
+    PUSHBUTTON      "Súgó",IDHELP,169,74,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_LOWMEM, "Nincs elég memória."
+  IDS_ERRORREADINGMFT, "MFT klaszter olvasási hiba."
+  IDS_MFTRECORDDAMAGED, "MFT olvasási hiba: az első rekord sérült."
+  IDS_ROOTNOTFOUND, "Nem található a gyökér mappa."
+  IDS_VDIRECTORY, "Mappa%06d"
+  IDS_ALLDELETEDFILES, "{Minden törölt fájl}"
+  IDS_ERRORNOTNTFS, "Belső hiba: nem NTFS kötet."
+  IDS_ERRORNOTOPEN, "Belső hiba: nem nyitott kötet."
+  IDS_ERROROPENINGVOLUME, "Kötet megnyitási hiba."
+  IDS_ERRORREADINGBOOT, "Boot szektor olvasási hiba."
+  IDS_ERRORVOLUMETYPE, "Ismeretlen kötet típus, csak FAT 12, 16, 32 és NTFS kötet támogatott."
+  IDS_READINGMFT, "MFT olvasása..."
+  IDS_ERRORREADINGFAT, "FAT olvasási hiba."
+  IDS_ERRORREADINGDIRCLUSTERS, "Mappa klaszterek olvasási hiba."
+  IDS_ERRORNOTFAT, "Belső hiba: nem FAT kötet."
+  IDS_LOADINGFAT, "FAT olvasása..."
+  IDS_READINGDIRS, "Mappák olvasása..."
+  IDS_READINGEXISTINGDIRS, "Létező mappák olvasása..."
+  IDS_READINGDELETEDDIRS, "Törölt mappák olvasása..."
+  IDS_SCANNINGVACANTCLUSTERS, "Szabad klaszterek vizsgálata..."
+  IDS_REUSESCANNEDINFO, "Biztos fel akarja használni az előző klaszter vizsgálat információját?"
+  IDS_RELOADINGCLUSTERS, "Előzőleg talált klaszterek újratöltése..."
+  IDS_FLOPPY350, "3.5 Floppy"
+  IDS_FLOPPY525, "5.25 Floppy"
+  IDS_FLOPPY800, "8.0 Floppy"
+  IDS_COMPACT_DISK, "Optikai lemez"
+  IDS_LOCAL_DISK, "Helyi lemez"
+  IDS_REMOVABLE_DISK, "Cserélhető lemez"
+  IDS_ANALYZINGDIRS, "Mappák analizálása..."
+  IDS_INCOMPLETEMFT, "Nem lehetett az egész MFT-t (Master File Table) átvizsgálni. Meg akarja jeleníteni a részleges eredményt?"
+  IDS_BITMAPNOTFOUND, "Sikertelen bemérés $Bitmap a kötetben. Fájl sérülési becslés megszakítva."
+  IDS_BITMAPNOSTREAM, "Az alap fájlfolyam bemérése sikertelen $Bitmap. Fájl sérülési becslés megszakítva."
+  IDS_LOWMEMBITMAP, "Nincs elég memória a bitmap klaszter fájl betöltéséhez. Fájl sérülési becslés kihagyva."
+  IDS_ERRORREADINGBMP, "Olvasási hiba $Bitmap fájl. Fájl sérülési becslés megszakítva."
+  IDS_BITMAPISEMPTY, "$Bitmap mérete nulla. Fájl sérülési becslés megszakítva."
+}
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "Visszaállítás"
+  IDS_DESCRIPTION, "Fájlok helyreállítása FAT vagy NTFS partíciókon."
+  IDS_ABOUTTITLE, "Plugin névjegy"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{Metafájlok}"
+  IDS_PATHDISK, "Az elérésnek tartalmaznia kell a lemezt."
+  IDS_PATHFILE, "Az elérési út egy fájlhoz vezet. A fájl nem nyitható meg."
+  IDS_PATHNOTFOUND, "Elérési út nem, található."
+  IDS_IMAGENOTFOUND, "A fájl megadás nem található."
+  IDS_ERROROPENINGPROGRESS, "Folyamat ablak megnyitási hiba."
+  IDS_VOLENUMERATE, "Rendszerkötetek felmérési hiba."
+  IDS_OPENINGVOLUME, "Kötet megnyitása..."
+  IDS_SCANNINGFOUND, "{!}Szabad klaszterek vizsgálata... (%d mappa klaszter{|1|} találat)"
+  IDS_ALWAYSCHOOSEYES, "Mindig Igen válasz (ha kell, visszaállíthatja a Beállításokban)"
+  IDS_PATHTOOLONG, "a cél elérési út túl hosszú"
+  IDS_QUESTION, "Kérdés"
+  IDS_WANTCANCEL, "Biztos megszakítja a műveletet?"
+  IDS_BADPATH, "Visszaállítás archívumokba vagy plugin fájlrendszerekbe nem támogatott."
+  IDS_ERROR, "Hiba" // title of error messages
+  IDS_VIEW, "Nézet" // the function "F3"
+  IDS_TEMPDIR, "%c fájlok megtekintéséhez: meg kell adnia egy alternatív ideiglenes mappát egy meghajtón, amely nem a(z) %c:"
+  IDS_WAIT, "Fájl visszaállítása egy ideiglenes mappába, kérem várjon"
+  IDS_ENCRYPTEDWARNING, "A cél kötet nem támogatja a titkosított fájlrendszert (EFS).\n\nA titkosított fájlok biztonsági mentés formátumba lesznek visszaállítva, melyből később helyreállíthatóak a fájlok egy NTFS partícióra a ""Pluginok/Visszaállítás/Titkosított fájlok visszaállítása mentésből"" paranccsal."
+  IDS_DONTSHOWAGAIN, "Ne mutassa újra"
+  IDS_CHOOSETEMPDIR, "Válasszon alternatív ideiglenes mappát:"
+  IDS_SAMEPARTITION, "Úgy látszik ugyanarra a logikai lemezre állít vissza, ahol a törölt fájl(ok) vannak. Mindig egy másik partícióra kellene visszaállítania, különben a visszaállítandó fájlokat önmagukat írják felül vagy más törölt fájlok vesznek el.\n\nTipp: ha nincs több partíciója, visszaállíthat floppy-ra vagy USB lemezre."
+  IDS_UNDELETECMD, "Tö&rölt fájlok és mappák visszaállítása..."
+  IDS_ERRORENCRYPTED, "A titkosított fájl nem állítható vissza: "
+  IDS_RESTORECMD, "Titkosított fájlok visszaállítása biztonsági m&entésből..."
+  IDS_CANNOTVIEW, "A fájl nem nézhető meg -az ideiglenes mappa nem támogatja a titkosított fájlrendszert (EFS)"
+  IDS_CHOOSETARGET, "Válasszon cél mappát"
+  IDS_RESTORE, "Visszaállít" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "Visszaállítás" // label inside the progress dialog
+  IDS_READINGTREE, "Mappafa olvasása..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "A cél kötet nem támogatja a titkosított fájlrendszert (EFS)."
+  IDS_VOLUME_MOUNT, "Csatlakozási pont"
+  IDS_VOLUME_NAME, "Név"
+  IDS_VOLUME_FORMAT, "Formátum"
+  IDS_VOLUME_SIZE, "Méret"
+  IDS_VOLUME_FREE, "Szabad"
+  IDS_VOLUME_FREEPROC, "% szabad"
+  IDS_VOLUME_VOLID, "GUID elérési út"
+  IDS_CONDITION, "Állapot"
+  IDS_CONDITIONDESC, "Fájl sérülési becslés"
+  IDS_CONDITION_GOOD, "Jó"
+  IDS_CONDITION_FAIR, "Kielégítő"
+  IDS_CONDITION_POOR, "Gyenge"
+  IDS_CONDITION_LOST, "Elveszett"
+  IDS_CONDITION_UNKNOWN, "Ismeretlen"
+  IDS_UNDELETEINCHDRVMENU, "\tVisszaállítás"
+  IDS_PARTIALRECOVER, "A következő fájlt nem lehet teljesen visszaállítani: %s\n\nSzeretné a fájl töredékét visszaállítani?"
+  IDS_PARTIALRECOVER_DONTASK, "Választás megjegyzése"
+  IDS_ERRORRECOVER, "Fájl visszaállítási hiba: %s"
+}

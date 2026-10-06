@@ -1,0 +1,482 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for renamer. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/renamer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\renamer.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_RENAME DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Kötegelt átnevezés"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_MENUSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,368,1
+    LTEXT           "&Maszk:",IDC_STATIC_1,16,11,51,8
+    COMBOBOX        IDC_MASK,70,9,95,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Almapp&ákban is",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,10,86,12
+    PUSHBUTTON      "Átne&vezés",IDOK,301,9,60,14
+    CONTROL         "Kéz&i mód",IDC_MANUAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,27,44,12
+    CONTROL         "",IDS_MANSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,52,32,310,1
+    EDITTEXT        IDE_MANUAL,6,41,355,138,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Új &név:",IDS_LABELNEWNAME,16,43,51,8
+    COMBOBOX        IDC_NEWNAME,70,41,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_NEWNAME,349,41,12,12
+    LTEXT           "Csere",IDS_LABELREPLACE,6,60,21,8
+    CONTROL         "",IDS_REPLACESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,29,64,333,1
+    LTEXT           "Kere&s:",IDS_LABELSEARCHFOR,16,77,51,8
+    COMBOBOX        IDC_SEARCH,70,75,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_SEARCH,349,75,12,12
+    LTEXT           "&Csere ezzel:",IDS_LABELREPLACEWITH,16,94,51,8
+    COMBOBOX        IDC_REPLACE,70,92,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_REPLACE,349,92,12,12
+    CONTROL         "N&agybetű érzékeny",IDC_CASESENSITIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,70,109,76,12
+    CONTROL         "Eg&yszer egy névben",IDC_GLOBAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,70,123,94,12
+    CONTROL         "Tel&jes szavak",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,109,60,12
+    CONTROL         "Sza&bályos kifejezés",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,123,77,12
+    CONTROL         "&Kiterjesztés kizárása",IDC_EXCLUDEEXT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,265,109,82,12
+    LTEXT           "Betű módosítása",IDS_LABELCASE,6,139,58,8
+    CONTROL         "",IDS_CHANGECASESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,66,143,296,1
+    LTEXT           "&Fájlnév:",IDS_LABELNAME,16,155,51,8
+    COMBOBOX        IDC_NAMECASE,70,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Kite&rjesztés:",IDS_LABELEXT,186,155,44,8
+    COMBOBOX        IDC_EXTCASE,236,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Elérési ú&ttal",IDC_PATHPART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,70,170,92,12
+    LTEXT           "E&lőnézet:",IDS_PREVIEW,6,182,51,8
+    RTEXT           "",IDS_COUNT,100,182,261,8
+    CONTROL         "",IDL_PREVIEW,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,0,192,368,68
+END
+
+IDD_CUT DIALOGEX 9, 20, 225, 88
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Részkarakter hozzáadása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ré&szkaraktere:",IDC_STATIC_1,7,9,55,8
+    COMBOBOX        IDC_CUTFROM,69,7,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Kez&dő pozíció",IDC_STATIC_2,7,28,55,8
+    EDITTEXT        IDE_START,69,26,48,12,ES_AUTOHSCROLL
+    LTEXT           "viszonyítva",IDC_STATIC_3,126,28,38,8
+    COMBOBOX        IDC_START,170,26,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Vég pozíció",IDC_STATIC_4,7,47,55,8
+    EDITTEXT        IDE_END,69,45,48,12,ES_AUTOHSCROLL
+    LTEXT           "viszonyítva",IDC_STATIC_5,126,47,38,8
+    COMBOBOX        IDC_END,170,45,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,69,67,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,123,67,50,14
+END
+
+IDD_COUNTER DIALOGEX 9, 20, 168, 130
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Számláló hozzáadása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Kezdé&s:",IDC_STATIC_1,7,9,36,8
+    EDITTEXT        IDE_START,61,7,100,12,ES_AUTOHSCROLL
+    LTEXT           "Lé&pés:",IDC_STATIC_2,7,25,36,8
+    EDITTEXT        IDE_STEP,61,23,100,12,ES_AUTOHSCROLL
+    LTEXT           "&Alap:",IDC_STATIC_3,7,41,36,8
+    COMBOBOX        IDC_BASE,61,39,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Min. szélesség:",IDC_STATIC_4,7,57,53,8
+    EDITTEXT        IDE_MINWIDTH,61,55,100,12,ES_AUTOHSCROLL
+    LTEXT           "&Kitöltés:",IDC_STATIC_5,7,73,51,8
+    COMBOBOX        IDC_FILL,61,71,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Ba&lra igazítás",IDC_LEFT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,90,76,12
+    DEFPUSHBUTTON   "OK",IDOK,32,109,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,86,109,50,14
+END
+
+IDD_DEFINESET DIALOGEX 9, 20, 269, 192
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Karakterkészlet megadása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Karakterké&szlet:",IDC_STATIC_1,7,7,65,8
+    EDITTEXT        IDE_SET,7,17,255,12,ES_AUTOHSCROLL
+    LTEXT           "Megjegyzés:\n\nA '-' karaktert használja karakteres tartomány megadásához (pl. A-Z).\n\n'-' karakter megadásához írja azt a megadás elejére vagy végére (pl. -AZ).",IDC_STATIC_2,7,36,255,40
+    LTEXT           "']' karakter beszúrásához írja a megadás elejére.\n\n'^' karakter megadásához írja azt bárhova, kivéve a megadás elejére.",IDC_STATIC_3,7,84,255,32
+    LTEXT           "Egy POSIX karakter beszúrásához használja a class-t [:class:], ahol a class egy alpha, alnum, ascii, blank, cntrl, digit, graph, lower, print, punct, space, upper, word, xdigit.\n\nFordított perjel beszúrása: \\\\.",IDC_STATIC_4,7,124,255,40
+    DEFPUSHBUTTON   "OK",IDOK,82,171,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,136,171,50,14
+END
+
+IDD_SUBEXPRESSION DIALOGEX 9, 20, 192, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Alkifejezés megadása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Alkifejezé&si szám:",IDC_STATIC_1,7,9,82,8
+    COMBOBOX        IDC_NUMBER,95,7,90,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Megj.: 0-val teljes kifejezésbeli egyezés.",IDC_STATIC_2,7,23,177,8
+    LTEXT           "&Betű:",IDC_STATIC_3,7,37,75,8
+    COMBOBOX        IDC_CASE,95,35,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,44,57,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,98,57,50,14
+END
+
+IDD_PROGRESS DIALOGEX 6, 15, 194, 60
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Átnevező"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDS_MESSAGE,7,7,180,8
+    LTEXT           "",IDS_PROGRESS,7,22,180,10,0,WS_EX_STATICEDGE
+    DEFPUSHBUTTON   "Mégse",IDCANCEL,72,39,50,14
+END
+
+IDD_COMMAND DIALOGEX 9, 20, 368, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Parancssor végrehajtása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Paran&cs:",IDC_STATIC_1,7,7,82,8
+    COMBOBOX        IDC_COMMAND,7,17,354,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,257,37,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,311,37,50,14
+END
+
+IDD_ERROR DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Parancssori hiba"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "A parancs talán nem sikeresen fejeződött be.",IDC_STATIC_1,7,7,218,8
+    LTEXT           "Parancssor:",IDC_STATIC_2,7,22,54,8
+    EDITTEXT        IDE_COMMAND,61,22,300,8,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    LTEXT           "Kilépési kód:",IDC_STATIC_3,7,34,54,8
+    LTEXT           "",IDS_EXITCODE,63,34,298,8
+    LTEXT           "&Std-hiba:",IDC_STATIC_4,7,46,82,8
+    EDITTEXT        IDE_STDERR,7,56,354,176,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON   "Kihagy",IDOK,257,239,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,311,239,50,14
+END
+
+IDD_CONFIG DIALOGEX 45, 31, 257, 160
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Átnevező haladó beállításai"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Külső szerkesztő beállításai kézi módhoz:",IDC_STATIC_1,7,7,240,8
+    LTEXT           "Paran&cs:",IDC_STATIC_2,14,21,52,8
+    EDITTEXT        IDE_COMMAND,68,19,166,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_BROWSE,237,19,13,12,WS_GROUP
+    LTEXT           "P&araméterek:",IDC_STATIC_3,14,37,52,8
+    EDITTEXT        IDE_ARGUMENTS,68,35,166,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ARGHELP,237,35,13,12,WS_GROUP
+    LTEXT           "&Induló mappa:",IDC_STATIC_4,14,53,53,8
+    EDITTEXT        IDE_INITDIR,68,51,166,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_INITDIRHELP,237,51,13,12,WS_GROUP
+    LTEXT           "Kézi mód betűtípus:",IDC_STATIC_5,7,74,113,8
+    PUSHBUTTON      "&Módosítás",IDB_FONT,14,84,50,14,WS_GROUP
+    LTEXT           "Megerősítések:",IDC_STATIC_6,7,109,60,8
+    CONTROL         "Fő ablak bezárása az &ESC gombbal.",IDC_CONFIRMESCCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,118,201,12
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,7,138,243,1
+    DEFPUSHBUTTON   "OK",IDOK,92,142,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,146,142,50,14
+    PUSHBUTTON      "Súgó",IDHELP,200,142,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Átnevező"
+  IDS_DESCRIPTION, "Hasznos kötegelt átnevező valós idejű előnézettel."
+  IDS_ABOUT, "Plugin névjegy"
+  IDS_RENAMERERR, "Átnevező - Hiba"
+  IDS_LOWMEM, "Kevés memória."
+  IDS_PLUGMENU_RENAME, "&Kötegelt átnevezés..."
+  IDS_PLUGMENU_UNDO, "&Visszavonás..."
+  IDS_RENAME, "Á&tnevezés"
+  IDS_VALIDATE, "Ér&vényesítés"
+  IDS_ORIGNAME_COLUMN, "Eredeti név"
+  IDS_NEWNAME_COLUMN, "Új név"
+  IDS_SIZE_COLUMN, "Méret"
+  IDS_DATE_COLUMN, "Dátum"
+  IDS_TIME_COLUMN, "Idő"
+  IDS_PATH_COLUMN, "Elérési út"
+
+  // menu
+  IDS_MENU_FILE, "&Parancsok"
+  IDS_MENU_VIEW, "Né&zet"
+  IDS_MENU_OPTIONS, "Beállítás&ok"
+  IDS_MENU_HELP, "Sú&gó"
+  IDS_MENU_RENAME, "Á&tnevezés\tAlt+R"
+  IDS_MENU_VALIDATE, "Ér&vényesítés\tCtrl+I"
+  IDS_MENU_EXIT, "&Kilépés\tAlt+F4"
+  IDS_MENU_SORTOLD, "Rendezés eredeti né&v szerint\tCtrl+F1"
+  IDS_MENU_SORTNEW, "Rendezés új &név szerint\tCtrl+F1"
+  IDS_MENU_SORTSIZE, "Rendezé&s méret szerint\tCtrl+F2"
+  IDS_MENU_SORTTIME, "Rendezés idő szerin&t\tCtrl+F3"
+  IDS_MENU_SORTPATH, "Ren&dezés elérési út szerint\tCtrl+F4"
+  IDS_MENU_FILENAMES, "Fájl&nevek átnevezése\tCtrl+N"
+  IDS_MENU_RELATIVEPATH, "&Relatív elérési út átnevezése\tCtrl+R"
+  IDS_MENU_FULLPATH, "&Teljes elérési út átnevezése\tCtrl+F"
+  IDS_MENU_FONT, "Kézi &módú betűtípus..."
+  IDS_MENU_LAST, "Uto&ljára használt\tCtrl+L"
+  IDS_MENU_RESET, "Alapbeállítá&s\tCtrl+D"
+  IDS_MENU_REGEXP, "&Szabályos kifejezések"
+  IDS_MENU_CUSTOMFONT, "&Egyéni betűtípus..."
+  IDS_MENU_AUTOFONT, "Az &alapértelmezett betűtípus használata"
+  IDS_MENU_REMOVESOURCEPATH, "Ür&es mappák törlése"
+  IDS_MENU_UNDO, "V&isszavonás\tCtrl+U"
+  IDS_MENU_EDIT, "Sz&erkesztés"
+  IDS_MENU_STORELIST, "Li&sta mentése vágólapra\tF2"
+  IDS_MENU_LOADLIST, "L&ista betöltése vágólapról\tF3"
+  IDS_MENU_EDITLIST, "Lis&ta megnyitása Külső szerkesztőben...\tF4"
+  IDS_MENU_FILTER, "&Lista szűrése parancssorral...\tF5"
+  IDS_MENU_ALLFILES, "&Minden fájl\tF6"
+  IDS_MENU_RENAMED, "Sike&resen átnevezett fájlok\tF7"
+  IDS_MENU_NOTRENAMED, "Át &nem nevezett fájlok\tF8"
+  IDS_MENU_ADVANCED, "H&aladó..."
+  IDS_MENU_BATCHRENDLG, "&Kötegelt átnevezési súgó\tF1"
+
+  IDS_VAR_ORIGNAME, "$(OriginalName)"
+  IDS_CASE_DONTCHANGE, "Nincs változás"
+  IDS_CASE_LOWER, "Kisbetű"
+  IDS_CASE_UPPER, "Nagybetű"
+  IDS_CASE_MIXED, "Vegyes betű"
+  IDS_INVALIDMASK, "Érvénytelen maszk."
+  IDS_TOOLONGPATH, "A mappa nem olvasható, mert túl hosszú az elérési útja"
+  IDS_ERRREADDIR, "A mappa nem olvasható."
+  IDS_ERROR, "Hiba"
+  IDS_DIRTEXT, "DIR"
+  IDS_CANCELCNFRM, "Biztos megszakítja a műveletet?"
+  IDS_QUESTION, "Kérdés"
+  IDS_VAR_ORIGINALNAME, "Eredeti név"
+  IDS_VAR_DRIVE, "Meghajtó"
+  IDS_VAR_PATH, "Elérési út"
+  IDS_VAR_RELATIVEPATH, "Relatív elérési út"
+  IDS_VAR_NAME, "Név"
+  IDS_VAR_NAMEPART, "Név rész"
+  IDS_VAR_EXTPART, "Kiterjesztés rész"
+  IDS_VAR_SIZE, "Méret"
+  IDS_VAR_TIME, "Idő"
+  IDS_VAR_DATE, "Dátum"
+  IDS_VAR_COUNTER, "Számláló..."
+  IDS_VAR_LOWER, "Kisbetű"
+  IDS_VAR_UPPER, "Nagybetű"
+  IDS_VAR_MIXED, "Vegyes betű"
+  IDS_VAR_STRIPDIA, "Ékezetek elhagyása"
+  IDS_VAR_CUT, "Részkarakter..."
+  IDS_LEFT, "start"
+  IDS_RIGHT, "vége"
+  IDS_BADCUTOFFSET, "Pozitív értéket adjon meg."
+  IDS_DECIMAL, "Decimális"
+  IDS_HEX_LOWER, "Hexadecimális (abcdef)"
+  IDS_HEX_UPPER, "Hexadecimális (ABCDEF)"
+  IDS_FILL_SPACES, "Szünetek"
+  IDS_FILL_ZEROS, "Nullák"
+  IDS_FILL_UNDERSCORES, "Aláhúzások"
+
+  IDS_EXP_UNMATCHEDPAR, "A változók nevét ')' karakterrel kell lezárni."
+  IDS_EXP_VARNOTFOUND, "A változó nem található."
+  IDS_EXP_UNEXPECTEDCHAR, "Változónév vagy '$' szükséges a zárójelben."
+  IDS_EXP_SMALLBUFFER, "A kiterjesztett karaktersor túl nagy."
+  IDS_EXP_TRAILINGDOLLAR, "Váratlan karaktersor-vég. A '$' karaktert változónévnek vagy '$' karakternek kell követnie."
+  IDS_EXP_EMPTYSTR, "Az üres karaktersor itt nem engedélyezett."
+  IDS_EXP_UNEXPECTARG, "Itt nincs szükség paraméterre."
+  IDS_EXP_EXPECTCUTORCASE, "Nagybetű megadás szükséges ('kicsi', 'nagy', 'kevert', vagy 'ékezetlevágás') vagy névlevágás (két egész szám)."
+  IDS_EXP_EXPECTENDCUT, "Névlevágási lezárás szükséges (egész szám)."
+  IDS_EXP_UNEXPECTEDARGUMENT, "Váratlan paraméter."
+  IDS_EXP_MISTIMEFORMAT, "Hiányzó idő formátum."
+  IDS_EXP_INVALIDTIMEFMT, "Érvénytelen idő formátum."
+  IDS_EXP_MISDATEFORMAT, "Hiányzó dátum formátum"
+  IDS_EXP_INVALIDDATEFMT, "Érvénytelen dátum formátum."
+  IDS_EXP_TOOMUCHARGUMENTS, "Túl sok paraméter."
+  IDS_EXP_EXPECTSTART, "Számláló kezdés szükséges (egész szám)."
+  IDS_EXP_EXPECTSTEP, "Léptetés szükséges (lebegőpontos szám)."
+  IDS_EXP_EXPECTBASEALIGNWIDTH, "Alap- (az egyik 'dxX'), igazítási- ('l') vagy szélességmegadás (pozitív egész szám) szükséges."
+  IDS_EXP_EXPECTALIGNWIDTH, "Igazítási- ('l') vagy szélességmegadás (pozitív egész szám) szükséges."
+  IDS_EXP_EXPECTWIDTH, "Szélességmegadás szükséges (pozitív egész szám)"
+  IDS_EXP_EXPECTFILL, "Kitöltésmegadás szükséges (egy betű)"
+
+  IDS_NEWNAMEERR, "<Új név hiba: %s>"
+  IDS_TRANSFERERROR, "<Érvénytelen érték néhány beviteli mezőben>"
+  IDS_REGEXPERR, "<Szabványos kifejezés hiba: %s>"
+  IDS_BMERR, "<Boyer-Moore hiba: %s>"
+  IDS_GENERICERR, "<Hiba: %s>"
+  IDS_REPLACEERR, "<Cserélési minta hiba: %s>"
+
+  IDS_REP_EXPCLOSEPAR1, "Lezáró zárójel vagy nagybetű megadás ('kicsi', 'nagy', 'kevert', vagy 'ékezetlevágás') szükséges."
+  IDS_REP_EXPCLOSEPAR2, "Lezáró zárójel szükséges."
+  IDS_REP_EXPCLOSEPAR3, "Lezáró zárójel vagy ':' karakter után nagybetű megadás szükséges ('kicsi', 'nagy', 'kevert', vagy 'ékezetlevágás')."
+  IDS_REP_BADREF, "Nem definiált alkifejezés referenciája."
+  IDS_EXP_EXPECTSUBNUM1, "Alkifejezési szám szükséges"
+  IDS_EXP_EXPECTSUBNUM2, "Alkifejezési szám, zárójeles alkifejezési szám vagy '$' karakter szükséges."
+  IDS_EXP_TRAILINGBACKSLASH, "Váratlan szövegvég. A fordított perjel nem állhat a végén."
+
+  IDS_REENOERROR, "Nincs hiba."
+  IDS_REELOWMEMORY, "Kevés memória."
+  IDS_REEEMPTY, "A szabványos kifejezés üres."
+  IDS_REETOOBIG, "A szabványos kifejezés túl nagy."
+  IDS_REETOOMANYPARENTHESISES, "Túl sok ()."
+  IDS_REEUNMATCHEDPARENTHESIS, "Páratlan ()."
+  IDS_REEOPERANDCOULDBEEMPTY, "*+ művelet nem lehet üres."
+  IDS_REENESTED, "Egymásba ágyazott *?+."
+  IDS_REEUNMATCHEDBRACKET, "Páratlan []."
+  IDS_REEFOLLOWSNOTHING, "?+* után nincs semmi."
+  IDS_REETRAILINGBACKSLASH, "Fölösleges \\."
+  IDS_REEINTERNALDISASTER, "Belső katasztrófa."
+  IDS_REEINVALIDPOSIXCLASS, "Ismeretlen POSIX osztálynév."
+  IDS_REEEXPECTINGXDIGIT, "A \\x után két hexadecimális számjegy szükséges."
+  IDS_REESTACKOVERFLOW, "Verem-túlcsordulás"
+  IDS_REENOPATTERN, "Lefordított kifejezés szükséges."
+  IDS_REEERRORSTARTINGTHREAD, "Nem indítható új szál."
+  IDS_REEEXPECTINGEXTENDEDPATTERN1, "(? után egy :=!< karakter szükséges"
+  IDS_REEEXPECTINGEXTENDEDPATTERN2, "(?< után egy =! karakter szükséges"
+  IDS_REEBADFIXEDWIDTHLOOKBEHIND, "A visszatekintési minta nem kötött szélességű."
+
+  IDS_RE_POSIX_ALPHA, "Alfabetikus karakterek (alpha)"
+  IDS_RE_POSIX_ALNUM, "Alfanumerikus karakterek (alnum)"
+  IDS_RE_POSIX_ASCII, "ASCII karakterek (ascii)"
+  IDS_RE_POSIX_CNTRL, "Vezérlő karakterek (cntrl)"
+  IDS_RE_POSIX_DIGIT, "Decimális számjegyek (digit)"
+  IDS_RE_POSIX_GRAPH, "Nyomtatható karakterek, kivéve a szünet (graph)"
+  IDS_RE_POSIX_LOWER, "Kisbetűs karakterek (lower)"
+  IDS_RE_POSIX_PRINT, "Nyomtatható karakterek (print)"
+  IDS_RE_POSIX_PUNCT, "Pont karakterek (punct)"
+  IDS_RE_POSIX_SPACE, "Üres helyű karakterek (space)"
+  IDS_RE_POSIX_UPPER, "Nagybetűs karakter (upper)"
+  IDS_RE_POSIX_WORD, "Alfanumerikus karakter + '_' (word)"
+  IDS_RE_POSIX_XDIGIT , "Hexadecimális számjegy (xdigit)"
+  IDS_RE_LEFTPAREN, "Bal zárójel '('"
+  IDS_RE_RIGHTPAREN, "Jobb zárójel ')'"
+  IDS_RE_LEFTBRACKET, "Bal szögletes zárójel '['"
+  IDS_RE_CIRCUMFLEX,  "Csúcsos ékezet '^'"
+  IDS_RE_DOLLAR, "Dollár '$'"
+  IDS_RE_DOT, "Pont '.'"
+  IDS_RE_PIPE, "Vonal '|'"
+  IDS_RE_ASTERISK, "Csillag '*'"
+  IDS_RE_PLUS, "Plusz jel '+'"
+  IDS_RE_QUESTIONMARK, "Kérdőjel '?'"
+  IDS_RE_BACKSLASH, "Fordított perjel '\\'"
+  IDS_RE_ANYCHAR, "Bármelyik karakter"
+  IDS_RE_ANYFROM, "Bármelyik a megadott karakterek közül"
+  IDS_RE_ANYBUT, "Bármelyik, kivéve a megadott karakterek"
+  IDS_RE_ANYFROMPOSIX, "POSIX karakterosztály"
+  IDS_RE_ANYBUTPOSIX, "POSIX karakterosztály"
+  IDS_RE_BOL, "Név kezdete"
+  IDS_RE_EOL, "Név vége"
+  IDS_RE_OR, "Vagy"
+  IDS_RE_ITERATION, "0 vagy több egyezés"
+  IDS_RE_POSITIVEITERATION, "1 vagy több egyezés"
+  IDS_RE_ITERATION_GREEDY, "A lehető legtöbb egyezés"
+  IDS_RE_ITERATION_UNGREEDY, "A lehető legkevesebb egyezés"
+  IDS_RE_ONEORZERO, "1 vagy 0 egyezések"
+  IDS_RE_ZEROORONE, "0 vagy 1 egyezések"
+  IDS_RE_SUBEXPRESSION, "Alkifejezés"
+  IDS_RE_NOTCAPTURESUBEXP, "Nem elfogható alkifejezés"
+  IDS_RE_LITERALS, "Speciális karakter"
+  IDS_RE_WORDCHAR, "Szó karakter"
+  IDS_RE_NONWORDCHAR, "Nem szó karakter"
+  IDS_RE_SPACE, "Üres karakter"
+  IDS_RE_NONSPACE, "Nem üres karakter"
+  IDS_RE_DIGIT, "Számjegy"
+  IDS_RE_NONDIGIT, "Nem számjegy"
+  IDS_RE_WORDB, "Szóhatároló"
+  IDS_RE_NONWORDB, "Nem-szóhatároló"
+  IDS_RE_NUMBER, "Decimális szám"
+  IDS_RE_HEXNUMBER, "Hexadecimális szám"
+  IDS_RE_WORD, "Szó"
+  IDS_RE_PATHCOMPONENT, "Elérési út összetevő"
+  IDS_RE_FILENAME, "Fájlnév (Név - $1, Kiterj. - $2)"
+  IDS_RE_DEFINESET, "Egyéni megadás..."
+  IDS_RE_MATCHEDEXPR, "Egyező szabványos kifejezés"
+  IDS_RE_MATCHEDSUBEXP, "Egyező alkifejezés..."
+  IDS_RE_PLOOKA, "Pozitív előretekintés"
+  IDS_RE_NLOOKA, "Negatív előretekintés"
+  IDS_RE_PLOOKB, "Pozitív visszatekintés"
+  IDS_RE_NLOOKB, "Negatív visszatekintés"
+  IDS_RE_ZEROWIDTHASSERT, "Nulla szélesség előfeltételezése"
+
+  IDS_EMPTYSTR, "Itt nem lehet üres mezőt hagyni."
+  IDS_EMPTYMSG_DEF, "Nincs elem a listában."
+  IDS_EMPTYMSG_NOMATCH, "Nem illik egy fájl sem a megadott maszkba."
+  IDS_EMPTYMSG_BADMASK, "Érvénytelen maszk."
+  IDS_EMPTYMSG_GENERATING, "Fájlok listájának létrehozása. Megszakításhoz ESC"
+  IDS_EMPTYMSG_ERROR, "Hiba lépett fel a fájllista létrehozásakor."
+  IDS_CNFRM_CLOSE, "Be akarja zárni a Kötegelt átnevezőt?"
+  IDS_CNFRM_ESC_CLOSE2, "&Kötegelt átnevező kérdés nélküli bezárása"
+
+  IDS_CANCELING, "Művelet megszakítása, kérem várjon..."
+  IDS_NOTVALID_FILENAME, "Nem érvényes fájlnév."
+  IDS_NOTVALID_RELATIVEPATH, "Nem érvényes relatív elérési út."
+  IDS_NOTVALID_FULLPATH, "Nem érvényes teljes elérési út."
+  IDS_DUPLICATENAME, "Kettős név."
+  IDS_DEPENDENCE, "Periodikus névfüggőség vagy fájlfüggőség miatt nem nevezhető át."
+
+  IDS_RENAMING, "Fájlok átnevezése, megszakításhoz ESC..."
+  IDS_PREPARING, "Adat előkészítése az átnevezéshez..."
+  IDS_DIRNOTSAMEROOT, "A mappa másik meghajtóra történő áthelyezése nem támogatott."
+  IDS_DIRDIR, "Már létezik egy ilyen nevű mappa."
+  IDS_FILEDIR, "Ezt a nevet már használja egy mappa."
+  IDS_CNFRM_SHOVERWRITE, "Felül akarja írni a RENDSZER vagy REJTETT attribútumú fájlt?"
+  IDS_OVEWWRITETITLE, "Fájl felülírásának megerősítése"
+  IDS_OVERWRITEERROR, "Nem lehet felülírni a fájlt: "
+  IDS_MOVEERROR, "Nem lehet átnevezni a fájlt: "
+  IDS_DELETEERROR, "Nem lehet törölni a fájlt: "
+  IDS_WRITEERROR, "Nem lehet írni a fájlt: "
+  IDS_READERROR, "Nem lehet olvasni a fájlt: "
+  IDS_OPENFILEERROR, "Nem lehet megnyitni a fájlt: "
+  IDS_DIRCASEERROR, "nem módosítható a mappanév betűje: "
+  IDS_CREATEDIR, "Nem lehet a mappát létrehozni: "
+  IDS_UNDOING, "Átnevezési művelet visszavonása..."
+  IDS_REMOVEDIR,"Nem lehet a mappát törölni: "
+  IDS_UNDOQUEST, "Visszavonja az átnevezést?"
+  IDS_SOMEERRORS, "Néhány fájl nem lett sikeresen átnevezve. Ezen fájlok kilistázódnak a hibák javításához és hogy megpróbálhassa újra átnevezni őket.\n\nA sikeresen átnevezett fájlok listáját a 'Nézet' menüben találja."
+  IDS_VALIDATEOK, "Az érvényesítés sikeresen végrehajtva."
+  IDS_NOTTODO, "Semmi sem történt."
+  IDS_WAITINGFORWINDOWS, "A Kötegelt átnevező ablakok bezárására várakozás..."
+  IDS_MISLINES, "Túl rövid sorok."
+  IDS_BADLINECOUNT, "A megadott soroknak meg kell egyezniük az átnevezendő fájlok számával."
+  IDS_CREATETEMP, "Az ideiglenes fájlt nem lehet létrehozni. "
+  IDS_WRITETEMP, "Az ideiglenes fájlt nem lehet írni. "
+  IDS_OPENTEMP, "Az ideiglenes fájlt nem lehet megnyitni. "
+  IDS_SIZEOFTEMP, "Az ideiglenes fájlt méretét nem lehet lekérni. "
+  IDS_READTEMP, "Az ideiglenes fájlból nem lehet olvasni. "
+  IDS_PROCESS, "Nem lehet új folyamatot indítani: "
+  IDS_ERRLAUNCHEDIT, "A külső szerkesztő nem indítható el. Ellenőrizze az Átnevező Plugin beállításaiban a külső szerkesztő beállításait. "
+  IDS_LONGDATA, "A műveletet nem lehet befejezni, mert túl hosszú az adat."
+  IDS_EXTEDIT, "Ha végzett a szerkesztéssel és elmentette a módosításokat a külső szerkesztőben, az OK gombbal frissítse a szerkesztett fájlok névlistáját.\n\nA Mégse gombbal módosítás nélkül visszatérhet."
+  IDS_CREATEPIPE, "A csatorna nem hozható létre: "
+  IDS_WRITEPIPE, "A csatornába nem lehet írni. "
+  IDS_EXEFILES, "Futtatható fájl (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\tMinden fájl (*.*)\t*.*\t\t"
+  IDS_EXP_FULLNAME, "Teljes név"
+  IDS_EXP_DRIVE, "Meghajtó"
+  IDS_EXP_PATH, "Elérési út"
+  IDS_EXP_NAME, "Név"
+  IDS_EXP_NAMEPART, "Név rész"
+  IDS_EXP_EXTPART, "Kiterjesztés rész"
+  IDS_EXP_FULLPATH, "Teljes elérési út"
+  IDS_EXP_WINDIR, "Windows mappa"
+  IDS_EXP_SYSDIR, "Rendszer mappa"
+  IDS_EXP_DOSFULLNAME, "DOS teljes név"
+  IDS_EXP_DOSDRIVE, "DOS meghajtó"
+  IDS_EXP_DOSPATH, "DOS elérési út"
+  IDS_EXP_DOSNAME, "DOS név"
+  IDS_EXP_DOSNAMEPART, "DOS név rész"
+  IDS_EXP_DOSEXTPART, "DOS kiterjesztés név"
+  IDS_EXP_DOSFULLPATH, "DOS teljes elérési út"
+  IDS_EXP_DOSWINDIR, "DOS Windows mappa"
+  IDS_EXP_DOSSYSDIR, "DOS rendszer mappa"
+  IDS_EXP_ENVVAR, "Környezeti változó"
+  IDS_EXP_BROWSE, "Tallóz..."
+  IDS_EXP_SALDIR, "Sally mappa"
+  IDS_CFG_CONFLICT, "A beállítás már meg van nyitva."
+  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
+  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+}

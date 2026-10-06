@@ -53,7 +53,7 @@ int ExportToXML(const wchar_t* fname, COutput& Output);
 extern CSalamanderGeneralAbstract* SalGeneral;
 
 extern HINSTANCE DLLInstance; // handle to the SPL - language-independent resources
-extern HINSTANCE HLanguage;   // handle to the SLG - language-dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 
 // Configuration variables
 extern LOGFONT CfgLogFont;                 // description of the font used for the panel

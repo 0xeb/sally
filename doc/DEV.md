@@ -10,7 +10,7 @@
 \src             Sally core source code
 \src\common      Shared libraries
 \src\common\dep  Shared third-party libraries
-\src\lang        English resources
+\src\lang        UI resources: English and every translation
 \src\plugins     Plugins source code
 \src\reglib      Access to Windows Registry files
 \src\res         Image resources
@@ -20,7 +20,7 @@
 \src\shellext    Shell extension DLL
 \src\tserver     Trace Server to display info and error messages
 \tools           Minor utilities
-\translations    Translations into other languages
+\translations-draft  Unfinished translations (not built)
 ```
 
 The user manual is published at https://sally-filemanager.app/manual/. Help commands (F1, What's
@@ -65,8 +65,28 @@ cmake --build build --config Release --target ALL_BUILD utfnames salbreak regpar
 
 The old Portables plugin Visual Studio project was removed without a separate dev-tool replacement because the normal CMake plugin build already covers `plugin_portables` and its English language file. `packages.config` is still used by `cmake/sal_nuget.cmake` to restore the WebView2 SDK for the CMake build.
 
-## Localization
+## Translations
 
-Translation source archives live under `translations/`. Contributors can submit
-updates to those `.slt` files; release-time validation and language-pack
-generation are maintained outside this repository.
+Every language is ordinary resource source compiled into `sally.exe` and into each plugin
+DLL; there are no separate language files. Sally uses the language chosen in Configuration,
+or the Windows display language, when it starts.
+
+- Sally: English is `src/lang/lang.rc` (with `lang.rc2` and `texts.rc2`); each translation
+  is `src/lang/<tag>/lang.rc`, for example `src/lang/de-DE/lang.rc`.
+- Plugins: English is `src/plugins/<plugin>/lang/lang.rc`; each translation is
+  `src/plugins/<plugin>/lang/<tag>/lang.rc`.
+- Each module's `languages.rc` includes its English file and all of its translations.
+
+To fix a translation, edit the text in the translated `lang.rc`. If a longer text needs
+more room, adjust the size or position of the affected controls, but keep every resource
+ID, style and the order of controls identical to the English file. Windows falls back to
+English only for a whole dialog, menu or string table, so a missing string or a changed
+control is not reported by the build; it just shows up wrong at runtime.
+
+If you spot a problem but do not want to fix it yourself, open a GitHub issue that names
+the language and the dialog, menu or message.
+
+To add a language, create `<tag>/lang.rc` for Sally and for every plugin that is already
+translated (start from the English file and set its `LANGUAGE`), add its `#include` line to
+each module's `languages.rc`, and add an entry to the table in
+`src/common/BuiltinLanguages.h`.

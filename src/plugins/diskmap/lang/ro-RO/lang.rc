@@ -1,0 +1,120 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for diskmap. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/diskmap/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#define SALAMANDER
+#include "..\..\DiskMap\Resources\DiskMap.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDC_ZAREVAKDISKMAP MENU 
+BEGIN
+    POPUP "&Fisier"
+    BEGIN
+        MENUITEM "&Deschid fisier",                       IDM_FILE_OPEN
+        MENUITEM "&Focus in Panou\tF",        IDM_FILE_FOCUSINSALAMANDER
+        MENUITEM SEPARATOR
+        MENUITEM "Re&nunt\tEsc",                      IDM_FILE_ABORT
+        MENUITEM "Rei&mprospatare\tCtrl+R",            IDM_FILE_REFRESH
+        MENUITEM SEPARATOR
+        MENUITEM "&Inchid\tAlt+F4",                      IDM_FILE_EXIT
+    END
+    POPUP "&Vizualizare"
+    BEGIN
+        MENUITEM "Zoom &In\t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "Zoom &Out\t -",                IDM_VIEW_ZOOMOUT
+        MENUITEM "&Unzoom\t Shift+Backspace",   IDM_VIEW_GOTOROOT
+        MENUITEM SEPARATOR
+        MENUITEM "&Log Fereastra...\tCtrl+L",              IDM_VIEW_LOG
+    END
+
+    POPUP "&Optiuni"
+    BEGIN
+	MENUITEM "&Directoare iesite in evidenta",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
+	MENUITEM "&Afiseaza Tooltip\tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+        POPUP "Tooltip Cale &Format"
+        BEGIN
+            MENUITEM "&Nume fisier",            IDM_PATHFORMAT_FILENAME
+            MENUITEM "&Relativ",            IDM_PATHFORMAT_RELATIVEVIEW
+//            MENUITEM "&Relative to Root",  IDM_PATHFORMAT_RELATIVEROOT
+            MENUITEM "&Absolut",            IDM_PATHFORMAT_ABSOLUTE
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Confirm Inchid la Esc",       IDM_OPTIONS_CONSFIRMCLOSE, CHECKED
+    END
+    POPUP "&Help"
+    BEGIN
+//        POPUP "&Debug"
+//        BEGIN
+//            MENUITEM "&Export Directory Structure...", IDM_DEBUG_EXPORTDIR
+//        END
+//        MENUITEM SEPARATOR
+        MENUITEM "&Despre...",                  IDM_HELP_ABOUT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME,            "DiskMap"
+    IDS_PLUGIN_DESCRIPTION,     "Afiseaza o harta arborescenta a fisierelor de pe disk-ul dumneavoastra."
+    IDS_PLUGIN_ABOUT,           "Despre Sally DiskMap Plugin"
+    IDS_PLUGIN_MENU,            "Arata &DiskMap"
+    IDS_CLOSE_CONFIRMATION,     "Doriti sa inchideti DiskMap?"
+    IDS_CLOSE_CONFIRMATION_CHECKBOX, "Nu aratati acest mesaj din nou si inchideti DiskMap fara a mai intreba"
+
+    IDS_DISKMAP_TITLE,               "DiskMap"
+    IDS_DISKMAP_TITLEPREFIX,         "DiskMap - "
+
+    IDS_DISKMAP_LOAD_TITLE,          "Cautand fisiere..."
+    IDS_DISKMAP_LOAD_FOOTER,         "...apasa tasta ESC pentru a renunta"
+    IDS_DISKMAP_LOAD_HSIZE,          "Marime:"
+    IDS_DISKMAP_LOAD_HFILE,          "Fisiere:"
+    IDS_DISKMAP_LOAD_HDIRS,          "Directoare:"
+
+    IDS_DISKMAP_ABORT_TITLE,         "Cautarea de fisiere anulata..."
+    IDS_DISKMAP_ABORT_FOOTER,        "...apasa Ctrl+R pentru reimprospatarea vizualizarii"
+
+    IDS_DISKMAP_LOG_TITLE,           "Log"
+    IDS_DISKMAP_LOG_HTYPE,           "Tip"
+    IDS_DISKMAP_LOG_HTEXT,           "Text"
+    IDS_DISKMAP_LOG_HFILE,           "Fisier sau Director"
+    IDS_DISKMAP_LOG_LINFO,           "Informatie"
+    IDS_DISKMAP_LOG_LWARN,           "Atentionare"
+    IDS_DISKMAP_LOG_LERROR,          "Eroare"
+
+    IDS_DISKMAP_SHELL_FOCUS,         "&Focus in Panou"
+    IDS_DISKMAP_SHELL_ZOOMIN,        "Zoom &In"
+    IDS_DISKMAP_SHELL_ZOOMOUT,       "Zoom &Out"
+    IDS_DISKMAP_SHELL_DIROPEN,       "&Deschid in Panou"
+    IDS_DISKMAP_SHELL_DIRCHANGE,     "Schimb &Director"
+
+    IDS_DISKMAP_TTIP_TIMECREATE,     "Creat:"
+    IDS_DISKMAP_TTIP_TIMEMODIFY,     "Modificat:"
+    IDS_DISKMAP_TTIP_TIMEACCESS,     "Accesat:"
+    IDS_DISKMAP_TTIP_SIZEDATA,       "Marimea datelor:"
+    IDS_DISKMAP_TTIP_SIZEREAL,       "Marimea reala:"
+    IDS_DISKMAP_TTIP_SIZEDISK,       "Marimea disk-ului:"
+    IDS_DISKMAP_TTIP_COUNTFILE,      "Fisiere:"
+    IDS_DISKMAP_TTIP_COUNTDIRS,      "Directoare:"
+
+    IDS_DISKMAP_FORMAT_BYTE0,        "bytes"
+    IDS_DISKMAP_FORMAT_BYTE1,        "byte"
+    IDS_DISKMAP_FORMAT_BYTEN,        "bytes"
+
+    IDS_DISKMAP_EMPTY_TITLE,         "Nimic de afisat..."
+    IDS_DISKMAP_EMPTY_FOOTER,        "...acest director nu contine fisiere de mapat"
+END

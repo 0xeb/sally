@@ -7,6 +7,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/IPathService.h"
+#include "common/BuiltinLanguages.h"
 #include "cfgdlg.h"
 #include "darkmode.h"
 #include "dialogs.h"
@@ -1265,45 +1266,19 @@ CImportConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CLanguageSelectorDialog
 //
 
-CLanguageSelectorDialog::CLanguageSelectorDialog(HWND hParent, std::wstring& slgName, const wchar_t* pluginName)
-    : CCommonDialog(NULL, pluginName == NULL ? IDD_SLGSELECTOR : IDD_SLGSELECTORPLUG, hParent), Items(5, 5), SLGName(slgName)
+CLanguageSelectorDialog::CLanguageSelectorDialog(HWND hParent, std::wstring& slgName)
+    : CCommonDialog(HInstance, IDD_SLGSELECTOR, hParent), SLGName(slgName)
 {
     Web = NULL;
-    OpenedFromConfiguration = hParent != NULL && pluginName == NULL;
-    OpenedForPlugin = pluginName != NULL;
+    OpenedFromConfiguration = hParent != NULL;
     HListView = NULL;
-    PluginName = pluginName;
     ExitButtonLabel.clear();
-}
-
-CLanguageSelectorDialog::~CLanguageSelectorDialog()
-{
-    int i;
-    for (i = 0; i < Items.Count; i++)
-        Items[i].Free();
 }
 
 int CLanguageSelectorDialog::Execute()
 {
-    HINSTANCE hTmpLanguage = NULL;
-    if (OpenedFromConfiguration || OpenedForPlugin)
-    {
-        // use the template from the currently running language version
-        Modul = HLanguage;
-    }
-    else
-    {
-        // load the template from the best available SLG
-        int index = GetPreferredLanguageIndex(SLGName.c_str());
-        std::wstring pathW;
-        // Items[].FileName is already wchar_t*; the AnsiToWide here was
-        // the conversion layer applied to wide data (silent-failure class #2).
-        std::wstring slgNameW = Items[index].FileName;
-        if (BuildModuleRelativePathW(HInstance, (L"lang\\" + slgNameW).c_str(), pathW))
-            hTmpLanguage = HANDLES(LoadLibraryW(pathW.c_str()));
-        if (hTmpLanguage != NULL)
-            Modul = hTmpLanguage;
-    }
+    // the dialog comes from sally.exe in whatever language the process prefers at the moment
+    // (at first start: the closest match to the user's Windows languages, else English)
     const wchar_t* exitButtonLabel = NULL;
     const int exitButtonLabelLength = LoadStringW(Modul, IDS_SELLANGEXITBUTTON,
                                                    reinterpret_cast<wchar_t*>(&exitButtonLabel), 0);
@@ -1311,70 +1286,32 @@ int CLanguageSelectorDialog::Execute()
         ExitButtonLabel.assign(exitButtonLabel, exitButtonLabelLength);
     else
         ExitButtonLabel = L"Exit";
-    int ret = (int)CCommonDialog::Execute();
-    if (hTmpLanguage != NULL)
-    {
-        Modul = NULL;
-        HANDLES(FreeLibrary(hTmpLanguage));
-    }
-
-    return ret;
-}
-
-BOOL CLanguageSelectorDialog::GetSLGName(std::wstring& path, int index)
-{
-    if (index >= Items.Count)
-        return FALSE;
-    path = Items[index].FileName;
-    return TRUE;
-}
-
-BOOL CLanguageSelectorDialog::SLGNameExists(const wchar_t* slgName)
-{
-    int i;
-    for (i = 0; i < Items.Count; i++)
-    {
-        if (StrICmpW(Items[i].FileName, slgName) == 0)
-            return TRUE;
-    }
-    return FALSE;
+    return (int)CCommonDialog::Execute();
 }
 
 void CLanguageSelectorDialog::FillControls()
 {
     int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
-    if (index != -1)
+    if (index >= 0 && index < (int)Items.size())
     {
-        SetDlgItemTextW(HWindow, IDC_SLG_AUTHOR, Items[index].AuthorW);
-        SetDlgItemTextW(HWindow, IDC_SLG_WEB, Items[index].Web);
-        SetDlgItemTextW(HWindow, IDC_SLG_COMMENT, Items[index].CommentW);
-        if (PluginName == NULL)
-            SetDlgItemTextW(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir);
+        SetDlgItemTextW(HWindow, IDC_SLG_AUTHOR, Items[index].Author.c_str());
+        SetDlgItemTextW(HWindow, IDC_SLG_WEB, Items[index].Web.c_str());
+        SetDlgItemTextW(HWindow, IDC_SLG_COMMENT, Items[index].Comment.c_str());
         if (Web != NULL)
-            Web->SetActionOpen(MakeOpenableWebUrl(Items[index].Web).c_str());
+            Web->SetActionOpen(MakeOpenableWebUrl(Items[index].Web.c_str()).c_str());
     }
 }
 
 void CLanguageSelectorDialog::LoadListView()
 {
-    wchar_t buff[500];
-    // wide - GetLanguageName narrows a language's own native display
-    // name through CP_ACP; this dialog already sets other controls wide
-    // (FillControls's SetDlgItemTextW for Author/Comment), so it's wide-capable.
-    wchar_t buffW[200];
-    int i;
-    for (i = 0; i < Items.Count; i++)
+    for (int i = 0; i < (int)Items.size(); i++)
     {
         LVITEMW lvi;
         lvi.mask = 0;
         lvi.iItem = i;
         lvi.iSubItem = 0;
         ListView_InsertItemW(HListView, &lvi);
-
-        Items[i].GetLanguageName(buffW, 200);
-        ListView_SetItemTextW(HListView, i, 0, buffW);
-        swprintf_s(buff, _countof(buff), L"lang\\%s", Items[i].FileName);
-        ListView_SetItemTextW(HListView, i, 1, buff);
+        ListView_SetItemTextW(HListView, i, 0, (LPWSTR)Items[i].DisplayName.c_str());
     }
 
     int preferredIndex = GetPreferredLanguageIndex(SLGName.c_str());
@@ -1387,125 +1324,48 @@ void CLanguageSelectorDialog::LoadListView()
 
 void CLanguageSelectorDialog::Transfer(CTransferInfo& ti)
 {
-    if (PluginName != NULL) // show this checkbox only when selecting an alternative language for a plug-in
-        ti.CheckBox(IDC_USESAMESLGINOTHERPLUGINS, Configuration.UseAsAltSLGInOtherPlugins);
-
     if (ti.Type == ttDataToWindow)
     {
         LoadListView();
 
-        // we do not want a horizontal scrollbar, so first fill items and only then set the column widths
-        RECT r;
-        GetClientRect(HListView, &r);
-        ListView_SetColumnWidth(HListView, 0, r.right / 1.6);
-        ListView_SetColumnWidth(HListView, 1, LVSCW_AUTOSIZE_USEHEADER);
+        // we do not want a horizontal scrollbar, so first fill items and only then set the column width
+        ListView_SetColumnWidth(HListView, 0, LVSCW_AUTOSIZE_USEHEADER);
     }
     else
     {
         int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
-        if (index != -1)
-        {
-            SLGName = Items[index].FileName;
-            if (PluginName != NULL) // store the alternative language name only when selecting an alternative language for a plug-in
-            {
-                if (Configuration.UseAsAltSLGInOtherPlugins)
-                    Configuration.AltPluginSLGName = SLGName;
-                else
-                    Configuration.AltPluginSLGName.clear();
-            }
-        }
+        if (index >= 0 && index < (int)Items.size())
+            SLGName = Items[index].PersistedName;
     }
 }
 
-BOOL CLanguageSelectorDialog::Initialize(const wchar_t* slgSearchPath, HINSTANCE pluginDLL)
+BOOL CLanguageSelectorDialog::Initialize()
 {
-    std::wstring path;
-    if (slgSearchPath == NULL)
+    Items.clear();
+    // in the order of the built-in language table (English first), not of the resources
+    std::vector<LANGID> available = GetBuiltinLanguageIDs(HInstance);
+    for (const sally::languages::BuiltinLanguage& builtin : sally::languages::kBuiltinLanguages)
     {
-        if (!BuildModuleRelativePathW(NULL, L"lang\\*.slg", path))
-            return FALSE;
+        if (!sally::languages::Contains(available, builtin.LangId))
+            continue;
+        CLanguage language;
+        if (language.Init(builtin.LangId, HInstance))
+            Items.push_back(std::move(language));
     }
-    else
-        path = slgSearchPath;
-
-    WIN32_FIND_DATAW file;
-    HANDLE hFind = SalFindFirstFileHW(path.c_str(), &file);
-    if (hFind != INVALID_HANDLE_VALUE)
-    {
-        do
-        {
-            // cFileNameA was ALREADY wchar_t[] - the WideCharToMultiByte here
-            // narrowed file.cFileName through CP_ACP only to hand it straight back to wide
-            // consumers, and any .slg whose name CP_ACP cannot represent would have been
-            // dropped. Renamed to say what it holds.
-            const wchar_t* cFileName = file.cFileName;
-            const wchar_t* point = wcsrchr(cFileName, L'.');
-            if (point != NULL && _wcsicmp(point + 1, L"slg") == 0) // it was returning *.slg*
-            {
-                CLanguage lang;
-                if (lang.Init(cFileName, pluginDLL))
-                {
-                    Items.Add(lang);
-                    if (!Items.IsGood())
-                    {
-                        Items.ResetState();
-                        lang.Free();
-                        return FALSE;
-                    }
-                }
-            }
-        } while (SalLPFindNextFile(hFind, &file));
-        SalLPFindClose(hFind);
-    }
-    return TRUE;
+    return !Items.empty();
 }
 
-int CLanguageSelectorDialog::GetPreferredLanguageIndex(const wchar_t* selectSLGName, BOOL exactMatch)
+int CLanguageSelectorDialog::GetPreferredLanguageIndex(const wchar_t* selectSLGName)
 {
-    WORD langID = GetUserDefaultUILanguage();
-
-    WORD primaryID = PRIMARYLANGID(langID);
-    int localeIndex = -1;        // index corresponding to the user's locale
-    int primarylocaleIndex = -1; // index corresponding to the user's primary language locale
-    int englishIndex = -1;       // index of the file "english.slg"
-    int i;
-    for (i = 0; i < Items.Count; i++)
+    int englishIndex = 0;
+    for (int i = 0; i < (int)Items.size(); i++)
     {
-        if (selectSLGName != NULL && _wcsicmp(Items[i].FileName, selectSLGName) == 0)
+        if (selectSLGName != NULL && _wcsicmp(Items[i].PersistedName.c_str(), selectSLGName) == 0)
             return i;
-        if (localeIndex == -1 && Items[i].LanguageID == langID)
-            localeIndex = i;
-        if (primarylocaleIndex == -1 && PRIMARYLANGID(Items[i].LanguageID) == primaryID)
-            primarylocaleIndex = i;
-        if (_wcsicmp(Items[i].FileName, L"english.slg") == 0)
+        if (Items[i].LanguageID == sally::languages::kEnglishLangId)
             englishIndex = i;
     }
-    if (localeIndex == -1)
-    {
-        // if we didn't find a language exactly matching the user's settings
-        if (primarylocaleIndex != -1)
-        {
-            // try to assign at least the primary language
-            localeIndex = primarylocaleIndex;
-        }
-        else
-        {
-            if (!exactMatch)
-            {
-                if (englishIndex != -1)
-                {
-                    // if even that isn't found, prefer the English version
-                    localeIndex = englishIndex;
-                }
-                else
-                {
-                    // otherwise take whichever one is available
-                    localeIndex = 0;
-                }
-            }
-        }
-    }
-    return localeIndex;
+    return englishIndex;
 }
 
 INT_PTR
@@ -1515,32 +1375,13 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-
-        // There is no download page for languages yet, so this button is disabled
-        // EnableWindow(GetDlgItem(HWindow, IDB_GETMORELANGS), FALSE);
-
-        if (!OpenedFromConfiguration && !OpenedForPlugin)
+        if (!OpenedFromConfiguration)
         {
             // put the program name in the title since this is the first window the user sees
             SetWindowTextW(HWindow, L"Sally");
-        }
-        else
-        {
-            if (PluginName != NULL)
-            {
-                // put the plug-in name in the title so the user knows which plug-in the language is for
-                wchar_t buf[200];
-                _snwprintf_s(buf, _TRUNCATE, L"%s: ", PluginName);
-                buf[99] = 0; // use only 100 characters for the plug-in name so some space remains for the original title dialog
-                int len = (int)wcslen(buf);
-                if (GetWindowTextW(HWindow, buf + len, 200 - len))
-                    SetWindowTextW(HWindow, buf);
-            }
-        }
-        if (!OpenedFromConfiguration && PluginName == NULL) // turn the Cancel button into Exit
+            // turn the Cancel button into Exit
             SetDlgItemTextW(HWindow, IDCANCEL, ExitButtonLabel.c_str());
-        if (PluginName != NULL) // disable closing
-            EnableMenuItem(GetSystemMenu(HWindow, FALSE), SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
+        }
 
         Web = new CHyperLink(HWindow, IDC_SLG_WEB, STF_HYPERLINK_COLOR);
 
@@ -1550,7 +1391,7 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         DWORD origFlags = ListView_GetExtendedListViewStyle(HListView);
         ListView_SetExtendedListViewStyle(HListView, origFlags | exFlags); // 4.71
 
-        // add the Language and Path columns to the listview
+        // add the Language column to the listview
         wchar_t buff[100];
         LVCOLUMNW lvc;
         lvc.mask = LVCF_TEXT | LVCF_SUBITEM;
@@ -1560,46 +1401,11 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         DestroyWindow(GetDlgItem(HWindow, IDC_SLG_DESCR));
         ListView_InsertColumnW(HListView, 0, &lvc);
 
-        lvc.iSubItem = 1;
-        GetDlgItemTextW(HWindow, IDC_SLG_PATH, buff, 100);
-        DestroyWindow(GetDlgItem(HWindow, IDC_SLG_PATH));
-        ListView_InsertColumnW(HListView, 1, &lvc);
-
         // under W2K when launched via a shortcut set to MAXIMIZED
         // the dialog appeared maximized; SC_RESTORE fixes it
         INT_PTR ret = CCommonDialog::DialogProc(uMsg, wParam, lParam);
         SendMessage(HWindow, WM_SYSCOMMAND, SC_RESTORE, 0);
         return ret;
-    }
-
-    case WM_COMMAND:
-    {
-        if (PluginName != NULL && LOWORD(wParam) == IDCANCEL)
-            return 0;
-        if (LOWORD(wParam) == IDB_GETMORELANGS)
-            ShellExecuteW(HWindow, L"open", L"https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
-        if (LOWORD(wParam) == IDB_REFRESHLANGS)
-        {
-            ListView_DeleteAllItems(HListView);
-            int i;
-            for (i = 0; i < Items.Count; i++)
-                Items[i].Free();
-            Items.DestroyMembers();
-            Initialize();
-            if (GetLanguagesCount() == 0) // should not happen because this dialog is loaded from the .slg module (that .slg cannot be deleted)
-            {
-                // wide: same MessageBoxW/SALAMANDER_TEXT_VERSIONW() pairing already
-                // used at the equivalent startup-time check in sally_entry_lifecycle.cpp (198).
-                MessageBoxW(HWindow, L"Unable to find any language file (.SLG) in subdirectory LANG.\n"
-                                     L"Please reinstall Open Salamander.",
-                            SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
-                TRACE_E("CLanguageSelectorDialog: unexpected situation (no language file): calling ExitProcess(667).");
-                //          ExitProcess(667);
-                TerminateProcess(GetCurrentProcess(), 667); // harder exit (this call still performs some operations)
-            }
-            LoadListView();
-        }
-        break;
     }
 
     case WM_NOTIFY:

@@ -70,16 +70,6 @@ function(sal_install_plugins)
     )
   endforeach()
 
-  # Install plugin language files
-  get_property(PLUGIN_LANGS GLOBAL PROPERTY SAL_PLUGIN_LANGS_LIST)
-  foreach(LANG_TARGET ${PLUGIN_LANGS})
-    # Extract plugin name from target name (plugin_<name>_lang -> <name>)
-    string(REGEX REPLACE "^plugin_(.+)_lang$" "\\1" PLUGIN_NAME ${LANG_TARGET})
-    install(TARGETS ${LANG_TARGET}
-      LIBRARY DESTINATION "plugins/${PLUGIN_NAME}/lang"
-      RUNTIME DESTINATION "plugins/${PLUGIN_NAME}/lang"
-    )
-  endforeach()
 endfunction()
 
 # Generate plugins.ver file for auto-discovery of new plugins
@@ -170,12 +160,6 @@ function(sal_create_populate_target)
   sal_get_all_plugins(PLUGINS)
   if(PLUGINS)
     add_dependencies(populate ${PLUGINS})
-  endif()
-
-  # Make populate depend on all plugin language targets
-  get_property(PLUGIN_LANGS GLOBAL PROPERTY SAL_PLUGIN_LANGS_LIST)
-  if(PLUGIN_LANGS)
-    add_dependencies(populate ${PLUGIN_LANGS})
   endif()
 
   # Make populate depend on extra targets (like fcremote helper exe)

@@ -1,0 +1,2373 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for ftp. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/ftp/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\ftp.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CFGGENERAL DIALOGEX 37, 31, 469, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "General"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Arat&a fereastra cu mesajul de intampinare de la server dupa conectare",IDC_WELCOMEMESSAGE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,250,12
+    CONTROL         "&Da prioritate conexiunilor folosite in panouri (navigare mai usoara prin meniuri)",IDC_PRIORITYTOPANELCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,499,130,278,12
+    CONTROL         "Limita &totala dei viteza pentru clientul FTP:",IDC_ENABLETOTSPEEDLIM,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,499,143,155,12
+    EDITTEXT        IDE_TOTALSPEEDLIMIT,655,143,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Acc&epta secvente de escape  hex in cai (cunoscut din browser-e web, e.g. ""%20""catre "" "")",IDC_ACCEPTHEXESCSEQ,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,317,12
+    CONTROL         "Inch&ide dialogul operatiunii in mod automat cand operatiunea s-a terminat cu succes in dialog neatins",IDC_CLOSEOPERDLGIFSUCCESS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,355,12
+    CONTROL         "De&schide dialogurile Rezolva Erorile pentru erori in mod automat daca dialogul operatiunii este in asteptare",IDC_OPENSOLVEERRIFIDLE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,371,12
+    LTEXT           "KB/s",IDC_STATIC_1,687,145,22,8,WS_DISABLED
+    LTEXT           "&Parola pentru conexiuni anonime (adresa dvs de e-mail):",IDC_STATIC_2,5,69,193,8
+    EDITTEXT        IDE_ANONYMOUSPASSWD,199,67,265,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_CFGDEFAULTS DIALOGEX 37, 31, 469, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Defaults"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,150,9,311,1
+    LTEXT           "Optiuni avansate default pentru conexiuni",IDC_STATIC_2,5,5,143,8
+    LTEXT           "P&roxy server:",IDC_STATIC_3,14,17,46,8
+    COMBOBOX        IDC_PROXYSERVER,61,15,338,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "A&dauga...",IDB_ADDPROXYSRV,406,14,55,14,WS_GROUP
+    CONTROL         "Foloseste modul pasi&v de transfer (ajuta de esti protejat firewall ori proxy server)",IDC_PASSIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,29,282,12
+    CONTROL         "P&astreaza conexiunile active (nu lasa server-ul sa va deconecteze din lipsa de activitate)",IDC_KEEPALIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,42,305,12
+    CONTROL         "Numarul &maxim de conexiuni simultane la server:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,501,137,183,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,685,137,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "T&otalul limitei vitezei pentru server:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,501,151,131,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,685,151,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Fo&loseste cache pentru fisierle vizualizate si listele de fisiere si directoare din server",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,55,290,12
+    CONTROL         "Transferuri de date comprimate daca server-ul suporta compresia (MODE &Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,68,269,12
+    LTEXT           "KB/s",IDC_STATIC_4,717,153,21,8,WS_DISABLED
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,177,95,284,1
+    LTEXT           "Setari default pentru pastrarea conexiunilor active",IDC_STATIC_6,5,91,170,8
+    LTEXT           "&Trimite:",IDC_STATIC_7,14,105,29,8
+    COMBOBOX        IDC_KEEPALIVESEND,44,103,114,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "la &fiecare:",IDC_STATIC_8,163,105,36,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,200,103,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "secunde",IDC_STATIC_9,232,105,34,8
+    LTEXT           "O&preste trimiterea dupa:",IDC_STATIC_10,14,120,85,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,130,118,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "minute",IDC_STATIC_11,163,120,34,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,127,145,334,1
+    LTEXT           "Mod de transfer al fisierului default",IDC_STATIC_13,5,141,120,8
+    CONTROL         "Mod &binar (fara schimbari in timpul transferurilor)",IDC_BINARYMODE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,151,179,12
+    CONTROL         "Mod AS&CII (converteste fisierele pentru a folosi sfarsituri de linii sistem default)",IDC_ASCIIMODE,
+                    "Button",BS_AUTORADIOBUTTON,14,164,276,12
+    CONTROL         "Mod  ASCII A&utomat pentru:",IDC_AUTODETECT,"Button",BS_AUTORADIOBUTTON,14,177,108,12
+    EDITTEXT        IDE_ASCIIMASKS,123,177,338,12,ES_AUTOHSCROLL
+    RTEXT           "indicii pentru masca",IDT_ASCIIMASKHINTS,390,191,70,8,WS_TABSTOP
+END
+
+IDD_CFGCONFIRMATIONS DIALOGEX 37, 31, 469, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Confirmari"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Arata mesajul ""Acum ati iesit de pe server. Doriti sa va deconectati sau pastrati conexiunea activa?""",IDC_ALWAYSNOTCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,345,12
+    CONTROL         "A&rata mesajul ""Doriti sa va deconectati?""",IDC_ALWAYSDISCONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,150,12
+    CONTROL         "Ara&ta mesajul ""Conexiunea e inchisa. Doriti sa va reconectati?""",IDC_ALWAYSRECONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,222,12
+    CONTROL         "Arata &mesajul ""Fisierul tinta exista deja. Doriti sa-l suprascrieti?"" in Redenumire Rapida",IDC_ALWAYSOVERWRITE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,303,12
+    CONTROL         "Arata m&esajul ""Conexiunea la server-ul FTP s-a pierdut""",IDC_WARNWHENCONLOST,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,57,199,12
+    CONTROL         "Arata me&sajul ""Daca doriti sa listati fisierele ascunse si directoarele in mod permanent pe acest server FTP, ...""",IDC_HINTLISTHIDDENFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,70,382,12
+END
+
+IDD_CFGADVANCED DIALOGEX 37, 31, 469, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Avansat"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Limita &spatiului pentru memoria cache:",IDC_STATIC_1,5,7,133,8
+    EDITTEXT        IDE_MEMCACHESIZELIMIT,166,5,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "KB",IDC_STATIC_2,198,7,11,8
+    LTEXT           "&Pauza pentru actiuni ale retelei:",IDC_STATIC_3,5,21,109,8
+    EDITTEXT        IDE_SRVREPLIESTIMEOUT,166,19,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "secunde",IDC_STATIC_4,198,21,30,8
+    LTEXT           "&Intarziere dintre incercarile de conectare:",IDC_STATIC_5,5,35,142,8
+    EDITTEXT        IDE_DELAYBETWCONRETR,166,33,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "secunde",IDC_STATIC_6,198,35,30,8
+    LTEXT           "Nu&marul de incercari de conectare:",IDC_STATIC_7,5,49,122,8
+    EDITTEXT        IDE_CONNECTRETRIES,166,47,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Anuleaza conexiunea datelor daca este idle de:",IDC_STATIC_8,5,63,160,8
+    EDITTEXT        IDE_NODATATRTIMEOUT,166,61,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "secunde",IDC_STATIC_9,198,63,30,8
+    LTEXT           "In&cearca sa reiei copierea doar daca s-a copiat deja o parte a fisierului:",IDC_STATIC_10,5,77,242,8
+    EDITTEXT        IDE_RESUMEMINFILESIZE,298,75,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "bytes",IDC_STATIC_11,337,77,20,8
+    LTEXT           "&Numarul de bytes pentru a verifica (la sf fisierului) cand se reia copierea de pe server:",IDC_STATIC_12,5,91,292,8
+    EDITTEXT        IDE_RESUMEOVERLAP,298,89,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "bytes",IDC_STATIC_13,337,91,20,8
+END
+
+IDD_CFGLOGS DIALOGEX 23, 39, 469, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Log-uri"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "KB",IDC_STATIC_1,274,23,14,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,177,12,284,1
+    CONTROL         "&Activeaza log-urile de comunicare cu server-ele",IDC_ENABLELOGGING,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,7,170,12
+    CONTROL         "&Limiteaza marimea unui log pentru un server la:",IDC_LOGMAXSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,21,174,12
+    EDITTEXT        IDE_LOGMAXSIZE,242,21,28,12,ES_AUTOHSCROLL
+    CONTROL         "Numarul &maxim de log-uri pastrate pentru conexiuni intrerupte:",IDC_MAXCLOSEDCONLOGS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,35,227,12
+    EDITTEXT        IDE_MAXCLOSEDCONLOGS,242,35,28,12,ES_AUTOHSCROLL
+    CONTROL         "&Dezactiveaza log-urile pentru conexiuni folosite pentru operatii cu fisiere",IDC_DISABLELOGWORKERS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,49,254,12
+END
+
+IDD_CONNECT DIALOGEX 23, 72, 448, 164
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Conectare la Serverul FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDL_BOOKMARKS,7,7,169,129,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Adresa:",IDT_HOSTADDRESS,190,9,31,8
+    COMBOBOX        IDE_HOSTADDRESS,234,7,207,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Cal&e initiala:",IDT_INITIALPATH,190,23,43,8
+    COMBOBOX        IDE_INITIALPATH,234,21,207,117,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,254,47,187,1
+    CONTROL         " Login  anoni&m",IDC_ANONYMOUSLOGIN,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,190,42,62,12
+    LTEXT           "Nume &utilizator:",IDT_USERNAME,200,58,56,8
+    EDITTEXT        IDE_USERNAME,257,56,184,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Par&ola:",IDT_PASSWORD,200,72,52,8
+    EDITTEXT        IDE_PASSWORD,257,70,58,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    EDITTEXT        IDE_PASSWORD_LOCKED,320,70,58,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "&Deblocare...",IDB_PASSWORD_CHANGE,381,69,60,14
+    CONTROL         "&Salvez parola",IDC_SAVEPASSWORD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,200,84,58,12
+    LTEXT           "nu e securizat",IDC_SAVEPASSWORD_HINT,266,86,173,8,WS_TABSTOP
+    PUSHBUTTON      "Avansa&t...",IDB_ADVACED,190,107,53,14,WS_GROUP
+    EDITTEXT        IDE_ADVANCEDINFO,246,108,195,12,ES_AUTOHSCROLL | ES_READONLY | WS_GROUP
+    PUSHBUTTON      "&Nou...",IDB_NEWBOOKMARK,6,142,53,14,WS_GROUP
+    PUSHBUTTON      "&Redenum...",IDB_RENAMEBOOKMARK,64,142,53,14
+    PUSHBUTTON      "E&limina...",IDB_REMOVEBOOKMARK,122,142,53,14
+    DEFPUSHBUTTON   "Conecteaza",IDOK,214,142,53,14,WS_GROUP
+    PUSHBUTTON      "&Inchide",IDB_CLOSE,272,142,53,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,330,142,53,14
+    PUSHBUTTON      "Help",IDHELP,388,142,53,14
+END
+
+IDD_CONNECTADVANCED DIALOGEX 22, 28, 366, 301
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Optiuni Avansate"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Prox&y server:",IDC_STATIC_1,7,10,45,8
+    COMBOBOX        IDC_PROXYSERVER,111,8,175,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "Adau&ga...",IDB_ADDPROXYSRV,293,7,65,14,WS_GROUP
+    LTEXT           "Calea &Tintei in panou:",IDC_STATIC_2,7,25,76,8
+    EDITTEXT        IDE_TARGETPATH,111,23,175,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "Rasfoieste &j...",IDB_BROWSE,293,22,65,14,WS_GROUP
+    LTEXT           "Conecta&rea la portul:",IDC_STATIC_3,7,40,73,8
+    EDITTEXT        IDC_CONNECTTOPORT,111,38,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Tipul &Server-ului:",IDC_STATIC_4,7,54,60,8
+    COMBOBOX        IDC_SERVERTYPE,111,52,249,61,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Modul de transfer al &fisierului:",IDC_STATIC_5,7,69,103,8
+    COMBOBOX        IDC_TRANSFERMODE,111,67,249,57,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Comanda pentru &listare:",IDC_STATIC_6,7,84,84,8
+    COMBOBOX        IDC_LISTCOMMAND,111,82,88,57,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Comenzi initiale FTP:",IDC_STATIC_7,7,99,74,8
+    EDITTEXT        IDE_INITFTPCOMMANDS,111,97,248,12,ES_AUTOHSCROLL | WS_GROUP
+    RTEXT           "comenzile sunt despartite de punct si virgula (CWD []; HELP)",IDC_STATIC_8,150,111,207,8
+    GROUPBOX        "     ",IDC_STATIC_9,7,129,352,46
+    CONTROL         " P&astreaza conexiunile active [opreste server-ul de la deconectare din lipsa de activitate(copiere)]",IDC_USEKEEPALIVE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,15,127,337,12
+    LTEXT           "Tr&imite:",IDC_STATIC_10,15,143,29,8
+    COMBOBOX        IDC_KEEPALIVESEND,45,141,114,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "la fi&ecare:",IDC_STATIC_11,164,143,36,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,201,141,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "secunde",IDC_STATIC_12,233,143,34,8
+    LTEXT           "Opreste trimiterea d&upa:",IDC_STATIC_13,15,158,85,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,131,156,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "minute",IDC_STATIC_14,164,158,34,8
+    CONTROL         "Foloseste modul de transfer pasi&v (poate ajuta daca esti protejat de firewall sau de un proxy server)",IDC_USEPASSIVEMODE,
+                    "Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,7,186,347,12
+    CONTROL         "Numarul &maxim de conexiuni simultane:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,404,206,151,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,556,206,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "T&otalul limitei vitezei pentru server:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,404,220,131,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,556,220,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Foloseste cac&he pentru fisierele vizualizate si pentru lista fisierelor si directoarelor pe server",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,200,317,12
+    CONTROL         "Cripteaza cone&xiunea de control cu TLS/SSL",IDC_ENCRYPTCONTROLCONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,214,160,12
+    CONTROL         "Cripteaza conexiuni de &data (transfer de fisiere si listari de directoare) cu TLS/SSL",IDC_ENCRYPTDATACONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,228,286,12
+    CONTROL         "Com&prima transferurulie de data daca server-ul suporta compresie (MODE Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,242,271,12
+    LTEXT           "Nota: a treia stare = foloseste valoarea default (vezi pagina Defaults in Configurare)",IDC_STATIC_15,7,258,284,8
+    LTEXT           "KB/s",IDC_STATIC_16,593,236,21,8,WS_DISABLED
+    DEFPUSHBUTTON   "OK",IDOK,97,279,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,158,279,50,14
+    PUSHBUTTON      "Help",IDHELP,219,279,50,14
+END
+
+IDD_RENAMEDLG DIALOGEX 10, 24, 227, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Redenumeste Bookmark"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,57,42,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,119,42,50,14
+END
+
+IDD_NEWBOOKMARKDLG DIALOGEX 10, 24, 227, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Bookmark Nou"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Nume bookmark:",IDT_NEWNAME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    CONTROL         "",IDC_COPYFOCUSEDSRV,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,35,199,12
+    DEFPUSHBUTTON   "OK",IDOK,57,55,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,119,55,50,14
+END
+
+IDD_ENTERSTRDLG DIALOGEX 10, 24, 243, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Introdu Nume Utilizator"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CONNECTINGTOAS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,9,8,227,8
+    LTEXT           "Nume &utilizator:",IDT_STRING,9,23,223,8
+    EDITTEXT        IDE_STRING,9,33,225,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,65,60,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,127,60,50,14
+END
+
+IDD_LOGINERRORDLG DIALOGEX 10, 24, 284, 165
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Eroare la Conectarea la Server-ul FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nume &utilizator:",IDC_STATIC_1,7,55,56,8
+    EDITTEXT        IDE_USERNAME,64,53,214,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Parola:",IDC_STATIC_2,7,70,36,8
+    EDITTEXT        IDE_PASSWORD,64,68,214,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Cont:",IDC_STATIC_3,7,85,34,8
+    EDITTEXT        IDE_ACCOUNT,64,83,214,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Mai Incearca",IDOK,81,110,55,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,148,110,55,14
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,7,132,271,1
+    CONTROL         "Incearca &din nou fara sa intrebi data viitoare (doar pentru acesta conexiune)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,137,270,12
+    CONTROL         "Ap&lica acum la toate conexiunile cu eroare",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,149,250,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,270,8
+    LTEXT           "Mesaj de la server:",IDT_ERRORTITLE,7,22,272,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,272,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_LOGINERRORDLGEX DIALOGEX 10, 24, 299, 195
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Eroare la Conectarea la Server-ul FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nume &utilizator:",IDC_STATIC_1,7,55,56,8
+    EDITTEXT        IDE_USERNAME,84,53,209,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Parola:",IDC_STATIC_2,7,70,36,8
+    EDITTEXT        IDE_PASSWORD,84,68,209,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Cont:",IDC_STATIC_3,7,85,34,8
+    EDITTEXT        IDE_ACCOUNT,84,83,209,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Nume u&tilizator proxy:",IDC_STATIC_4,7,100,76,8
+    EDITTEXT        IDE_PROXYUSER,84,98,209,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Par&ola proxy:",IDC_STATIC_5,7,115,55,8
+    EDITTEXT        IDE_PROXYPASSWD,84,113,209,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Mai incearca",IDOK,88,140,55,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,155,140,55,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,162,286,1
+    CONTROL         "&Mai incearca fara sa intrebi data viitoare (doar pentru pentru aceasta conexiune)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,167,284,12
+    CONTROL         "Apl&ica acum conexiunilor cu eroare",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,179,132,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,285,8
+    LTEXT           "Raspuns de la server:",IDT_ERRORTITLE,7,22,287,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,287,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_WELCOMEMSGDLG DIALOGEX 10, 24, 396, 170
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Mesaj de Intampinare"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_WELCOMEMSG,5,5,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Inchide",IDOK,141,152,50,14,WS_GROUP
+    PUSHBUTTON      "&Salveaza Ca",IDB_SAVEMSGAS,204,152,50,14
+END
+
+IDD_LOGSDLG DIALOGEX 17, 51, 396, 165
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Log-uri FTP"
+MENU IDM_LOGSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_MENULINE,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,396,1
+    COMBOBOX        IDC_LISTOFLOGS,5,5,386,104,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDE_SERVERLOG,5,19,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+END
+
+IDD_SENDCOMMANDDLG DIALOGEX 10, 24, 337, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Trimite Comanda FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Comanda:",IDC_STATIC_1,9,9,37,8
+    COMBOBOX        IDC_FTPCOMMAND,9,19,319,90,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDE_FTPCOMMAND_PASSWD,9,19,319,12,ES_PASSWORD | ES_AUTOHSCROLL | NOT WS_VISIBLE | WS_GROUP
+    CONTROL         "Comanda  &secreta (ascunde tastarea sa si nu e retinuta sau aratata in log)",IDC_SECRETCOMMAND,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,34,262,12
+    CONTROL         "C&omanda poate schimba calea de lucru pe server (schimba calea si in panou de asemenea)",IDC_CHANGEPATHINPANEL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,46,320,12
+    CONTROL         "Co&manda poate face schimbari pe calea de lucru (reafiseaza calea de lucru)",IDC_REFRESHWORKINGPATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,58,267,12
+    DEFPUSHBUTTON   "OK",IDOK,83,79,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,143,79,50,14
+    PUSHBUTTON      "Help",IDHELP,203,79,50,14
+END
+
+IDD_LISTWAITDLG DIALOGEX 10, 24, 357, 91
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Client FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDT_ACTION,9,9,341,16
+    LTEXT           "Cale:",IDT_PATHONFTP1,9,27,20,8
+    LTEXT           "",IDT_PATHONFTP2,30,27,320,8
+    LTEXT           "Timp ramas estimat:",IDT_ESTIMATEDTIME1,9,38,71,8
+    LTEXT           "",IDT_ESTIMATEDTIME2,81,38,269,8
+    LTEXT           "Timp consumat:",IDT_ELAPSEDTIME1,9,49,71,8
+    LTEXT           "",IDT_ELAPSEDTIME2,81,49,269,8
+    LTEXT           "Status:",IDT_OPERSTATUS1,9,60,26,8
+    LTEXT           "",IDT_OPERSTATUS2,36,60,314,8
+    CONTROL         "",IDC_OPERPROGRESS,"Static",0,9,71,340,12
+END
+
+IDD_CFGSERVERTYPES DIALOGEX 37, 31, 469, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Server-e"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Tipuri suportate de server-e:",IDC_STATIC_1,5,5,99,8
+    LISTBOX         IDL_SUPPORTEDSERVERS,5,15,393,197,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Nou...",IDB_NEWSERVER,407,14,55,14,WS_GROUP
+    PUSHBUTTON      "&Editeaza...",IDB_EDITSERVER,407,32,55,14
+    PUSHBUTTON      "&Muta Sus",IDB_MOVESERVERUP,407,50,55,14
+    PUSHBUTTON      "Muta &Jos",IDB_MOVESERVERDOWN,407,68,55,14
+    PUSHBUTTON      "&Altul",IDB_OTHERSERVERACT,407,86,55,14
+END
+
+IDD_EDITSERVERTYPE DIALOGEX 22, 28, 421, 241
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Editez Tipul de Server"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Conditie de &Autodetect:",IDC_STATIC_1,7,7,80,8
+    EDITTEXT        IDE_AUTODETECTCOND,7,17,390,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ADCONDINSERT,402,17,12,12,WS_GROUP
+    RTEXT           "(gol = intotdeauna adevarat)",IDC_STATIC_2,296,31,100,8
+    LTEXT           "&Coloane in panou:",IDC_STATIC_3,7,39,91,8
+    CONTROL         "",IDL_SRVTYPECOLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,49,347,68
+    PUSHBUTTON      "&Nou...",IDB_NEWCOLUMN,364,49,50,14,WS_GROUP
+    PUSHBUTTON      "&Editeaza...",IDB_EDITCOLUMN,364,67,50,14
+    PUSHBUTTON      "Elim&ina...",IDB_REMOVECOLUMN,364,85,50,14
+    PUSHBUTTON      "&Muta",IDB_MOVECOLUMN,364,103,50,14
+    LTEXT           "&Reguli pentru parcurgerea listarii:",IDC_STATIC_4,7,127,116,8
+    EDITTEXT        IDE_PARSINGRULES,7,137,407,76,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    PUSHBUTTON      "&Testeaza Analizator...",IDB_TESTPARSER,7,221,90,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,242,221,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,303,221,50,14
+    PUSHBUTTON      "Help",IDHELP,364,221,50,14
+END
+
+IDD_EDITSRVTYCOLUMN DIALOGEX 58, 53, 252, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Editeaza Coloana"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Identificator:",IDC_STATIC_1,11,12,46,8
+    EDITTEXT        IDE_COL_ID,65,10,177,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Nume:",IDC_STATIC_2,11,27,26,8
+    COMBOBOX        IDC_COL_NAME,65,25,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Tip:",IDC_STATIC_3,11,43,26,8
+    COMBOBOX        IDC_COL_TYPE,65,41,177,65,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Valoare &empty:",IDC_STATIC_4,11,59,53,8
+    EDITTEXT        IDE_COL_EMPTY,65,57,134,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "",IDT_COL_FORMHELP,203,59,43,8
+    LTEXT           "&Descriere:",IDC_STATIC_5,11,74,42,8
+    COMBOBOX        IDC_COL_DESCR,65,72,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Aliniament:",IDC_STATIC_6,11,89,40,8
+    COMBOBOX        IDC_COL_ALIGNMENT,65,87,94,37,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,41,113,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,101,113,50,14
+    PUSHBUTTON      "Help",IDHELP,161,113,50,14
+END
+
+IDD_SRVTYPETESTPARSER DIALOGEX 30, 34, 456, 263
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Testarea Parser"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Listare &Raw:",IDC_STATIC_1,7,7,43,8
+    EDITTEXT        IDE_PARSER_RAWLIST,7,17,441,83,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    CONTROL         "&Comportament ca si cum listarea raw este incompleta (oprita)",IDC_PARSER_LISTINCOMPL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,219,12
+    PUSHBUTTON      "&Parcurge Listarea Raw",IDB_PARSER_PARSELIST,231,107,87,14,WS_GROUP
+    PUSHBUTTON      "C&iteste Listarea Raw din Fisierul...",IDB_PARSER_LOADLIST,323,107,125,14
+    LTEXT           "Re&zultatele parcurgerii:",IDC_STATIC_2,7,129,80,8
+    CONTROL         "",IDL_PARSER_COLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,441,94
+    DEFPUSHBUTTON   "Inchide",IDOK,338,241,50,14,WS_GROUP
+    PUSHBUTTON      "Help",IDHELP,398,241,50,14
+END
+
+IDD_OPERATIONDLG DIALOGEX 25, 31, 398, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPSOURCETITLE,5,8,44,8
+    CONTROL         "",IDT_OPSOURCETEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,53,8,340,8
+    RTEXT           "",IDT_OPTARGETTITLE,5,19,44,8
+    CONTROL         "",IDT_OPTARGETTEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,53,19,340,8
+    RTEXT           "Timp ramas:",IDC_STATIC_1,5,30,44,8
+    CONTROL         "",IDT_OPTIMELEFT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,53,30,340,8
+    RTEXT           "Timp trecut:",IDC_STATIC_2,5,41,44,8
+    CONTROL         "",IDT_OPELAPSEDTIME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,53,41,340,8
+    RTEXT           "Status:",IDC_STATIC_3,5,52,44,8
+    CONTROL         "",IDT_OPSTATUS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,53,52,340,8
+    ICON            "",IDI_ERRORICON,327,51,18,20,WS_GROUP
+    CONTROL         "spatiu mic disk",IDT_ERRORMSG,"Static",SS_LEFTNOWORDWRAP | WS_GROUP | WS_TABSTOP,341,52,52,8
+    RTEXT           "Progres:",IDC_STATIC_4,5,64,44,8
+    CONTROL         "",IDC_OPPROGRESS,"Static",WS_GROUP,53,63,338,12
+    PUSHBUTTON      "&Detalii >>",IDB_SHOWDETAILS,113,100,50,14,WS_GROUP
+    PUSHBUTTON      "&Erori >>",IDB_SHOWERRORS,170,100,50,14
+    PUSHBUTTON      "A&scunde",IDB_HIDE,56,100,50,14,WS_DISABLED
+    PUSHBUTTON      "&Pauza",IDB_PAUSERESUME,227,100,50,14
+    PUSHBUTTON      "",IDCANCEL,284,100,50,14
+    PUSHBUTTON      "Help",IDHELP,341,100,50,14
+    CONTROL         "",IDC_DLGSPLITBAR,"Static",SS_ETCHEDHORZ | WS_GROUP,7,122,384,1
+    LTEXT           "&Conexiuni:",IDT_CONNECTIONS,7,129,60,8
+    CONTROL         "",IDL_CONNECTIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,383,35
+    PUSHBUTTON      "Re&zolva Eroarea",IDB_OPCONSSOLVEERROR,152,181,68,14,WS_GROUP
+    PUSHBUTTON      "Adauga &y",IDB_OPCONSADD,227,181,50,14
+    PUSHBUTTON      "S&top",IDB_OPCONSSTOP,284,181,50,14
+    PUSHBUTTON      "Pa&uza",IDB_OPCONSPAUSERESUME,341,181,50,14
+    LTEXT           "Operatiu&ni:",IDT_OPERATIONSTEXT,7,195,381,8
+    CONTROL         "",IDL_OPERATIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,205,383,35
+    CONTROL         "Arata doar erori&le",IDB_OPOPERSSHOWONLYERR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,247,72,12
+    PUSHBUTTON      "&Rezolva Eroarea",IDB_OPOPERSSOLVEERROR,202,247,68,14,WS_GROUP
+    PUSHBUTTON      "&Mai incearca",IDB_OPOPERSRETRY,277,247,57,14
+    PUSHBUTTON      "S&ari Peste",IDB_OPOPERSSKIP,341,247,50,14
+    CONTROL         "&Inchide acest dialog cand operatiunea se termina",IDC_OPCLOSEWINWHENDONE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,81,178,12
+END
+
+IDD_COPYMOVEDLG DIALOGEX 10, 24, 244, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_TGTPATHSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,226,8
+    COMBOBOX        IDC_TGTPATH,10,19,225,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "&Doar adauga in Coada (nu procesa in conexiunea activa)",IDC_ADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,292,47,197,12
+    DEFPUSHBUTTON   "OK",IDOK,37,42,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,97,42,50,14
+    PUSHBUTTON      "Help",IDHELP,157,42,50,14
+END
+
+IDD_CONFIRMDELETEDLG DIALOGEX 10, 24, 331, 61
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Confirma Stergere"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "D&a",IDOK,112,39,50,14,WS_GROUP
+    PUSHBUTTON      "&Nu",IDCANCEL,169,39,50,14
+    ICON            "",IDC_DELICON,8,8,18,20,WS_GROUP
+    LTEXT           "",IDT_DELSUBJECT,41,12,284,16,SS_NOPREFIX
+    CONTROL         "D&oar adauga in Coada (nu procesa in conexiunea activa)",IDC_DELADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,352,40,197,12
+END
+
+IDD_CHANGEATTRSDLG DIALOGEX 10, 24, 278, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Schimba Atributele"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CHATTRSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,7,10,264,8
+    GROUPBOX        " Proprietar ",IDC_STATIC_1,7,26,84,51,WS_GROUP
+    GROUPBOX        " Grup ",IDC_STATIC_2,97,26,84,51,WS_GROUP
+    GROUPBOX        " Altii ",IDC_STATIC_3,187,26,84,51,WS_GROUP
+    CONTROL         "&Citeste",IDC_READOWNER,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,36,71,12
+    CONTROL         "&Scrie",IDC_WRITEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,48,71,12
+    CONTROL         "E&xecuta (Acces)",IDC_EXECUTEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,60,71,12
+    CONTROL         "Citeste &y",IDC_READGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,106,36,71,12
+    CONTROL         "Scrie (&w)",IDC_WRITEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,106,48,71,12
+    CONTROL         "Ex&ecuta (Acces)",IDC_EXECUTEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,106,60,71,12
+    CONTROL         "Ci&teste",IDC_READOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,196,36,71,12
+    CONTROL         "Sc&rie",IDC_WRITEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,196,48,71,12
+    CONTROL         "Exec&uta(Acces)",IDC_EXECUTEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,196,60,71,12
+    LTEXT           "Nota: al treileas stat = nu schimba",IDC_STATIC_4,7,81,119,8
+    LTEXT           "Valoare &numerica:",IDC_STATIC_5,7,101,64,8
+    EDITTEXT        IDE_NUMATTRVALUE,74,99,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = Executa, 2 = Scrie, 4 = Citeste)",IDC_STATIC_6,106,101,126,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,34,126,237,1
+    LTEXT           "Optiuni",IDC_STATIC_8,7,122,25,8
+    CONTROL         "Include su&bdirectoarele",IDC_INCLUDESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,132,91,12
+    CONTROL         "Schi&mba atributele fisierelor",IDC_CHATTRSETFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,144,106,12
+    CONTROL         "Schimba atributele &directoarelor",IDC_CHATTRSETDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,156,120,12
+    CONTROL         "D&oar adauga in Coada (nu procesa in conexiunea activa)",IDC_CHATTRADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,320,160,203,12
+    DEFPUSHBUTTON   "OK",IDOK,54,178,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,114,178,50,14
+    PUSHBUTTON      "Help",IDHELP,174,178,50,14
+END
+
+IDD_CFGOPERATIONS DIALOGEX 37, 31, 469, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Operatiuni 1"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,122,9,345,1
+    LTEXT           "Copie si Muta de pe server-ul FTP",IDC_STATIC_2,5,5,115,8
+    LTEXT           "Daca exista deja fisierul &tinta:",IDC_STATIC_3,9,17,102,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,354,15,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca exista deja directorul t&inta:",IDC_STATIC_4,9,31,111,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,354,29,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca numele fisierului ti&nta nu poate fi creat:",IDC_STATIC_5,9,45,154,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,354,43,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca numele directorului tint&a nu poate fi creat:",IDC_STATIC_6,9,59,164,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,354,57,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca tran&sferul se opreste, cum sa reincerci in cazul in care fisierul tinta a fost creat:",IDC_STATIC_7,9,73,287,8
+    COMBOBOX        IDC_RETRYONCREATED,354,71,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca transf&erul se opreste, cum sa reincerci in cazul in care fisierul a fost continuat de unde s-a oprit:",IDC_STATIC_8,9,87,344,8
+    COMBOBOX        IDC_RETRYONRESUMED,354,85,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca modul de transfer AS&CII e setat pentru fisierul cu continut binar:",IDC_STATIC_9,9,101,239,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,354,99,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,130,124,337,1
+    LTEXT           "Schimba Atributele pe server-ul FTP",IDC_STATIC_11,5,120,123,8
+    LTEXT           "Daca atributele e&xistente nu pot fi pastrate (ex. in modul Unix):",IDC_STATIC_12,9,132,215,8
+    COMBOBOX        IDC_UNKNOWNATTRS,354,130,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,99,155,368,1
+    LTEXT           "Sterge de pe server-ul FTP",IDC_STATIC_14,5,151,92,8
+    LTEXT           "Daca &directorul nu e gol:",IDC_STATIC_15,9,163,86,8
+    COMBOBOX        IDC_NONEMPTYDIRDEL,354,161,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca &fisierul e ascuns:",IDC_STATIC_16,9,177,78,8
+    COMBOBOX        IDC_HIDDENFILEDEL,354,175,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca direct&orul e ascuns:",IDC_STATIC_17,9,191,88,8
+    COMBOBOX        IDC_HIDDENDIRDEL,354,189,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_CFGOPERATIONS2 DIALOGEX 37, 31, 469, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Operatiuni 2"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,111,9,356,1
+    LTEXT           "Copie si Muta pe server-ul FTP",IDC_STATIC_2,5,5,104,8
+    LTEXT           "Daca fisierul &tinta exista deja:",IDC_STATIC_3,9,17,102,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,354,15,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca directorul t&inta exista deja:",IDC_STATIC_4,9,31,111,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,354,29,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca numele de fisier ti&nta nu poate fi creat:",IDC_STATIC_5,9,45,153,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,354,43,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca numele directorului tint&a nu poate fi creat:",IDC_STATIC_6,9,59,164,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,354,57,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca tran&sferul se opreste, cum sa reincerci in cazul in care fisierul tinta a fost creat:",IDC_STATIC_7,9,73,287,8
+    COMBOBOX        IDC_RETRYONCREATED,354,71,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca transf&erul se opreste, cum sa reincerci in cazul in care fisierul tinta a fost continuat:",IDC_STATIC_8,9,87,301,8
+    COMBOBOX        IDC_RETRYONRESUMED,354,85,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Daca modul transfer AS&CII e setat pentru fisierul cu continut binar:",IDC_STATIC_9,9,101,228,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,354,99,112,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_SOLVEITEMERRDETAILED DIALOGEX 10, 24, 348, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai incearca",IDOK,46,88,60,14,WS_GROUP
+    PUSHBUTTON      "S&ari peste",IDB_SCRD_SKIP,111,88,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,176,88,60,14
+    PUSHBUTTON      "Help",IDHELP,241,88,60,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,333,1
+    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,332,12
+    LTEXT           "D&etalii:",IDC_STATIC_3,7,9,52,8
+    EDITTEXT        IDE_SCRD_DETAILS,61,9,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea su&rsei:",IDC_STATIC_4,7,27,52,8
+    EDITTEXT        IDE_SCRD_SRCPATH,61,27,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele s&ursei:",IDC_STATIC_5,7,39,52,8
+    EDITTEXT        IDE_SCRD_SRCNAME,61,39,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea t&intei:",IDC_STATIC_6,7,51,52,8
+    EDITTEXT        IDE_SCRD_TGTPATH,61,51,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele ti&ntei:",IDC_STATIC_7,7,65,52,8
+    EDITTEXT        IDE_SCRD_TGTNAME,61,63,280,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILEDEX DIALOGEX 10, 24, 374, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai Incearca",IDOK,12,88,60,14,WS_GROUP
+    PUSHBUTTON      "Re&ia",CM_SIED_RESUME,77,88,53,14
+    PUSHBUTTON      "&Suprascrie",CM_SIED_OVERWRITE,135,88,53,14
+    PUSHBUTTON      "S&ari Peste",IDB_SCRD_SKIP,193,88,53,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,251,88,53,14
+    PUSHBUTTON      "Help",IDHELP,309,88,53,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,359,1
+    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,332,12
+    LTEXT           "&Detalii:",IDC_STATIC_3,7,9,52,8
+    EDITTEXT        IDE_SCRD_DETAILS,61,9,306,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea su&rsei:",IDC_STATIC_4,7,27,52,8
+    EDITTEXT        IDE_SCRD_SRCPATH,61,27,306,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele surs&ei:",IDC_STATIC_5,7,39,52,8
+    EDITTEXT        IDE_SCRD_SRCNAME,61,39,306,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea tin&tei:",IDC_STATIC_6,7,51,52,8
+    EDITTEXT        IDE_SCRD_TGTPATH,61,51,306,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele ti&ntei:",IDC_STATIC_7,7,65,52,8
+    EDITTEXT        IDE_SCRD_TGTNAME,61,63,306,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED2 DIALOGEX 10, 24, 348, 147
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai Incearca",IDOK,46,101,60,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDB_SCRD_SKIP,111,101,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,176,101,60,14
+    PUSHBUTTON      "Help",IDHELP,241,101,60,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,334,1
+    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,332,12
+    LTEXT           "Descrierea &erorii:",IDC_STATIC_3,7,9,66,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,334,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea su&rsei:",IDC_STATIC_4,7,40,52,8
+    EDITTEXT        IDE_SCRD_SRCPATH,61,40,278,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele s&ursei:",IDC_STATIC_5,7,52,52,8
+    EDITTEXT        IDE_SCRD_SRCNAME,61,52,278,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea t&intei:",IDC_STATIC_6,7,64,52,8
+    EDITTEXT        IDE_SCRD_TGTPATH,61,64,278,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele &tintei:",IDC_STATIC_7,7,78,52,8
+    EDITTEXT        IDE_SCRD_TGTNAME,61,76,278,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3 DIALOGEX 10, 24, 287, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Eroare in Crearea Directorului Tinta cu Nume Alternativ"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai incearca",IDOK,16,101,60,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDB_SCRD_SKIP,81,101,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,146,101,60,14
+    PUSHBUTTON      "Help",IDHELP,211,101,60,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,273,1
+    CONTROL         "A&plica acum la operatiunile cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,164,12
+    LTEXT           "&Descrierea erorii:",IDC_STATIC_2,7,9,66,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,275,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea su&rsei:",IDC_STATIC_3,7,40,52,8
+    EDITTEXT        IDE_SCRD_SRCPATH,61,40,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele s&ursei:",IDC_STATIC_4,7,52,52,8
+    EDITTEXT        IDE_SCRD_SRCNAME,61,52,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea t&intei:",IDC_STATIC_5,7,64,52,8
+    EDITTEXT        IDE_SCRD_TGTPATH,61,64,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele &tintei:",IDC_STATIC_6,7,78,52,8
+    EDITTEXT        IDE_SCRD_TGTNAME,61,76,219,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3EX DIALOGEX 10, 24, 374, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Eroare in Crearea Directorului Tinta cu Nume Alternativ"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai Incearca",IDOK,12,101,60,14,WS_GROUP
+    PUSHBUTTON      "&Reia",CM_SIED_RESUME,77,101,53,14
+    PUSHBUTTON      "&Suprascrie",CM_SIED_OVERWRITE,135,101,53,14
+    PUSHBUTTON      "S&ari Peste",IDB_SCRD_SKIP,193,101,53,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,251,101,53,14
+    PUSHBUTTON      "Help",IDHELP,309,101,53,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,359,1
+    CONTROL         "A&plica acum la operatiunile cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,164,12
+    LTEXT           "&Descrierea erorii:",IDC_STATIC_2,7,9,66,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,362,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea s&ursei:",IDC_STATIC_3,7,40,52,8
+    EDITTEXT        IDE_SCRD_SRCPATH,61,40,306,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele surs&ei:",IDC_STATIC_4,7,52,52,8
+    EDITTEXT        IDE_SCRD_SRCNAME,61,52,306,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea tin&tei:",IDC_STATIC_5,7,64,52,8
+    EDITTEXT        IDE_SCRD_TGTPATH,61,64,306,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nu&mele tintei:",IDC_STATIC_6,7,78,52,8
+    EDITTEXT        IDE_SCRD_TGTNAME,61,76,306,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLE DIALOGEX 10, 24, 348, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai Incearca",IDOK,46,70,60,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDB_SCRD_SKIP,111,70,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,176,70,60,14
+    PUSHBUTTON      "Help",IDHELP,241,70,60,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,334,1
+    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,332,12
+    LTEXT           "Calea su&rsei:",IDC_STATIC_3,7,9,52,8
+    EDITTEXT        IDE_SCRD_SRCPATH,61,9,280,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele surs&ei:",IDC_STATIC_4,7,21,52,8
+    EDITTEXT        IDE_SCRD_SRCNAME,61,21,280,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea tin&tei:",IDC_STATIC_5,7,33,52,8
+    EDITTEXT        IDE_SCRD_TGTPATH,61,33,280,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele t&intei:",IDC_STATIC_6,7,47,52,8
+    EDITTEXT        IDE_SCRD_TGTNAME,61,45,280,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLEEX DIALOGEX 10, 24, 378, 116
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai Incearca",IDOK,16,70,57,14,WS_GROUP
+    PUSHBUTTON      "&Suprascrie",CM_SIED_OVERWRITE,78,70,50,14
+    PUSHBUTTON      "Suprascrie T&ot",CM_SIED_OVERWRITEALL,133,70,64,14
+    PUSHBUTTON      "S&ari Peste",IDB_SCRD_SKIP,202,70,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,257,70,50,14
+    PUSHBUTTON      "Help",IDHELP,312,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,364,1
+    CONTROL         "T&ine minte alegerea facuta  si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,335,12
+    LTEXT           "Calea su&rsei:",IDC_STATIC_3,7,9,52,8
+    EDITTEXT        IDE_SCRD_SRCPATH,61,9,311,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nu&mele sursei:",IDC_STATIC_4,7,21,52,8
+    EDITTEXT        IDE_SCRD_SRCNAME,61,21,311,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea tint&ei:",IDC_STATIC_5,7,33,52,8
+    EDITTEXT        IDE_SCRD_TGTPATH,61,33,311,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele &tintei:",IDC_STATIC_6,7,47,52,8
+    EDITTEXT        IDE_SCRD_TGTNAME,61,45,309,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRASCIITR DIALOGEX 16, 27, 347, 118
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Modul de Transfer ASCII e Setat pentru Fisiere cu Continut Binar"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Foloseteste Modul Binar",IDOK,14,70,99,14,WS_GROUP
+    PUSHBUTTON      "I&gnora",CM_SATR_IGNORE,118,70,50,14
+    PUSHBUTTON      "S&ari Peste",IDB_SCRD_SKIP,173,70,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,228,70,50,14
+    PUSHBUTTON      "Help",IDHELP,283,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,332,1
+    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,332,12
+    LTEXT           "Calea su&rsei:",IDC_STATIC_3,7,9,52,8
+    EDITTEXT        IDE_SCRD_SRCPATH,61,9,277,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele s&ursei:",IDC_STATIC_4,7,21,52,8
+    EDITTEXT        IDE_SCRD_SRCNAME,61,21,277,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea t&intei:",IDC_STATIC_5,7,33,52,8
+    EDITTEXT        IDE_SCRD_TGTPATH,61,33,277,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele &tintei:",IDC_STATIC_6,7,45,52,8
+    EDITTEXT        IDE_SCRD_TGTNAME,61,45,277,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMERRUNKATTR DIALOGEX 10, 24, 348, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Cateva din Atributele Existente Nu Pot fi Pastrate"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ignora",IDOK,56,70,50,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDB_SCRD_SKIP,118,70,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,180,70,50,14
+    PUSHBUTTON      "Help",IDHELP,242,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,335,1
+    CONTROL         "&Tine minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,332,12
+    LTEXT           "Ca&le:",IDC_STATIC_3,7,9,63,8
+    EDITTEXT        IDE_SCRD_SRCPATH,71,9,271,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nume:",IDC_STATIC_4,7,21,63,8
+    EDITTEXT        IDE_SCRD_SRCNAME,71,21,271,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Atribute &curente:",IDC_STATIC_5,7,33,63,8
+    EDITTEXT        IDE_SCRD_CURATTR,71,33,271,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Atribute n&oi:",IDC_STATIC_6,7,45,63,8
+    EDITTEXT        IDE_SCRD_NEWATTR,71,45,271,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSETNEWATTR DIALOGEX 10, 24, 293, 190
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Seteaza Atributele Noi"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Proprietar ",IDC_STATIC_1,7,56,89,51,WS_GROUP
+    GROUPBOX        " Grup ",IDC_STATIC_2,102,56,89,51,WS_GROUP
+    GROUPBOX        " Altii ",IDC_STATIC_3,197,56,89,51,WS_GROUP
+    CONTROL         "&Citeste",IDC_READOWNER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,66,71,12
+    CONTROL         "&Scrie",IDC_WRITEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,78,71,12
+    CONTROL         "Exec&uta (Acces)",IDC_EXECUTEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,90,71,12
+    CONTROL         "Citeste &y",IDC_READGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,111,66,71,12
+    CONTROL         "Sc&rie",IDC_WRITEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,111,78,71,12
+    CONTROL         "Execu&ta (Acces)",IDC_EXECUTEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,111,90,71,12
+    CONTROL         "Citest&e",IDC_READOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,206,66,71,12
+    CONTROL         "Scr&ie",IDC_WRITEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,206,78,71,12
+    CONTROL         "Executa (Acces &z)",IDC_EXECUTEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,206,90,74,12
+    LTEXT           "Valoare nu&merica:",IDC_STATIC_4,7,117,64,8
+    EDITTEXT        IDE_NUMATTRVALUE,72,115,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = Executa, 2 = Scrie, 4 = Citeste)",IDC_STATIC_5,104,117,126,8
+    DEFPUSHBUTTON   "Seteaza Atributele Noi",IDOK,31,144,95,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,136,144,50,14
+    PUSHBUTTON      "Help",IDHELP,196,144,50,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,165,278,1
+    CONTROL         "F&oloseste acum aceste atribute in operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,172,221,12
+    LTEXT           "C&ale:",IDC_STATIC_7,7,9,60,8
+    EDITTEXT        IDE_SCRD_SRCPATH,68,9,214,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nume:",IDC_STATIC_8,7,21,60,8
+    EDITTEXT        IDE_SCRD_SRCNAME,68,21,214,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Atri&bute curente:",IDC_STATIC_9,7,33,60,8
+    EDITTEXT        IDE_SCRD_CURATTR,68,33,214,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVELOWMEMORYERR DIALOGEX 10, 24, 274, 90
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Resurse Insuficiente Sistem pentru a Termina Operatiunea"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai incearca",IDOK,9,46,60,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDB_SCRD_SKIP,74,46,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,139,46,60,14
+    PUSHBUTTON      "Help",IDHELP,204,46,60,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,260,1
+    CONTROL         "A&plica operatiunilor cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,155,12
+    LTEXT           "Ca&le:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SCRD_SRCPATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nume:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SCRD_SRCNAME,32,21,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSIMPLEERR DIALOGEX 10, 24, 350, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Sterge",IDOK,57,46,50,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDB_SISE_SKIP,119,46,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,181,46,50,14
+    PUSHBUTTON      "Help",IDHELP,243,46,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,336,1
+    CONTROL         "&Tine minte alegerea facuta  si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SISE_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,335,12
+    LTEXT           "&Cale:",IDC_STATIC_3,7,9,25,8
+    EDITTEXT        IDE_SISE_PATH,35,9,307,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nume:",IDC_STATIC_4,7,21,25,8
+    EDITTEXT        IDE_SISE_NAME,35,21,307,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR DIALOGEX 10, 24, 274, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai Incearca",IDOK,9,82,60,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDB_SSCD_SKIP,74,82,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,139,82,60,14
+    PUSHBUTTON      "Help",IDHELP,204,82,60,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,260,1
+    CONTROL         "A&plica acum operatiunilor cu aceeasi eroare",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,158,12
+    LTEXT           "&Cale:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nume:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SSCD_NAME,32,21,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Descrierea erorii:",IDC_STATIC_4,7,40,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,50,262,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2 DIALOGEX 10, 24, 287, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai Incearca",IDOK,16,106,60,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDB_SSCD_SKIP,81,106,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,146,106,60,14
+    PUSHBUTTON      "Help",IDHELP,211,106,60,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,273,1
+    CONTROL         "A&plica acum operatiunilor cu aceeasi eroare",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,158,12
+    LTEXT           "Calea s&ursei:",IDC_STATIC_2,7,9,52,8
+    EDITTEXT        IDE_SSCD_SRCPATH,59,9,221,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele su&rsei:",IDC_STATIC_3,7,21,52,8
+    EDITTEXT        IDE_SSCD_SRCNAME,59,21,221,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea &tintei:",IDC_STATIC_4,7,33,52,8
+    EDITTEXT        IDE_SSCD_TGTPATH,59,33,221,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele t&intei:",IDC_STATIC_5,7,45,52,8
+    EDITTEXT        IDE_SSCD_TGTNAME,59,45,221,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Descrierea erorii:",IDC_STATIC_6,7,64,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,275,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2EX DIALOGEX 10, 24, 374, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai Incearca",IDOK,12,106,60,14,WS_GROUP
+    PUSHBUTTON      "&Reia",CM_SSCD_RESUME,77,106,53,14
+    PUSHBUTTON      "&Suprascrie",CM_SSCD_OVERWRITE,135,106,53,14
+    PUSHBUTTON      "S&ari Peste",IDB_SSCD_SKIP,193,106,53,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,251,106,53,14
+    PUSHBUTTON      "Help",IDHELP,309,106,53,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,359,1
+    CONTROL         "A&plica acum operatiunilor cu aceeasi eroare",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,158,12
+    LTEXT           "Calea s&ursei:",IDC_STATIC_2,7,9,52,8
+    EDITTEXT        IDE_SSCD_SRCPATH,59,9,307,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Numele surs&ei:",IDC_STATIC_3,7,21,52,8
+    EDITTEXT        IDE_SSCD_SRCNAME,59,21,307,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Calea &tintei:",IDC_STATIC_4,7,33,52,8
+    EDITTEXT        IDE_SSCD_TGTPATH,59,33,307,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nu&mele tintei:",IDC_STATIC_5,7,45,52,8
+    EDITTEXT        IDE_SSCD_TGTNAME,59,45,307,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Descrierea erorii:",IDC_STATIC_6,7,64,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,362,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR3 DIALOGEX 10, 24, 274, 112
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mai incearca",IDOK,9,70,60,14,WS_GROUP
+    PUSHBUTTON      "S&ari Peste",IDB_SSCD_SKIP,74,70,60,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,139,70,60,14
+    PUSHBUTTON      "Help",IDHELP,204,70,60,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,260,1
+    CONTROL         "A&plica acum operatiunilor cu aceeasi eroare",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,158,12
+    LTEXT           "&Cale:",IDC_STATIC_2,7,9,19,8
+    EDITTEXT        IDE_SSCD_PATH,27,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Descrierea erorii:",IDC_STATIC_3,7,28,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,38,262,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_VIEWERRASCIITRFORBINFILE DIALOGEX 25, 38, 327, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Client FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Foloseste Modul Binar",IDOK,62,57,88,14,WS_GROUP
+    PUSHBUTTON      "I&gnora",IDIGNORE,157,57,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,214,57,50,14
+    CONTROL         "Descarc fisier cu continut binar in modul de transfer ASCII. Poate produce fisiere",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,7,282,8
+    CONTROL         "corupte din cauza conversiei nedorite in randurile system de sfarsit. Puteti descarca",IDC_STATIC_2,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,16,282,8
+    CONTROL         "acest fisier din nou in mod de transfer binar (fara aceasta conversie nedorita). Sau",IDC_STATIC_3,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,25,282,8
+    CONTROL         "daca stiti ca acest fisier e doart text, apasati Ignora pentru a ignora acest mesaj.",IDC_STATIC_4,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,34,282,8
+    ICON            "",IDI_INFOICON,7,7,18,20
+END
+
+IDD_PROXYSERVER DIALOGEX 10, 24, 266, 231
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Adauga Server Proxy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Nume:",IDC_STATIC_1,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,10,24,8
+    EDITTEXT        IDE_PRXSRV_NAME,64,8,194,12,ES_AUTOHSCROLL
+    LTEXT           "&Tip:",IDC_STATIC_2,7,25,21,8
+    COMBOBOX        IDC_PRXSRV_TYPE,64,23,195,170,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Adresa:",IDC_STATIC_3,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,40,31,8
+    EDITTEXT        IDE_PRXSRV_ADDRESS,64,38,194,12,ES_AUTOHSCROLL
+    CONTROL         "&Port:",IDC_STATIC_4,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,55,18,8
+    EDITTEXT        IDE_PRXSRV_PORT,64,53,39,12,ES_AUTOHSCROLL
+    CONTROL         "Nume &Utilizator:",IDC_STATIC_5,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,70,56,8
+    EDITTEXT        IDE_PRXSRV_USER,64,68,194,12,ES_AUTOHSCROLL
+    CONTROL         "Pa&rola:",IDC_STATIC_6,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,85,53,8
+    EDITTEXT        IDE_PRXSRV_PASSWD,64,83,63,12,ES_PASSWORD | ES_AUTOHSCROLL
+    EDITTEXT        IDE_PRXSRV_PASSWD_LOCKED,132,83,63,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "&Deblocare...",IDB_PRXSRV_PASSWD_CHANGE,198,82,60,14
+    CONTROL         "&Salveaza parola",IDC_PRXSRV_SAVEPASSWD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,99,66,12
+    LTEXT           "nu e securizat",IDC_PRXSRV_SAVEPASSWD_HINT,83,101,140,8,WS_TABSTOP
+    LTEXT           "Script de &login:",IDC_STATIC_7,7,120,54,8
+    EDITTEXT        IDE_PRXSRV_SCRIPT,7,130,251,68,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN
+    DEFPUSHBUTTON   "OK",IDOK,88,210,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,148,210,50,14
+    PUSHBUTTON      "Help",IDHELP,208,210,50,14
+END
+
+IDD_CERTIFICATE DIALOGEX 10, 24, 270, 120
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Problema Identificata de Server"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Serverul a dat un certificat cu urmatoarele probleme:",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,9,258,8
+    GROUPBOX        " Pe scurt verificarea certificatului ",IDC_STATIC_2,9,21,252,54
+    LTEXT           "",IDT_CERTIFICATE_ERROR,16,32,238,40
+    LTEXT           "Acceptarea certificatului e potential periculoasa si nu e recomandata.",IDC_STATIC_3,7,80,258,8,NOT WS_GROUP
+    LTEXT           "",IDC_STATIC_4,5,95,260,1,SS_ETCHEDHORZ | WS_GROUP
+    PUSHBUTTON      "&Vizualizeaza Certificat",IDB_CERTIFICATE_VIEW,8,100,86,14,WS_GROUP
+    PUSHBUTTON      "&Accepta Certificatul",IDOK,99,100,79,14
+    DEFPUSHBUTTON   "Anuleaza",IDCANCEL,183,100,79,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SRVCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Conecteaza\tEnter",             IDOK
+        MENUITEM SEPARATOR
+        MENUITEM "&Nou...\tInsereaza",             IDB_NEWBOOKMARK
+        MENUITEM "C&opie in...",                 CM_COPYSRVTO
+        MENUITEM "&Redenumeste...\tF2",              IDB_RENAMEBOOKMARK
+        MENUITEM "E&limina...\tSterge",          IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "Muta &Sus\tAlt+Up Arrow",      CM_MOVEUPBOOKMARK
+        MENUITEM "Muta &Jos\tAlt+Down Arrow",  CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_SRVCONTEXTMENU2 MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Nou...\tInsereaza",             IDB_NEWBOOKMARK
+        MENUITEM "C&opie in...",                 CM_COPYSRVTO
+        MENUITEM "&Redenumeste...\tF2",              IDB_RENAMEBOOKMARK
+        MENUITEM "E&limina...\tSterge",          IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "Muta &Sus\tAlt+Up Arrow",      CM_MOVEUPBOOKMARK
+        MENUITEM "Muta &Jos\tAlt+Down Arrow",  CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_ACTPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Deconecteaza...",              CM_DISCONNECTSRV
+        MENUITEM "Arata &Certificatul...",        CM_SHOWCERT
+        POPUP "&Modul de Transfer"
+        BEGIN
+            MENUITEM "&Automat",                  CM_TRMODEAUTO
+            MENUITEM "A&SCII",                      CM_TRMODEASCII
+            MENUITEM "&Binar",                     CM_TRMODEBINARY
+        END
+        MENUITEM "&Reimprospatare",                    CM_REFRESHPATH
+        MENUITEM SEPARATOR
+        MENUITEM "Ada&uga Bookmark...",            CM_ADDBOOKMARK
+        MENUITEM "Arata &Log-ul...",                CM_SHOWLOG
+        MENUITEM "&Trimite Comanda FTP...",        CM_SENDFTPCOMMAND
+        MENUITEM "Arata Li&stare Raw...",        CM_SHOWRAWLISTING
+        MENUITEM "L&isteaza Fisierele si Directoarele Ascunse (Unix)", CM_LISTHIDDENFILES
+    END
+END
+
+IDM_CHNGDRVCONTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Conectare la Server-ul FTP...",   CM_CONNECTSRV
+        MENUITEM "&Organizeaza Bookmarks...",      CM_ORGBOOKMARKS
+        MENUITEM "Arata &Log-urile...",               CM_SHOWLOGS
+    END
+END
+
+IDM_DETPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "A&rata in Panou",              CM_OPENDETACHED
+        MENUITEM SEPARATOR
+        MENUITEM "&Deconecteaza",                 CM_DISCONNECTSRV
+        MENUITEM SEPARATOR
+        MENUITEM "Ada&uga Bookmark...",            CM_ADDBOOKMARK
+        MENUITEM "Arata &Log-ul...",                CM_SHOWLOG
+    END
+END
+
+IDM_LOGSMENU MENU 
+BEGIN
+    POPUP "&Jurnal"
+    BEGIN
+        MENUITEM "C&opie",                       CM_COPYLOG
+        MENUITEM "Co&pie Tot",                   CM_COPYALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "&Salveaza Ca...",                 CM_SAVELOG
+        MENUITEM "S&alveaza Tot Ca...",             CM_SAVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "&Reseteaza...",                   CM_CLEARLOG
+        MENUITEM "E&limina...",                  CM_REMOVELOG
+        MENUITEM "El&imina Tot...",              CM_REMOVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "I&nchide\tAlt+F4",              IDCANCEL
+    END
+    POPUP "&Optiuni"
+    BEGIN
+        MENUITEM "&Intotdeauna arata log-ul pentru panoul activ", CM_SHOWLOGFORPANEL
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "Log-uri &FTP\tF1",               CM_HELPFORLOGSWND
+    END
+END
+
+IDM_SERVERSOTHERACT MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Copie in...",                 CM_COPYSERVERTO
+        MENUITEM "&Redenumeste...\tF2",              CM_RENAMESERVER
+        MENUITEM "&Elimina...\tSterge",          CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "I&mporta din Fisierul...",        CM_IMPORTSERVER
+        MENUITEM "E&xporta in Fisierul...",          CM_EXPORTSERVER
+    END
+END
+
+IDM_SERVERSACTIONS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Nou...\tInsereaza",             IDB_NEWSERVER
+        MENUITEM "&Editeaza...",                    IDB_EDITSERVER
+        MENUITEM "&Copie in...",                 CM_COPYSERVERTO
+        MENUITEM "&Redenumeste...\tF2",              CM_RENAMESERVER
+        MENUITEM "E&limina...\tSterge",          CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "Muta &Sus\tAlt+Up Arrow",      IDB_MOVESERVERUP
+        MENUITEM "Muta &Jos\tAlt+Down Arrow",  IDB_MOVESERVERDOWN
+        MENUITEM SEPARATOR
+        MENUITEM "I&mporta din Fisierul...",        CM_IMPORTSERVER
+        MENUITEM "E&xporta in Fisierul...",          CM_EXPORTSERVER
+    END
+END
+
+IDM_SRVTYPEMOVECOLUMN MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Sus\tAlt+Up Arrow",           CM_MOVECOLUMNUP
+        MENUITEM "&Jos\tAlt+Down Arrow",       CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_SRVTYPERULESMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "&Insereaza"
+        BEGIN
+            MENUITEM "I&nceperea Regulei",              CM_STRM_RULESTART
+            MENUITEM "&Sfarsitul Regulei",                CM_STRM_RULEEND
+            MENUITEM "Comentariu de &Linie",               CM_STRM_COMMENT
+            MENUITEM SEPARATOR
+            POPUP "&Sari peste"
+            BEGIN
+                MENUITEM "Spatii Libere (Daca sunt)",       CM_STRM_SKIPWSIFANY
+                MENUITEM "Spatii Libere (Cel Putin Unul)", CM_STRM_SKIPWS
+                MENUITEM "Numarul Exact de Spatii Libere", CM_STRM_SKIPNUMOFWS
+                MENUITEM "Spatii Libere Si Linia se Termina (Cel Putin Unul)", CM_STRM_SKIPWSENDEOLS
+                MENUITEM "Restul Liniei (Cel Putin Un Caracter)", CM_STRM_SKIPRESTOFLINE
+                MENUITEM "Cuvant",                        CM_STRM_SKIPWORD
+                MENUITEM "Numarul Exact de Caractere",  CM_STRM_SKIPNUMOFLETTERS
+                MENUITEM "Toate Caracterele Pana la Sfarsitul Sirului Cautat", CM_STRM_SKIPALLTO
+                MENUITEM "Toate Caracterele Pana la Cel Mai Apropiat Numar", CM_STRM_SKIPALLTONUMBER
+            END
+            POPUP "&Atribuie coloanei"
+            BEGIN
+                MENUITEM "Restul Randului (Cel Putin Un Caracter)", CM_STRM_ASGNRESTOFLINE
+                MENUITEM "Cuvant",                        CM_STRM_ASGNWORD
+                MENUITEM "Numar",                      CM_STRM_ASGNNUM
+                MENUITEM "Numar Pozitiv",             CM_STRM_ASGNPOSNUM
+                MENUITEM "Numar cu Separatori",      CM_STRM_ASGNNUMWITHSEP
+                MENUITEM "Luna formata din Trei Litere (Engleza, Germana)", CM_STRM_ASGN3LETTERMONTH
+                MENUITEM "Luna formata din Trei Litere (Definita de Utilizator)", CM_STRM_ASGN3LETMONTHGEN
+                MENUITEM "Luna Text (Germana)",         CM_STRM_ASGNTEXTMONTH
+                MENUITEM "Luna Text (Definita de Utilizator)",   CM_STRM_ASGNTEXTMONTHGEN
+                MENUITEM "Numar Luna",                CM_STRM_ASGNMONTH
+                MENUITEM "Numar Ziua",                  CM_STRM_ASGNDAY
+                MENUITEM "Numar An",                 CM_STRM_ASGNYEAR
+                MENUITEM "Ora",                        CM_STRM_ASGNTIME
+                MENUITEM "An sau Ora",                CM_STRM_ASGNYEARORTIME
+                MENUITEM "Numar Exact de Caractere",  CM_STRM_ASGNNUMOFLETTERS
+                MENUITEM "Toate Caracterele Pana la Sfarsitul Sirului Cautat", CM_STRM_ASGNALLTO
+                MENUITEM "Toate Caracterele Pana la Sirul Cautat", CM_STRM_ASGNALLUPTO
+                MENUITEM "Legatura Unix (Imparte Legatura Nume si Tinta)", CM_STRM_ASGNUNIXLINK
+                MENUITEM "Dispozitiv Unix",                 CM_STRM_ASGNUNIXDEV
+                MENUITEM "Expresie",                  CM_STRM_ASGNEXPR
+            END
+            POPUP "&Elimina spatiile din coloana"
+            BEGIN
+                MENUITEM "Initial",                     CM_STRM_CUTWSINIT
+                MENUITEM "Trailing",                    CM_STRM_CUTWSTRAIL
+                MENUITEM "Initial si Trailing",        CM_STRM_CUTWSBOTH
+            END
+            POPUP "&Variabile de stare si operatori pentru expresii"
+            BEGIN
+                MENUITEM "Este Prima Linie Plina", CM_STRM_STVARISFIRSTNELINE
+                MENUITEM "Este Ultima Linie Plina",  CM_STRM_STVARISLASTNELINE
+                MENUITEM "Urmatorul Caracter",              CM_STRM_STVARNEXTCHAR
+                MENUITEM "Urmatorul Cuvant",                   CM_STRM_STVARNEXTWORD
+                MENUITEM "Restul Liniei",                CM_STRM_STVARRESTOFLINE
+                MENUITEM SEPARATOR
+                MENUITEM "Egal",                       CM_STRM_OPEREQUAL
+                MENUITEM "Inegal",                   CM_STRM_OPERNOTEQUAL
+                MENUITEM "Sir Egal (Caracter Insensibil - litera mica, mare = nu conteaza)", CM_STRM_OPERSTREQUAL
+                MENUITEM "Sir Inegal (Caracter Insensibil - litera mica, mare = nu conteaza)", CM_STRM_OPERSTRNOTEQUAL
+                MENUITEM "Subsirul e in Sir",      CM_STRM_OPERISINSTR
+                MENUITEM "Subsirul Nu e in Sir",  CM_STRM_OPERISNOTINSTR
+                MENUITEM "Sirul se Termina cu Sir",     CM_STRM_OPERENDWITH
+                MENUITEM "Sirul nu se Termina cu Sir", CM_STRM_OPERNOTENDWITH
+            END
+            POPUP "Alt&ele"
+            BEGIN
+                MENUITEM "Continua Doar Daca",            CM_STRM_IF
+                MENUITEM "Adauga Sir La Coloana",        CM_STRM_ADDSTRTOCOL
+                MENUITEM "Mergi Inapoi cu Un Numar de Caractere", CM_STRM_BACK
+                MENUITEM "Taie Sfarsitul Sirului in Coloana", CM_STRM_CUTENDOFSTR
+            END
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Undo",                       CM_STRM_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Cut &x",                        CM_STRM_CUT
+        MENUITEM "&Copie",                       CM_STRM_COPY
+        MENUITEM "&Paste",                      CM_STRM_PASTE
+        MENUITEM "&Sterge",                     CM_STRM_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "S&electeaza Tot",                 CM_STRM_SELECTALL
+    END
+END
+
+IDM_SRVTYPECOLUMNS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Nou...\tInsereaza",             IDB_NEWCOLUMN
+        MENUITEM "&Editeaza...",                    IDB_EDITCOLUMN
+        MENUITEM "El&imina...\tSterge",          IDB_REMOVECOLUMN
+        MENUITEM SEPARATOR
+        MENUITEM "Muta &Sus\tAlt+Up Arrow",      CM_MOVECOLUMNUP
+        MENUITEM "Muta &Jos\tAlt+Down Arrow",  CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_DIREXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Mai Incearca",                      IDOK
+        MENUITEM "F&oloseste Directorul Existent",     CM_SDEX_USEEXISTINGDIR
+        MENUITEM "&Foloseste Nume Alternativ",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_FILEEXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Mai Incearca",                      IDOK
+        MENUITEM "Re&ia",                     CM_SIED_RESUME
+        MENUITEM "Reia& sau Suprascrie",        CM_SIED_RESUMEOROVR
+        MENUITEM "&Foloseste Nume Alternativ",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_TRANSFERFAILEDERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Mai Incearca",                      IDOK
+        MENUITEM "F&oloseste Nume Alternativ",         CM_SCRD_USEALTNAME
+        MENUITEM "Re&ia sau Suprascrie",        CM_SIED_RESUMEOROVR
+    END
+END
+
+IDM_CANTCRFILEERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Mai Incearca",                      IDOK
+        MENUITEM "&Folosete Nume Alternativ",         CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_UNKATTRSERRIGNORE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "I&gnora",                     IDOK
+        MENUITEM "&Mai Incearca",                      CM_SIEA_RETRY
+        MENUITEM "&Seteaza Atribute Noi...",      CM_SIEA_SETNEWATTRS
+    END
+END
+
+IDM_DELETEERRORRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Sterge",                     IDOK
+        MENUITEM "&Mai Incearca",                      CM_SISE_RETRY
+    END
+END
+
+IDM_DELETEERRORONSRVRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Ma&i Incearca",                      IDOK
+        MENUITEM "M&archeaza ca Sters",            CM_SSCD_MARKASDELETED
+    END
+END
+
+IDM_RESUMEERRORONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Mai Incearca",                      IDOK
+        MENUITEM "&Foloseste Nume Alternativ",         CM_SSCD_USEALTNAME
+        MENUITEM "Re&ia sau Suprascrie",        CM_SSCD_RESUMEOROVR
+    END
+END
+
+IDM_RESUMETESTFAILEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Mai Incearca",                      IDOK
+        MENUITEM "F&oloseste Nume Alternativ",         CM_SSCD_USEALTNAME
+        MENUITEM "Re&ia sau Suprascrie",        CM_SSCD_RESUMEOROVR
+        MENUITEM "Redu Marimea &Fsierului Si Incarca Sa Reiei Din Nou", CM_SSCD_REDUCEFILESIZE
+    END
+END
+
+IDM_UPLTESTIFFINISHEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Mai I&ncearca",                      IDOK
+        MENUITEM "&Foloseste Nume Alternativ",         CM_SSCD_USEALTNAME
+        MENUITEM "Re&ia sau Suprascrie",        CM_SSCD_RESUMEOROVR
+        MENUITEM "Ma&rcheaza Fisier Ca Incarcat Cu Succes", CM_SSCD_MARKASUPLOADED
+    END
+END
+
+IDM_ASCIITRFORBINFILE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Foloseste Mod Binar",            IDOK
+        MENUITEM "&Mai Incearca",                      CM_SATR_RETRY
+    END
+END
+
+IDM_ADDPROXYSERVER MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "A&dauga...",                     IDB_ADDPROXYSRV
+        MENUITEM "Ed&iteaza...",                    CM_EDITPROXYSRV
+        MENUITEM "&Sterge...",                  CM_DELETEPROXYSRV
+        MENUITEM SEPARATOR
+        MENUITEM "&Muta Sus",                    CM_MOVEUPPROXYSRV
+        MENUITEM "M&uta Jos",                  CM_MOVEDOWNPROXYSRV
+    END
+END
+
+IDM_PRXSRVSCRIPTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "&Insereaza"
+        BEGIN
+            MENUITEM "&3xx: (trimite doar daca server-ul cere parola/cont)", CM_PSS_3XX
+            MENUITEM SEPARATOR
+            MENUITEM "Adresa &Proxy",              CM_PSS_PROXYHOST
+            MENUITEM "Port Prox&y",                 CM_PSS_PROXYPORT
+            MENUITEM "Utilizator Pr&oxy",            CM_PSS_PROXYUSER
+            MENUITEM "Parola Pro&xy",             CM_PSS_PROXYPASSWD
+            MENUITEM "&Adresa",                    CM_PSS_HOST
+            MENUITEM "Por&t",                       CM_PSS_PORT
+            MENUITEM "&Utilizator",                  CM_PSS_USER
+            MENUITEM "Paro&la",                   CM_PSS_PASSWD
+            MENUITEM "Co&nt",                    CM_PSS_ACCOUNT
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Undo",                       CM_PSS_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Cut &z",                        CM_PSS_CUT
+        MENUITEM "&Copie",                       CM_PSS_COPY
+        MENUITEM "&Paste",                      CM_PSS_PASTE
+        MENUITEM "&Stege",                     CM_PSS_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "S&electeaza Tot",                 CM_PSS_SELECTALL
+    END
+END
+
+IDM_UNLOCKPASSWORD MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Deblocheaza Parola...",         CM_UNLOCKPASSWORD
+        MENUITEM "&Sterge Parola",             CM_CLEARPASSWORD
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_FTPPLUGINTITLE, "Client FTP"
+ IDS_PLUGINNAME, "Client FTP"
+ IDS_PLUGINDESCR, "Transferul fisierelor si directoarelor prin FTP."
+ IDS_ABOUTPLUGINTITLE, "Despre Plugin"
+ IDS_FTPCHNGDRVITEM, "/\tClient FTP"
+ IDS_FTPERRORTITLE, "Eroare FTP"
+ IDS_TOOLONGPATH, "Nu pot termina operatia deoarece calea este prea lunga."
+ IDS_HOSTNAMEMISSING, "Numele gazdei lipseste din calea specificata."
+ IDS_INVALIDPORT, "Port-ul nu e un numar sau nu este un numar de la 1 la 65535 in calea specificata."
+ IDS_INVALIDNUMBER, "Numar Invalid."
+ IDS_CONFIGTITLE, "Configurare FTP"
+ IDS_INCORRECTSYNTAX, "Masca de fisier e incorecta din punct de vedere sintactic."
+ IDS_MUSTBEPOSITIVE, "Numarul trebuie sa fie pozitiv."
+ IDS_MUSTBEGRTHANZERO, "Numarul trebuie sa fie mai mare ca zero."
+ IDS_KAEVERYGRTHSTOP, "Timpul in care se opreste nu trebuie sa fie mai scurt decat timpul in care trimite (ca sa activeze macar o trimitere)."
+ IDS_KAEVERYTOOBIG, "Perioada de trimitere nu poate fi mai mare decat 10000 secunde."
+ IDS_KASTOPTOOBIG, "Timpul de oprire nu poate fi mai mare de 10000 minute."
+ IDS_KEEPALIVECMDNOOP, "NOOP (fara transfer de date)"
+ IDS_KEEPALIVECMDPWD, "PWD (fara transfer de date)"
+ IDS_KEEPALIVECMDNLST, "NLST (transfer de date)"
+ IDS_KEEPALIVECMDLIST, "LIST (transfer de date)"
+ IDS_CONNECTFTPSERVER, "&Conectare la Server-ul FTP..."
+ IDS_DISCONNECT, "&Deconecteaza...\tF12"
+ IDS_ADDBOOKMARK, "Ada&uga Bookmark..."
+ IDS_SHOWLOGS, "Arata &Log-uri..."
+ IDS_SENDFTPCOMMAND, "&Trimite Comanda FTP..."
+ IDS_ORGBOOKMARKSCMD, "&Organizeaza Bookmarks..."
+ IDS_SHOWRAWLISTING, "Arata Li&stare Raw..."
+ IDS_REFRESHPATH, "&Reimprospateaza"
+ IDS_LISTHIDDENFILES, "L&isteaza Fisierele si Directoarele Ascunse (Unix)"
+ IDS_SHOWCERT, "&Arata Certificatul..."
+
+ IDS_QUICKCONNECT, "Conectare Rapida"
+
+ IDS_ADVSTRNONE, "Fara Optiuni Avansate"
+ IDS_ADVSTRTARGETPATH, "Cale Tinta: %s"
+ IDS_ADVSTRSERVERTYPE, "Tipul de Server: %s"
+ IDS_ADVSTRPORT, "Port: %d"
+ IDS_ADVSTRSERVERPASVYES, "Mod Pasiv"
+ IDS_ADVSTRSERVERPASVNO, "Fara Mod Pasiv"
+ IDS_ADVSTRKEEPALIVEYES, "Mentin Activ"
+ IDS_ADVSTRKEEPALIVENO, "Nu Mentin Activ"
+ IDS_ADVSTRMAXCONCURCON, "Nr de Conexiuni Maxime: %d"
+ IDS_ADVSTRUNLIMITEDCON, "Conexiuni Nelimitate"
+ IDS_ADVSTRSPEEDLIM, "Limita de Viteza: %g KB/s"
+ IDS_ADVSTRUNLIMITEDSPEED, "Viteza Nelimitata"
+ IDS_ADVSTRTRMODBINARY, "Modul de Transfer: Binar"
+ IDS_ADVSTRTRMODASCII, "Modul de Transfer: ASCII"
+ IDS_ADVSTRTRMODAUTO, "Modul de Transfer: Automat"
+ IDS_ADVSTRUSECACHEYES, "Foloseste Cache"
+ IDS_ADVSTRUSECACHENO, "Nu Folosi Cache"
+ IDS_ADVSTRINITFTPCMDS, "Comenzi Initiale: %s"
+ IDS_ADVSTRLISTCOMMAND, "Listeaza Comanda: %s"
+ IDS_ADVSTRPROXYSRV, "Proxy: %s"
+ IDS_ADVSTRPROXYNOTUSED, "Nefolosit"
+ IDS_ADVSTRSSLCONTRONLY, "Criptat"
+ IDS_ADVSTRSSLCONTRDATA, "Criptare Totala"
+ IDS_ADVSTRMODEZ, "MOD Z"
+ IDS_ADVSTRNOMODEZ, "Fara MOD Z"
+
+ IDS_SRVTYPEAUTODETECT, "Autodetect"
+ IDS_TRANSFMODEDEFAULT, "Default (vezi Configurare/Defaults)"
+ IDS_TRANSFMODEBINARY, "Binar (fara schimbari in timpul transferului)"
+ IDS_TRANSFMODEASCII, "ASCII (converteste in sfarsituri de randuri default)"
+ IDS_TRANSFMODEAUTO, "Automat (vezi masti ASCII in Configurare/Defaults)"
+ IDS_SELECTTARGETDIR, "Selecteaza directorul pentru panoul tinta."
+ IDS_RENAMESRVTO, "Redenumeste ""%s"" in"
+ IDS_COPYDATAFROM, "&Copie data din bookmark ""%s"""
+ IDS_MAYNOTBEEMPTY, "Aici trebuie introdusa obligatoriu o valoare."
+ IDS_REMOVECONFIRM, "Sunteti sigur ca doriti sa eliminati bookmark ""%s""?"
+ IDS_HOSTMAYNOTBEEMPTY, "Va rugam introduceti adresa server-ului FTP (nume, IP, sau URL) inainte de a incerca sa va conectati."
+ IDS_ORGANIZEBOOKMARKS, "Organizeaza Bookmarks"
+ IDS_CLOSECONINPANEL, "Sunteti pe cale sa parasiti server-ul FTP in panou. Doriti sa pastrati activa conexiunea cu acest server?\n\nDaca alegeti Pastrez,puteti accesa aceasta conexiune mai tarziu din meniul Schimba Drive-ul."
+ IDS_ALWAYSNOTCLOSE, "Alege &intotdeauna Pastrez\tcum sa revin\tPuteti schimba aceasta optiune mai tarziu din pagina de Confirmare in Configurare FTP"
+ IDS_DISCONNECTBUTTON, "&Deconectare"
+ IDS_KEEPCONBUTTON, "&Pastrez"
+
+ IDS_ADDBOOKMARKTITLE, "Adauga Bookmark"
+ IDS_ADDBOOKMARKTEXT, "Nume nou bookmark:"
+
+ IDS_WINSOCKETSERROR, "Nu pot initializa libraria Windows Sockets.\n\nEroare: %s"
+
+ IDS_WANTDISCONNECT, "Doriti sa va deconectati de la server-ul FTP?"
+ IDS_ALWAYSCLOSE, "&Inchide conexiunea fara a mai intreba data viitoare\tcum sa revin\tPuteti schimba aceasta optiune mai tarziu din pagina de Confirmare in Configurare FTP"
+
+ IDS_GETTINGIPOFSERVER, "Obtin adresa IP al server-ului ""%s"", apasa tasta ESC pentru a anula..."
+ IDS_OPENINGCONTOSERVER, "Deschid conexiunea cu server-ul FTP ""%s"" (IP: %s, port: %d),\napasa tasta ESC pentru a anula..."
+ IDS_WAITINGTORETRY, "Nu ma pot conecta la server ""%s"" (IP: %s, port: %d).\nEroare: %s"
+ IDS_WAITINGTORETRY2, "Nu ma pot conecta la server ""%s"" (port: %d).\nEroare: %s"
+ IDS_WAITINGTORETRYSUF, "%s\n\nAstept %d secunde pentru a ma reconecta (incercarea nr. %d of %d), apasa tasta ESC pentru a anula..."
+ IDS_WAITINGFORLOGIN, "Astept fereastra de login, apasa tasta ESC pentru a anula..."
+ IDS_SENDINGLOGINCMD, "Trimit comanda ""%s"", apasa tasta ESC pentru anulare..."
+ IDS_CLOSINGCONNECTION, "Inchid conexiunea cu ""%s"", apasa tasta ESC pentru anulare..."
+ IDS_SENDINGCOMMAND, "Trimit comanda ""%s"", apasa tasta ESC pentru a anula..."
+ IDS_ABORTINGCOMMAND, "Anulez comanda FTP, apasa tasta ESC pentru anulare..."
+ IDS_OPENINGCONTOSERVER2, "Deschid conexiunea cu server-ul FTP ""%s"" (port: %d),\napasa tasta ESC pentru anulare..."
+ IDS_PREPARINGACTDATACON, "Pregatesc conexiunea activa de date, apasa tasta ESC pentru anulare..."
+
+ IDS_GETIPESC, "Doriti sa anulati obtinerea adresei IP a server-ului?"
+ IDS_GETIPTIMEOUT, "A expirat perioada de obtinere a adresei IP a server-ului."
+ IDS_OPENCONESC, "Doriti sa anulati conectarea la server?"
+ IDS_OPENCONTIMEOUT, "Conectarea la serverul FTP a expirat."
+ IDS_OPENPROXYSRVCONTIMEOUT, "Conectarea la server-ul proxy a expirat."
+ IDS_WAITRETRESC, "Apasa butonul Renunta pentru a renunta la toate incercarile viitoare de login. Apasa butonul Mai Incearca pentru a nu mai astepta urmatoarea incercare de login. Apasa butonul de Astept pentru a continua sa asteptati inainte de urmatoarea incercare de login."
+ IDS_WAITRETRESCABORTBTN, "&Renunta"
+ IDS_WAITRETRESCRETRYBTN, "&Mai Incearca"
+ IDS_WAITRETRESCWAITBTN, "&Asteapta"
+
+ IDS_WAITFORLOGESC, "Doriti sa anulati asteptarea ferestrei de login?"
+ IDS_WAITFORLOGTIMEOUT, "Asteptarea ferestrei de login a expirat."
+ IDS_CLOSECONESC, "Doriti sa inchideti conexiunea imediat?"
+ IDS_LOGMSGACTIONCANCELED, "Operatiunea anulata de utilizator.\r\n"
+ IDS_LOGMSGDISCONTIMEOUT, "Deconectarea de la server s-a terminat. Conexiunea a fost inchisa.\r\n"
+ IDS_SENDCOMMANDESC, "Doriti sa anulati comada FTP?"
+ IDS_SENDCOMMANDESC2, "Doriti sa anulati comada FTP? Conexiunea la serverul FTP va fi inchisa."
+ IDS_ABORTCOMMANDESC, "Doriti sa anulati renuntarea la comanda FTP? Conexiunea la server-ul FTP va fi inchisa."
+ IDS_PREPACTDATACONESC, "Doriti sa anulati pregatirea conexiunii active? Conexiunea la serverul FTP va fi oprita."
+ IDS_SNDORABORCMDTIMEOUT, "Trimiterea sau renuntarea la comanda FTP a expirat."
+ IDS_LISTCMDTIMEOUT, "Trimiterea sau renuntarea la comanda de listare a expirat. Nota: daca transferul de data nu a fost inceput, incercati sa\nschimbati modul de transfer(vezi Dialogul de la conectare la Server FTP>Avansat>Foloseste modul de transfer pasiv )"
+ IDS_PREPACTDATACONTIMEOUT, "Pregatirea conexiunii active a expirat."
+ IDS_LOGMSGFATALERROR, "Eroare totala in comunicarea cu server-ul. Conexiunea a fost inchisa.\r\n"
+ IDS_LOGMSGFATALERROR2, "O eroare totala a avut loc. Conexiunea a fost inchisa..\r\n"
+
+ IDS_UNKNOWNERROR, "Eroare necunoscuta (poate din cauza resurselor system insuficiente)."
+ IDS_GETIPERROR, "Nu pot obtine adresa IP al server-ului ""%s"".\n\nEroare: %%s"
+ IDS_OPENCONERROR, "Nu ma pot conecta la server ""%s"" (IP: %s, port: %d).\n\nEroare: %%s"
+ IDS_CONNECTIONLOSTERROR, "Conexiunea la server s-a pierdut pe neasteptate."
+ IDS_NOTFTPSERVERERROR, "Conexiunea la server nu a reusit. Cel mai probabil, nu e din cauza server-ului FTP sau a FTP proxy server-ului.\n\nRaspunsul server-ului: %s"
+ IDS_SENDCOMMANDERROR, "Nu pot trimite comenzi la server.\n\nEroare: %s"
+ IDS_LOGINERROR, "Nu ma pot loga la server-ul FTP sau la FTP proxy server.\n\nEroare: %s"
+ IDS_ABORTCOMMANDERROR, "Nu pot anula comanda.\n\nEroare: %s"
+ IDS_GETCURWORKPATHERROR, "Nu pot afisa calea curenta de lucru pe server-ul FTP.\n\nRaspunsul server-ului: %s"
+ IDS_CHANGEWORKPATHERROR, "Nu pot schimba calea pe server-ul FTP.\n\nCale: %s\nRaspunsul server-ului: %s"
+ IDS_CREATEDIRERROR, "Nu pot crea director pe server-ul FTP.\n\nDirectorul: %s\nRaspunsul server-ului: %s"
+ IDS_QUICKRENAMEERROR, "Nu pot redenumi fisier sau director pe server-ul FTP.\n\nNume: %s\nRedenumeste in: %s\nRaspunsul server-ului: %s"
+ IDS_QUICKRENAMEFILEERR, "Nu pot redenumi fisierul pe server-ul FTP.\n\nNume: %s\nRedenumeste in: %s\n"
+ IDS_QUICKRENAMEFILEERRSUF1, "Eroare: Fisierul sursa e blocat de alta operatiune."
+ IDS_QUICKRENAMEFILEERRSUF2, "Eroare: Fisierul tinta e blocat de alta operatiune."
+ IDS_ERRINPROXYSCRIPT, "Eroarea a avut loc in timp ce procesa script-ul server-ului proxy.\n\nEroare: %s"
+ IDS_PROXYSRVADREMPTY, "Adresa server-ului proxy lipseste."
+ IDS_PROXYOPENCONERROR, "Server-ul proxy nu se poate conecta la server-ul FTP ""%s"" (port: %d).\n\nEroare: %%s"
+ IDS_PROXYSENDREQERROR, "Nu pot trimite cererea la server-ul proxy.\n\nEroare: %%s"
+ IDS_PROXYRECVREPERROR, "Nu pot primi raspuns de la server-ul proxy.\n\nEroare: %%s"
+ IDS_PROXYUNEXPECTEDREPLY, "Raspuns neasteptat primit de la server-ul proxy. Probabil ati specificat un tip incorect de server proxy."
+
+ IDS_ENTERPASSTITLE, "Introduceti Parola"
+ IDS_ENTERPASSTEXT, "&Parola:"
+ IDS_ENTERACCTTITLE, "Introduceti Contul"
+ IDS_ENTERACCTTEXT, "&Cont:"
+ IDS_CONNECTINGTOAS1, "Conectare la ""%s""."
+ IDS_CONNECTINGTOAS2, "Conectare la ""%s"" ca ""%s""."
+
+ IDS_HIDDENPASSWORD, "ascuns"
+
+ IDS_LCONLOSTFORMATERROR, "Conexiunea la server-ul FTP in panoul stang s-a pierdut.\n\nEroare: %s"
+ IDS_RCONLOSTFORMATERROR, "Conexiunea la server-ul FTP in panoul drept s-a pierdut.\n\nEroare: %s"
+ IDS_DCONLOSTFORMATERROR, "Conexiunea la server-ul FTP s-a pierdut.\n\nEroare: %s"
+ IDS_NONEREPLY, "(nimic)"
+ IDS_WARNWHENCONLOST, "&Nu arata acest mesaj data viitoare\tcum sa revin\tPuteti schimba aceasta optine mai tarziu in pagina Configurare FTP"
+
+ IDS_LOGHEADER, "Conectarea la ""%s"" (%s) pe port %d.\r\nLog UID este %d, ora este %s.\r\n\r\n"
+ IDS_RECONLOGHEADER, "\r\n-----\r\n\r\nReconectarea la ""%s"" (%s) pe port %d (incercarea nr. %d).\r\nOra e %s.\r\n\r\n"
+ IDS_PRXSRVLOGHEADER, "Adresa server-ului FTP: %s, port: %d, user: %s\r\nNumele server-ului proxy: %s, type: %s\r\nAdresa server-ului proxy: %s, port: %d, utilizator: %s\r\nConectarea la ""%s"" (%s) on port %d.\r\nLog UID este %d, ora este %s.\r\n\r\n"
+ IDS_PRXSRVRECONLOGHEADER, "\r\n-----\r\n\r\nAdresa server-ului FTP: %s, port: %d, utilizator: %s\r\nNumele server-ului proxy: %s, tip: %s\r\nAdresa server-ului proxy: %s, port: %d, utilizator: %s\r\nReconectarea la ""%s"" (%s) pe port %d (incercarea nr. %d).\r\nOra este %s.\r\n\r\n"
+
+ IDS_NOLOGS, "Nu sunt log-uri de vizualizat."
+
+ IDS_FTPINLEFTPANEL, "panou stanga"
+ IDS_FTPINRIGHTPANEL, "panou dreapta"
+ IDS_FTPNOTINPANEL, "nu in panou"
+ IDS_FTPOPERATION, "folosit pentru operatiune"
+ IDS_FTPDISCONNECTED, "deconectat"
+ IDS_OPERSTOPPED, "oprit"
+ IDS_FTPINACTIVE, "conexiune inactiva"
+
+ IDS_FSHAVENOLOG, "Aceasta conexiune la server-ul FTP nu are log. Cel mai probabil, conexiunea a fost pornita cu log-are dezactivata (vezi pagina Logs in Configurare FTP)."
+
+ IDS_CLEARLOGQUESTION, "Sunteti sigur-a ca doriti sa stergeti log-ul ""%s""?"
+ IDS_REMOVELOGQUESTION, "Sunteti sigur-a ca doriti eliminarea log-ului ""%s""?"
+ IDS_REMOVEALLLOGSQUESTION, "Sunteti sigur-a ca doriti eliminarea tuturor log-urilor?"
+ IDS_TEXTCOPIEDTOCLIPBOARD, "Textul a fost copiat cu succes in clipboard."
+ IDS_COPYTOCLIPBOARDERROR, "Nu pot copia textul in clipboard."
+ IDS_SAVELOGFILTER, "Fisiere log (*.log)|*.log|Toate fisierele (*.*)|*.*|"
+ IDS_SAVEASTITLE, "Salveaza Log Ca"
+ IDS_SAVEALLASTITLE, "Salveaza Toate Log-urile Ca"
+ IDS_SAVELOGERROR, "Nu pot salva log in fisier.\n\nEroare: %s"
+
+ IDS_CMDMAYNOTBEEMPTY, "Comenzi empty nu sunt permise."
+ IDS_SECRETFTPCOMMAND, "(comanda secreta)"
+ IDS_SERVERREPLYTITLE, "Server-ul FTP Raspunde la ""%s"""
+
+ IDS_RECONNECTTOSRV, "Conexiunea la server-ul FTP e inchisa. Doriti sa va reconectati la server-ul FTP?"
+ IDS_ALWAYSRECONNECT, "&Reconectare fara sa intrebi data viitoare\tcum sa revin\tPuteti schimba aceasta optiune mai tarziu in pagina Confirmari din Configurare FTP"
+
+ IDS_LOGMSGLOGINSUCCESS, "Logare cu succes, obtin informatia sistemului...\r\n"
+ IDS_LOGMSGCHANGINGPATH, "Schimbarea caii in ""%s""...\r\n"
+ IDS_LOGMSGSENDINGUSRCMD, "Trimit comanda utilizatorului ""%s""...\r\n"
+ IDS_LOGMSGREFRESHINGPATH, "Reimprospatarea caii ""%s""...\r\n"
+ IDS_LOGMSGDETACHED, "Conexiunea s-a oprit in panoul stanga...\r\n"
+ IDS_LOGMSGATTACHED, "Conexiunea s-a intors in panou...\r\n"
+ IDS_LOGMSGDISCONNECT, "Deconectare de pe server...\r\n"
+ IDS_LOGMSGLISTINGCACHEDPATH, "Listarea caii ""%s"" din cache...\r\n"
+ IDS_LOGMSGLISTINGPATH, "Listarea caii ""%s""...\r\n"
+ IDS_LOGMSGRESOLVINGLINK, "Rezolvarea legaturii ""%s""...\r\n"
+ IDS_LOGMSGVIEWCACHEDFILE, "Vizualizarea fisierului ""%s"" din cache...\r\n"
+ IDS_LOGMSGVIEWFILE, "Obtinerea fisierului ""%s"" pentru vizualizare...\r\n"
+ IDS_LOGMSGCREATEDIR, "Crearea directorului ""%s""...\r\n"
+ IDS_LOGMSGQUICKRENAME, "Redenumirea ""%s"" to ""%s""...\r\n"
+ IDS_LOGMSGDOWNLOADFILE, "Descarcarea fisierului ""%s""...\r\n"
+ IDS_LOGMSGUPLOADFILE, "Incarcarea fisierului ""%s""...\r\n"
+ IDS_LOGMSGPAUSE, "Utilizatorul doreste sa puna pe pauza aceasta conexiune...\r\n"
+ IDS_LOGMSGRESUME, "Utilizatorul doreste sa reia aceasta coneziune pusa pe pauza...\r\n"
+ IDS_LOGMSGUPLOADISCOMPL, "Fisierul ""%s"" a fost incarcat complet (marimea fisierului de pe server este %s)...\r\n"
+ IDS_LOGMSGUPLOADISCOMPL2, "Fisierul text ""%s"" a fost incarcat in totalitate...\r\n"
+ IDS_LOGMSGUPLOADISNOTCOMPL, "Fisierul ""%s"" nu a fost incarcat in totalitate (marimea fisierului de pe server nu este %s)...\r\n"
+ IDS_LOGMSGUPLOADISNOTCOMPL2, "Fisierul text ""%s"" nu a fost incarcat in totalitate...\r\n"
+ IDS_LOGMSGDWNLOADFORCRESUM, "Fortez Reluarea pentru fisierul ""%s"" (continutul fisierului a fost primit cu succes dar server-ul nu a confirmat trimiterea cu succes a acestui fisier).\r\n"
+ IDS_LOGMSGUPLOADRENFILE, "Redenumesc fisierul pentru a-l incarca la ""%s""...\r\n"
+ IDS_LOGMSGDOWNLOADFILE2, "Descarcarea fisierului ""%s"" in ""%s""...\r\n"
+
+ IDS_UNABLETOREADLIST, "Nu pot citi toata lista de fisiere si directoare de pe server. Lista afisata in panou poate fi incompleta."
+ IDS_UNABLETOREADLISTSUFFIX, "\n\nEroare: %s"
+ IDS_UNABLETOREADLISTSUFFIX2, "\n\nRaspunsul server-ului: %s"
+ IDS_UNABLETOREADLISTSUFFIX3, "\n\nEroare: %s\nNota: daca transferul de date nu a fost inceput, incearca sa schimbati modul de transfer (vezi dialogul de Conectare la Server-ul FTP > Avansat > Foloseste modul de transfer pasiv)"
+ IDS_UNABLETOREADLISTSUFFIX4, "\n\nRaspunsul server-ului: %s\nNota: daca transferul de date nu a fost pornit, incercati sa modificati modul de transfer (vezi dialogul de Conectare la Server-ul FTP > Avansat > Foloseste modul de transfer pasiv)"
+ IDS_LOGMSGPASVNOTSUPPORTED, "Modul pasiv nu este suportat pe acest site, incerc modul activ...\r\n"
+ IDS_LISTPATHERROR, "Nu pot citi lista de fisiere si directoare pentru noua cale pe server.\nDoriti sa afisez aceasta cale in panou oricum?\n\nCale: %s\nRaspunsul server-ului: %s"
+ IDS_OPENACTDATACONERROR, "Nu pot pregati conexiune activa de date.\n\nEroare: %s"
+
+ IDS_LOGMSGUNABLETOOPEN, "Nu pot deschide conexiune pasiva de date (IP: %s, port: %d)...\r\n"
+ IDS_LOGMSGUNABLETOOPEN2, "Nu pot deschide conexiune pasiva de date (IP: %s, port: %d), eroare: %s...\r\n"
+ IDS_LOGMSGDATACONTERMINATED, "Conexiunea de data a fost anulata la cererea utilizatorului...\r\n"
+ IDS_LOGMSGDATACONRECON, "Reconectarea conexiunii de date...\r\n"
+ IDS_LOGMSGDATCONERROR, "Eroare la conexiunea de date: %s\r\n"
+ IDS_LOGMSGUNEXPREPLY, "Raspuns neasteptat: "
+ IDS_LOGMSGNODATATRTIMEOUT, "Conexiunea de date a fost anulata deoarece e in asteptare de prea mult timp...\r\n"
+ IDS_LOGMSGDATACONNOTOPENED, "Conexiunea de date nu a fost deschisa...\r\n"
+ IDS_ERRDATACONNODATATRTIMEOUT, "Conexiunea de date a fost anulata pentru ca e in asteptare de prea mult timp."
+ IDS_ERRDATACONNOTOPENED, "Conexiunea de date nu a fost deschisa."
+ IDS_LOGMSGUNABLETOCONPRX, "Nu pot deschide conexiunea pe server-ul proxy (IP: %s, port: %d)...\r\n"
+ IDS_LOGMSGUNABLETOCONPRX2, "Nu pot deschide conexiunea pe server-ul proxy (IP: %s, port: %d), eroare: %s...\r\n"
+ IDS_ERRDATACONSSLCONNECTERROR, "Nu pot stabili conexiune de date criptata (SSL)."
+ IDS_ERRDATACONDECOMPRERROR, "Data e corupta sau incompleta deci nu poate fi decomprimata corect (MODE Z)."
+ IDS_LOGMSGDECOMPRERROR, "Nu pot decomprima data (MODE Z), este corupta.\r\n"
+
+ IDS_LINENUMCOLUMN, "Linie"
+ IDS_LINENUMCOLUMNDESC, "Numere Linie ale Listarii Raw Server FTP"
+ IDS_RAWLISTCOLUMN, "Listare"
+ IDS_RAWLISTCOLUMNDESC, "Listare Raw Server FTP"
+
+ IDS_LISTWNDDOWNLOADING, "Descarcarea listei de fisiere si directoare de la %s, apasati tasta ESC pentru anulare..."
+ IDS_LISTWNDDOWNLOADSPEED, "la %s/s"
+ IDS_LISTWNDCONNECTIONIDLE, "conexiune in asteptare de %s"
+ IDS_LISTWNDSTATUS1, "%s din %s (%s)"
+ IDS_LISTWNDSTATUS2, "%s (%s)"
+ IDS_LISTWNDESTIMTIMEUNKNOWN, "(necunoscut)"
+ IDS_LISTWNDABORTINGCOMMAND, "Anulez descarcarea listei de fisiere si directoare, apasati tasta ESC pentru anulare..."
+ IDS_LISTWNDSENDCOMMANDESC, "Vreti sa opriti descarcarea listei? Poate cauza afisarea incompleta a listei fisirelor si directoarelor din panou.\n\nNota: daca transferul de date nu a inceput, incercati sa schimbati modul de transfer (vezi dialogul de Conectare la Server-ul FTP > Avansat > Foloseste modul de transfer pasiv)"
+ IDS_LISTWNDSENDCOMMANDESC2, "Doriti sa anulati descarcarea listei? Conexiunea cu server-ul FTP va fi oprita.Poate cauza listarea incompleta a fisierelor si directoarelor in panou.\n\nNota: daca transferul de date nu a inceput, incercati sa schimbati modul de transfer  (vezi dialogul de Conectare la Server-ul FTP > Avansat > Foloseste modul de transfer pasiv)"
+ IDS_LISTWNDABORTCOMMANDESC, "Doriti sa anulati oprirea? Conexiunea la server-ul FTP va fi terminata."
+
+ IDS_LISTWNDDOWNLFILEABORTING, "Opresc descarcarea fisierului, apasati tasta ESC pentru anulare..."
+ IDS_LISTWNDDOWNLOADINGFILE, "Descarc fisierul  %s de la %s, apasati tasta ESC pentru anulare..."
+ IDS_LISTWNDDOWNLFILESENDCMDESC, "Doriti sa opriti descarcarea? Poate cauza vizualizarea fisierului incomplet."
+ IDS_LISTWNDDOWNLFILESENDCMDESC2, "Doriti sa anulati descarcarea? Conexiunea la server-ul FTP va fi oprita. Poate cauza vizualizarea fisierului incomplet."
+ IDS_LISTWNDDOWNLFILETIMEOUT, "Descarcarea a intrat in pauza."
+
+ IDS_RAWLISTINGTITLE, "Listare Raw"
+ IDS_RAWLISTINGFILTER, "Listez fisierele (*.txt)|*.txt|Toate fisierele (*.*)|*.*|"
+ IDS_RAWLISTSAVEASTITLE, "Salveaza Listare Raw Ca"
+ IDS_RAWLISTSAVEERROR, "Nu pot salva listare raw in fisier.\nEroare: %s"
+
+ IDS_SRVTYPEREMOVECONF, "Sunteti sigur-a ca doriti sa eliminati suportul pentru server-ele de tipul ""%s""?"
+ IDS_SRVTYPENEWTITLE, "Noul Tip de Server"
+ IDS_SRVTYPENEWSUBJECT, "&Numele tipului de server:"
+ IDS_SRVTYPERENAMETITLE, "Redenumeste Tip Server"
+ IDS_SRVTYPECOPYFROM, "&Copie data de pe tip server ""%s"""
+ IDS_SRVTYPEUSERDEF, "(definit de utilizator)"
+ IDS_SRVTYPENOTUNIQUE, "Tipul Server-ului ""%s"" exista deja, va rog alegeti alt nume."
+ IDS_SRVTYPEFILEFILTER, "Fisiere tip server (*.str)|*.str|Toate fisierele (*.*)|*.*|"
+ IDS_SRVTYPESAVEASTITLE, "Exporta Tipul de Server in"
+ IDS_SRVTYPEEXPORTERROR, "Nu pot exporta tipul de server in fisier.\n\nEroare: %s"
+ IDS_SRVTYPEIMPORTERROR, "Nu pot importa tip de server din fisier.\n\nEroare: %s"
+ IDS_SRVTYPEIMPMOREDATA, "Fisierul contine linie prea lunga sau prea multe date decat era de asteptat."
+ IDS_SRVTYPEIMPNOTSTRFILE, "Fisierul e corupt sau nu este fisier valid de tip server."
+ IDS_SRVTYPEIMPSYNERR, "Format neasteptat al fisier sau resurse sistem insuficiente."
+ IDS_SRVTYPEOVERWRITE, "Tipul server ""%s"" exista deja. Doriti sa-l inlocuiti?"
+ IDS_SRVTYPEIMPERRINRULES, "Reguli pentru analiza care contin eroare."
+ IDS_SRVTYPEIMPERRINACOND, "Conditia autodetect contine eroare."
+
+ IDS_ADCSTR_AND, "Si"
+ IDS_ADCSTR_OR, "Sau"
+ IDS_ADCSTR_NOT, "Nu"
+ IDS_ADCSTR_LEFTPAR, "Inceperea Subexpresiei"
+ IDS_ADCSTR_RIGHTPAR, "Sfarsitul Subexpresiei"
+ IDS_ADCSTR_SYSTCONTAINS, "Raspuns SYST Contine"
+ IDS_ADCSTR_WELMSGCONTAINS, "Raspusnsul de Intampinare Contine"
+ IDS_ADCSTR_SYSTCONTAINSREG, "Expresie Normala Gasita in Raspuns SYST"
+ IDS_ADCSTR_WELMSGCONTAINSREG, "Expresie Normala Gasita in Raspunsul de Intampinare"
+
+ IDS_SRVTYPECOL_ID, "Identificator"
+ IDS_SRVTYPECOL_NAME, "Nume"
+ IDS_SRVTYPECOL_DESCR, "Descriere"
+ IDS_SRVTYPECOL_TYPE, "Tip"
+ IDS_SRVTYPECOL_EMPTYVAL, "Valoare Empty"
+ IDS_SRVTYPECOL_ALIGN, "Aliniament"
+
+ IDS_STC_STDNAME_NAME, "Nume"
+ IDS_STC_STDNAME_EXT, "Ext"
+ IDS_STC_STDNAME_SIZE, "Marime"
+ IDS_STC_STDNAME_DATE, "Data"
+ IDS_STC_STDNAME_TIME, "Ora"
+ IDS_STC_STDNAME_TYPE, "Tip"
+ IDS_STC_STDNAME_RIGHTS, "Drepturi"
+ IDS_STC_STDNAME_USER, "Utilizator"
+ IDS_STC_STDNAME_GROUP, "Grup"
+ IDS_STC_STDNAME_DEVICE, "Dispozitiv"
+ IDS_STC_STDNAME_BLKSIZE, "Blocuri"
+ IDS_STC_STDNAME_ALLOCBLKS, "Alocate"
+ IDS_STC_STDNAME_LINKTGT, "LinkTgt"
+ IDS_STC_STDNAME_FORMAT, "Format"
+ IDS_STC_STDNAME_LRECL, "Lrecl"
+ IDS_STC_STDNAME_RECORDS, "Inregistrari"
+ IDS_STC_STDNAME_FILEMODE, "Fm"
+ IDS_STC_STDNAME_VOLUME, "Volum"
+ IDS_STC_STDNAME_UNIT, "Unit"
+ IDS_STC_STDNAME_EXTENTS, "Ext"
+ IDS_STC_STDNAME_USED, "Folosit"
+ IDS_STC_STDNAME_RECFM, "Recfm"
+ IDS_STC_STDNAME_BLKSZ, "BlkSz"
+ IDS_STC_STDNAME_DSORG, "Dsorg"
+ IDS_STC_STDNAME_VVMM, "VV.MM"
+ IDS_STC_STDNAME_CREATED, "Creat"
+ IDS_STC_STDNAME_INIT, "Init"
+ IDS_STC_STDNAME_MOD, "Mod"
+ IDS_STC_STDNAME_ID, "Id"
+ IDS_STC_STDNAME_TTR, "TTR"
+ IDS_STC_STDNAME_ALIASOF, "Alias-of"
+ IDS_STC_STDNAME_AC, "AC"
+ IDS_STC_STDNAME_ATTR, "Atribute"
+ IDS_STC_STDNAME_AMODE, "Amode"
+ IDS_STC_STDNAME_RMODE, "Rmode"
+ IDS_STC_STDNAME_CODE, "Cod"
+ IDS_STC_STDNAME_RWEP, "RWEP"
+
+ IDS_STC_STDDESCR_NAME, "Nume"
+ IDS_STC_STDDESCR_EXT, "Extensie"
+ IDS_STC_STDDESCR_SIZE, "Marime"
+ IDS_STC_STDDESCR_DATE, "Ultima Data Scrisa"
+ IDS_STC_STDDESCR_TIME, "Ultima Ora Scris"
+ IDS_STC_STDDESCR_TYPE, "Tip Fisier"
+ IDS_STC_STDDESCR_RIGHTS, "Drepturi de Acces"
+ IDS_STC_STDDESCR_USER, "Utilizator"
+ IDS_STC_STDDESCR_GROUP, "Grup"
+ IDS_STC_STDDESCR_DEVICE, "Numere Dispozitiv Majore si Minore"
+ IDS_STC_STDDESCR_BLKSIZE, "Marimea in Blocks"
+ IDS_STC_STDDESCR_ALLOCBLKS, "Blocks Alocate"
+ IDS_STC_STDDESCR_LINKTGT, "Legatura Tinta"
+ IDS_STC_STDDESCR_FORMAT, "Format"
+ IDS_STC_STDDESCR_LRECL, "Lungimea Inregistrarior Logice"
+ IDS_STC_STDDESCR_RECORDS, "Numarul de Inregistrari"
+ IDS_STC_STDDESCR_FILEMODE, "Modfisier"
+ IDS_STC_STDDESCR_VOLUME, "Volum"
+ IDS_STC_STDDESCR_UNIT, "Unit"
+ IDS_STC_STDDESCR_EXTENTS, "Extents"
+ IDS_STC_STDDESCR_USED, "Folosit"
+ IDS_STC_STDDESCR_RECFM, "Format de Inregistrare"
+ IDS_STC_STDDESCR_BLKSZ, "Lungime Fizica Block"
+ IDS_STC_STDDESCR_DSORG, "Organizatie Setari Data"
+ IDS_STC_STDDESCR_VVMM, "VV.MM"
+ IDS_STC_STDDESCR_CREATED, "Creat"
+ IDS_STC_STDDESCR_INIT, "Marime Initiala"
+ IDS_STC_STDDESCR_MOD, "Mod"
+ IDS_STC_STDDESCR_ID, "Id"
+ IDS_STC_STDDESCR_TTR, "TTR"
+ IDS_STC_STDDESCR_ALIASOF, "Alias-of"
+ IDS_STC_STDDESCR_AC, "AC"
+ IDS_STC_STDDESCR_ATTR, "Atribute"
+ IDS_STC_STDDESCR_AMODE, "Amode"
+ IDS_STC_STDDESCR_RMODE, "Rmode"
+ IDS_STC_STDDESCR_CODE, "Cod"
+ IDS_STC_STDDESCR_RWEP, "RWEP"
+
+ IDS_STC_TYPE_NAME, "Nume (obligatoriu)"
+ IDS_STC_TYPE_EXT, "Extensie (generat din numele de fisier)"
+ IDS_STC_TYPE_SIZE, "Marimea Fisierului in Bytes"
+ IDS_STC_TYPE_DATE, "Data Ultimei Scrieri"
+ IDS_STC_TYPE_TIME, "Ora Ultimei Scrieri"
+ IDS_STC_TYPE_TYPE, "Tip Fisier  (generat din extensie)"
+ IDS_STC_TYPE_ANYTEXT, "Orice Text"
+ IDS_STC_TYPE_ANYDATE, "Orice Data"
+ IDS_STC_TYPE_ANYTIME, "Orice Ora"
+ IDS_STC_TYPE_ANYNUM, "Orice Numar"
+
+ IDS_STC_ERR_NAMEERR, "Prima coloana din tip server trebuie sa fie vizibila si sa aiba tipul  ""Nume""."
+ IDS_STC_ERR_EXTERR, "Coloana cu tipul ""Extensie"" in tip server trebuie sa urmeze coloana cu tipul ""Nume"" si trebuie sa fie vizibila."
+ IDS_STC_ERR_IDEMPTY, "Identificatorul de coloane din tip server nu trebuie sa fie gol."
+ IDS_STC_ERR_IDINVALID, "Formatul identificatoruluii de coloane din tip server e invalid. Trebuie sa inceapa cu litera sau linie joasa(shift+ minus de langa 0=underscore) si sa contina doar litere numere si underscores."
+ IDS_STC_ERR_IDRESERVED, "Identificatorul de coloane din tip server poate sa nu foloseasca nume rezervate (""is_dir"", ""is_hidden"", si ""is_link"")."
+ IDS_STC_ERR_IDNOTUNIQUE, "Acelasi identificator pentru doua coloane din tip server nu e permis."
+ IDS_STC_ERR_TYPEERR, "Folosirea incorecta (repetata) a tipurilor de coloana in tip server."
+ IDS_STC_ERR_INVALEMPTY, "Valoarea empty e invalida pentru coloana in tip server."
+ IDS_STC_ERR_EMPTYNAME, "Numele coloanei in tip server nu poate fi empty."
+ IDS_STC_ERR_EMPTYDESCR, "Descrierea coloanei in tip server nu poate fi empty."
+
+ IDS_SRVTYPECOL_REMOVECONF, "Sunteti sigur-a ca doriti sa eliminati coloana ""%s""?"
+
+ IDS_SRVTYPE_EXITCONF, "Ati facut ceva schimbari. Chiar doriti sa ignorati aceste schimabri si sa inchideti dialogul?"
+
+ IDS_SRVTYPECOL_NEWTITLE, "Coloana Noua"
+ IDS_SRVTYPECOL_FORMDATE, "dd.mm.yyyy"
+ IDS_SRVTYPECOL_FORMTIME, "hh:mm:ss"
+ IDS_SRVTYPECOL_FORMNUM, "(numar)"
+ IDS_SRVTYPECOL_FORMSTR, "(text)"
+
+ IDS_SRVTYPECOL_ALIGNLEFT, "Stanga"
+ IDS_SRVTYPECOL_ALIGNRIGHT, "Dreapta"
+
+ IDS_SRVTYPE_READRAWLISTERR, "Nu pot citi listarea raw din fisier.\n\nEroare: %s"
+ IDS_SRVTYPE_READRAWLISTLIMIT, "Atentionare: citesc doar primul 1 MB de text din fisier."
+ IDS_SRVTYPE_ONLYINPANEL, "(doar in panou)"
+ IDS_SRVTYPE_SIZEISDIR, "DIR"
+ IDS_STPAR_UNABLECOMPPARSER, "Nu pot compila analizatorul. Regulile pentru analizare contin erori.\n\nEroare: %s"
+ IDS_SRVTYPE_PARSEERROR, "Nu pot analiza toata listarea raw."
+
+ IDS_STPAR_ERR_UNEXPSYM, "A fost gasit un simbol neasteptat."
+ IDS_STPAR_ERR_MISSINGRULEEND, "Lipseste sfarsitul regulei (simbol ';')."
+ IDS_STPAR_ERR_INVALIDFUNCNAME, "Nume functie invalid."
+ IDS_STPAR_ERR_MISSINGFUNCPARS, "Lipsesc parametrii functiei (simbol '(')."
+ IDS_STPAR_ERR_FUNCEXPECTED, "Numele functiei nu a fost gasit (poate simbol superfluous ',')."
+ IDS_STPAR_ERR_UNKNOWNFUNC, "A fost gasita o functie necunoscuta."
+ IDS_STPAR_ERR_MISSINGPAREND, "Lipsesc parametrii sfarsitului functiei (simbol ')')."
+ IDS_STPAR_ERR_PAREXPECTED, "Nu a fost gasit parametrul functiei (poate simbol superfluous ',')."
+ IDS_STPAR_ERR_MISSINGCOLUMNID, "Lipseste identificatorul de coloana."
+ IDS_STPAR_ERR_INVALIDCOLUMNID, "Identificator de coloana invalid."
+ IDS_STPAR_ERR_UNKNOWNCOLUMN, "A fost gasit identificator de coloana necunoscut."
+ IDS_STPAR_ERR_GENERCOLUMN, "Coloana cu tip ""Extensie"" sau ""Tip"" nu poate fi folosita in reguli pentru analiza."
+ IDS_STPAR_ERR_MISSINGCOLIDEND, "Lipseste sfarsitul identificatorului de coloana (simbol '>')."
+ IDS_STPAR_ERR_MISSINGSTREND, "Lipseste sfarsitul sirului (simbol '""')."
+ IDS_STPAR_ERR_STRUNKNESCSEQ, "Secventa de scapare necunoscuta folosita in sir (foloseste secventa de scapare ""\\\\"" pentru caracterul backslash"""")."
+ IDS_STPAR_ERR_INVALIDNUMBER, "Numar invalid."
+ IDS_STPAR_ERR_INVALVARORBOOL, "A fost gasit simbol neasteptat (poate variabila state invalid sau valoare booleana)."
+ IDS_STPAR_ERR_UNKNOWNSTVAR, "A fost gasita variabila state necunoscuta."
+ IDS_STPAR_ERR_RIGHTPAREXPECT, "Nu a fost gasit operandul corect in expresie."
+ IDS_STPAR_ERR_UNEXPSYORUNKNOP, "A fost gasit simbol neasteptat sau operator necunoscut."
+ IDS_STPAR_ERR_UNSUPEXPRESSION, "Expresie nesuportata. Doar un singur operator este permis."
+ IDS_STPAR_ERR_UNEXPTYPESINEXP, "Utilizare incorecta de operator. Nepotrivirea in tipuri de operanzi sau tipuri de operanzi neasteptati."
+ IDS_STPAR_ERR_BADPARINFUNC, "Utilizare incorecta a functiei. Numaratoare neasteptata sau tipuri de parametri."
+ IDS_STPAR_ERR_BADUSEOFCOLID, "Utilizare incorecta a identificatorului de coloana. Trebuie sa-i atribui o valoare coloanei inainte de o folosi."
+ IDS_STPAR_ERR_BADMONTH3STR, "Sir invalid cu luni formate din 3 litere (format: 12 luni din 3 litere separate cu spatii)."
+ IDS_STPAR_ERR_MISSINGSTRPAR, "Lipseste parametrul sirului (simbol '""')."
+ IDS_STPAR_ERR_MISSINGRIGHTPAR, "Lipseste sfarsitul subexpresiei (simbol ')')."
+ IDS_STPAR_ERR_INVALREGEXP, "Expresie normala invalida: %s"
+ IDS_STPAR_ERR_INVALREGEXP2, "Expresie normala invalida"
+ IDS_STPAR_ERR_BADMONTHTXTSTR, "Sir invalid cu luni in mod text (format: 12 luni separate cu spatii)."
+
+ IDS_STPAR_UNABLECOMPAUTODCOND, "Conditia autodetect contine eroare.\n\nEroare: %s"
+
+ IDS_LOGMSGUNKNOWNSRVTYPE, "Tip server necunoscut, nu pot analiza listarea...\r\n"
+ IDS_UNKNOWNSRVTYPEINFO, "Nu pot analiza listarea fisierelor si directoarelor de pe server. Numai tip text din listare va fi afisat in panou.\n\nVa rugam verificati paginile noastre web pentru o versiune mai noua a Sally. Daca folositi ultima versiune, va rugam deschideti un issue la https://github.com/0xeb/sally/issues si atasati listarea raw (daca nu e confidentiala; click drt in panou > Arata Listare Raw > Salveaza Ca). Va rugam ajutati-ne sa sustinem cat mai multe tipuri de server-e."
+ IDS_LOGMSGUNKNOWNSRVTYPE2, "Nu pot analiza listarea text folosind tip server selectat...\r\n"
+ IDS_UNKNOWNSRVTYPEINFO2, "Nu pot analiza listarea fisierelor si directoarelor de pe server. Numai text simplu din listare va fi aratat in panou.\n\nIncearca sa selectezi un tip server diferit sau lasa clientul FTP sa il autodetecteze (foloseste butonul Avansat in dialogul Conectare la Server-ul FTP)."
+ IDS_LOGMSGPARSEDBYSRVTYPE, "Listarea text a fost analizata de ""%s"" tip server...\r\n"
+ IDS_WAITWNDPARSINGLST, "Analizez listarea fisierelor si directoarelor de pe server, va rugam asteptati..."
+
+ IDS_PLSTR_BLOCKSINSELFILES, "{!}<%s> block{s|0||1|s} in <%s> fisierul selectat{s|0||1|s}"
+
+ IDS_INVALIDMEMCACHESIZE, "Limita de marime trebuie sa fie de cel putin 100KB si de cel mult 1GB."
+ IDS_INVALIDRESUMEOVERLAP, "Numarul bytes verificati poate fi maxim de 1GB."
+
+// IDS_NOPATHACCESSINPANEL, "No path is accessible on this FTP server. Do you wish to disconnect from this server?"
+
+ IDS_LOGMSGKEEPALIVE, "Trimit comanda pentru a pastra conexiunea activa...\r\n"
+ IDS_FINISHINGKEEPALIVECMD, "Termin comanda trimisa pentru a pastra conexiunea activa, apasa tasta ESC pentru anulare..."
+ IDS_KEEPALIVECMDESC, "Doriti sa anulati comanda trimisa pentru a mentine conexiunea activa? Conexiunea la server-ul FTP va fi oprita."
+ IDS_LOGMSGKEEPALIVECMDTIMEOUT, "Trimiterea comenzii pentru a pastra conexiunea activa a expirat.\r\n"
+ IDS_LOGMSGOPENACTDATACONERROR, "Nu pot pregati conexiune activa de date.\r\n"
+ IDS_LOGMSGKAPASVNOTSUPPORTED, "Modul pasiv nu e suportat pe acest site.\r\n"
+ IDS_LOGMSGKASTOPPED, "Trimiterea comenzilor pentru a pastra conexiunea activa a fost oprita...\r\n"
+ IDS_LOGMSGOPENACTDATACONERROR2, "Nu ma pot conecta la server-ul proxy.\r\n"
+
+ IDS_COPYFROMFTP, "Copie %s de pe server-ul FTP pe"
+ IDS_MOVEFROMFTP, "Muta %s de pe server-ul FTP pe"
+ IDS_COPYTITLE, "Copie"
+ IDS_MOVETITLE, "Muta"
+
+ IDS_DELETEFROMFTP, "Sunteti sigur-a ca doriti sa stergeti %s de pe server-ul FTP?"
+
+ IDS_CHATTRNOTUNIXSRV, "Comanda Schimba Atributele probabil ca nu va functiona pe acest server. Functioneaza doar pe server-ele UNIX cu model traditional de permisie.\n\nInca mai doriti sa folositi comanda Schimba Atributele?"
+ IDS_CHANGEATTRSONFTP, "Schimba atributele ale %s la"
+ IDS_CHATTRNOTHINGTODO, "Nimic de facut. Va rugam selectati schimbarea atributelor pentru fisiere sau directoare."
+ IDS_CHATTRNUMVAL3DIGITS, "Valoarea numerica trebuie sa fie alcatuita din 3 cifre."
+ IDS_CHATTRNOTHINGTODO2, "Nimic de facut. Va rugam selectati schimbarea catorva atribute."
+
+ IDS_MENUTRANSFERMODE, "&Mod Transfer"
+ IDS_MENUTRMODEAUTO, "&Automat"
+ IDS_MENUTRMODEASCII, "A&SCII"
+ IDS_MENUTRMODEBINARY, "&Binar"
+
+ IDS_OPERATIONSUSERPROMPT, "Intreaba Utilizatorul"
+ IDS_OPERATIONSAUTORENAME, "Foloseste Alt Nume"
+ IDS_OPERATIONSRESUME, "Reia"
+ IDS_OPERATIONSRESUMEOROVERWR, "Reia sau Suprascrie"
+ IDS_OPERATIONSOVERWRITE, "Suprascrie"
+ IDS_OPERATIONSSKIP, "Sari Peste"
+ IDS_OPERATIONSUSEEXISTINGDIR, "Foloseste Directorul Existent"
+ IDS_OPERATIONSIGNORE, "Ignora"
+ IDS_OPERATIONSINBINMODE, "Foloseste Mod Binar"
+ IDS_OPERATIONSDELETE, "Sterge"
+
+ IDS_MASKS_HINT, "'*' tine locul a oricarui numar de caractere. '?' tine locul oricarui caracter.\nExemplu: *.a? (.a1, anything.ai, etc)\nMastile sunt separate de punct si virgula. Exemple: *.txt;*.doc (a.txt, b.doc, etc)\nMastile excluse sunt plasate dupa '|'. Exemplu: |*.txt;*.doc (anything except *.txt;*.doc)\nDaca ai nevoie de punct si virgula in masca, bate-l de 2 ori. Exemplu: one;;mask"
+
+ IDS_OPERDLGDELETETITLE, "sterge %s de pe %s"
+ IDS_OPERDLGCOPYDOWNLOADTITLE, "Copie %s de pe %s"
+ IDS_OPERDLGMOVEDOWNLOADTITLE, "Muta %s de pe %s"
+ IDS_OPERDLGCOPYUPLOADTITLE, "Copie %s pe %s"
+ IDS_OPERDLGMOVEUPLOADTITLE, "Muta %s pe %s"
+ IDS_OPERDLGCHATTRSTITLE, "Schimba Atributele ale %s din %s"
+
+ IDS_OPERDLGSRCPATH, "Calea sursa:"
+ IDS_OPERDLGTGTPATH, "Calea tinta:"
+ IDS_OPERDLGPATH, "Cale:"
+ IDS_OPERDLGCONFIRMCANCEL, "Doriti intr-adevar sa anulati operatiunea?"
+ IDS_OPERDLGCLOSEBUTTON1, "Inchide"
+ IDS_OPERDLGCLOSEBUTTON2, "Anuleaza"
+ IDS_OPERDLGCONFIRMCLOSE, "Cateva parti ale operatiunii nu au fost terminate cu succes.\n\nChiar doriti sa inchideti operatiunea neterminata?"
+
+ IDS_OPERDLGCONS_ID, "ID"
+ IDS_OPERDLGCONS_ACTION, "Actiune"
+ IDS_OPERDLGCONS_STATUS, "Status"
+
+ IDS_OPERDLGOPERS_DESCR, "Descriere"
+ IDS_OPERDLGOPERS_STATUS, "Status"
+
+ IDS_OPERDLGOPSTS_FINISHED, "Terminata"
+ IDS_OPERDLGOPSTS_SKIPPED, "Sarit Peste: %s"
+ IDS_OPERDLGOPSTS_FAILED, "Eroare: %s"
+ IDS_OPERDLGOPSTS_WAITUSER, "Intreaba utulizatorul: %s, ce sa faca?"
+ IDS_OPERDLGOPSTS_WAITING, "Asteptand"
+ IDS_OPERDLGOPSTS_PROCESSING, "Procesand"
+ IDS_OPERDLGOPSTS_DELAYED, "Amanat: subobiectele nu sunt terminate inca"
+ IDS_OPERDLGOPSTS_FORCEDTOFAIL, "Esuat: subobiectele nu au fost terminate cu succes"
+
+ IDS_OPERDOPDS_DELLINK, "Sterge legatura %s de pe %s"
+ IDS_OPERDOPDS_DELFILE, "Sterge fisierul %s de pe %s"
+ IDS_OPERDOPDS_DELDIR, "Sterge directorul %s de pe %s"
+ IDS_OPERDOPDS_CHATTREXPLDIR, "Explora directorul %s de pe %s pentru schimbarea atributelor"
+ IDS_OPERDOPDS_RESLINK, "Rezolva legatura %s de pe %s"
+ IDS_OPERDOPDS_COPY1, "Copie %s%s de pe %s pe %s in %s mod transfer"
+ IDS_OPERDOPDS_COPY2, "Copie %s%s de pe %s pe %s ca %s in %s mod transfer"
+ IDS_OPERDOPDS_MOVE1, "Muta %s%s de pe %s pe %s in %s mod transfer"
+ IDS_OPERDOPDS_MOVE2, "Muta %s%s de pe %s pe %s ca %s in %s mod transfer"
+ IDS_OPERDOPDS_ASCIITRMODE, "ASCII"
+ IDS_OPERDOPDS_BINARYTRMODE, "binar"
+ IDS_OPERDOPDS_SIZEINBLOCKS, "blocks"
+ IDS_OPERDOPDS_MOVEDELDIR, "Sterge directorul %s de pe %s dupa mutarea continutului sau"
+ IDS_OPERDOPDS_MOVEDELDIRLNK, "Sterge legatura directorului %s de pe %s dupa mutarea continutului sau"
+ IDS_OPERDOPDS_COPYEXPLDIR, "Explora directorul %s de pe %s pentru copiere pe %s ca %s"
+ IDS_OPERDOPDS_MOVEEXPLDIR, "Explora directorul %s de pe %s pentru mutare pe %s ca %s"
+ IDS_OPERDOPDS_MOVEEXPLDIRLNK, "Explora legatura directorului %s de pe %s pentru mutare pe %s ca %s"
+ IDS_OPERDOPDS_CHATTRFILE, "Schimba atributele fisierului %s din %s in %s"
+ IDS_OPERDOPDS_CHATTRDIR, "Schimba atributele directorului %s din %s in %s"
+ IDS_OPERDOPDS_CHATTREXPLDIRLNK, "Explora legatura directorului %s de pe %s pentru schimbarea atributelor"
+ IDS_OPERDOPDS_DELEXPLDIR, "Explora directorul %s de pe %s pentru stergere"
+
+ IDS_OPERDOPPR_OK, "Succes"
+ IDS_OPERDOPPR_LOWMEM, "Resurse sistem insuficiente"
+ IDS_OPERDOPPR_CANTCRTGTFILE, "Fisierul tinta nu poate fi creat sau deschis, eroare system: %s"
+ IDS_OPERDOPPR_CANTCRTGTDIR, "Directorul tinta nu poate fi creat, eroare system: %s"
+ IDS_OPERDOPPR_TGTFILEEXISTS, "Fisierul tinta exista deja"
+ IDS_OPERDOPPR_TGTDIREXISTS, "Directorul tinta exista deja"
+ IDS_OPERDOPPR_TRANSFERFAILED, "Transferul a esuat"
+ IDS_OPERDOPPR_ASCIITRBINFILE, "Modul de transfer ASCII e setat pentru fisier cu continut binar"
+ IDS_OPERDOPPR_UNKNOWNATTRS, "Cateva din atributele existente (%s) nu pot fi pastrate"
+ IDS_OPERDOPPR_UNKEXISTATTR, "necunoscut"
+ IDS_OPERDOPPR_INVALIDPATHTODIR, "Calea spre director e prea lunga sau  invalida"
+ IDS_OPERDOPPR_UNABLETOCWD, "Nu pot schimba calea de lucru, raspunsul server-ului:"
+ IDS_OPERDOPPR_UNABLETOPWD, "Nu pot obtine calea de lucru, raspunsul server-ului:"
+ IDS_OPERDOPPR_DIREXPLENDLESSLOOP, "Explorarea acestui director va porni o bucla infinita"
+ IDS_OPERDOPPR_LISTENFAILURE, "Nu pot pregati conexiune de data activa: %s"
+ IDS_OPERDOPPR_INCOMPLLISTING1, "Nu pot citi toata lista de fisiere si directoare de pe server, eroare: %s"
+ IDS_OPERDOPPR_INCOMPLLISTING2, "Nu pot citi toata lista de fisiere si directoare de pe server, raspunsul server-ului:"
+ IDS_OPERDOPPR_UNABLETOPARSELISTING, "Nu pot analiza listarea fisierelor si directoarelor de pe server"
+ IDS_OPERDOPPR_DIRISHIDDEN, "Directorul e ascuns"
+ IDS_OPERDOPPR_DIRISNOTEMPTY, "Directorul nu e empty"
+ IDS_OPERDOPPR_FILEISHIDDEN, "Fisierul e ascuns"
+ IDS_OPERDOPPR_INVALIDPATHTOLINK, "Numele intreg al legaturii e prea lung sau invalid"
+ IDS_OPERDOPPR_UNABLETORESOLVELNK, "Nu pot rezolva daca legatura e catre director sau catre fisier, raspunsul server-ului:"
+ IDS_OPERDOPPR_UNABLETODELFILE, "Nu pot sterge fisierul sau legatura, raspunsul server-ului:"
+ IDS_OPERDOPPR_UNABLETODELDIR, "Nu pot sterge directorul, raspunsul server-ului:"
+ IDS_OPERDOPPR_UNABLETOCHATTRS, "Nu pot schimba atributele, raspunsul server-ului:"
+ IDS_OPERDOPPR_UNABLETORESUME, "Nu pot relua transferul de fisier (server-ul nu suporta)"
+ IDS_OPERDOPPR_RESUMETESTFAILED, "Nu pot relua transferul fisierului, sfarsit necunoscut al fisierului (fisierul s-a schimbat sau serverul nu reuseste a relua corect daca folositi modul de transfer ASCII)"
+ IDS_OPERDOPPR_TGTFILEREADERROR, "Nu pot citi fisierul tinta, eroare de sistem: %s"
+ IDS_OPERDOPPR_TGTFILEWRITEERROR, "Nu pot scrie in fisierul tinta, eroare de sistem: %s"
+ IDS_OPERDOPPR_INCOMPLDOWNLOAD1, "Nu pot lua fisierul de pe server, eroare: %s"
+ IDS_OPERDOPPR_INCOMPLDOWNLOAD2, "Un pot lua fisierul de pe server, raspunsul server-ului:"
+ IDS_OPERDOPPR_UNABLETODELSRCFILE, "Nu pot sterge fisierul sursa sau legatura dupa un transfer efectuat cu succes, raspunsul server-ului:"
+
+ IDS_OPERDLGCOACT_STOPPING, "Opresc"
+ IDS_OPERDLGCOACT_LOOKFORWORK, "Caut operatiunea pentru procesare"
+ IDS_OPERDLGCOACT_SLEEPING, "In asteptare"
+ IDS_OPERDLGCOACT_WAITFORUSER, "Astept asistenta utilizatorului"
+ IDS_OPERDLGCOACT_DELLINK, "Sterg legatura %s"
+ IDS_OPERDLGCOACT_DELFILE, "Sterg fisierul %s"
+ IDS_OPERDLGCOACT_DELDIR, "Sterg directorul %s"
+ IDS_OPERDLGCOACT_EXPLDIR, "Explor directorul %s"
+ IDS_OPERDLGCOACT_RESLINK, "Rezolv legatura %s"
+ IDS_OPERDLGCOACT_COPY, "Copii %s"
+ IDS_OPERDLGCOACT_MOVE, "Mut %s"
+ IDS_OPERDLGCOACT_CHATTR, "Schimb atributele %s"
+
+ IDS_OPERDLGCOACT_PREPARING, "Pregatesc operatiunea"
+ IDS_OPERDLGCOACT_CONNECTING, "Conectez"
+ IDS_OPERDLGCOACT_WAITRECON, "Nu ma pot conecta, astept %d secunde pentru a reincerca (incercarea nr. %d din %d): %s"
+ IDS_OPERDLGCOACT_CONERROR, "Nu ma pot conecta: %s"
+ IDS_OPERDLGCOACT_TIMELEFT, "timp ramas:"
+ IDS_OPERDLGCOACT_WAITFORLIST, "Astept listarea caii tintei"
+ IDS_OPERDLGCOACT_PAUSED, "In pauza"
+
+ IDS_WORKERLOGHEADER, "Gazda: ""%s"", port: %d.\r\nLog UID este %d, ora este %s.\r\n\r\n"
+ IDS_LOGMSGCONINWORKER, "\r\nConexiunea a fost detasata din panou pentru a fi folosita la operatiune...\r\n"
+ IDS_LOGMSGCONFROMWORKER, "\r\nConexiunea a fost atasata la panou (a fost folosita pentru operatiune)...\r\n\r\n"
+ IDS_LOGMSGWORKERUSECON, "Folosesc conexiunea din panou...\r\n\r\n"
+ IDS_LOGMSGWORKERRETCON, "Conexiunea a fost returnata in panou...\r\n"
+
+ IDS_CANCELEXISTINGOPER, "Coada de asteptare inca contine niste operatiuni FTP neterminate. Doriti sa le anulati?"
+
+ IDS_CLOSINGOPERCONS1, "Inchid conexiunea folosita pentru operatiune, apasati tasta ESC pentru a o opri..."
+ IDS_CLOSINGOPERCONS2, "Inchid toate conexiunile folosite pentru operatiune, apasa tasta ESC pentru a le opri..."
+ IDS_CLOSINGOPERCONS3, "Inchid toate conexiunile folosite pentru toate operatiunile, apasa tasta ESC pentru a le opri..."
+ IDS_TERMCONFOROPER1, "Vreti sa opriti conexiunea folosita pentru operatiune?"
+ IDS_TERMCONFOROPER2, "Doriti sa opriti toate conexiunile folosite pentru operatiune?"
+ IDS_TERMCONFOROPER3, "Doriti sa opriti toate conexiunile folosite pentru toate operatiunile?"
+
+ IDS_WANTTOSTOPCON, "Chiar doriti sa opriti conexiunea ""%d""?"
+
+ IDS_LOGMSGCMDTIMEOUT, "Trimiterea comenzii FTP s-a oprit.\r\n"
+ IDS_WORKERCONLOGHDR, "Ma conectez la ""%s"" (%s) pe port-ul %d...\r\n\r\n"
+ IDS_WORKERWAITLOGTIM, "Asteptarea ecranului de logare s-a oprit.\r\n"
+ IDS_WORKERLOGPARCHANGED, "\r\n-----\r\n\r\nParametrii de logare s-au schimbat sau certificatul server-ului (SSL) a fost acceptat sau verificat.\r\n\r\n"
+ IDS_PRXSRVWORKERCONLOGHDR, "Adresa server FTP: %s, port: %d, utilizator: %s\r\nNume server proxy: %s, type: %s\r\nAdresa server proxy: %s, port: %d, utilizator: %s\r\nMa conectez la ""%s"" (%s) pe port-ul %d...\r\n\r\n"
+
+ IDS_WORKERGETIPERROR, "Eroare in obtinerea adresei IP: %s"
+ IDS_WORKEROPENCONERR, "Eroare in deschiderea conexiunii: %s"
+ IDS_WORKERUNKNOWNPROXYHOST, "Adresa server proxy este necesara dar nu a fost specificata inca"
+ IDS_WORKERUNKNOWNPROXYPASSWORD, "Parola server proxy e necesara dar nu a fost specificata inca"
+ IDS_WORKERUNKNOWNPASSWD, "Parola e necesara dar nu a fost specificata inca"
+ IDS_WORKERUNKNOWNACCOUNT, "Contul e cerut dar nu a fost specificat inca"
+ IDS_WORKERLOGINERR, "Eroare de login: %s"
+
+ IDS_SOLVEERRSUBJECT, "Toate conexiunile folosite pentru aceasta operatiune au in comun urmatorii parametri."
+ IDS_SOLVEERRRETRY, "In&totdeauna incearca sa te reconectezi (chiar daca apare o eroare permanenta de login)"
+ IDS_SOLVEERRREPLY, "Descrierea erorii:"
+
+ IDS_CLOSINGDISKTHREAD, "Inchid sirul operatiunilor de disk, apasa tasta ESC pentru a opri..."
+ IDS_CANCELDISKTHREAD, "Chiar doriti sa opriti sirul operatiunilor disk?\n\nAtentionare: cateva fisiere de pe disk ar putea ramane deschise dupa oprirea acestui sir."
+
+ IDS_SIED_TITLE1, "Eroare in Crearea Directorului Tinta"
+ IDS_SIED_TITLE2, "Directorul Tinta Exista Deja"
+ IDS_SIED_TITLE3, "Eroare in Crearea Fisierului Tinta"
+ IDS_SIED_TITLE4, "Fisierul Tinta Exista Deja"
+ IDS_SIED_TITLE5, "Transferul a Esuat"
+ IDS_SIED_TITLE6, "Directorul Tinta sau Legatura catre Director Exista Deja"
+ IDS_SIED_TITLE7, "Eroare la Crearea Fisierului Tinta cu Nume Alternativ"
+ IDS_SISE_TITLE1, "Confirm Stergerea Directorului Ascuns"
+ IDS_SISE_TITLE2, "Confirm Stergerea Fisierului Ascuns"
+ IDS_SISE_TITLE3, "Confirm Stergerea Directorului care nu e Empty"
+ IDS_SSCD_TITLE1, "Eroare la Schimbarea Caii de Lucru Pe Server"
+ IDS_SSCD_TITLE2, "Eroare la Obtinerea Caii de Lucru Pe Server"
+ IDS_SSCD_TITLE3, "Eroare in Citirea Listei de Fisiere si Directoare de pe Server"
+ IDS_SSCD_TITLE4, "Eroare in Pregatirea Conexiunii Active de Data"
+ IDS_SSCD_TITLE5, "Eroare in Rezolvarea Legaturii"
+ IDS_SSCD_TITLE6, "Eroare in Schimbarea Atributelor"
+ IDS_SSCD_TITLE7, "Eroare la Stergerea Fisierului sau Legaturii"
+ IDS_SSCD_TITLE8, "Eroare in Stergerea Directorului"
+ IDS_SSCD_TITLE9, "Eroare la Listarea Caii Tinta"
+ IDS_SSCD_TITLE10, "Eroare la Citirea Listei de Fisiere si Diretoare de pe Disk"
+ IDS_SSCD_TITLE11, "Eroare la Deschiderea Fisierului Sursa"
+ IDS_SSCD_TITLE12, "Eroare la Citirea Fisierului Sursa"
+ IDS_SCRD_TITLE1, "Eroare in Parcurgerea Listarii |Fisierelor si Directoarelor de pe Server"
+ IDS_SCRD_TITLE2, "Fisierul Tinta E Blocat De Alta Operatiune"
+ IDS_SCRD_TITLE3, "Fisierul Sursa E Blocat De Alta Operatiune"
+ IDS_SSCD2_TITLE1, "Eroare in Reluarea Fisierului"
+ IDS_SSCD2_TITLE2, "Eroare la Citirea Fisierului Tinta"
+ IDS_SSCD2_TITLE3, "Eroare la Scrierea in Fisierul Tinta"
+ IDS_SSCD2_TITLE4, "Eroare la Luarea Fisierului de pe Server"
+ IDS_SSCD2_TITLE5, "Eroare la Stergerea Fisierului Sursa Dupa un Transfer cu Succes"
+ IDS_SIED_TITLE8, "Eroare la Stocarea Fisierului pe Server"
+ IDS_SSCD2_TITLE7, "Eroare la Testarea Fisierului"
+
+ IDS_SIED_DETAIL1, "Fisierul tinta a fost creat sau suprascris."
+ IDS_SIED_DETAIL2, "Fisierul tinta a fost reluat."
+ IDS_SSCD2_UNABLETORESUME, "Server-ul probabil nu suporta reluarea"
+ IDS_SSCD2_RESUMETESTFAILED, "Sfarsit de fisier neasteptat. Fisierul s-a schimbat sau server-ul esueaza in a relua in mod corect\r\ndaca folositi mod transfer ASCII."
+
+ IDS_DRAGDROP_TGTNOTEXIST, "Calea tinta nu exista si crearea caii tinta nu e suportata."
+ IDS_DRAGDROP_TGTARCORFS, "Copierea si mutarea in arhive sau fisiere sistem plugin nu e suportata."
+
+ IDS_OPERDLGCONNECTIONSIDLE, "fara data transfer pentru %s"
+ IDS_OPERDLGSTATUS1, "rata totala de transfer: %s/s"
+ IDS_OPERDLGSTATUS2, "%s din %s"
+ IDS_OPERDLGSTATUS3, "{!}%d din %d operatiune{|1|s}"
+ IDS_OPERDLGSTATUS4, "{!}%d operatiune{|1|s} cu marime necunoscuta"
+ IDS_OPERDLGSTATUS5, "{!}%d eroare{|1|s}"
+ IDS_OPERDLGTIMLEFTWAIT, "(asteptand utilizatorul)"
+ IDS_OPERDLGTIMLEFTDONE, "(gata)"
+ IDS_OPERDLGCONNECTIONSIDLE2, "in asteptare de %s"
+
+ IDS_OPERDLGTITLE_DONE, "gata"
+ IDS_OPERDLGTITLE_ERRORS, "erori"
+ IDS_OPERDLGTITLE_STOPPED, "oprit"
+ IDS_OPERDLGTITLE_PAUSED, "in pauza"
+ IDS_OPERDLGTITLE_WAITING, "asteptand"
+
+ IDS_LOWDISKSPACEONTGTPATH, "Se pare ca nu este suficient spatiu pe disk pe calea tinta.\nSpatiul cerut: %s\nSpatiul disponibil: %s\nSpatiul lipsa: %s"
+
+ IDS_NEEDPARSEDLISTING, "Aceasta operatiune nu e pregatita sa functioneze corect fara analizarea listarii fisierelor si directoarelor de pe server."
+
+ IDS_DOWNLOADFILEERROR, "Nu pot descarca fisierul de pe server.\n\nNume: %s\nCale: %s\n"
+ IDS_DOWNLOADFILEERRORSUFIX1, "Eroare: %s"
+ IDS_DOWNLOADFILEERRORSUFIX2, "Raspunsul server-ului: %s"
+ IDS_DOWNLOADFILEERRORSUFIX3, "Eroare in scrierea fisierului tinta: %s"
+ IDS_DOWNLOADFILEERRORSUFIX4, "Eroare: Fisierul e blocat de alta operatiune."
+
+ IDS_HOMEDIRNOTDEFINED, "Ati specificat home directory ca si cale tinta, dar home directory nu e definit pentru\naceasta conexiune pe server-ul FTP. Va rugam specificati o alta cale tinta pe server-ul FTP."
+ IDS_INVALIDPATH, "Calea specificata e invalida."
+ IDS_COPYMOVE_NONSENSE, "Aceasta operatiune probabil nu are nici un sens. Toate fisierele si directoarele selectate au acelasi nume tinta (se vor suprascrie unele pe altele). \nDoriti sa continuati cu aceasta opeartiune?"
+
+ IDS_OPERDOPPR_UPLCANTCRTGTDIRINV, "Directorul tinta nu poate fi creat, numele sau e invalid pe acest server"
+ IDS_OPERDOPPR_UPLCANTCRTGTDIRFILEEX, "Directorul tinta nu poate fi creat, numele sau e deja folosit pentru fisier sau legatura catre un fisier"
+ IDS_OPERDOPPR_UPLCANTCRTGTDIR, "Directorul tinta nu poate fi creat, raspunsul server-ului:"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH, "Nu pot lista calea tinta pe server pentru a detecta coliziuni ale numelor fisierelor"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH2, "Nu pot lista calea tinta pe server pentru a detecta coliziuni ale numelor fisierelor, raspunsul server-ului:"
+ IDS_OPERDOPPR_UPLCANTLISTTGTPATH3, "Nu pot lista calea tinta pe server pentru a detecta coliziuni ale numelor fisierelor, eroare: %s"
+ IDS_OPERDOPPR_UPLCANTLISTSRCPATH, "Nu pot lista calea sursa, eroare sistem: %s"
+ IDS_OPERDOPPR_UPLCRDIRAUTORENFAILED, "Nu pot crea directorul tinta cu nume alternativ, raspunsul server-ului:"
+ IDS_OPERDOPPR_UPLCANTDELSRCDISKDIR, "Nu pot sterge directorul, eroare sistem: %s"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILEINV, "Fisierul tinta nu poate fi creat sau deschis, numele sau e invalid pe acest server"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILEDIREX, "Fisierul tinta nu poate fi creat sau deschis, numele sau e deja folosit pentru director sau legatura catre director"
+ IDS_OPERDOPPR_UPLCANTCRTGTFILE, "Fisierul tinta nu poate fi creat sau deschis, raspunsul server-ului:"
+ IDS_OPERDOPPR_UPLCANNOTOPENSRCFILE, "Fisierul sursa nu poate fi deschis, eroare sistem: %s"
+ IDS_OPERDOPPR_UPLTGTFILEEXISTS, "Fisierul tinta sau legatura catre fisier exista deja"
+ IDS_OPERDOPPR_UPLTGTDIREXISTS, "Directorul tinta sau legatura catre director exista deja"
+ IDS_OPERDOPPR_SRCFILEINUSE, "Fisierul sursa sau legatura este blocata de o alta operatiune"
+ IDS_OPERDOPPR_TGTFILEINUSE, "Fisierul tinta sau legatura e blocata de alta operatiune"
+ IDS_OPERDOPPR_SRCFILEREADERROR, "Nu pot citi fisierul sursa, eroare sistem: %s"
+ IDS_OPERDOPPR_INCOMPLUPLOAD1, "Nu pot stoca fisierul pe server, eroare: %s"
+ IDS_OPERDOPPR_INCOMPLUPLOAD2, "Nu pot stoca fisierul pe server, raspunsul server-ului:"
+ IDS_OPERDOPPR_UPLCANTDELSRCDISKFILE, "Nu pot sterge fisierul sursa dupa un transfer cu succes, eroare sistem: %s"
+ IDS_OPERDOPPR_UPLASCIIRESNOTSUP, "Reluarea nu e suportata in mod transfer ASCII (indiciu: incarca fisierul in mod binar daca ai nevoie de reluare)"
+ IDS_OPERDOPPR_UPUNABLERESUNKSIZ, "Nu pot relua fisierul deoarece la fisierul tinta marimea in byte e necunoscuta"
+ IDS_OPERDOPPR_UPUNABLERESBIGTGT, "Nu pot relua fisierul pentru ca fisierul tinta e mai mare ca fisierul sursa (fisierul s-a modificat)"
+ IDS_OPERDOPPR_UPLFILEAUTORENFAILED, "Nu pot crea fisier tinta cu nume alternativ, raspunsul server-ului:"
+ IDS_OPERDOPPR_SKIPPEDBYUSER, "Sarit Peste de utilizator"
+ IDS_OPERDOPPR_UPLTESTIFFINNOTSUP, "Nu pot obtine marimea fisierului sa o testez daca incarcarea de fisier a fost cu succes (intreg fisierul a fost trimis dar server-ul nu a confirmat primirea acestui fisier)"
+
+ IDS_UPLERR_CANTCRTGTDIRINV, "Numele directorului tinta e invalid pe acest server."
+ IDS_UPLERR_CANTCRTGTDIRFILEEX, "Numele directorului tinta e folosit deja pentru fisier sau legatura catre fisier."
+ IDS_UPLERR_CANTCRTGTFILEINV, "Numele fisierului tinta e invalid pe acest server."
+ IDS_UPLERR_CANTCRTGTFILEDIREX, "Numele fisierului tinta e folosit deja pentru director sau legatura catre director."
+ IDS_UPLERR_UPLCANTRESUMINASC, "Reluarea nu e suportata in modul de transfer ASCII.\r\nIndiciu: incarca fisierul din nou in mod binar daca ai nevoie sa reiei."
+ IDS_UPLERR_UPLCANTRESUMBIGTGT, "Nu pot relua fisierul pentru ca fisierul tinta e mai mare decat fisierul sursa\r\n(fisierul s-a schimbat)."
+ IDS_UPLERR_UPLTESTIFFINNOTSUP, "Nu pot obtine fisierul de marimea byte pentru a testa daca incarcarea de fisier a fost cu succes (tot\r\nfisierul a fost trimis dar server-ul nu a confirmat primirea lui)."
+
+ IDS_RENAME_FILEEXISTS, "Numele tinta e folosit deja pentru fisier. Doriti sa-l suprascrieti?"
+ IDS_RENAME_DIREXISTS, "Numele tinta e deja folosit pentru director. Doriti sa continuati?"
+ IDS_RENAME_UNABLETOGETLIST, "Nu pot verifica daca numele tinta nu e folosit deja. Doriti sa continuati?"
+ IDS_RENAME_FILEEXISTS2, "Numele tinta e folosit deja pentru fisier. Doriti sa continuati?"
+
+ IDS_OPERDLGRESUMEBUTTON, "Re&ia"
+ IDS_OPERDLGRESUMECONBUTTON, "Rei&a"
+
+ IDS_PROXYSERVER_NOTUSED, "Nefolosit (conexiune directa)"
+ IDS_PROXYSERVER_DEFAULT, "Default (vezi Configurare/Defaults)"
+ IDS_PROXYSERVER_USERDEF, "Definit de Utilizator"
+ IDS_PROXYSERVER_SOCKS4, "SOCKS 4"
+ IDS_PROXYSERVER_SOCKS4A, "SOCKS 4A"
+ IDS_PROXYSERVER_SOCKS5, "SOCKS 5"
+ IDS_PROXYSERVER_HTTP11, "HTTP 1.1"
+ IDS_PROXYSERVER_SITE1, "SITE gazda:port"
+ IDS_PROXYSERVER_SITE2, "SITE gazda port"
+ IDS_PROXYSERVER_SITE3, "SITE utilizator@gazda:port"
+ IDS_PROXYSERVER_SITE4, "SITE utilizator@gazda port"
+ IDS_PROXYSERVER_OPEN, "DESCHIS gazda:port"
+ IDS_PROXYSERVER_TRANSPAR, "Transparent"
+ IDS_PROXYSERVER_USER1, "UTILIZATOR utilizator@gazda:port"
+ IDS_PROXYSERVER_USER2, "UTILIZATOR utilizator@gazda port"
+ IDS_PROXYSERVER_USER3, "UTILIZATOR proxy-utilizator@gazda:port"
+ IDS_PROXYSERVER_USER4, "UTILIZATOR utilizator@gazda:port proxy-utilizator"
+ IDS_PROXYSERVER_USER5, "UTILIZATOR utilizator@proxy-utilizator@gazda:port"
+
+ IDS_PRXSCRERR_INVSTART, "Script-ul trebuie sa inceapa cu ""Conectare la:""."
+ IDS_PRXSCRERR_HOSTEMPTY, "Gazda nu trebuie sa fie empty."
+ IDS_PRXSCRERR_INVHOSTORPORT, "Gazda invalida sau port specificat (folositi formatul ""gazda"" sau ""gazda:port"")."
+ IDS_PRXSCRERR_UNKNOWNVAR, "Script-ul contine variabila necunoscuta."
+ IDS_PRXSCRERR_HOSTVARSONLY, "Puteti folosi doar $(ProxyGazda) sau $(Gazda) ca variabile aici."
+ IDS_PRXSCRERR_INVPORT, "Puteti seta port doar ca numar sau ca $(ProxyPort) sau $(Port) ca si variabila."
+ IDS_PRXSCRERR_3XXONFIRSTLINE, "Nu puteti folosi  ""3xx:"" conditia pentru prima comanda, o comanda precedenta (de obicei ""UTILIZATOR"") e necesar."
+ IDS_PRXSCRERR_NONECMDS, "Script-ul proxy trebuie sa contina cel putin o comanda."
+ IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
+ IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+
+ IDS_EDITPROXYSRVTITLE, "Editez Server-ul Proxy"
+ IDS_PORTISUSHORT, "Numarul port-ului trebuie sa fie de la 1 la 65535."
+ IDS_INVPROXYNAME, "Numele proxy specificat e ori gol ori folosit pentru alt proxy server. Va rugam sa-l schimbati."
+ IDS_INVPROXYADDRESS, "Adresa proxy nu poate contine caracterul ':' (indiciu: specifica numarul de port in urmatoarea casuta)."
+ IDS_EMPTYPROXYADDRESS, "Adresa proxy nu poate fi empty."
+ IDS_EMPTYUSERFORTRANSPRX, "Proxy transparent cu nume utilizator lasat necompletat nu are sens. Va rugam tastati nume utilizator sau conectati-va fara setari de server proxy."
+
+ IDS_WANTDELPRXSRV, "Chiar doriti sa stergeti ""%s"" server-ul proxy?"
+
+ IDS_ENTERPRXHOSTTITLE, "Introduceti Adresa de Server Proxy"
+ IDS_ENTERPRXHOSTTEXT, "Adresa server &proxy (adauga numar de port dupa ':' daca e necesar):"
+ IDS_ENTERPRXPASSTITLE, "Introdu Parola Server Proxy"
+ IDS_ENTERPRXPASSTEXT, "Parola server &proxy:"
+
+ IDS_INCOMPLETEPRXSCR, "Script-ul proxy e probabil incomplet. Vezi raspunsul server-ului la ultima comanda script pentru detalii.\r\n\r\nRaspusnsul server-ului: %s"
+ IDS_INCOMPLETEPRXSCR2, "Script-ul proxy e probabil incomplet. Toate comezile din script au fost sarite peste."
+ IDS_INCOMPLETEPRXSCR3, "Script-ul proxy e probabil incomplet. Vezi raspunsul server-ului la ultima comanda script pentru detalii: %s"
+
+ IDS_PROXYERRREJORFAIL, "Conexiunea a fost refuzata sau a esuat."
+ IDS_PROXYERRNEEDIDENTD, "Nu ma pot conecat la identd la client (aveti probabil nevoie sa instalati serviciul identd)."
+ IDS_PROXYERRDIFFUSERS, "Conexiunea a fost refuzata pentru ca nume utilizator proxy si nume utilizator intors de identd sunt diferite."
+ IDS_PROXYERRINVHOST, "Conexiunea de pe adresa necunoscuta de IP nu poate fi acceptata."
+
+ IDS_PROXYERRGETIP, "Eroare in obtinerea adresei IP a ""%s"": %s"
+ IDS_PROXYERRSENDREQ, "Eroare in trimiterea cererii la server-ul proxy: %s"
+ IDS_PROXYERRRECVREP, "Eroare in primirea raspunsului de la server-ul proxy: %s"
+ IDS_PROXYERROPENCON, "Server-ul proxy nu poate deschide conexiunea la server-ul FTP ""%s"" (port: %d), eroare: %s"
+ IDS_PROXYERRUNABLETOCON, "Nu ma pot conecta la server-ul proxy."
+ IDS_PROXYERROPENACTDATA, "Nu ma pot conecta la server-ul proxy sau server-ul proxy respinge deschiderea conexiunii active de data."
+ IDS_PROXYERRUNABLETOCON2, "Nu ma pot conecta la server-ul proxy, eroare: %s"
+ IDS_PROXYERRNOAUTHUNSUP, "Server-ul proxy respinge utilizatorii anonimi, va rugam adaugati nume utilizator si parola la definitia server-ului proxy."
+ IDS_PROXYERRUSERPASSAUTHUNSUP, "Server-ul proxy nu suporta autentificare utilizator+parola, va rugam incercati acces anonim (sterge nume utilizator si parola din definitia server-ului proxy)."
+ IDS_PROXYERRUSERPASSFAIL, "Server-ul proxy va respinge numele utilizator si parola."
+ IDS_PROXYERRLISTENUNSUP, "Server-ul proxy nu suporta deschiderea conexiunii active de data."
+
+ IDS_LOGMSGDELETEFILE, "Sterg fisierul ""%s""...\r\n"
+ IDS_LOGMSGDELETELINK, "Sterg legatura ""%s""...\r\n"
+ IDS_LOGMSGDELETEDIR, "Sterg directorul ""%s""...\r\n"
+ IDS_LOGMSGDELETEDIRLINK, "Sterg legatura directorului ""%s""...\r\n"
+ IDS_LOGMSGCHATTRSFILE, "Schimb atributele fisierului ""%s""...\r\n"
+ IDS_LOGMSGCHATTRSDIR, "Schimb atributele directorului ""%s""...\r\n"
+ IDS_LOGMSGEXPLORINGDIR, "Explorarea directorului ""%s"" in calea ""%s""...\r\n"
+
+ IDS_PROXYERRGENFAIL, "Eroare generala SOCKS server."
+ IDS_PROXYERRRULESET, "Conexiune nepermisa de setul de reguli."
+ IDS_PROXYERRNETUNR, "Retea de neatins."
+ IDS_PROXYERRHOSTUNR, "Gazda de neatins."
+ IDS_PROXYERRCONREF, "Conexiune refuzata."
+ IDS_PROXYERRTTLEXP, "TTL expirat."
+ IDS_PROXYERRCMDNOTSUP, "Comanda nesuportata."
+ IDS_PROXYERRADRTYPEUNSUP, "Tip adresa nesuportat."
+
+ IDS_HTTPNEEDPASSIVETRMODE, "Tipul default al server-ului tau proxy e HTTP 1.1. Suporta doar mod transfer pasiv. Va rugam sa schimbati modul de transfer default in pasiv (sau va schimbati server-ul proxy default)."
+ IDS_HTTPNEEDPASSIVETRMODE2, "Va conectati la server-ul FTP prin server proxy. Tipul acestui server proxy este HTTP 1.1.Suporta doar mod transfer pasiv. Va rugam schimbati modul de transfer in pasiv (dati click pe butonul Avansat, bifeaza Foloseste mod transfer pasiv)."
+ 
+ IDS_HINTLISTHIDDENFILES, "Daca doriti ca intotdeauna sa listati fisierele si directoarele ascunse pe acest server FTP, mergeti in meniul Plugins/FTP Client/Conectare la Server FTP, gasiti acest server in bookmarks, dati click pe butonul Avansat, si setati Comanda pentru listare in  ""LIST -a""."
+ IDS_DONOTSHOWHINTLISTHF, "&Nu arata acest indiciu data viitoare\tcum sa revin\tPuteti schimba aceasta optiune mai tarziu din pagina de Confirmari in Configurare FTP"
+ 
+ IDS_LOGMSGUNABLETORESUME, "Nu pot relua fisierul pentru ca verificarea sfrasitului fisierului a esuat (fisierul s-a schimbat).\r\n"
+ IDS_LOGMSGOVERWRTGTFILE, "Incerc sa suprascriu fisierul tinta (pentru a copia/muta tot fisierul din nou).\r\n"
+ IDS_LOGMSGRESUMEUSELESS, "Fisierul prea mic pentru a relua, tinta va fi suprascrisa.\r\n"
+ IDS_LOGMSGRESUMEFROMBEG, "Reiau: obtin fisierul de la inceput pentru a verifica partea descarcata deja.\r\n"
+ IDS_LOGMSGRESUMENOTSUP, "Nu pot relua fisierul (reluarea nu e suportata de server).\r\n"
+ IDS_LOGMSGUNABLETORESUME2, "Nu pot relua fisierul deoarece e mai scurt decat ce s-a copiat deja/mutat parte a fisierului (fisierul s-a schimbat).\r\n"
+ IDS_LOGMSGUPLRESUMENOTSUP, "Nu pot relua (adauga) fisierul (adaugarea nu e suportata de server sau incarcati in mod transfer ASCII).\r\n"
+ IDS_LOGMSGUPLUNABLETOGETSIZE, "Nu pot obtine marimea (in bytes) a unei parti copiate deja/mutate a fisierului tinta.\r\n"
+ IDS_LOGMSGUPLRESUMEERR, "Nu pot relua (adauga) fisierul (eroare neasteptata).\r\n"
+ IDS_LOGMSGUPLNOTCONFIRMED, "Fisierul intreg a fost trimis dar server-ul nu a confirmat primirea sa.\r\nAm sa obtin marimea fisierului (in bytes) pentru a testa daca fisierula fost copiat/mutat cu succes.\r\n"
+
+ IDS_SSL_ERR_OPENSSLNOTFOUND "Nu pot gasi sau incarca librariile OpenSSL necesare criptarii.\r\nFisierele necesare sunt ssleay32.dll si libeay32.dll.\r\nEle fac parte din instalarea Sally."
+ IDS_SSL_ERR_NEW "Nu pot aloca structura control OpenSSL. Fara memorie."
+ IDS_SSL_ERR_NEW_LOG "EROARE SSL: Nu pot aloca structura control OpenSSL. Fara memorie.\r\n"
+ IDS_SSL_ERR_CONNECT "Nu pot stabili conexiune criptata (SSL).\n\nEroare: %s"
+ IDS_SSL_ERR_CONNECT_ERR "SSL_conxiune  a dat mesajul %d: %s"
+ IDS_SSL_ERR_CONNECT_LOG "EROARE SSL: Nu pot stabili conexiune criptata, SSL_conexiune a dat mesajul %d: %s\r\n"
+ IDS_SSL_ERR_CONTRENCUNSUP "Server-ul nu suporta criptarea conexiunii control.\nComanda AUTH TLS nu a fost inteleasa de server."
+ IDS_SSL_ERR_DATAENCUNSUP "Server-ul nu suporta criptarea conexiunilor data."
+ IDS_SSL_ERR_NOTYETVALID "Certificatul server-ului nu este inca valid."
+ IDS_SSL_ERR_EXPIRED "Certificatul server-ului a expirat."
+
+ IDS_SSL_SECURITY_OK "Comunicarea e Criptata si Identitatea Server-ului Verificata"
+ IDS_SSL_SECURITY_UNVERIFIED "Comunicarea e Criptata dar Identitatea Server-ului nu e Verificata"
+
+ IDS_SSL_LOG_ALGO "SSL INFO: %s %s %d bits\r\n"
+ IDS_SSL_LOG_OSSL_CERT_VERIFY "SSL INFO: OpenSSL cert rezultat de verificare: %d\r\n"
+ IDS_SSL_LOG_ISSUER "SSL INFO: certificat eliberat de %s\r\n"
+ IDS_SSL_LOG_SUBJECT "SSL INFO: certificat eliberat catre %s\r\n"
+
+ IDS_SSL_LOG_CERTVERIFIED "Certificatul server-ului a fost verificat.\r\n"
+ IDS_SSL_LOG_CERTNOTVERIFIED, "Verificarea certificatului server-ului a esuat.\r\n"
+ IDS_SSL_LOG_CERTACCEPTED "Certificatul server-ului a fost acceptat de utilizator (dar identitatea serverului nu e verificata).\r\n"
+ IDS_SSL_LOG_CERTREJECTED "Certificatul server-ului nu a fost acceptat de utilizator, inchid conexiunea.\r\n"
+ IDS_SSL_LOG_CERTCHANGED, "Certificatul server-ului s-a schimbat.\r\n"
+
+ IDS_MODEZ_LOG_UNSUPBYSERVER "INFO: Server-ul nu suporta MODE Z -> compresie dezactivata\r\n"
+ 
+ IDS_LISTCOMMANDERROR, "Nu pot citi lista fisierelor si directoarelor de pe server.\n\nEroare: %s"
+ IDS_DOWNLOADONEFILEERROR, "Nu pot descarca fisierul de pe server.\n\nEroare: %s"
+ IDS_SSLNEWUNVERIFIEDCERT, "Certificatul server-ului s-a schimbat si verificarea sa a esuat."
+
+ IDS_SAVEPASSWORD_PROTECTED, "securizat de Master Password"
+ IDS_PASSWORD_UNSECURED, "Cateva parole FTP nu sunt sigure. Va rog tastati Master Password in urmatorul dialog.\n\nNota: daca dati click pe butonul Anuleaza, aceste parole vor fi stocate in mod nesigur."
+ IDS_CANNOT_DECRYPT_SOMEPASSWORDS, "Cateva parole FTP nu pot fi decriptate.\n\nEle au fost probabil criptate folosind alt Master Password.\nIncercati sa schimbati Master Password pentru a decripta asemenea parole."
+ IDS_CANNOT_DECRYPT_PASSWORD_DELETE, "Parola nu poate fi decriptata.\n\nParola a fost probabil criptata folosind alt Master Password.\nIncearca sa schimbi Master Password pentru a decripta aceasta parola.\nIn mod alternativ poti s-o stergi.\n\nDoriti sa stergeti aceasta parola?"
+ IDS_CLEARPASSWORD_CONFIRMATION, "Sunteti sigur-a ca doriti sa stergeti parola?"
+ IDS_SHOWPASSWORD_CONFIRMATION, "Suneti sigur-a ca doriti sa aratati aceasta parola?"
+ IDS_PASSWORDIS, "Parola este: %s\n\nDoriti sa copiati parola in clipboard?"
+ IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
+ IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
+ IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
+ IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
+ IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
+ IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+}

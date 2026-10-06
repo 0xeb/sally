@@ -1,0 +1,375 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for filecomp. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/filecomp/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\filecomp.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_COMPAREFILES DIALOGEX 10, 24, 227, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Porovnání souborů"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "P&orovnat soubor:",IDC_STATIC_1,10,9,207,8
+    COMBOBOX        IDE_PATH1,10,19,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE1,207,19,13,12
+    CONTROL         "&Se souborem:",IDC_STATIC_2,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,37,207,8
+    COMBOBOX        IDE_PATH2,10,47,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE2,207,47,13,12
+    DEFPUSHBUTTON   "OK",IDOK,29,71,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,88,71,50,14
+    PUSHBUTTON      "&Pokročilé...",IDADVANCED,147,71,50,14
+END
+
+IDD_CFGCOLORS DIALOGEX 15, 24, 250, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Barvy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Položka",IDC_STATIC_1,6,6,26,8,NOT WS_GROUP
+    COMBOBOX        IDC_ITEMS,6,16,149,82,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Čísla řádků:",IDC_STATIC_2,163,38,47,8,NOT WS_GROUP
+    LTEXT           "Text:",IDC_STATIC_3,212,38,24,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION1,11,51,144,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION2,11,67,144,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION3,11,83,144,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION4,11,99,144,8,NOT WS_GROUP
+    PUSHBUTTON      "text",IDB_LINENUM1,163,48,30,14
+    PUSHBUTTON      "text",IDB_TEXT1,212,48,30,14
+    PUSHBUTTON      "text",IDB_LINENUM2,163,64,30,14
+    PUSHBUTTON      "text",IDB_TEXT2,212,64,30,14
+    PUSHBUTTON      "text",IDB_LINENUM3,163,80,30,14
+    PUSHBUTTON      "text",IDB_TEXT3,212,80,30,14
+    PUSHBUTTON      "text",IDB_LINENUM4,163,96,30,14
+    PUSHBUTTON      "text",IDB_TEXT4,212,96,30,14
+    PUSHBUTTON      "&Obnovit výchozí",IDB_DEFAULT,172,202,70,14
+    LTEXT           "",IDS_PREVIEW2,125,129,117,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "",IDS_PREVIEW1,6,129,118,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "Ukázka",IDC_STATIC_4,6,120,60,8,NOT WS_GROUP
+END
+
+IDD_ADVANCEDOPTIONS DIALOGEX 70, 33, 222, 286
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Pokročilé možnosti"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ignorovat",IDC_STATIC_1,5,6,35,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,42,10,176,1
+    CONTROL         "Všechna bílá &místa",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,11,16,160,12
+    CONTROL         "&Změny velikosti bílých míst",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,28,160,12
+    CONTROL         "&Velikost znaků",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,40,160,12
+    LTEXT           "Typ souborů",IDC_STATIC_3,5,60,44,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,51,64,167,1
+    CONTROL         "&Autodetekce",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY | WS_GROUP | WS_TABSTOP,11,70,60,12
+    CONTROL         "&Binární",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,82,60,12
+    CONTROL         "&Textový",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,94,60,12
+    LTEXT           "Kódování textových souborů:",IDC_STATIC_15,11,111,99,8
+    LTEXT           "První soubor:",IDC_STATIC_5,11,126,47,8
+    LTEXT           "Druhý soubor:",IDC_STATIC_6,11,143,51,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,63,124,135,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,63,141,135,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,201,124,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,201,141,14,12
+    LTEXT           "Konec řádku",IDC_STATIC_7,5,163,44,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,51,167,167,1
+    LTEXT           "P&rvní soubor:",IDC_STATIC_9,11,175,47,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,64,173,35,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,103,173,35,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,142,173,35,12
+    CONTROL         "NULL",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,181,173,33,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,64,185,35,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,103,185,35,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,142,185,35,12
+    CONTROL         "NULL",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,181,185,33,12
+    LTEXT           "Druhý soubor:",IDC_STATIC_10,11,187,51,8
+    LTEXT           "Možnosti Unicode",IDC_STATIC_11,5,205,60,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,67,209,151,1
+    CONTROL         "Spojit &diakritické značky s precomposed znaky",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,215,180,12
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,4,237,214,1
+    CONTROL         "&Použít toto nastavení pro příští porovnání",IDC_USEINFUTURE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,242,160,12
+    CONTROL         "",IDC_STATIC_14,"Static",SS_ETCHEDHORZ | WS_GROUP,4,257,214,1
+    DEFPUSHBUTTON   "OK",IDOK,53,266,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,109,266,50,14
+    PUSHBUTTON      "Nápověda",IDHELP,165,266,50,14
+END
+
+IDD_CFGGENERAL DIALOGEX 28, 34, 250, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Hlavní"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Výběr souborů",IDC_STATIC_1,6,7,51,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,59,11,185,1
+    CONTROL         "Potvrdit výběr &souborů před spuštěním Porovnání souborů",IDC_CONFIRM,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,17,207,12
+    LTEXT           "Nastavení zobrazení souboru",IDC_STATIC_3,6,36,98,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,106,40,138,1
+    LTEXT           "P&očet kontextových řádků, pokud jsou zobrazeny jen rozdíly:",IDC_STATIC_5,12,48,205,8,NOT WS_GROUP
+    EDITTEXT        IDE_CONTEXT,218,46,16,12,ES_AUTOHSCROLL
+    LTEXT           "&Velikost tabulátoru:",IDC_STATIC_6,12,62,67,8,NOT WS_GROUP
+    EDITTEXT        IDE_TABSIZE,80,60,16,12
+    LTEXT           "Znak &bílého místa:",IDC_STATIC_7,12,76,67,8
+    COMBOBOX        IDC_WHITESPACE,80,74,55,98,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Zobrazit &detailní rozdíly jako výchozí",IDC_DETAILDIFFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,91,189,12
+    CONTROL         "Rozdělit souborový po&hled vodorovně",IDC_VIEW_HORIZONTAL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,103,189,12
+    LTEXT           "Písmo zobrazeného souboru",IDC_STATIC_8,6,121,96,8
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,104,125,140,1
+    PUSHBUTTON      "&Písmo",IDB_FONT,12,134,50,14
+    EDITTEXT        IDE_FONT,65,134,161,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    LTEXT           "Ostatní",IDC_STATIC_10,6,156,26,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,34,160,210,1
+    CONTROL         "&Nahrát plugin při spuštění Sally",IDC_LOADONSTART,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,166,166,12
+END
+
+IDD_CFGDEFOPTIONS DIALOGEX 31, 27, 250, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Výchozí nastavení porovnání"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ignorovat",IDC_STATIC_1,6,7,35,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,43,11,201,1
+    CONTROL         "Všechna bílá &místa",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,17,160,12
+    CONTROL         "&Změny velikosti bílých míst",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,29,160,12
+    CONTROL         "&Velikost znaků",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,41,160,12
+    LTEXT           "Typ souborů",IDC_STATIC_3,6,59,44,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,52,63,192,1
+    CONTROL         "&Autodetekce",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,13,69,74,12
+    CONTROL         "&Binární",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON,13,81,74,12
+    CONTROL         "&Textový",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON,13,93,74,12
+    LTEXT           "Kódování textových souborů:",IDC_STATIC_13,13,110,99,8
+    LTEXT           "První soubor:",IDC_STATIC_5,13,125,47,8
+    LTEXT           "Druhý soubor:",IDC_STATIC_6,13,142,51,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,65,123,156,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,65,140,156,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,224,123,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,224,140,14,12
+    LTEXT           "Konce řádků",IDC_STATIC_7,6,158,44,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,52,162,192,1
+    LTEXT           "První soubor:",IDC_STATIC_9,13,170,47,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,66,168,39,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,168,39,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,146,168,39,12
+    CONTROL         "NULL",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,186,168,39,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,66,180,39,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,180,39,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,146,180,39,12
+    CONTROL         "NULL",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,186,180,39,12
+    LTEXT           "Druhý soubor:",IDC_STATIC_10,13,182,51,8
+    LTEXT           "Možnosti Unicode",IDC_STATIC_11,6,197,60,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,68,201,176,1
+    CONTROL         "Spojit &diakritické značky s precomposed znaky",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,207,180,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_MENU MENU 
+BEGIN
+    POPUP "&Soubor"
+    BEGIN
+        MENUITEM "Porovnat...\tCtrl+O",          CM_COMPARE
+        MENUITEM "Znovu porovnat\tCtrl+R",           CM_RECOMPARE
+        MENUITEM SEPARATOR
+        MENUITEM "&Konec\tAlt+F4",               CM_EXIT
+    END
+    POPUP "Úpr&avy"
+    BEGIN
+        MENUITEM "Kopírovat\tCtrl+C",                CM_COPY
+    END
+    POPUP "&Zobrazení"
+    BEGIN
+        MENUITEM "Zobrazit prázdné &místo\tCtrl+W",   CM_SHOWWHITESPACE
+        MENUITEM "Zobrazit jen &rozdíly\tCtrl+D", CM_ONLYDIFFERENCES
+        MENUITEM "D&etailní rozdíly\tF4",   CM_DETAILDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "Pr&vní rozdíl\tAlt+Home", CM_FIRSTDIFF
+        MENUITEM "&Předchozí rozdíl\tAlt+Up Arrow", CM_PREVDIFF
+        MENUITEM "&Následující rozdíl\tAlt+Down Arrow", CM_NEXTDIFF
+        MENUITEM "P&oslední rozdíl\tAlt+End",   CM_LASTDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "Zo&brazit vynechané\tF2",             CM_SHOWCARET
+        MENUITEM SEPARATOR
+        MENUITEM "Maximální zobrazení &levého souboru\tCtrl+,", CM_MAXLEFTVIEW
+        MENUITEM "Maximální zobrazení pr&avého souboru\tCtrl+.", CM_MAXRIGHTVIEW
+        MENUITEM "&Stejná velikost zobrazení souboru\tCtrl+E", CM_SAMESIZEVIEW
+        MENUITEM "&Celá obrazovka\tF11",    CM_MAXIMIZE
+        MENUITEM "Vodorovný po&hled\tCtrl+H",    CM_VIEW_HORIZONTAL
+    END
+    POPUP "Nas&tavení"
+    BEGIN
+        MENUITEM "&Auto-kopie výběru do schránky", CM_AUTOCOPY
+        MENUITEM SEPARATOR
+        MENUITEM "&Konfigurace...",           CM_OPTIONS
+    END
+    POPUP "&Nápověda"
+    BEGIN
+        MENUITEM "O&bsah\tF1",               CM_HELP
+        MENUITEM "&Klávesové zkratky",         CM_HELPKEYBOARD
+        MENUITEM SEPARATOR
+        MENUITEM "&O pluginu",                      CM_ABOUT
+    END
+END
+
+IDM_CTX_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Vybrat &vše",                 CM_SELECTALL
+        MENUITEM "&Kopírovat",                       CM_COPY
+    END
+END
+
+IDM_CTX_1COLOR_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Vlastní barva...",             CM_CUSTOMBACKGROUND
+        MENUITEM "Automatická barva",             CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_2COLOR_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Vlastní barva textu...",     CM_CUSTOMTEXT
+        MENUITEM "Automatická barva textu",     CM_AUTOTEXT
+        MENUITEM SEPARATOR
+        MENUITEM "Vlastní barva pozadí...", CM_CUSTOMBACKGROUND
+        MENUITEM "Automatická barva pozadí", CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_FONT_MENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Vlastní písmo...",              CM_CUSTOMFONT
+        MENUITEM "Automatické písmo",              CM_AUTOFONT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGIN_DESCRIPTION, "Vizuální porovnání dvou textových nebo binárních souborů."
+  IDS_ABOUT, "O pluginu"
+  IDS_SPLERROR, "Porovnání souborů - Chyba"
+  IDS_PLUGINNAME, "Porovnání souborů"
+  IDS_LOWMEM, "Nedostatek paměti."
+  IDS_COMPAREFILES, "Porovnat soubory..."
+  IDS_CONFIGURATION, "Konfigurace..."
+  //IDS_SOMEWINDOWSOPEN, "Some File Comparator windows are opened. Do you want to close them?"
+  IDS_READFILE, "Nelze číst ze souboru '%s'. "
+  IDS_ACCESFILE, "Nelze zpřístupnit soubor '%s'. "
+  IDS_ACCESFILE2, "Nelze zpřístupnit soubor. "
+  IDS_INTERNALERROR, "Interní chyba v algoritmu porovnání."
+  IDS_LARGEFILE, "Nelze otevřít soubor '%s' pro textové porovnání, soubor je příliš velký.\nPoužijte binární porovnání."
+  IDS_OPEN, "Nelze otevřít soubor: '%s'. "
+  IDS_NODIFFERRENCE, "Soubory jsou identické."
+  IDS_ALLDIFFSIGNORED, "Soubory se zdají být shodné. Rozdíly mezi nimi se vyignorovaly na základě nastavení."
+  IDS_BINARYDIFFER, "Binárně jsou soubory rozdílné."
+  IDS_MAXLINES, "Dosažen maximální počet řádků"
+  IDS_MAINWNDHEADER, "{!}%s %s: %s %s- Porovnání souborů - %d Rozdíl{|1|y|4|ů}"
+  IDS_MAINWNDHEADER_NODIF "%s %s: %s %s- Porovnání souborů - Žádné rozdíly"
+  IDS_MAINWNDHEADERCOMPUTING, "%s : %s - Porovnání souborů - Počítám rozdíly (stiskněte ESC pro přerušení)"
+  IDS_MAINWNDHEADERCOMPUTING2, "%s %s: %s %s - Porovnání souborů - Počítám rozdíly"
+  IDS_MAINWNDHEADERCOMPUTING_PROGRESS, "%s : %s - Porovnání souborů - Počítám rozdíly (%d%% hotovo)"
+  IDS_MAINWNDHEADERCOMPUTING_PROGRESS_FOUND, "{!}%s : %s - Porovnání souborů - Počítám rozdíly (%d%% hotovo, %d nalezeno{})"
+  IDS_MAINWNDHEADERTOOMANY, "%s : %s - Porovnání souborů - Více jak 32 768 rozdílů"
+  IDS_DIFFERENCES, "&Rozdíl"
+  IDS_MISSINGPATH, "Chybí název souboru."
+  IDS_ERROR, "Chyba"
+  IDS_SELECTALL, "Vybrat &vše"
+  IDS_RECOMPARE, "Porovnat znovu (Ctrl+R)"
+  IDS_COPY, "&Kopírovat"
+  IDS_COPYCLIP, "Kopírovat do schránky (Ctr+C)"
+  IDS_FIRSTDIFF, "Přejít na první rozdíl (Alt+Home)"
+  IDS_PREVDIFF, "Přejít na předchozí rozdíl (Alt+Up Arrow)"
+  IDS_NEXTDIFF, "Přejít na následující rozdíl (Alt+Down Arrow)"
+  IDS_LASTDIFF, "Přejít na poslední rozdíl (Alt+End)"
+  IDS_CANCELED, "Operace přerušena."
+  IDS_CLOSEDIFF, "Chcete ukončit Porovnání souborů?"
+  IDS_COMMONTEXT, "Nezměněný text"
+  IDS_SELECTEDTEXT, "Vybraný text"
+  IDS_CHANGEDTEXT, "Změněný text"
+  IDS_FOCUSEDCHANGE, "Změněný text v zaměřeném rozdílu"
+  IDS_FOCUSEDFRAME, "Rámeček kolem zaměřeného rozdílu"
+  IDS_FOCUSEDCHANGE2, "Zaměřený rozdíl"
+  IDS_COMMONFOCUSED, "Nezměněný text v zaměřeném rozdílu"
+  IDS_COMMONFOCUSED2, "Nezměněný+zaměřený"
+  IDS_COMMONCOLORS, "Základní barvy"
+  IDS_RIGHTCOLORS, "Barvy pravého panelu"
+  IDS_LEFTCOLORS, "Barvy levého panelu"
+  IDS_POSITIVEVALUE, "Prosím zadejte kladnou hodnotu"
+  IDS_SELECTFIRST, "Vyberte první soubor"
+  IDS_SELECTSECOND, "Vyberte druhý soubor"
+  IDS_FILEDOESNOTEXIST, "Soubor %s neexistuje.\nProsím zadejte platný název souboru."
+  IDS_ALLFILES, "Všechny soubory (*.*)"
+  // font description in configuration dialog box   "10 pt. MS Shell Dlg"
+  IDS_FONTDESCRIPTION, "%d pt. %s"
+  IDS_BINREPORT1, "{!}%d: %s bajt{ změněn|1|y změněny|4|ů změněno} v offsetu %s"
+  IDS_BINREPORT2, "{!}%s bajt{ změněn|1|y změněny|4|ů změněno} v offsetu %s"
+  IDS_ADD1, "%d: Vložený řádek %d v pravém souboru (%s) po řádku %d v levém souboru (%s)"
+  IDS_ADD2, "%d: Vložené řádky %d-%d v pravém souboru (%s) po řádku %d v levém souboru (%s)"
+  IDS_DELETE1, "%d: Odstraněný řádek %d v levém souboru (%s)"
+  IDS_DELETE2, "%d: Odstraněné řádky %d-%d v levém souboru (%s)"
+  IDS_CHANGEFROM1, "%d: Změněný řádek %d v levém souboru (%s) s"
+  IDS_CHANGEFROM2, "%d: Změněné řádky %d-%d v levém souboru (%s) s"
+  IDS_CHANGETO1, "%s řádkem %d v pravém souboru (%s)"
+  IDS_CHANGETO2, "%s řádkami %d-%d v pravém souboru (%s)"
+  IDS_CONFIGURATIONTITLE, "Porovnání souborů - Konfigurace"
+  IDS_OK, "OK"
+  IDS_CANCEL, "Storno"
+  IDS_OPTIONSCHANGED, "Výchozí nastavení porovnání bylo změněno.\nZnovu porovnat soubory s novým nastavením?"
+  IDS_DETAILCANCEL, "Stornovaly jste operaci během počítání detailních rozdílů. Analýza detailních rozdílů může trvat příliš dlouho, zvláště pro soubory s velkými rozdílnými bloky.\n\nChcete vypnout detailní rozdíly a spustit porovnání znovu?"
+  IDS_INVALIDNUMBER, "Neplatné číslo!"
+  IDS_NOTVALIDFILE, "Nelze otevřít '%s'."
+  IDS_INVALIDARGS, "Neplatné argumenty. Použití:\n\tfilecomp.exe [volby] první druhý\nVolby jsou:\n\t-w\tČekat až se Porovnání souborů uzavře.\n\t--wait\tČekat až se Porovnání souborů uzavře."
+  IDS_MSGERR, "Nelze poslat zprávu do Porovnání souborů pluginu."
+  IDS_LAUNCHSAL, "Nelze spustit Sally."
+  IDS_MSGERR2, "Nelze poslat zprávu do Porovnání souborů pluginu. Zajistěte nastavení možnosti 'Nahrát plugin při spuštění Sally' v konfiguraci Porovnání souborů."
+  IDS_ERRORUNICODE, "Konverze na Unicode selhala."
+  IDS_ENCMENU_AUTO, "Automaticky"
+  IDS_ENCMENU_ASCII8, "ASCII-8"
+  IDS_ENCMENU_ASCII8NOINPUTENC, "Bez vstupní konverze"
+  IDS_ENCMENU_ASCII8AUTOINPUTENC, "Automatická vstupní konverze"
+  IDS_ENCMENU_UNICODE, "Unicode"
+  IDS_ENCMENU_UTF8, "UTF-8"
+  IDS_ENCMENU_UTF16LE, "UTF-16"
+  IDS_ENCMENU_UTF16BE, "UTF-16 (Big Endian)"
+  IDS_ENCMENU_UTF32LE, "UTF-32"
+  IDS_ENCMENU_UTF32BE, "UTF-32 (Big Endian)"
+  IDS_AUTOINPUTENC ", automatická vstupní konverze"
+  IDS_NOINPUTENC ", bez vstupní konverze"
+  IDS_MAXLEFTVIEW   "Maximalizovat pohled &levého souboru\tCtrl+,"
+  IDS_MAXTOPVIEW    "Maximalizovat pohled &horního souboru\tCtrl+,"
+  IDS_MAXRIGHTVIEW  "Maximalizovat pohled &pravého souboru\tCtrl+."
+  IDS_MAXBOTTOMVIEW "Maximalizovat pohled &dolního souboru\tCtrl+."
+  IDS_ERROR_COPY_LARGE_SELECTION "Výběr je příliš velký pro kopírování do schránky."
+  IDS_ERROR_COPY_OOM  "Nedostatek paměti pro kopírování vybraného textu do schránky."
+  IDS_ERROR_COPY_FAILED "Nelze kopírovat vybraný text do schránky."
+  IDS_LOWMEM_TRY_BINARY "Porovnání v textovém režimu selhalo, protože není k dispozici dostatek paměti nebo jsou soubory příliš velké. Můžete zkusit binární porovnání."
+}

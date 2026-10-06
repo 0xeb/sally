@@ -85,7 +85,7 @@ public:
 };
 
 extern HINSTANCE DLLInstance; // handle to SPL - language-independent resources
-extern HINSTANCE HLanguage;   // handle to SLG - language-dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 
 #define DUMP_MEM_OBJECTS
 

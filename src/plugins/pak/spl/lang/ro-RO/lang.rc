@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for pak. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 212, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Optimizeaza Arhiva PAK"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Marime valida data:",IDC_STATIC_1,8,9,69,8
+    LTEXT           "",IDC_VALIDSIZE,82,9,118,8
+    LTEXT           "Marimea totala fisier:",IDC_STATIC_2,8,20,73,8
+    LTEXT           "",IDC_TOTALSIZE,82,20,118,8
+    LTEXT           "Spatiu pierdut:",IDC_STATIC_3,8,31,53,8
+    LTEXT           "",IDC_WASTEDSPACE,82,31,118,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,196,1
+    DEFPUSHBUTTON   "Optimizeaza",IDOK,46,53,55,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,111,53,55,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "Nu pot deschide fisierul: %s"
+ IDS_PAK_ERRINIT, "Nu pot initializa interfata paklib. Este deja un fisier deschis."
+ IDS_PAK_ERROPEN2, "Nu pot deschide fisierul. Este un fisier deja deschis."
+ IDS_PAK_ERRGETFILESIZE, "Nu pot obtine marimea fisierului: %s"
+ IDS_PAK_INVLAIDDATA, "Data format e invalida."
+ IDS_PAK_LOWMEMORY, "Memorie insuficienta."
+ IDS_PAK_CENTRDIR, "directorul curent central PAK"
+ IDS_PAK_ERRSETFILEPTR, "Nu pot seta pointer de fisier: %s"
+ IDS_PAK_ERRREADFILE, "Nu pot citi din fisierul: %s"
+ IDS_PAK_ERRGETFILEPTR, "Nu pot obtine pointerul de fisier: %s"
+ IDS_PAK_ERRWRITEFILE, "Nu pot scrie in fisierul: %s"
+ IDS_PAK_TOOLONGNAME, "Nu pot adauga fisierul, nume prea lung."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Rasfoieste si extrage arhive Quake Pak."
+ IDS_ABOUT, "Despre Plugin"
+ IDS_LOWMEM, "Memorie insuficienta."
+ IDS_ERRLIST, "Nu pot adauga fisierul la lista."
+ IDS_ERRLOADPAKLIB, "Nu pot incarca paklib.dll sau sa obtin adresa procedurii: "
+ IDS_EXTRPROGTITLE, "Dezarhivez Arhiva PAK - %s"
+ IDS_PREPAREDATA, "pregatesc data..."
+ IDS_EXTRACTFILES, "dezarhivez..."
+ IDS_EXTRACTING, "dezarhivez: "
+ IDS_TOOLONGNAME, "Nu pot termina operatiunea, nume prea lung."
+ IDS_UNABLESEEK, "Nu pot seta pointerul de fisier: "
+ IDS_UNABLEGETFIELPOS, "Nu pot obtine pointerul de fisier: "
+ IDS_UNABLEWRITE, "Nu pot scrie in fisier:"
+ IDS_ERROPEN, "Nu pot deschide fisierul: "
+ IDS_TOOLONGMASK, "Nu pot termina operatiunea, masca prea lunga."
+ IDS_DELPROGTITLE, "Sterg din Arhiva PAK - %s"
+ IDS_DELFILES, "sterg..."
+ IDS_DELETING, "sterg: "
+ IDS_CANCELING, "anulez operatiunea, va rugam asteptati..."
+ IDS_ADDPROGTITLE, "Arhivez in Arhiva PAK - %s"
+ IDS_TOOLARGE, "Nu pot adauga fisierul: Fisierul e prea mare."
+ IDS_ADDFILES, "arhivez..."
+ IDS_TOOLONGNAME2, "Nu pot adauga fisierul, nume prea lung."
+ IDS_PACKING, "arhivez: "
+ IDS_UNABLEREAD, "Nu pot citi din fisier: "
+ IDS_ERRCONNECT, "Nu pot conecta plugin la Sally."
+ IDS_OPTIMIZING, "optimizez, va rugam asteptati..."
+ IDS_OPTPROGTITLE, "Optimizez Arhiva PAK - %s"
+ IDS_NEEDOPT, "Stergerea fisierelor nu a fost terminata cu succes. Va trebui sa rulezi optimizare PAK din meniul de Plugin al PAK pentru a pastra risipirea spatiului discului."
+ IDS_MENUOPTIMIZE, "&Optimizeaza PAK"
+ IDS_EXPIRE, "Ne pare rau, plugin-ul a expirat. Va rugam verificati pe web site-ul nostru pentru o noua versiune."
+}

@@ -34,8 +34,8 @@
 // if the window writes a null-terminated string into the buffer, it will be shown in the tooltip
 //
 // WM_USER_TTGETTEXTW is asked first; if the window leaves the buffer empty we retry with the
-// narrow WM_USER_TTGETTEXT and convert the answer. That fallback is what keeps v107 plugins
-// (loaded through compat/sdk107) showing tooltips without a source change. It is also why the
+// narrow WM_USER_TTGETTEXT and convert the answer. That fallback was added for plugins built for
+// the old narrow SDK. It is also why the
 // wide form had to be a new message number instead of a redefinition of the old lParam -- see
 // the note on WM_USER_TTGETTEXTW in spl_gui.h.
 //

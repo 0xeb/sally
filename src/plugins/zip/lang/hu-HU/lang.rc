@@ -1,0 +1,660 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for zip. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\zip.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_EXPACKOPTIONS DIALOGEX 41, 41, 318, 201
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Kiterjesztett csomag beállítások"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archívum:",IDC_STATIC_1,17,9,36,8
+    CONTROL         "",IDC_ARCHIVE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,54,9,256,8
+    LTEXT           "",IDC_STATIC_2,8,24,301,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Több-kötetes archívu&m",IDC_MULTIVOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,31,101,12
+    LTEXT           "&Kötet mérete:",IDC_STATIC_3,177,33,49,8,NOT WS_GROUP
+    COMBOBOX        IDC_VOLSIZE,228,31,49,110,CBS_DROPDOWN | WS_DISABLED | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_UNITS,282,31,27,34,CBS_DROPDOWNLIST | WS_DISABLED | WS_TABSTOP
+    CONTROL         "Fájlok el&nevezése sorrendben",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,17,45,111,12
+    LTEXT           "",IDC_STATIC_4,8,63,301,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Önki&tömörítő archívum",IDC_SELFEXTR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,70,108,12
+    PUSHBUTTON      "H&aladó...",IDC_ADVANCED,254,70,55,14,WS_DISABLED
+    LTEXT           "",IDC_STATIC_5,8,90,301,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Fájlok titkosítása",IDC_ENCRYPT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,97,70,12
+    LTEXT           "&Jelszó:",IDC_STATIC_6,28,113,60,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD1,92,111,83,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    LTEXT           "Je&lszó újra:",IDC_STATIC_7,28,129,61,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD2,92,127,83,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    GROUPBOX        " Kódolási mód ",IDC_STATIC_8,185,97,124,50
+    CONTROL         "&ZIP 2.0 kompatibilis (gyenge)",IDC_ENC_ZIP20,"Button",BS_AUTORADIOBUTTON | WS_DISABLED | WS_GROUP,190,108,110,12
+    CONTROL         "&128-bit AES",IDC_ENC_AES128,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,190,120,53,12
+    CONTROL         "&256-bit AES",IDC_ENC_AES256,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,190,132,55,12
+    LTEXT           "",IDC_STATIC_9,8,154,301,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "N&e mutassa újból ezt az ablakot (később a beállítás ablakban módosítható)",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,161,262,12
+    DEFPUSHBUTTON   "OK",IDOK,37,180,55,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,100,180,55,14
+    PUSHBUTTON      "&Beállítás...",IDC_CONFIG,163,180,55,14
+    PUSHBUTTON      "Súgó",IDHELP,226,180,55,14
+END
+
+IDD_CONFIG DIALOGEX 50, 37, 316, 277
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP beállítások"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Kitömörítés",IDC_STATIC_1,7,6,40,8
+    LTEXT           "",IDC_STATIC_2,46,10,264,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "&Automatikusan kiterjesztett több-kötetes archívumok tárolása merevlemezen",IDC_AUTOEXPANDMV,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,17,268,12
+    LTEXT           "Tömörítés",IDC_STATIC_3,7,35,36,8
+    LTEXT           "",IDC_STATIC_4,43,39,267,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "Ideiglenes másola&t használata az archívum módosításakor (ajánlott, hiba immúnis)",IDC_BACKUP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,46,288,12
+    CONTROL         "Ür&es mappák ne kerüljenek a ZIP archívumba",IDC_NOEMPTYDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,58,166,12
+    CONTROL         "Ar&chiválási idő igazítása az újabb fájl idejéhez, módosításkor",IDC_SETFILETIME,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,70,214,12
+    CONTROL         "WinZip kompatibilis nevek használata több-kötetes archívumoknál (kivéve az ön-",IDC_WINZIPNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,82,280,12
+    LTEXT           "kitömörítő archívumoknál, ahol mindig Sally névadási rend használata)",IDC_STATIC_5,26,94,282,8
+    LTEXT           "Tömörítési szint (0 - 9, 9 &legjobb tömörítés, hosszabb idő):",IDC_STATIC_6,14,107,198,8
+    EDITTEXT        IDC_LEVEL,213,105,16,12
+    LTEXT           "Ala&p önkitömörítő nyelv:",IDC_STATIC_7,14,120,83,8
+    COMBOBOX        IDC_LANGUAGE,98,118,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Megerősítések",IDC_STATIC_8,7,136,50,8
+    LTEXT           "",IDC_STATIC_9,56,140,254,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Ha az SFX nyelv változik",IDC_STATIC_10,14,148,245,49
+    CONTROL         "Mindi&g kérdezzen rá a szöveg módosítása előtt",IDC_ASK,"Button",BS_AUTORADIOBUTTON | WS_GROUP,20,158,171,12
+    CONTROL         "Automatikusan lecse&réli a szövegeket alapértelmezett értékeikre",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,20,170,227,12
+    CONTROL         "&Nem kérdez és a szövegek változatlanok maradnak",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,20,182,200,12
+    CONTROL         "Kiterjesztett beállítás&ok ablak mutatása tömörítés előtt",IDC_SHOWEXOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,200,196,12
+    LTEXT           "Panel beállítások",IDC_STATIC_11,7,217,58,8
+    LTEXT           "",IDC_STATIC_12,64,221,246,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         """Tö&mörített"" oszlop mutatása az archívum listázásakor",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,228,220,12
+    LTEXT           "",IDC_STATIC_13,6,247,304,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,44,256,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,103,256,50,14
+    PUSHBUTTON      "&Visszaállítás",IDC_DEFAULT,162,256,50,14
+    PUSHBUTTON      "Súgó",IDHELP,221,256,50,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 271, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP jelszó megadása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK,21,10,18,20
+    LTEXT           "A fájl titkosított. Adja meg a jelszót a dekódoláshoz.",IDC_STATIC_1,57,10,202,8
+    LTEXT           "Fájl:",IDC_STATIC_2,57,23,17,8
+    CONTROL         "",IDC_FILE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,77,23,182,8
+    LTEXT           "&Jelszó:",IDC_STATIC_3,57,36,24,8
+    EDITTEXT        IDC_PASSWORD,84,34,175,12,ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,20,55,50,14,WS_GROUP
+    PUSHBUTTON      "Ki&hagy",IDC_SKIP,80,55,50,14
+    PUSHBUTTON      "Mind &kihagy",IDC_SKIPALL,140,55,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,200,55,50,14
+END
+
+IDD_LOWFREESPACE DIALOGEX 13, 54, 352, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Kevés szabad terület"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Figyelem: a lemezen kisebb a szabad terület, mint a megadott kötetméret.",IDC_TEXT,63,9,279,8
+    RTEXT           "Elérés:",IDC_STATIC_1,4,26,54,8
+    LTEXT           "",IDC_PATH,63,26,279,8
+    RTEXT           "Szabad terület:",IDC_STATIC_2,4,39,54,8
+    LTEXT           "",IDC_FREESPACE,63,39,279,8
+    RTEXT           "Kötet mérete:",IDC_STATIC_3,4,52,54,8
+    LTEXT           "",IDC_VOLUMESIZE,63,52,279,8
+    DEFPUSHBUTTON   "Átugr&ik",IDC_IGNORE,55,73,55,14
+    PUSHBUTTON      "&Mind átugrik",IDC_ALL,117,73,55,14
+    PUSHBUTTON      "Új&ra",IDC_RETRY,179,73,55,14
+    PUSHBUTTON      "Mégse",IDCANCEL,241,73,55,14
+END
+
+IDD_CHANGEDISK DIALOGEX 24, 40, 194, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Lemez cseréje"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,168,24
+    LTEXT           "OK gomb ha kész.",IDC_STATIC_1,13,39,168,8
+    DEFPUSHBUTTON   "OK",IDOK,42,57,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,102,57,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 6, 15, 352, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fájl felülírás megerősítése"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Felülírandó fájl:",IDC_STATIC_1,5,14,54,8
+    LTEXT           "",IDC_FILE,64,14,277,8
+    LTEXT           "",IDC_FILEATTR,64,24,277,8
+    LTEXT           "A fájl már létezik a lemezen. Felülírja?",IDC_STATIC_2,64,39,174,8
+    DEFPUSHBUTTON   "&Igen",IDC_YES,64,56,50,14
+    PUSHBUTTON      "&Mind",IDC_ALL,122,56,50,14
+    PUSHBUTTON      "Új&ra",IDC_RETRY,180,56,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,238,56,50,14
+END
+
+IDD_CHANGEDISK2 DIALOGEX 24, 40, 210, 108
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ez egy több-kötetes archívum egyik része vagy sérült.",IDC_STATIC_1,13,8,184,16
+    LTEXT           "Ha úgy hiszi, ez egy több-kötetes archívum, helyezzen be egy lemezt az archívum utolsó részével vagy keresse ki a fájlt a merevlemezen. OK gomb ha kész.",IDC_STATIC_2,13,31,184,24
+    LTEXT           "Az archívum uto&lsó része:",IDC_STATIC_3,13,61,89,8
+    EDITTEXT        IDC_FILENAME,13,71,168,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,185,71,13,12
+    DEFPUSHBUTTON   "OK",IDOK,50,89,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,110,89,50,14
+END
+
+IDD_CHANGEDISK3 DIALOGEX 24, 40, 210, 132
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Lemez cseréje"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,184,16
+    LTEXT           "OK ha kész.",IDC_STATIC_1,13,31,184,8
+    CONTROL         "Fájlok elnevezése &sorrendben",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,43,135,12
+    CONTROL         "L&emezek száma a kiterjesztésben",IDC_WINZIP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,55,125,12
+    CONTROL         "Minden kötet feldolgozás&a kérdés nélkül",IDC_PROCEEDALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,67,146,12
+    LTEXT           "&Fájlnév:",IDC_STATIC_2,13,84,60,8
+    EDITTEXT        IDC_FILENAME,13,94,168,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,185,94,13,12
+    DEFPUSHBUTTON   "OK",IDOK,49,112,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,111,112,50,14
+END
+
+IDD_ADVANCEDSE DIALOGEX 37, 14, 305, 303
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Önkitömörítő beállítások"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_STATIC_1,0,0,305,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "Fájlok mappába kitömörítése",IDC_STATIC_2,7,7,292,89,WS_GROUP
+    LTEXT           "&Kitömörítés ide:",IDC_STATIC_3,20,19,55,8,NOT WS_GROUP
+    EDITTEXT        IDC_TARGETDIR,20,29,249,12,ES_AUTOHSCROLL | ES_NOHIDESEL
+    PUSHBUTTON      ">",IDC_SPECDIR,272,29,12,12
+    LTEXT           "Megj.: Megadhat relatív elérési utat, mely az aktuális mappával kombinálódik, mikor az önkitömörítés fut, vagy egy teljes elérési utat. Üresen hagyott mezőnél az aktuális mappába tömörítődik ki.",IDC_STATIC_4,20,47,259,24,NOT WS_GROUP
+    CONTROL         "A &felhasználó módosíthatja a mappát",IDC_ALLOWUSER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,77,146,12
+    LTEXT           "Parancs végr&ehajtása vagy dokumentum megnyitása:",IDC_STATIC_5,20,113,182,8,NOT WS_GROUP
+    EDITTEXT        IDC_EXECUTE,20,123,264,12,ES_AUTOHSCROLL
+    CONTROL         "Kitömörített fájlok tö&rlése",IDC_REMOVE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,139,131,12
+    PUSHBUTTON      "&Jelre vár...",IDC_WAITFOR,234,138,50,14
+    GROUPBOX        "Felület",IDC_STATIC_6,7,163,292,53,WS_GROUP
+    PUSHBUTTON      "S&zövegek...",IDC_TEXTS,20,177,50,14
+    LTEXT           "Nye&lv:",IDC_STATIC_7,20,198,36,8,NOT WS_GROUP
+    COMBOBOX        IDC_LANGUAGE,74,196,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "Ikon:",IDC_STATIC_8,169,198,20,8,NOT WS_GROUP
+    LTEXT           "",IDC_EXEICON,193,194,19,18,NOT WS_GROUP
+    PUSHBUTTON      "&Ikoncsere...",IDC_CHANGEICON,220,196,64,14
+    GROUPBOX        "Megerősítések és egyéb beállítások",IDC_STATIC_9,7,221,292,57
+    CONTROL         "Kitömörítés aut&omatikus indítása",IDC_AUTO,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,20,234,122,12
+    CONTROL         "Fő ö&nkitömörítő ablak rejtése",IDC_HIDEMAINDLG,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,246,129,12
+    CONTROL         "&Cél mappa automatikus létrehozása",IDC_AUTODIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,258,133,12
+    CONTROL         "Műveleti össze&sítő ablak",IDC_SUMDLG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,162,234,130,12
+    CONTROL         "Fájlok &automatikus felülírása",IDC_OVEWRITE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,162,246,108,12
+    CONTROL         "Ren&dszergazdai jogok szükségesek ",IDC_REQSADMIN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,162,258,131,12
+    DEFPUSHBUTTON   "OK",IDOK,66,283,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,127,283,50,14
+    PUSHBUTTON      "Súgó",IDHELP,188,283,50,14
+    GROUPBOX        "Kitömörítés befejezése után",IDC_STATIC_10,7,101,292,57,WS_GROUP
+END
+
+IDD_OVERWRITE2 DIALOGEX 6, 15, 350, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fájl felülírás megerősítése"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Felülírandó fájl:",IDC_STATIC_1,6,14,54,8
+    LTEXT           "",IDC_FILE,63,14,277,8
+    LTEXT           "",IDC_FILEATTR,63,24,277,8
+    LTEXT           "A fájl már létezik a lemezen. Felülírja?",IDC_STATIC_2,63,39,174,8
+    DEFPUSHBUTTON   "&Igen",IDC_YES,89,56,50,14
+    PUSHBUTTON      "&Nem",IDC_NO_,150,56,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,211,56,50,14
+END
+
+IDD_RENAMEFAVSET DIALOGEX 100, 37, 194, 99
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Új kedvenc beállítások"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Név:",IDC_STATIC_1,14,8,60,8
+    EDITTEXT        IDC_NAME,14,18,164,12,ES_AUTOHSCROLL
+    LTEXT           "Megj.: Gyorsbillentyűt rendelhet ehhez a kedvenc beállításához, ha a használni kívánt betű elé beír egy angol ÉS karaktert (&&).",IDC_STATIC_2,14,41,161,24
+    LTEXT           "",IDC_STATIC_3,7,74,180,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,39,80,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,99,80,50,14
+END
+
+IDD_CREATESFX DIALOGEX 6, 15, 209, 113
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Önkitömörítő archívum létrehozása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Önkitömörítő ar&chívum létrehozása az archívumból:",IDC_SOURCE,16,11,174,8
+    EDITTEXT        IDC_ARCHIVE,16,21,177,12,ES_AUTOHSCROLL
+    LTEXT           "Az új önkitömörítő archívum &fájlneve:",IDC_TARGET,16,39,149,8
+    EDITTEXT        IDC_NEWARCHIVE,16,49,177,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "H&aladó...",IDC_ADVANCED,143,68,50,14
+    LTEXT           "",IDC_STATIC_1,7,87,195,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,20,94,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,79,94,50,14
+    PUSHBUTTON      "Súgó",IDHELP,138,94,50,14
+END
+
+IDD_COMMENT DIALOGEX 9, 34, 340, 180
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "ZIP archívum jegyzet"
+MENU IDM_COMMENTMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_COMMENT,0,0,340,180,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+END
+
+IDD_SFXTEXTS DIALOGEX 94, 18, 260, 352
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Önkitömörítő szövegek"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Üzenet ablak ",IDC_STATIC_1,8,5,245,158
+    LTEXT           "Ez az üzenet ablak a főablak és a kibontás megkezdése előtt fog megjelenni.",IDC_STATIC_2,20,18,221,16,NOT WS_GROUP
+    LTEXT           "Hagyja a 'Cím' és az 'Üzenet' mezőt üresen, ha nem akar üzenetet megjeleníteni.",IDC_STATIC_3,20,38,221,16,NOT WS_GROUP
+    LTEXT           "Gom&bok:",IDC_STATIC_4,20,61,33,8
+    COMBOBOX        IDC_MBOXBUTTONS,54,59,97,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Típus:",IDC_STATIC_5,20,77,22,8,NOT WS_GROUP
+    COMBOBOX        IDC_MBOXICON,54,75,97,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Cí&m:",IDC_STATIC_6,20,92,145,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTITLE,20,102,221,12,ES_AUTOHSCROLL
+    LTEXT           "Ü&zenet:",IDC_STATIC_7,20,117,32,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTEXT,20,127,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    GROUPBOX        "Főablak",IDC_STATIC_8,8,169,245,158
+    LTEXT           "&Cím:",IDC_STATIC_9,20,179,28,8
+    EDITTEXT        IDC_TITLE,20,189,221,12,ES_AUTOHSCROLL
+    LTEXT           "Az ab&lakban megjelenő szöveg:",IDC_STATIC_10,20,205,110,8,NOT WS_GROUP
+    EDITTEXT        IDC_TEXT,20,215,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "&Kibontás gomb szövege:",IDC_STATIC_11,20,247,90,8,NOT WS_GROUP
+    EDITTEXT        IDC_BUTTONTEXT,20,257,68,12,ES_AUTOHSCROLL
+    LTEXT           "&Forgalmazó neve:",IDS_VENDOR,20,272,174,8
+    EDITTEXT        IDE_VENDOR,20,282,184,12,ES_AUTOHSCROLL
+    LTEXT           "&WWW link:",IDS_WWW,20,297,174,8
+    EDITTEXT        IDE_WWW,20,307,108,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,24,333,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,78,333,50,14
+    PUSHBUTTON      "&Alap",IDC_RESET,132,333,50,14
+    PUSHBUTTON      "Súgó",IDHELP,186,333,50,14
+END
+
+IDD_MANFAVS DIALOGEX 59, 61, 220, 123
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Kedvencek kezelő"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Kedvencek:",IDC_STATIC_1,9,4,60,8
+    LISTBOX         IDC_FAVORITIES,9,14,142,100,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Át&nevezés",IDC_RENAME,161,13,50,14,WS_GROUP
+    PUSHBUTTON      "Tö&röl",IDC_REMOVE,161,32,50,14
+    PUSHBUTTON      "&Mind töröl",IDC_REMOVEALL,161,51,50,14
+    DEFPUSHBUTTON   "Bezárás",IDOK,161,100,50,14
+END
+
+IDD_WAITFOR DIALOGEX 15, 24, 227, 147
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Várakozás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ennek segítségével egy másik folyamatra várakozhat, melyet a 'Parancs' mezőben adott meg. Miután ez a folyamat lezárul, az önkitömörítő eltávolítja az ideiglenes fájlokat és befejezi a futását.",IDC_STATIC_1,12,9,200,32
+    LTEXT           "",IDC_STATIC_2,12,49,200,32
+    LTEXT           "A &futtatható fájl neve:",IDC_STATIC_3,12,89,103,8
+    EDITTEXT        IDC_FILENAME,12,99,200,12,ES_AUTOHSCROLL
+    LTEXT           "",IDC_STATIC_4,3,121,220,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,28,128,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,88,128,50,14
+    PUSHBUTTON      "Súgó",IDHELP,148,128,50,14
+END
+
+IDD_CHANGELANG DIALOGEX 6, 15, 248, 114
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Önkitömörítő szövegeinek módosítása"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Megváltoztatta az önkitömörítő nyelvét. Szeretne egyéni szöveget megadni az 'Önkitömörítő szövegei' ablakban, hogy lecserélje a kiválasztott nyelvhez tartozó alapértelmezett szövegeket?",IDC_STATIC_1,11,8,225,32
+    DEFPUSHBUTTON   "Igen",IDOK,40,48,50,14
+    PUSHBUTTON      "Nem",IDCANCEL,99,48,50,14
+    PUSHBUTTON      "Súgó",IDHELP,158,48,50,14
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,3,70,242,1
+    CONTROL         "&Mindig kérdezzen szövegmódosítás előtt",IDC_ASK,"Button",BS_AUTORADIOBUTTON,11,74,146,12
+    CONTROL         "A szövegeket automatikusan cse&rélje az alapértelmezett értékre",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,11,86,226,12
+    CONTROL         "&Ne kérdezze meg és a szövegeket mindig hagyja érintetlenül",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,11,98,215,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SFXMENU MENU 
+BEGIN
+    POPUP "&Fájl"
+    BEGIN
+        MENUITEM "&Exportálási beállítások...\tCtrl+E", CM_SFX_EXPORT
+        MENUITEM "&Importálási beállítások...\tCtrl+I", CM_SFX_IMPORT
+    END
+    POPUP "&Nézet"
+    BEGIN
+        MENUITEM "&SFX ablak előnézete...\tCtr+V", CM_SFX_PREVIEW
+    END
+    POPUP "Beállítás&ok"
+    BEGIN
+        MENUITEM "&Mind visszaállít\tCtrl+Shift+R",    CM_SFX_RESETALL
+        MENUITEM "Ala&p értékek\tCtrl+R",       CM_SFX_RESETVALUES
+        MENUITEM "Alap &szövegek\tCtrl+T",        CM_SFX_RESETTEXTS
+        MENUITEM SEPARATOR
+        MENUITEM "Hozzá&adás a Kedvencekhez...\tCtrl+A", CM_SFX_ADD
+        MENUITEM "&Kedvencek\tCtrl+F",          CM_SFX_FAVORITIES
+        MENUITEM SEPARATOR
+        MENUITEM "Uto&ljára használt\tCtrl+L",          CM_SFX_LASTUSED
+    END
+END
+
+IDM_FAVMANMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Á&tnevezés",                     CM_FAVRENAME
+        MENUITEM "Tö&rlés",                     CM_FAVDELETE
+        MENUITEM SEPARATOR
+        MENUITEM "&Mind töröl",                 CM_FAVREMOVEALL
+    END
+END
+
+IDM_COMMENTMENU MENU 
+BEGIN
+    POPUP "&Fájl"
+    BEGIN
+        MENUITEM "Menté&s",                       CM_SAVE
+        MENUITEM SEPARATOR
+        MENUITEM "&Bezárás\tAlt+F4",              CM_CLOSE
+    END
+END
+
+IDM_SPECDIR MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ideiglenes mappa",        CM_TEMP
+        MENUITEM "&Program Files",              CM_PROGFILES
+        MENUITEM "&Windows mappa",          CM_WINDIR
+        MENUITEM "&System mappa",           CM_SYSDIR
+        MENUITEM SEPARATOR
+        MENUITEM "Körny&ezeti változó",       CM_ENVVAR
+        MENUITEM "&Regisztrációs érték",             CM_REGENTRY
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_ABOUTPLUGINTITLE, "Plugin névjegy"
+  IDS_PLUGIN_DESCRIPTION, "ZIP archívumok létrehozása, böngészése és kibontása."
+  IDS_ERROPEN, "A fájl nem nyitható meg."
+  IDS_ERRFORMAT, "Érvénytelen adatformátum."
+  IDS_ERREOCENTRDIR, "Nem található a központi mappa jelzés vége. Valószínűleg sérült a fájl."
+  IDS_LOWMEM, "Kevés memória."
+  IDS_ERRADDFILE, "Nem adható a fájl a listához."
+  IDS_ERRADDFILE_TOOLONG, "Egy vagy több fájl nem adható hozzá a listához. Túl hosszú a teljes elérési út.\nNéhány mappa vagy fájl talán hiányozni fog az archívum listájából."
+  IDS_ERRADDDIR, "Nem adható a mappa a listához."
+  IDS_ERRADDDIR_TOOLONG, "Egy vagy több fájl nem adható hozzá a listához. Túl hosszú a teljes elérési út.\nNéhány mappa vagy fájl talán hiányozni fog az archívum listájából."
+  IDS_PLUGINNAME, "ZIP"
+  IDS_TOOBIG, "A 4GB-nál nagyobb fájlok nem támogatottak."
+  IDS_ERRACCESS, "Nem érhető el a fájl."
+  IDS_ERRREAD, "Nem lehet a fájlból olvasni."
+  IDS_EOF, "Nem várt fájlvég."
+  IDS_NODISPLAY, "A hibaüzenet már megjelent. Ez az üzenet nem fog feltűnni a képernyőn."
+  IDS_ERRCREATE, "Nem nyitható meg vagy hozható létre a fájl."
+  IDS_MULDISK, "Sajnálom, a több lemezes archívumok nem támogatottak ebben a ZIP plugin-ban."
+  IDS_TOOLONGNAME, "A fájl elérése túl hosszú és nem dolgozható fel."
+  IDS_TOOLONGNAME2, "A fájl elérése túl hosszú és nem fog megjelenni a panelben."
+  IDS_PREPAREDATA, "adat előkészítése..."
+  IDS_EXTRPROGTITLE, "ZIP archívum kibontása - %s"
+  IDS_ERRTEMPDIR, "Az ideiglenes mappa nem hozható létre a célmappában."
+  IDS_EXTRACTING, "kibontás: "
+  IDS_TOOLONGNAME3, "A fájl nem tömöríthető ki, mert túl hosszú az elérése."
+  IDS_ERRCOMPDATA, "Hiba a tömörített adatban."
+  IDS_BADMETHOD, "A fájl olyan tömörítési módot használ, amelyet nem támogat ez a ZIP plugin."
+  IDS_ERRCRC, "Hiba a tömörített adatban. A CRC nem egyezik."
+  IDS_ERRWRITE, "Nem lehet a fájlba írni."
+  IDS_TOOLONGMASK, "A maszk túl hosszú."
+  IDS_EXTRACTFILES, "kibontás..."
+  IDS_BADPACKLEVEL, "Rossz csomag szint."
+  IDS_BLOCKVANISHED, "Váratlan hiba lépett fel a tömörítés közben: a blokk eltűnt."
+  IDS_DELPROGTITLE, "ZIP archívumi bejegyzés törlése - %s"
+  IDS_DELETEFILES, "törlés..."
+  IDS_DELETING, "törlés: "
+  IDS_CANCELING, "művelet megszakítása, kérem várjon..."
+  IDS_ERRTEMP, "Az ideiglenes biztonsági fájl nem hozható létre."
+  IDS_READONLY, "Az archívum írásvédett. Előbb törölje az írásvédett attribútumot."
+  IDS_USERBREAK, "Felhasználói megszakítás. Ennek nem kellene megjelennie."
+  IDS_REMOVEFILES, "felesleges fájlok törlése az archívumból..."
+  IDS_ADDFILES, "hozzáadás..."
+  IDS_ADDING, "hozzáadás: "
+  IDS_BACKUPING, "archívum biztonsági mentése..."
+  IDS_SKIP, "Fájl kihagyása. Ennek nem kellene megjelennie."
+  IDS_ERRACCESDIR, "A mappa elérhetetlen."
+  IDS_REMOVING, "törlés: "
+  IDS_ERRRESTORE, "Az eredeti archívum nem cserélhető le az ideiglenes munkafájllal. Az archívum nem változott."
+  IDS_AUTO, "automata"
+  IDS_BADLEVEL, "A tömörítési szintnek 0 és 9 közé kell esnie."
+  IDS_ERROR, "Hiba"
+  IDS_BADVOLSIZE, "Érvénytelen kötetméret. Csak számokat és egy tizedesjegy karaktert tartalmazhat.\n\nA kötetméret 1KB vagy nagyobb kell, hogy legyen és kevesebb, mint 4GB."
+  IDS_PWDDONTMATCH, "A megadott jelszók nem egyeznek."
+  IDS_PWDTOOSHORT, "A jelszónak legalább egy karakter hosszúnak kell lennie."
+  IDS_BADPWD, "A jelszó érvénytelen. Adja meg újra a jelszót. A jelszóban megadott betűket nagybetű helyesen kell megadni. Talán a CapsLock véletlen be van nyomva."
+  IDS_BADPWDTITLE, "Érvénytelen jelszó"
+  IDS_ADDPROGTITLE, "ZIP archívum tömörítés - %s"
+  IDS_ERRRECOVER, "A zip archívum visszaállítási kísérlete sikertelen. Talán sérült."
+  IDS_ECRYPTSTORED, "A titkosítás nem alkalmazható tárolási módnál (tömörítési szint 0)."
+  IDS_ECRYPTSFX, "Az AES titkosítást nem támogatják az önkitömörítő archívumok."
+  IDS_ERRCREATEDIR, "Mappa nem hozható létre."
+  IDS_CANTMULTIVOL, "Már létezik ilyen nevű archívum.\nA több-kötetes archívumok csak új archívumként hozhatók létre."
+  IDS_FILEEXIST, "A megadott fájl már létezik. Felül akarja írni?"
+  IDS_CHDISKTEXT, "%d kötetszám csomagolása kész.\nHelyezzen másik lemezt a meghajtóba, melyre a(z) %d kötetszámú archívum fog kerülni."
+  IDS_BYTES, "bájt"
+  IDS_TOOLOWSPACE, "Nincs elég szabad hely a lemezen. A lemez nem használható csomagolásra."
+  IDS_LOWSPACE, "Figyelem: A lemezen található szabad hely kisebb, mint a megadott kötetméret."
+  IDS_LOWSPACE2, "Figyelem: Nincs elég szabad hely a lemezen."
+  IDS_MULTISTORED, "Több-kötetes archívumok nem hozhatók létre tároló móddal (tömörítési szint 0)."
+  IDS_CHDISKTEXT2, "Helyezze be a(z) %d kötetszámú lemezt vagy keresse ki a lemezen."
+  IDS_ZIPARCHIVES, "ZIP archívum (*.zip; *.z*; *.pk3; *.jar)"
+  IDS_BROWSEARCHIVETITLE, "Archívum kiválasztása"
+  IDS_ZIPARCHIVESEXTS, "*.zip;*.z*;*.pk3;*.jar"
+  IDS_ERRMULTIVOL, "A kért művelet nem támogatott több-kötetes archívumoknál. A több-kötetes archívumok csak megnézhetők és kibonthatók.\n\nMegjegyzés: Ha ez nem több-kötetes archívum, a fájl ismeretlen formátumú vagy sérült."
+  IDS_MISSLHSIG, "Érvénytelen adatformátum. A helyi fájl fejléc-azonosítója hiányzik."
+  IDS_ERRGETDISKFREESP, "Nem észlelhető elég szabad hely."
+  IDS_MISSCHSIG, "Érvénytelen adatformátum. A központi fájl fejléc-azonosítója hiányzik."
+  IDS_WRITINGEXE, "önkitömörítő fájl írása..."
+  IDS_TOOLONGZIPNAME, "Nem folytatható. A ZIP archívum túl hosszú az elérési útja."
+  IDS_ERRGETMODULENAME, "Nem érhető el a modulnév."
+  IDS_DEFAULTTEXT, "Ki fogja tömöríteni a zip archívumot."
+  IDS_CREAETARCH, "Új archívum létrehozása"
+  IDS_ADDTOARCHIVE, "Fájl hozzáadása az archívumhoz"
+  IDS_DEFSFXTITLE, "Önkitömörítő ZIP archívum"
+  IDS_ERRBADTITLE, "A főablak címe nem lehet üres. Adjon meg legalább egy karaktert."
+  IDS_ERRBADMBOXTITLE, "Az üzenetablak fejléce nem lehet üres. Legalább egy karaktert adjon meg."
+  IDS_ERRLAODSHELLDLL, "shell32.dll nem tölthető be. "
+  IDS_ERRGETPROCADDRESS, "Nem érhető el a folyamat címe a dll modulból. "
+  IDS_ERRADDICON, "Nem adható ikon az önkitömörítő fájlhoz."
+  IDS_ERRLOADICON, "A fájlból nem tölthető be az ikon. "
+  IDS_ERRLOADLIB, "Az ikont tartalmazó modult nem lehet betölteni. A modul nem érvényes Win32 alkalmazás. "
+  IDS_ERRLOADLIB2, "Az ikont tartalmazó modult nem lehet betölteni. "
+  IDS_ERRLOADSFXICON, "Az önkitömörítő ikonját nem lehet betölteni."
+  IDS_EXPIRE, "Sajnálom, a plugin lejárt. Keresse fel weboldalunk egy újabb verzióért."
+  IDS_UNDERCOSTRUCT, "Fejlesztés alatt."
+  IDS_NOSFXINSTALLED, "Nem található egyetlen Önkitömörítő fájl sem.\n\nHa önkitömörítő archívumot akar létrehozni, telepítse újra a ZIP plugint."
+  IDS_UNABLEREADSFXDIR, "Nem olvasható az önkitömörítő mappa: "
+  IDS_UNABLEREADALLSFX, "Egyik önkitömörítő fájl sem tölthető be."
+  IDS_UNABLEREADSFX, "Nem tölthető be az önkitömörítő fájl: %s\n\nFolytatáshoz OK, megszakításhoz Mégse."
+  IDS_UNABLEREADSFX2, "Nem tölthető be az alapértelmezett önkitömörítő fájl: %s"
+  IDS_CORRUPTSFX, "Az önkitömörítő fájl sérült."
+  IDS_CORRUPTSFX2, "A(z) %s önkitömörítő fájl sérült.\n\nFolytatáshoz OK, megszakításhoz Mégse."
+  IDS_ERRLOADMENU, "A menü nem tölthető be."
+  IDS_ERRLOADACCELS, "A gyorsítók táblázata nem tölthető be."
+  IDS_NODEFSFX, "Alapértelmezett önkitömörítő fájl nincs betöltve."
+  IDS_ERRLOADCONFIG, "Nem tölthető be a beállítás - kevés a memória."
+  IDS_EMPTY, "Üres"
+  IDS_RENAMEFAVSET, "Kedvenc beállítások átnevezése."
+  IDS_USEDNAME, "A név már használatban van."
+  IDS_NOLANGFILE, "Nem tölthetők be a kedvenc beállítások: a szükséges önkitömörítő nyelv nincs telepítve (%s)."
+  IDS_SETTINGSFILE, "Beállítási fájl (*.set)"
+  IDS_DEFEXTRBUTTON, "&kibont"
+  IDS_EXPORTOVEWRITE, "A fájl már létezik. Felülírja?"
+  IDS_ERRGETTEMP, "Az ideiglenes fájl nem hozható létre."
+  IDS_SFXABOUTBTN1, "&Névjegy >>"
+  IDS_SFXABOUTBTN2, "<< &Névjegy"
+  IDS_MENUCREATESFX, "Önkitömörítő archívum létrehozá&sa (.exe)..."
+  IDS_MENUTEST, "Archívum &tesztelése"
+  IDS_MENUREPAIR, "Sé&rült archívum javítása"
+  IDS_CONTINUE, "Az utolsó művelet nem hajtódott sikeresen végre. Folytatja a következő fájllal?"
+  IDS_NOARCHIVETYPED, "Hiányzó archívum fájlnév."
+  IDS_NOEXETYPED, "Hiányzik az önkitömörítő archívum egy fájlneve a létrehozáshoz."
+  IDS_SFXPROGTITLE, "Önkitömörítő ZIP archívum létrehozása - %s"
+  IDS_COPYDATA, "archív adat másolása..."
+  IDS_EMPTYARCHIVE, "Az archívum üres."
+  IDS_BADMETHODSFX, "Az archívum az Önkitömörítő által nem támogatott tömörítési fájlokat tartalmaz.\n\nTömörítse újra az archívumot a ZIP plugin használatával."
+  IDS_TESTPROGTITLE, "ZIP archívum tesztelése - %s"
+  IDS_TESTFILES, "fájlok tesztelése..."
+  IDS_TESTING, "tesztelés: "
+  IDS_TESTOK, "A(z) '%s' archívum jó."
+  IDS_TESTKO, "A(z) '%s' archívum néhány fájlja sérült vagy ismeretlen jelszóval titkosított."
+  IDS_MENUCOMMENT, "Ar&chívum megjegyzés..."
+  IDS_COMMENTMODIFIED, "A megjegyzés megváltozott.\n\nMenti a módosításokat?"
+  IDS_COMMENTDLGTITLE, "ZIP archívum megjegyzés - %s"
+  IDS_ERRREADCOMMENT, "Hiba a ZIP archívum megjegyzésének olvasásakor. A fájl sérült vagy ismeretlen formátumú.\n\nAz archívum megjegyzésének kihagyásához és az archívum olvasásához nyomjon OK gombot."
+  IDS_COMMENTMV, "Több-kötetes archívum megjegyzése megnézhető de nem menthető."
+  IDS_RECOVERARCHIVETITLE, "ZIP archívum javítása"
+  IDS_SOURCEHEADING, "A&rchívum javítása:"
+  IDS_TARGETHEADING, "Visszaállított archívum menté&se mint:"
+  IDS_REPAIRPROGTITLE, "ZIP archívum javítása - %s"
+  IDS_SAVING, "mentés: "
+  IDS_REPAIRING, "archívum javítása..."
+  IDS_ERROPENICO, "Az ikont tartalmazó fájl nem nyitható meg."
+  IDS_BADBUTTONTEXT, "A főablak fejléce nem lehet üres. Legalább egy karaktert adjon meg."
+  IDS_BADTEMP, "$(Temp) után nem lehet semmilyen karakter. Csak a $(Temp) értéket adja meg az ideiglenes mappa kiválasztásához."
+  IDS_MISBAR, "Hiányzó $() lezárás."
+  IDS_BADVAR, "Ismeretlen $() változó."
+  IDS_MBOK, "OK"
+  IDS_MBOKCANCEL, "OK + Mégse"
+  IDS_MBYESNO, "Igen + Nem"
+  IDS_MBAGREEDISAGREE, "Elfogadom + Elutasítom"
+  IDS_MBNOICON, "Egyszerű"
+  IDS_MBEXCLAMATION, "Figyelmeztetés"
+  IDS_MBINFORMATION, "Információk"
+  IDS_MBQUESTION, "Kérdés"
+  IDS_LONGMESSAGE, "Hosszú üzenet"
+  IDS_BADKEY, "Érvénytelen kulcsnév."
+  IDS_MANAGE, "&Kezelés..."
+  IDS_REMOVEWARNTITLE, "Kedvenc beállítások törlése"
+  IDS_REMOVEWARN, "Biztos törli a(z) '%s' beállításokat ?\n\nEz a művelet nem vonható vissza."
+  IDS_REMOVEALLWARN, "Biztos töröl minden tárolt beállítást?\n\nEz a művelet nem vonható vissza."
+  IDS_MISSINGVERSION, "Beállítások fájl nem tölthető be: hiányzó verziószám."
+  IDS_BADVERSION, "Beállítások fájl nem tölthető be: nem támogatott verzió."
+  IDS_BADTEMP2, "Beállítások fájl nem tölthető be, hibás 'cél_mappa' érték: $(Temp) után nem lehet semmilyen karakter."
+  IDS_MISBAR2, "Beállítások fájl nem tölthető be, hibás 'cél_mappa' érték: hiányzó $() lezárás."
+  IDS_BADVAR2, "Beállítások fájl nem tölthető be, hibás 'cél_mappa' érték: ismeretlen $() változó."
+  IDS_BADKEY2, "Beállítások fájl nem tölthető be, hibás 'cél_mappa' érték: érvénytelen kulcsnév."
+  IDS_CHDISKTEXT3, "Helyezze be a(z) %d kötetszámú lemezt."
+  IDS_NONTEXT, "Adjon meg legalább egy karaktert."
+  IDS_BADSFXVER, "Nem támogatott SFX csomag verzió (%s). Töltse le a legújabb ZIP plugint a megfelelő SFX verzióval."
+  IDS_BADSFXVER2, "Nem támogatott SFX csomag verzió. Töltse le a legújabb ZIP plugint a megfelelő SFX verzióval."
+  IDS_TOOBIG2, "A művelet nem fejezhető be, mert a ZIP fájl méretének korlátja 4GB.\n\nHogy 4GB-nál nagyobb adatot tömörítsen ZIP archívumba, használja a több-kötetes archívum szolgáltatást. Ezzel 65536 kötet készíthető, egyenként 4GB-os méretben. Azonban minden tömörített archívum mérethatára 4GB."
+  IDS_FILENOTFOUND, "A fájl nem található."
+  IDS_ALLFILES, "Minden fájl (*.*)"
+  IDS_NOTFOUND, "A fájl nem található."
+  IDS_BADMSGBOXTYPE, """Elfogadom + Elutasítom"" gombok csak a ""Hosszú üzenet"" típusú ablaknál használhatók."
+  IDS_LOTFILES, "Olyan ZIP archívumot készül létrehozni, mely 65535-nél több bejegyzést tartalmazna. Az ilyen archívum nem kompatibilis az eredeti ZIP formátummal és néhány tömörítő nem lesz képes kibontani.\n\nFolytatni szeretné?"
+  IDS_LOTFILESSFX, "Nem hozható létre 65535-nél több bejegyzést tartalmazó önkitömörítő ZIP archívum."
+  IDS_BADAES, "A fájl ismeretlen AES verzióval van titkosítva."
+  IDS_PWDTOOLONG, "Túl hosszú jelszó.\nAz AES titkosítás maximális jelszómérete 128 karakter."
+  IDS_AESERROR, "AES hiba."
+  IDS_MACERROR, "A hitelesítő kód nem egyezik. A vagy sérült vagy rossz a jelszó."
+  IDS_ERRZIP64, "A kért művelet nem támogatott zip64 archívumoknál. A zip64 archívumok csak listázhatók és kibonthatók."
+  IDS_ONLYFULLVERSION, " (csak a teljes verzióban érhető el)"
+  IDS_ERRBZIP2 "Hiba lépett fel a BZIP2 adatfolyamban. Az archívum talán sérült."
+  IDS_UNSUP_CD_ENCRYPTION "Az archívum központi mappájában tárolt fájlok listája titkosított vagy tömörített.\nNem támogatott funkció."
+  IDS_LISTINFO_PAKEDSIZE      "Tömörített"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Tömörített fájlméret"
+  IDS_SIZE_KB, "KB"
+  IDS_SIZE_MB, "MB"
+  IDS_MODIFICATION_NOT_SUPPORTED, "A ZIP fájl által használd adatformátum módosítását nem támogatja a jelenlegi ZIP plugin verzió"
+  IDS_WAITFOR_INFO, "Ez csak akkor szükséges, ha a telepítő program egy másik programot indít, amely folytatja a telepítést, amíg az eredeti telepítő program befejeződik.\nÍgy viselkedik pl. néhány Install Shield verzió."
+}
+
+STRINGTABLE
+{
+  IDS_SFX_COMMENT_HEAD1, ";Önkitömörítő beállítások\r\n\r\n;Ez az Önkitömörítő beállítási fájlja.\r\n;\r\n;Fájlformátum szintaktika:\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD2, ";A ';' karakterrel kezdődő sorok megjegyzésnek minősülnek\r\n;és kimaradnak a beállítási fájl feldolgozása során.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD3, ";A verzió kivételével minden változó elhagyható. Ha egy változó nem található\r\n;a beállítási fájlban, az alapértelmezett értéke lesz használva.\r\n;A nyelvhez tartozó értékek (dlg_text, dlg_title,\r\n;button_text) az sfx csomagból lesznek beolvasva.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD4, ";Minden sztring értéket, beleértve az üres sztringeket is, dupla\r\n;idézőjelbe kell zárni. A sztringben dupla idézőjel megadásához\r\n;használjon két egymást követő dupla idézőjelet.\r\n;\r\n;A számok nem zárhatók dupla idézőjelbe.\r\n\r\n"
+  IDS_SFX_COMMENT_VERSION, "\r\n;a beállítási fájl verziója, a jelenlegi verzió 2\r\n;ez az egyetlen kötelező változó\r\n\r\n"
+  IDS_SFX_COMMENT_TARGDIR1, "\r\n;a célkönyvtár megadása, lehet abszolút útvonal\r\n;vagy relatív útvonal; a relatív útvonal az aktuális könyvtárhoz képest értendő,\r\n;amikor az sfx végrehajtható fájl elindul\r\n"
+  IDS_SFX_COMMENT_TARGDIR2, ";a 'target_dir' sztring elején előre definiált változókat is\r\n;használhat (!):\r\n;\r\n"
+  IDS_SFX_COMMENT_TARGDIR3, ";  $(Temp)      ideiglenes könyvtár, csak önállóan szerepelhet\r\n;               a target_dir mezőben, nem követheti\r\n;               semmilyen útvonalrész\r\n"
+  IDS_SFX_COMMENT_TARGDIR4, ";  $(ProgFiles) a felhasználó 'Program Files' mappája\r\n;  $(WinDir)    windows könyvtár\r\n;  $(SysDir)    rendszerkönyvtár\r\n"
+  IDS_SFX_COMMENT_TARGDIR5, ";  $[variable]  a 'variable' által meghatározott\r\n;               környezeti változó értéke\r\n;  $<regkey>    a 'regkey' által meghatározott registry kulcsérték\r\n;  pl. SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ProgramFilesDir\r\n\r\n"
+  IDS_SFX_COMMENT_ALLOWCHANGE, "\r\n;megadja, hogy a felhasználó megváltoztathatja-e a célkönyvtárat\r\n;kitömörítés közben\r\n;állítsa 1-re, ha engedélyezni kívánja ezt\r\n\r\n"
+  IDS_SFX_COMMENT_REMOVE1, "\r\n;megadja, hogy eltávolítsa-e a kibontott fájlokat az ideiglenes mappából,\r\n;amikor a 'command' változóban megadott program befejeződött\r\n"
+  IDS_SFX_COMMENT_REMOVE2, ";állítsa 1-re, ha el szeretné távolítani az ideiglenes fájlokat\r\n;ennek a változónak csak akkor van értelme, ha a 'target_dir' értéke\r\n;""$(Temp)"", különben az értékét figyelmen kívül hagyja\r\n\r\n"
+  IDS_SFX_COMMENT_AUTO, "\r\n;megadja, hogy a kitömörítés automatikusan induljon-e el, amikor a felhasználó\r\n;futtatja az önkitömörítő archívumot\r\n;állítsa 1-re, ha azt szeretné, hogy a kitömörítés automatikusan kezdődjön\r\n\r\n"
+  IDS_SFX_COMMENT_SUMMARY, "\r\n;megadja, hogy megjelenjen-e egy üzenetpanel a művelet sikerességéről\r\n;értesítve a fájlok kitömörítésének befejezése után\r\n;állítsa 1-re, ha meg szeretné jeleníteni a művelet összefoglalóját\r\n\r\n"
+  IDS_SFX_COMMENT_HIDE, "\r\n;megadja, hogy megjelenjen-e az önkitömörítő fő párbeszédablaka\r\n;állítsa 1-re, ha nem szeretné megjeleníteni a fő sfx párbeszédablakot\r\n;ennek a változónak csak akkor van értelme, ha az 'autostart' értéke 1,\r\n;különben az értékét figyelmen kívül hagyja\r\n\r\n"
+  IDS_SFX_COMMENT_OVERWRITE, "\r\n;megadja, hogy automatikusan felülírja-e a célkönyvtárban lévő\r\n;összes fájlt\r\n;állítsa 1-re, ha azt szeretné, hogy a fájlok automatikusan\r\n;felülíródjanak\r\n\r\n"
+  IDS_SFX_COMMENT_AUTODIR, "\r\n;megadja, hogy automatikusan, a felhasználó megkérdezése nélkül\r\n;hozza-e létre a célkönyvtárat\r\n;állítsa 1-re, ha azt szeretné, hogy a célkönyvtár automatikusan\r\n;jöjjön létre\r\n\r\n"
+  IDS_SFX_COMMENT_COMMAND, "\r\n;a fájlok sikeres kibontása után futtatandó/megnyitandó program,\r\n;http hivatkozás vagy dokumentum; az útvonal a kibontás célkönyvtárához\r\n;képest relatív; ha programot ad meg, argumentumait is megadhatja\r\n\r\n"
+  IDS_SFX_COMMENT_PACKAGE, "\r\n;az önkitömörítő archívum létrehozásakor használandó sfx csomag\r\n;a relatív útvonal a zip2sfx.exe könyvtárához képest értendő\r\n\r\n"
+  IDS_SFX_COMMENT_MBUT, "\r\n;az opcionális üzenetpanel gombjai\r\n;a következők egyike lehet: ""ok"", ""ok_cancel"", ""yes_no"",\r\n;""agree_disagree""\r\n\r\n"
+  IDS_SFX_COMMENT_MICO, "\r\n;az opcionális üzenetpanel típusa\r\n;a következők egyike lehet: ""simple"", ""exclamation"", ""information"",\r\n;""question"", ""long_message""\r\n\r\n"
+  IDS_SFX_COMMENT_MBOX, "\r\n;az opcionális üzenetpanel szövege és címe, amely a kitömörítés\r\n;megkezdése előtt jelenik meg\r\n;ha nem szeretne üzenetpanelt megjeleníteni, hagyja mindkét mezőt\r\n;üresen ("""")\r\n\r\n"
+  IDS_SFX_COMMENT_TEXT, "\r\n;a fő önkitömörítő párbeszédablakban megjelenő szöveg\r\n\r\n"
+  IDS_SFX_COMMENT_TITLE, "\r\n;a fő önkitömörítő párbeszédablak címe\r\n\r\n"
+  IDS_SFX_COMMENT_BUTTON, "\r\n;a fő sfx párbeszédablak kibontás gombjának szövege\r\n\r\n"
+  IDS_SFX_COMMENT_VENDOR, "\r\n;szállító neve a fő sfx párbeszédablak bal alsó sarkában\r\n\r\n"
+  IDS_SFX_COMMENT_WWW, "\r\n;www hivatkozás a fő sfx párbeszédablak jobb alsó sarkában\r\n\r\n"
+  IDS_SFX_COMMENT_ICOFILE, "\r\n;ikondatát tartalmazó fájlok; lehet ICO fájl vagy PE\r\n;végrehajtható fájl (pl. win32 EXE vagy DLL), amely tartalmazza az ikont\r\n;a relatív útvonal a zip2sfx.exe könyvtárához képest értendő\r\n\r\n"
+  IDS_SFX_COMMENT_ICOINDEX, "\r\n;pozitív érték az 'icon_file' változóban megadott végrehajtható fájlban lévő\r\n;ikon indexét jelenti\r\n;negatív érték az ikon erőforrás-azonosítóját jelenti\r\n;ICO fájlok esetén az index mindig 0, és az értékét figyelmen kívül hagyja\r\n\r\n"
+  IDS_SFX_COMMENT_WAITFOR1, "\r\n;Ez a beállítás lehetővé teszi, hogy egy másik folyamatra várakozzon,\r\n;nem arra, amelyet a 'Command' mezőben megadott. Miután ez a folyamat\r\n;befejeződött, az önkitömörítő eltávolítja az ideiglenes fájlokat,\r\n;majd maga is befejeződik.\r\n"
+  IDS_SFX_COMMENT_WAITFOR2, ";Csak akkor szükséges, ha a telepítőprogram egy másik végrehajtható\r\n;fájlt indít el, amely folytatja a telepítést, miközben az eredeti\r\n;telepítőprogram már befejeződött.\r\n"
+  IDS_SFX_COMMENT_WAITFOR3, ";Ilyen módon viselkedik például az Install Shield egyes verziója.\r\n;Ezt a beállítást a rendszer figyelmen kívül hagyja, hacsak a 'remove_temp'\r\n;értéke nem 1.\r\n\r\n"
+  IDS_SFX_COMMENT_REQUIRESADMIN, "\r\n;Windows Vista vagy újabb rendszeren futtatáshoz rendszergazdai jogosultságot igényel\r\n\r\n"
+}

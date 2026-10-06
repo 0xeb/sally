@@ -1,0 +1,48 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for unchm. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unchm/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unchm.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "Невозможно открыть файл."
+    IDS_UNKNOW_ERROR            "Неизвестная ошибка."
+    IDS_UNPACKING_ARCHIVE       "Распаковка архива CHM"
+    IDS_ERROR_UNPACKING         "Ошибка распаковки файла."
+    IDS_CANT_HANDLE_FILE        "Не удалось обработать этот файл."
+    IDS_INSUFFICIENT_MEMORY     "Недостаточно памяти."
+    IDS_ABOUT                   "О модуле"
+    IDS_PLUGIN_DESCRIPTION      "Просмотр и извлечение файлов CHM."
+    IDS_CANT_CREATE_TEMP        "Не удалось создать временную папку."
+    IDS_CANT_DELETE_TEMP_FILE   "Не удалось удалить временный файл."
+    IDS_UNKNOWN_FILE_FORMAT     "Неизвестный формат файла или некорректный образ CHM.\n\nЕсли Вы уверены, что образ CHM корректен, пожалуйста, создайте issue на https://github.com/0xeb/sally/issues для содействия в части поддержки данного формата."
+    IDS_CANT_OPEN_FILE          "Не удалось открыть файл."
+    IDS_ERR_TMP                 "Не удалось создать временный файл."
+    IDS_CANT_SET_ATTRS          "Не удалось установить атрибуты файла."
+    IDS_CANT_CREATE_DIR         "Не удалось создать папку ""%s""."
+    IDS_YES                     "Да"
+    IDS_NO                      "Нет"
+    IDS_ERROR                   "Ошибка"
+    IDS_WARNING                 "Предупреждение"
+    IDS_READERROR               "Ошибка чтения"
+    IDS_WRITEERROR              "Ошибка записи"
+    IDS_INTERNAL_PLUGIN_ERROR   "Внутренняя ошибка модуля."
+    IDS_INVALIDNUMBER           "Недопустимое число."
+    IDS_CANCELOPER              "выполняется отмена операции, пожалуйста, подождите..."
+    IDS_CHMLIBCOPYRIGHT         "Библиотека CHMLIB © 2001-2010 Jed Wing"
+}

@@ -1,0 +1,120 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for diskmap. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/diskmap/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#define SALAMANDER
+#include "..\..\DiskMap\Resources\DiskMap.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDC_ZAREVAKDISKMAP MENU 
+BEGIN
+    POPUP "&Soubor"
+    BEGIN
+        MENUITEM "&Otevřít soubor",                       IDM_FILE_OPEN
+        MENUITEM "&Ukázat v panelu\tF",        IDM_FILE_FOCUSINSALAMANDER
+        MENUITEM SEPARATOR
+        MENUITEM "&Přerušit\tEsc",                      IDM_FILE_ABORT
+        MENUITEM "O&bnovit\tCtrl+R",            IDM_FILE_REFRESH
+        MENUITEM SEPARATOR
+        MENUITEM "Z&avřít\tAlt+F4",                      IDM_FILE_EXIT
+    END
+    POPUP "&Zobrazení"
+    BEGIN
+        MENUITEM "Zvě&tšit\t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "Zm&enšit\t -",                IDM_VIEW_ZOOMOUT
+        MENUITEM "&Zrušit lupu\t Shift+Backspace",   IDM_VIEW_GOTOROOT
+        MENUITEM SEPARATOR
+        MENUITEM "&Log okno...\tCtrl+L",              IDM_VIEW_LOG
+    END
+
+    POPUP "N&astavení"
+    BEGIN
+	MENUITEM "&Zvýraznit adresáře",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
+	MENUITEM "Zobrazit &Tooltip\tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+        POPUP "Tooltip &formát cesty"
+        BEGIN
+            MENUITEM "&Název souboru",            IDM_PATHFORMAT_FILENAME
+            MENUITEM "&Relativní",            IDM_PATHFORMAT_RELATIVEVIEW
+//            MENUITEM "&Relative to Root",  IDM_PATHFORMAT_RELATIVEROOT
+            MENUITEM "&Absolutní",            IDM_PATHFORMAT_ABSOLUTE
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Potvrdit zavření přes Esc",       IDM_OPTIONS_CONSFIRMCLOSE, CHECKED
+    END
+    POPUP "&Nápověda"
+    BEGIN
+//        POPUP "&Debug"
+//        BEGIN
+//            MENUITEM "&Export Directory Structure...", IDM_DEBUG_EXPORTDIR
+//        END
+//        MENUITEM SEPARATOR
+        MENUITEM "&O pluginu...",                  IDM_HELP_ABOUT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME,            "Mapa disku"
+    IDS_PLUGIN_DESCRIPTION,     "Zobrazuje stromovou mapu souborů na Vašem disku."
+    IDS_PLUGIN_ABOUT,           "O pluginu Mapa disku"
+    IDS_PLUGIN_MENU,            "Zobrazit &mapu disku"
+    IDS_CLOSE_CONFIRMATION,     "Chcete zavřít Mapu disku?"
+    IDS_CLOSE_CONFIRMATION_CHECKBOX, "Příště nezobrazovat a zavřít mapu disku bez dotazu"
+
+    IDS_DISKMAP_TITLE,               "Mapa disku"
+    IDS_DISKMAP_TITLEPREFIX,         "Mapa disku - "
+
+    IDS_DISKMAP_LOAD_TITLE,          "Hledání souborů..."
+    IDS_DISKMAP_LOAD_FOOTER,         "...stiskněte ESC pro přerušení"
+    IDS_DISKMAP_LOAD_HSIZE,          "Velikost:"
+    IDS_DISKMAP_LOAD_HFILE,          "Souborů:"
+    IDS_DISKMAP_LOAD_HDIRS,          "Adresářů:"
+
+    IDS_DISKMAP_ABORT_TITLE,         "Hledání souborů přerušeno..."
+    IDS_DISKMAP_ABORT_FOOTER,        "...stiskněte Ctrl+R pro obnovení zobrazení"
+
+    IDS_DISKMAP_LOG_TITLE,           "Log"
+    IDS_DISKMAP_LOG_HTYPE,           "Typ"
+    IDS_DISKMAP_LOG_HTEXT,           "Text"
+    IDS_DISKMAP_LOG_HFILE,           "Soubor nebo adresář"
+    IDS_DISKMAP_LOG_LINFO,           "Informace"
+    IDS_DISKMAP_LOG_LWARN,           "Upozornění"
+    IDS_DISKMAP_LOG_LERROR,          "Chyba"
+
+    IDS_DISKMAP_SHELL_FOCUS,         "&Ukázat v panelu"
+    IDS_DISKMAP_SHELL_ZOOMIN,        "Zvě&tšit"
+    IDS_DISKMAP_SHELL_ZOOMOUT,       "Z&menšit"
+    IDS_DISKMAP_SHELL_DIROPEN,       "&Otevřít v panelu"
+    IDS_DISKMAP_SHELL_DIRCHANGE,     "Změnit &adresář"
+
+    IDS_DISKMAP_TTIP_TIMECREATE,     "Vytvořeno:"
+    IDS_DISKMAP_TTIP_TIMEMODIFY,     "Změněno:"
+    IDS_DISKMAP_TTIP_TIMEACCESS,     "Otevřeno:"
+    IDS_DISKMAP_TTIP_SIZEDATA,       "Velikost dat:"
+    IDS_DISKMAP_TTIP_SIZEREAL,       "Skutečná velikost:"
+    IDS_DISKMAP_TTIP_SIZEDISK,       "Velikost na disku:"
+    IDS_DISKMAP_TTIP_COUNTFILE,      "Souborů:"
+    IDS_DISKMAP_TTIP_COUNTDIRS,      "Adresářů:"
+
+    IDS_DISKMAP_FORMAT_BYTE0,        "bajtů"
+    IDS_DISKMAP_FORMAT_BYTE1,        "bajt"
+    IDS_DISKMAP_FORMAT_BYTEN,        "bajtů"
+
+    IDS_DISKMAP_EMPTY_TITLE,         "Nic k zobrazení..."
+    IDS_DISKMAP_EMPTY_FOOTER,        "...tato složka neobsahuje žádné soubory k zmapování"
+END

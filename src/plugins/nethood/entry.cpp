@@ -157,14 +157,8 @@ SalamanderPluginEntry(
 	//_osplatform = VER_PLATFORM_WIN32_NT;
 #endif
 
-    // Load language module.
-    hLangInst = salamander->LoadLanguageModule(
-        salamander->GetParentWindow(),
-        PluginNameEN);
-    if (hLangInst == NULL)
-    {
-        return NULL;
-    }
+    // The plugin's resources (every language) are in its own DLL.
+    hLangInst = g_hInstance;
     g_hLangInstance = hLangInst;
 
     if (!InitializeWinLib(PluginNameEN, g_hInstance))

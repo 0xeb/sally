@@ -507,43 +507,67 @@ int C__MessagesW::MessageBox(HWND hWnd, const WCHAR* lpCaption, UINT uType)
 
 namespace
 {
-// The diagnostic layer is used from late static destructors. Keep its dynamic
-// scratch owners alive for the process lifetime so destruction order across
-// translation units cannot invalidate them before a final handle/trace report.
-std::string& ResourceStringBufferA()
+// The diagnostic layer is used from late static destructors, so its scratch and title buffers
+// live for the whole process: they are never destroyed, and they are refilled, grown and
+// replaced for as long as the session runs. They allocate from the Windows process heap, not
+// the CRT heap. The Debug leak check (heap.cpp) watches the CRT heap from a startup checkpoint,
+// and any CRT block these buffers took after it - a longer message, or even the swap of a
+// Debug STL container proxy - was reported as a leak at exit.
+template <class T>
+struct ProcessHeapAllocator
 {
-    static std::string* value = new std::string;
-    return *value;
+    using value_type = T;
+    ProcessHeapAllocator() noexcept = default;
+    template <class U>
+    ProcessHeapAllocator(const ProcessHeapAllocator<U>&) noexcept {}
+    T* allocate(size_t count)
+    {
+        if (count > SIZE_MAX / sizeof(T))
+            throw std::bad_alloc();
+        void* block = HeapAlloc(GetProcessHeap(), 0, count * sizeof(T));
+        if (block == NULL)
+            throw std::bad_alloc();
+        return static_cast<T*>(block);
+    }
+    void deallocate(T* block, size_t) noexcept { HeapFree(GetProcessHeap(), 0, block); }
+    template <class U>
+    bool operator==(const ProcessHeapAllocator<U>&) const noexcept { return true; }
+    template <class U>
+    bool operator!=(const ProcessHeapAllocator<U>&) const noexcept { return false; }
+};
+
+using DiagnosticTextA = std::basic_string<char, std::char_traits<char>, ProcessHeapAllocator<char>>;
+using DiagnosticTextW = std::basic_string<wchar_t, std::char_traits<wchar_t>, ProcessHeapAllocator<wchar_t>>;
+
+// One never-destroyed buffer per tag, held in static storage (no CRT allocation either). The
+// union's empty destructor is what keeps the buffer alive through late static destructors.
+template <class Text>
+union NeverDestroyedText
+{
+    Text Value;
+    NeverDestroyedText() : Value() {}
+    ~NeverDestroyedText() {}
+};
+
+template <class Text, int Tag>
+Text& ProcessLifetimeText()
+{
+    static NeverDestroyedText<Text> holder;
+    return holder.Value;
 }
 
-std::wstring& ResourceStringBufferW()
-{
-    static std::wstring* value = new std::wstring;
-    return *value;
-}
+DiagnosticTextA& ResourceStringBufferA() { return ProcessLifetimeText<DiagnosticTextA, 1>(); }
+DiagnosticTextW& ResourceStringBufferW() { return ProcessLifetimeText<DiagnosticTextW, 2>(); }
+DiagnosticTextA& PrintfBufferA() { return ProcessLifetimeText<DiagnosticTextA, 3>(); }
+DiagnosticTextW& PrintfBufferW() { return ProcessLifetimeText<DiagnosticTextW, 4>(); }
+DiagnosticTextA& ErrorBufferA() { return ProcessLifetimeText<DiagnosticTextA, 5>(); }
+DiagnosticTextW& ErrorBufferW() { return ProcessLifetimeText<DiagnosticTextW, 6>(); }
 
-std::string& PrintfBufferA()
+template <class Text, class Source>
+const typename Text::value_type* StoreDiagnosticText(Text& buffer, const Source& text)
 {
-    static std::string* value = new std::string;
-    return *value;
-}
-
-std::wstring& PrintfBufferW()
-{
-    static std::wstring* value = new std::wstring;
-    return *value;
-}
-
-std::string& ErrorBufferA()
-{
-    static std::string* value = new std::string;
-    return *value;
-}
-
-std::wstring& ErrorBufferW()
-{
-    static std::wstring* value = new std::wstring;
-    return *value;
+    buffer.assign(text.data(), text.size());
+    return buffer.c_str();
 }
 
 bool LoadResourceStringOwned(int resID, std::wstring& value)
@@ -656,17 +680,8 @@ bool FormatSystemErrorOwned(DWORD error, std::wstring& value)
     return length != 0;
 }
 
-std::string& MessagesTitleStorageA()
-{
-    static std::string* value = new std::string;
-    return *value;
-}
-
-std::wstring& MessagesTitleStorageW()
-{
-    static std::wstring* value = new std::wstring;
-    return *value;
-}
+DiagnosticTextA& MessagesTitleStorageA() { return ProcessLifetimeText<DiagnosticTextA, 7>(); }
+DiagnosticTextW& MessagesTitleStorageW() { return ProcessLifetimeText<DiagnosticTextW, 8>(); }
 } // namespace
 
 void PreallocateMessagesDiagnosticStorage()
@@ -691,15 +706,12 @@ const char* rsc(int resID)
         try
         {
             std::wstring resource;
+            std::string encoded;
             if (!LoadResourceStringOwned(resID, resource))
-            {
                 TRACE_E("Unable to load string from resource (resource ID is " << resID << ")");
-                ResourceStringBufferA().clear();
-            }
-            else if (!EncodeLegacyDiagnosticText(resource, ResourceStringBufferA()))
-                ResourceStringBufferA() =
-                    "Unicode resource is unavailable through the legacy diagnostic API.";
-            return ResourceStringBufferA().c_str();
+            else if (!EncodeLegacyDiagnosticText(resource, encoded))
+                encoded = "Unicode resource is unavailable through the legacy diagnostic API.";
+            return StoreDiagnosticText(ResourceStringBufferA(), encoded);
         }
         catch (const std::bad_alloc&)
         {
@@ -726,12 +738,13 @@ const WCHAR* rscW(int resID)
 #endif // MULTITHREADED_MESSAGES_ENABLE
         try
         {
-            if (!LoadResourceStringOwned(resID, ResourceStringBufferW()))
+            std::wstring resource;
+            if (!LoadResourceStringOwned(resID, resource))
             {
                 TRACE_E("Unable to load string from resource (resource ID is " << resID << ")");
-                ResourceStringBufferW().clear();
+                resource.clear();
             }
-            return ResourceStringBufferW().c_str();
+            return StoreDiagnosticText(ResourceStringBufferW(), resource);
         }
         catch (const std::bad_alloc&)
         {
@@ -763,12 +776,12 @@ const char* spf(const char* formatString, ...)
 #endif // MULTITHREADED_MESSAGES_ENABLE
         try
         {
-            std::string& buffer = PrintfBufferA();
+            std::string formatted;
             va_list params;
             va_start(params, formatString);
-            VFormatOwned(formatString, params, buffer);
+            VFormatOwned(formatString, params, formatted);
             va_end(params);
-            return buffer.c_str();
+            return StoreDiagnosticText(PrintfBufferA(), formatted);
         }
         catch (const std::bad_alloc&)
         {
@@ -795,12 +808,12 @@ const WCHAR* spfW(const WCHAR* formatString, ...)
 #endif // MULTITHREADED_MESSAGES_ENABLE
         try
         {
-            std::wstring& buffer = PrintfBufferW();
+            std::wstring formatted;
             va_list params;
             va_start(params, formatString);
-            VFormatOwned(formatString, params, buffer);
+            VFormatOwned(formatString, params, formatted);
             va_end(params);
-            return buffer.c_str();
+            return StoreDiagnosticText(PrintfBufferW(), formatted);
         }
         catch (const std::bad_alloc&)
         {
@@ -833,12 +846,12 @@ const char* spf(int formatStringResID, ...)
         try
         {
             const char* format = rsc(formatStringResID);
-            std::string& buffer = PrintfBufferA();
+            std::string formatted;
             va_list params;
             va_start(params, formatStringResID);
-            VFormatOwned(format, params, buffer);
+            VFormatOwned(format, params, formatted);
             va_end(params);
-            return buffer.c_str();
+            return StoreDiagnosticText(PrintfBufferA(), formatted);
         }
         catch (const std::bad_alloc&)
         {
@@ -866,12 +879,12 @@ const WCHAR* spfW(int formatStringResID, ...)
         try
         {
             const WCHAR* format = rscW(formatStringResID);
-            std::wstring& buffer = PrintfBufferW();
+            std::wstring formatted;
             va_list params;
             va_start(params, formatStringResID);
-            VFormatOwned(format, params, buffer);
+            VFormatOwned(format, params, formatted);
             va_end(params);
-            return buffer.c_str();
+            return StoreDiagnosticText(PrintfBufferW(), formatted);
         }
         catch (const std::bad_alloc&)
         {
@@ -905,10 +918,10 @@ const char* err(DWORD error)
         {
             std::wstring errorW;
             FormatSystemErrorOwned(error, errorW);
-            if (!EncodeLegacyDiagnosticText(errorW, ErrorBufferA()))
-                ErrorBufferA() =
-                    "Unicode system error is unavailable through the legacy diagnostic API.";
-            return ErrorBufferA().c_str();
+            std::string encoded;
+            if (!EncodeLegacyDiagnosticText(errorW, encoded))
+                encoded = "Unicode system error is unavailable through the legacy diagnostic API.";
+            return StoreDiagnosticText(ErrorBufferA(), encoded);
         }
         catch (const std::bad_alloc&)
         {
@@ -935,8 +948,9 @@ const WCHAR* errW(DWORD error)
 #endif // MULTITHREADED_MESSAGES_ENABLE
         try
         {
-            FormatSystemErrorOwned(error, ErrorBufferW());
-            return ErrorBufferW().c_str();
+            std::wstring errorW;
+            FormatSystemErrorOwned(error, errorW);
+            return StoreDiagnosticText(ErrorBufferW(), errorW);
         }
         catch (const std::bad_alloc&)
         {
@@ -967,12 +981,8 @@ void SetMessagesTitleW(const WCHAR* title)
         std::string narrow;
         if (!EncodeLegacyDiagnosticText(wide, narrow))
             narrow = "Sally";
-        std::wstring& wideStorage = MessagesTitleStorageW();
-        std::string& narrowStorage = MessagesTitleStorageA();
-        wideStorage.swap(wide);
-        narrowStorage.swap(narrow);
-        __MessagesTitleW = wideStorage.c_str();
-        __MessagesTitle = narrowStorage.c_str();
+        __MessagesTitleW = StoreDiagnosticText(MessagesTitleStorageW(), wide);
+        __MessagesTitle = StoreDiagnosticText(MessagesTitleStorageA(), narrow);
     }
     catch (const std::bad_alloc&)
     {

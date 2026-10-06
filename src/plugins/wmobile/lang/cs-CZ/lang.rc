@@ -1,0 +1,133 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Czech (cs-CZ) resources for wmobile. Translation: Hynek Mikulič.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/wmobile/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\wmobile.rh2"
+
+LANGUAGE LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_PROGRESSDLG DIALOGEX 18, 80, 353, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,8,11,32,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,11,305,8
+    RTEXT           "Celkem:",IDC_STATIC_1,7,35,28,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,39,34,301,12
+    PUSHBUTTON      "Storno",IDCANCEL,151,57,50,14
+END
+
+IDD_PROGRESS2DLG DIALOGEX 10, 30, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,3,11,37,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,11,305,8
+    RTEXT           "",IDT_OPERATION2,8,23,32,8
+    CONTROL         "",IDT_FILENAME2,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,23,305,8
+    RTEXT           "Soubor:",IDC_STATIC_1,11,41,29,8
+    CONTROL         "",IDP_PROGRESSBAR2,"Static",0,43,40,297,12
+    RTEXT           "Celkem:",IDC_STATIC_2,11,56,29,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,43,55,297,12
+    PUSHBUTTON      "Storno",IDCANCEL,155,78,50,14
+END
+
+IDD_ATTRIBUTES DIALOGEX 30, 29, 187, 203
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Změna atributů"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,75,12,106,1
+    LTEXT           "Nastavení atributů",IDC_STATIC_2,9,8,64,8
+    CONTROL         "&Archivovat",IDC_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,18,48,12
+    CONTROL         "&Skrytý",IDC_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,78,18,34,12
+    CONTROL         "&Jen pro čtení",IDC_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,16,30,56,12
+    CONTROL         "S&ystémový",IDC_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,78,30,48,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,78,58,103,1
+    LTEXT           "Změna data a času",IDC_STATIC_4,9,54,67,8
+    LTEXT           "&Změněno",IDC_STATIC_5,16,71,33,8
+    CONTROL         "",IDC_ATTR_MODIFIED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,69,66,12
+    CONTROL         "",IDC_ATTR_MODIFIED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,69,50,12
+    LTEXT           "Vy&tvořeno",IDC_STATIC_6,16,87,36,8
+    CONTROL         "",IDC_ATTR_CREATED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,85,66,12
+    CONTROL         "",IDC_ATTR_CREATED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,85,50,12
+    LTEXT           "&Otevřeno",IDC_STATIC_7,16,103,37,8
+    CONTROL         "",IDC_ATTR_ACCESSED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,101,66,12
+    CONTROL         "",IDC_ATTR_ACCESSED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,101,50,12
+    PUSHBUTTON      "Nastavit akt&uální",IDC_ATTR_CURRENT,109,118,70,14
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,43,141,138,1
+    LTEXT           "Možnosti",IDC_STATIC_9,9,137,32,8
+    CONTROL         "&Včetně podadresářů",IDC_RECURSESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,147,87,12
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,9,172,172,1
+    DEFPUSHBUTTON   "OK",IDOK,13,181,50,14,WS_GROUP
+    PUSHBUTTON      "Storno",IDCANCEL,69,181,50,14
+    PUSHBUTTON      "Nápověda",IDHELP,125,181,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Windows Mobile"
+  IDS_PLUGIN_DESCRIPTION, "Zpřístupní soubory na Vašem Windows Mobile zařízení."
+  IDS_ABOUT, "O pluginu"
+}
+
+STRINGTABLE
+BEGIN
+  IDS_WMPLUGINTITLE          "Windows Mobile plugin"
+  IDS_WMPLUGINTITLE_ERROR    "Chyba Windows Mobile pluginu"
+  IDS_WMPLUGINTITLE_QUESTION "Dotaz Windows Mobile pluginu"
+  IDS_ERR_CONNECTION         "Nelze připojit zařízení.\n\nProsím ověřte si zda jste nainstalovaly základní přenašeč (např.: ActiveSync) a zda máte zařízení připojeno."
+  IDS_CONNECTING             "Připojování zařízení, čekejte prosím..."
+  IDS_PATH_ERROR             "Cesta: %s\nChyba: %s"
+  IDS_YESNO_CANCEL           "Chcete přerušit tuto operaci?"
+  IDS_ERR_MEMORYLOW          "Mimo paměť."
+  IDS_ERR_PATHTOOLONG        "Nelze dokončit operaci kvůli příliš dlouhé cestě."
+  IDS_ERR_CREATEDIR          "Nelze vytvořit adresář ""%s""."
+  IDS_YESNO_CREATEDIR        "Adresář ""%s"" neexistuje.\n\nChcete adresář vytvořit?"
+  IDS_ERR_DIRNAMEISFILE      "Název ""%s"" již byl použit pro soubor."
+  IDS_ERR_INVALIDDATEFORMAT  "Datum má neplatný formát."
+  IDS_ERR_NAMETOOLONG        "Nelze dokončit operaci kvůli příliš dlouhému názvu."
+  IDS_ERR_FILEINPATH         "Zadaná cesta obsahuje cestu k souboru. Nelze otevřít tento soubor."
+  IDS_YESNO_CONNETCLOSEPLUGIN "Nelze připojit zařízení.\r\n\r\nChcete ukončit plugin?"
+  IDS_SORRY_CREATEDIR1        "Promiňte, ale tento plugin není schopen vytvořit adresář na disku nebo v archivu."
+  IDS_SORRY_CREATEDIR2        "Promiňte, ale tento plugin není schopen vytvořit adresář na stanoveném systému souborů."
+  IDS_SORRY_CREATEDIR3        "Promiňte, ale tento plugin není schopen vytvořit adresář uvnitř aktuálně otevřené jednotky."
+  IDS_ERR_INVALIDPATH         "Zadaná cesta je neplatná."
+  IDS_READ                    "Načíst"
+  IDS_READING                 "Čtení"
+  IDS_WAIT_READINGDIRTREE     "Čtení struktury adresáře, čekejte prosím..."
+  IDS_DELETE                  "Odstranit"
+  IDS_DELETING                "Odstraňuji"
+  IDS_YESNO_DELETENOEMPTYDIR  "Adresář ""%s"" není prázdný\nChcete adresář odstranit?"
+  IDS_YESNO_DELETEHIDDENFILE  "Chcete odstranit soubor se SYSTÉMOVÝM nebo SKRYTÝM atributem?"
+  IDS_YESNO_DELETEHIDDENDIR   "Chcete odstranit adresář se SYSTÉMOVÝM nebo SKRYTÝM atributem?"
+  IDS_ERR_TARGETPATHNOEXISTS  "Cílová cesta neexistuje. Windows Mobile plugin nepodporuje vytvoření cílové cesty."
+  IDS_ERR_COPYTOOTHERFS       "Windows Mobile plugin nepodporuje kopírování ani přesun do jiných pluginů systému souborů."
+  IDS_ERR_COPYTOARCHIVES      "Windows Mobile plugin nepodporuje kopírování ani přesun do archivů."
+  IDS_COPY                    "Kopírovat"
+  IDS_COPYING                 "Kopíruji"
+  IDS_MOVE                    "Přesunout"
+  IDS_MOVING                  "Přesunuji"
+  IDS_TO                      "do"
+  IDS_ERR_COPYDIRTOITSELF     "Nelze kopírovat adresář do sebe."
+  IDS_ERR_COPYFILETOITSELF    "Nelze kopírovat soubor do sebe."
+  IDS_YESNO_OVERWRITEHIDDENFILE "Chcete přepsat soubor se SYSTÉMOVÝM nebo SKRYTÝM atributem?"
+  IDS_ERR_MOVEDIRTOITSELF     "Nelze přesunout adresář do sebe."
+  IDS_ERR_MOVEFILETOITSELF    "Nelze přesunout soubor do sebe."
+  IDS_ATTRIBUTES              "Atributy"
+  IDS_CHANGING                "Měním"
+END

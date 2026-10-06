@@ -6110,22 +6110,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         break;
     }
 
-    case WM_USER_SLGINCOMPLETE:
-    {
-        // wide: LoadStr()+AnsiToWide() was a lossy round trip - the narrow
-        // LoadStringA call already mangled any character outside the process ANSI code page
-        // before AnsiToWide ever ran. LoadStrW is already used one line below for the title;
-        // use it here too instead of narrowing then re-widening.
-        WCHAR buff[1000];
-        swprintf_s(buff, L"%s\n", LoadStrW(IDS_SLGINCOMPLETE_TEXT));
-        Configuration.ShowSLGIncomplete = FALSE;
-        CMessageBox(HWindow, MSGBOXEX_OK | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT | MSGBOXEX_ICONINFORMATION,
-                    LoadStrW(IDS_SLGINCOMPLETE_TITLE), buff, NULL,
-                    NULL, NULL, 0, NULL, NULL, IsSLGIncomplete, NULL)
-            .Execute();
-        break;
-    }
-
     case WM_USER_USERMENUICONS_READY:
     {
         CUserMenuIconDataArr* bkgndReaderData = (CUserMenuIconDataArr*)wParam;
@@ -6907,13 +6891,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         // if the window opens up, the user would find both panels empty (listing released).
         // This is already violated during Shutdown / Log Off / Restart because we must distribute
         // messages, otherwise we are considered "not responding" and the system kills us prematurely.
-
-        if (StrICmpW(Configuration.SLGName.c_str(), Configuration.LoadedSLGName.c_str()) != 0) // if the user changed Salamander's language
-        {
-            Plugins.ClearLastSLGNames(); // so that a new fallback language will be selected for all plugins if needed
-            Configuration.UseAsAltSLGInOtherPlugins = FALSE;
-            Configuration.AltPluginSLGName.clear();
-        }
 
         if (Configuration.AutoSave)
             SaveConfig();

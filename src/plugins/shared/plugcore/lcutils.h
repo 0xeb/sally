@@ -37,7 +37,7 @@ private: \
 //
 
 extern HINSTANCE DLLInstance;     // handle to SPL - language-independent resources
-extern HINSTANCE HLanguage;       // handle to SLG - language-dependent resources
+extern HINSTANCE HLanguage;       // handle to the module with language-dependent resources (this DLL)
 extern BOOL WindowsVistaAndLater; // Windows Vista or later in the NT line (6.0+)
 extern BOOL WindowsXP64AndLater;  // Windows XP 64, Vista or later (5.2+)
 

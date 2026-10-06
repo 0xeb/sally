@@ -1,0 +1,133 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for wmobile. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/wmobile/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\wmobile.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_PROGRESSDLG DIALOGEX 18, 80, 359, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,8,11,38,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,49,11,305,8
+    RTEXT           "Всего:",IDC_STATIC_1,17,35,24,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,45,34,301,12
+    PUSHBUTTON      "Отмена",IDCANCEL,154,57,50,14
+END
+
+IDD_PROGRESS2DLG DIALOGEX 10, 30, 365, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,3,11,49,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,55,11,305,8
+    RTEXT           "",IDT_OPERATION2,8,23,44,8
+    CONTROL         "",IDT_FILENAME2,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,55,23,305,8
+    RTEXT           "Файл:",IDC_STATIC_1,28,41,24,8
+    CONTROL         "",IDP_PROGRESSBAR2,"Static",0,55,40,297,12
+    RTEXT           "Всего:",IDC_STATIC_2,28,56,24,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,55,55,297,12
+    PUSHBUTTON      "Отмена",IDCANCEL,157,78,50,14
+END
+
+IDD_ATTRIBUTES DIALOGEX 30, 29, 187, 203
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Изменение атрибутов"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,87,12,94,1
+    LTEXT           "Установка атрибутов",IDC_STATIC_2,9,8,76,8
+    CONTROL         "&Архивный",IDC_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,18,48,12
+    CONTROL         "&Скрытый",IDC_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,89,18,45,12
+    CONTROL         "Только &чтение",IDC_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,16,30,63,12
+    CONTROL         "С&истемный",IDC_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,89,30,53,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,111,58,70,1
+    LTEXT           "Изменение даты и времени",IDC_STATIC_4,9,54,100,8
+    LTEXT           "Из&менен",IDC_STATIC_5,16,71,33,8
+    CONTROL         "",IDC_ATTR_MODIFIED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,69,66,12
+    CONTROL         "",IDC_ATTR_MODIFIED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,69,50,12
+    LTEXT           "С&оздан",IDC_STATIC_6,16,87,30,8
+    CONTROL         "",IDC_ATTR_CREATED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,85,66,12
+    CONTROL         "",IDC_ATTR_CREATED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,85,50,12
+    LTEXT           "От&крыт",IDC_STATIC_7,16,103,37,8
+    CONTROL         "",IDC_ATTR_ACCESSED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,57,101,66,12
+    CONTROL         "",IDC_ATTR_ACCESSED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,129,101,50,12
+    PUSHBUTTON      "Установить т&екущие",IDC_ATTR_CURRENT,89,118,90,14
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,53,141,128,1
+    LTEXT           "Параметры",IDC_STATIC_9,9,137,42,8
+    CONTROL         "Включая вложенные &папки",IDC_RECURSESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,147,107,12
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,9,172,172,1
+    DEFPUSHBUTTON   "ОК",IDOK,13,181,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,69,181,50,14
+    PUSHBUTTON      "Справка",IDHELP,125,181,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Windows Mobile"
+  IDS_PLUGIN_DESCRIPTION, "Средство доступа к файлам на устройствах Windows Mobile."
+  IDS_ABOUT, "О модуле"
+}
+
+STRINGTABLE
+BEGIN
+  IDS_WMPLUGINTITLE          "Модуль Windows Mobile"
+  IDS_WMPLUGINTITLE_ERROR    "Ошибка модуля Windows Mobile"
+  IDS_WMPLUGINTITLE_QUESTION "Запрос модуля Windows Mobile"
+  IDS_ERR_CONNECTION         "Не удалось выполнить подключение к устройству.\n\nПожалуйста, убедитесь, что установлены средства синхронизации (например ActiveSync) и устройство правильно подключено."
+  IDS_CONNECTING             "Выполняется подключение к устройству. Пожалуйста, подождите..."
+  IDS_PATH_ERROR             "Путь: %s\nОшибка: %s"
+  IDS_YESNO_CANCEL           "Вы действительно хотите отменить операцию?"
+  IDS_ERR_MEMORYLOW          "Недостаточно памяти."
+  IDS_ERR_PATHTOOLONG        "Невозможно завершить операцию, путь слишком длинный."
+  IDS_ERR_CREATEDIR          "Не удалось создать папку ""%s""."
+  IDS_YESNO_CREATEDIR        "Папка ""%s"" не существует.\n\nСоздать папку?"
+  IDS_ERR_DIRNAMEISFILE      "Имя ""%s"" уже используется файлом."
+  IDS_ERR_INVALIDDATEFORMAT  "Недопустимый формат даты."
+  IDS_ERR_NAMETOOLONG        "Невозможно завершить операцию, путь слишком длинный."
+  IDS_ERR_FILEINPATH         "Путь указывает файл. Невозможно открыть файл."
+  IDS_YESNO_CONNETCLOSEPLUGIN "Невозможно выполнить подключение к устройству.\r\n\r\nВы хотите завершить работу модуля?"
+  IDS_SORRY_CREATEDIR1        "К сожалению, модуль не может создать папку на диске или в архиве."
+  IDS_SORRY_CREATEDIR2        "К сожалению, модуль не может создать папку в данной файловой системе."
+  IDS_SORRY_CREATEDIR3        "К сожалению, модуль не может создать папку вне текущего открытого диска."
+  IDS_ERR_INVALIDPATH         "Указан некорректный путь."
+  IDS_READ                    "Чтение"
+  IDS_READING                 "Чтение"
+  IDS_WAIT_READINGDIRTREE     "Чтение структуры папок. Пожалуйста, подождите..."
+  IDS_DELETE                  "Удаление"
+  IDS_DELETING                "Удаление"
+  IDS_YESNO_DELETENOEMPTYDIR  "Папка ""%s"" не пуста.\nВы действительно хотите ее удалить?"
+  IDS_YESNO_DELETEHIDDENFILE  "Вы действительно хотите удалить файл с атрибутом ""скрытый"" или ""системный""?"
+  IDS_YESNO_DELETEHIDDENDIR   "Вы действительно хотите удалить папку с атрибутом ""скрытый"" или ""системный""?"
+  IDS_ERR_TARGETPATHNOEXISTS  "Путь назначения не существует. Модуль Windows Mobile не поддерживает функцию создания пути назначения."
+  IDS_ERR_COPYTOOTHERFS       "Модуль Windows Mobile не поддерживает функцию копирования/перемещения файлов в виртуальные системы других модулей."
+  IDS_ERR_COPYTOARCHIVES      "Модуль Windows Mobile не поддерживает функцию копирования/перемещения файлов в архивы."
+  IDS_COPY                    "Копировать"
+  IDS_COPYING                 "Копирование"
+  IDS_MOVE                    "Переместить"
+  IDS_MOVING                  "Перемещение"
+  IDS_TO                      "в"
+  IDS_ERR_COPYDIRTOITSELF     "Невозможно скопировать папку саму в себя."
+  IDS_ERR_COPYFILETOITSELF    "Невозможно скопировать файл сам в себя."
+  IDS_YESNO_OVERWRITEHIDDENFILE "Вы действительно хотите перезаписать файл с атрибутом ""скрытый"" или ""системный""?"
+  IDS_ERR_MOVEDIRTOITSELF     "Невозможно переместить папку саму в себя."
+  IDS_ERR_MOVEFILETOITSELF    "Невозможно переместить папку саму в себя."
+  IDS_ATTRIBUTES              "Атрибуты"
+  IDS_CHANGING                "Изменение"
+END

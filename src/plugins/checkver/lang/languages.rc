@@ -1,0 +1,18 @@
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// The built-in languages of checkver: English and every translation, each under its own
+// LANGUAGE. One resource script per module, so the build compiles them as one unit. To add a
+// language, add its <tag>/lang.rc here.
+
+#include "lang.rc"
+#include "cs-CZ/lang.rc"
+#include "de-DE/lang.rc"
+#include "es-ES/lang.rc"
+#include "fr-FR/lang.rc"
+#include "hu-HU/lang.rc"
+#include "nl-NL/lang.rc"
+#include "ro-RO/lang.rc"
+#include "ru-RU/lang.rc"
+#include "sk-SK/lang.rc"
+#include "zh-CN/lang.rc"

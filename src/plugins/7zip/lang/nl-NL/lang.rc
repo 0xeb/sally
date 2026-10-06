@@ -1,0 +1,197 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for 7zip. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/7zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\7zip.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 23, 38, 253, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "7-Zip configuratie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Paneelinstellingen",IDC_STATIC_1,5,6,64,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,71,10,179,1
+    CONTROL         "Laat dialoogvenster zien met uitgebreide &opties vóór het inpakken",IDC_CFG_SHOWEXTENDEDOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,19,233,10
+    CONTROL         "Laat uitgebreide &informatie zien bij het weergeven van het archief",IDC_CFG_EXTENDEDLISTINFO,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,31,234,10
+    CONTROL         "Ingepakt",IDC_CFG_LISTINFOPACKEDSIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,43,42,10
+    CONTROL         "Methode",IDC_CFG_LISTINFOMETHOD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,55,42,10
+    LTEXT           "Standaard compressie parameters",IDC_STATIC_3,5,70,117,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,124,74,126,1
+    LTEXT           "Compressie &niveau:",IDC_STATIC_5,10,85,76,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,89,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Compressie &methode:",IDC_STATIC_6,10,103,76,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,89,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Woordenboek grootte:",IDC_STATIC_7,10,121,78,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,89,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Woo&rdgrootte:",IDC_STATIC_8,10,139,76,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,89,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Maak &solide archief aan",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,155,90,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,3,175,247,1
+    DEFPUSHBUTTON   "OK",IDOK,86,181,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,141,181,50,14
+    PUSHBUTTON      "Help",IDHELP,196,181,50,14
+END
+
+IDD_NEWARCHIVE DIALOGEX 27, 37, 350, 224
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Maak nieuw archief"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Archief:",IDC_STATIC_1,16,7,30,8
+    LTEXT           "",IDC_NA_ARCHIVE,48,7,293,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,8,21,334,1
+    CONTROL         "&Versleutel bestanden",IDC_NA_ENCRYPTFILES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,28,83,10
+    LTEXT           "&Wachtwoord:",IDC_NA_PASSWORD_TXT,105,29,60,8
+    EDITTEXT        IDC_NA_PASSWORD,182,27,138,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Bevestig w&achtwoord:",IDC_NA_CONFIRMPASSWORD_TXT,105,46,76,8
+    EDITTEXT        IDC_NA_CONFIRMPASSWORD,182,44,138,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Compressie parameters",IDC_STATIC_3,8,67,81,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,91,71,251,1
+    LTEXT           "Compressie &niveau:",IDC_STATIC_5,16,85,68,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,105,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Compressie &methode:",IDC_STATIC_6,16,103,75,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,105,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Wo&ordenboek grootte:",IDC_STATIC_7,16,121,78,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,105,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Woo&rdgrootte:",IDC_STATIC_8,16,139,51,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,105,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Maak &solide archief aan",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,159,92,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,8,181,334,1
+    CONTROL         "&Laat dit dialoogvenster niet meer zien (u kunt dit later veranderen in het configuratievenster)",IDC_NA_NOTAGAIN,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,187,324,12
+    PUSHBUTTON      "Con&figureren...",IDC_SHOW_CONFIG,10,204,65,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,180,204,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,235,204,50,14
+    PUSHBUTTON      "Help",IDHELP,290,204,50,14
+END
+
+IDD_ENTERPASSWORD DIALOGEX 6, 15, 267, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Voer 7-Zip wachtwoord in"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,16,12,20,20
+    LTEXT           "Dit bestand is versleuteld. Geeft u a.u.b. het wachtwoord in voor het ontsleutelen van het bestand.",IDC_STATIC_1,48,12,214,16
+/*    LTEXT           "File:",IDC_STATIC_2,48,26,17,8
+    LTEXT           "",IDC_FILE,65,26,175,8 */
+    LTEXT           "Wachtwoord:",IDC_STATIC_3,48,40,47,8
+    EDITTEXT        IDC_PASSWORD,96,38,153,12,ES_PASSWORD | ES_AUTOHSCROLL
+/*
+ // preparation for skip and skip all
+    DEFPUSHBUTTON   "OK",IDOK,12,63,50,14
+    PUSHBUTTON      "Skip",IDC_SKIP,72,63,50,14
+    PUSHBUTTON      "Skip all",IDC_SKIPALL,132,63,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,192,63,50,14
+*/    
+    DEFPUSHBUTTON   "OK",IDOK,142,63,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,202,63,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME,             "7-Zip"
+  IDS_ABOUT,                  "Over Plugin"
+  IDS_PLUGIN_DESCRIPTION,     "Creëer, blader en pak  7-Zip archiefbestanden uit."
+  IDS_INSUFFICIENT_MEMORY,    "Onvoldoende geheugen."
+  IDS_CANT_LOAD_LIBRARY,      "Kan het bibliotheek-bestand 7za.dll niet laden."
+  IDS_CANT_GET_CRATEOBJECT,   "Kan de methode CreateObject niet laden."
+  IDS_CANT_GET_CLASS_OBJECT,  "Kan klassenobject niet laden."
+  IDS_CANT_OPEN_ARCHIVE,      "Kan het archief '%s' niet openen."
+  IDS_CANT_OPEN_ARCHIVE_PWD,  "Kan het archief '%s' niet openen.\nHet verkeerde wachtwoord van dit archief kan zijn ingevoerd."
+  IDS_ERROR,                  "Interne fout."
+  IDS_PACKING_ARCHIVE,        "Inpakken van 7-Zip Archief"
+  IDS_UNPACKING_ARCHIVE,      "Uitpakken van 7-Zip Archief"
+  IDS_UPDATING_ARCHIVE,       "Bijwerken van 7-Zip archief"
+  IDS_TESTING_ARCHIVE,        "Testen van 7-Zip Archief"
+  IDS_TESTING_ARCHIVE_NAME    "Testen van archiefbestand '%s'..."
+  IDS_READING_DIRTREE,        "Mapstructuur wordt gelezen..."
+  IDS_CANT_CREATE_ARCHIVE,    "Kan het archief niet aanmaken."
+  IDS_TESTARCHIVE,            "Test Archief"
+  IDS_TESTARCHIVECORRUPTED,   "Archief '%s' is beschadigd."
+  IDS_TESTARCHIVEOK,          "Archief '%s' is OK."
+  IDS_INCORRECTPASSWORD,      "Onjuist wachtwoord"
+  IDS_INCORRECTPASSWORDBODY,  "Het wachtwoord is onjuist. Gelieve het wachtwoord opnieuw invoeren. De letters in het wachtwoord kunnen\n hoofdletter gevoelig zijn. Wees er zeker van dat de CapsLock niet per ongeluk is ingeschakeld."
+  IDS_PASSWORDSNOTMATCH,      "De opgegeven wachtwoorden komen niet overeen."
+  IDS_EMPTYPASSWORD,          "Het wachtwoord moet ten minste één teken lang zijn."
+  IDS_UPDATE_NOT_SUPPORTED,   "Bijwerken worden niet ondersteund voor dit archiefbestand."
+  IDS_CANT_MOVE_TMPARCHIVE,   "Kan het tijdelijk archiefbestand '%s' niet verplaatsen."
+  IDS_CANT_DELETE_TMPARCHIVE, "Kan het tijdelijk archiefbestand '%s' niet verwijderen."
+  IDS_7Z_UPDATE_ERROR,        "Er is een fout opgetreden tijdens het bijwerken van het archiefbestand.\n\nDit is geen fout van de Sally 7-Zip plug-in. Het probleem zit in het 7za.dll bestand,\ngelieve hierover GEEN bugreports te sturen, wij zijn ons bewust van dit probleem."
+  IDS_7Z_SOLID_DELETE_UNSUP,  "Verwijderen van bestanden in solide archiefbestanden wordt niet ondersteund."
+  IDS_CANT_UPDATE_ARCHIVE,    "Kan het archiefbestand '%s' niet bijwerken."
+  IDS_CANT_CREATE_TMPFILE,    "Kan geen tijdelijk bestand aanmaken."
+//  IDS_CANT_CREATEMUTEX,       "Cannot create mutex."
+  IDS_ARCHIVE_CHANGED,        "Archiefbestand '%s' is gewijzigd. Archiefbestand zal opnieuw geopend worden in paneel."
+  IDS_DELETE_ERROR,           "Verwijder Fout"
+  IDS_ADD_FILES_TO_ARCHIVE,   "Bestanden toevoegen aan archiefbestand"
+  IDS_CREATE_NEW_ARCHIVE,     "Maak nieuw archief aan"
+  IDS_REMOVING_FILES,         "Verwijderen bestanden..."
+  IDS_READING_ARCHIVEITEMS,   "Lezen van archiefbestand..."
+  IDS_UNPACKING,              "Uitpakken..."
+  IDS_PACKING,                "Inpakken..."
+  IDS_REMOVING,               "Verwijderen..."
+  IDS_UPDATING,               "Bijwerken..."
+  IDS_CANCELING_OPERATION,    "Annuleren van bewerking, een ogenblik geduld..."
+  IDS_UNSUPPORTED_METHOD,     "Niet ondersteunde methode."
+  IDS_CRC_FAILED,             "CRC mislukt."
+  IDS_UNKNOWN_ERROR,          "Onbekende fout."
+  IDS_DATA_ERROR,             "Data fout opgetreden bij het uitpakken van bestand '%s'."
+  IDS_DATA_ERROR_PWD,         "Data fout opgetreden bij het uitpakken van bestand '%s'..\nHet verkeerde wachtwoord is mogelijk ingevoerd."
+  IDS_BTN_DELETE,             "&Verwijderen"
+  IDS_BTN_DELETE_ALL,         "Ve&rwijder alles"
+  IDS_BTN_KEEP,               "&Behouden"
+  IDS_BTN_KEEP_ALL,           "B&ehoud alles"
+  IDS_ERROR_PROCESSING_FILE,  "Fout bij verwerken bestand '%s'.\n\nWilt u dit bestand verwijderen of behouden?"
+  IDS_ERROR_PROCESSING_FILE_PWD, "Fout bij verwerken bestand '%s'.\nHet verkeerde wachtwoord is mogelijk ingevoerd.\n\nWilt u dit bestand verwijderen of behouden?"
+  IDS_OVERWRITE_FILE,         "Bestand overschrijven";
+  IDS_READONLY_ARCHIVE,       "Het archiefbestand is alleen lezen. Gelieve het alleen lezen attribuut van het bestand verwijderen."
+  IDS_CANT_REMOVE_DIRECTORY,  "Kan de map'%s' niet verwijderen"
+  IDS_CANT_READ_ARCHIVE       "Fout bij het lezen van het archiefbestand."
+  IDS_CANT_READ               "Fout bij het lezen van het invoer bestand."
+  IDS_CANT_WRITE              "{!}Kan niet schrijven %d byte{|1|s}."
+  IDS_BTN_RETRY               "Opnieuw proberen"
+  IDS_BTN_ABORT               "Afbreken"
+  IDS_STORE,                  "Opslaan"
+  IDS_FASTEST,                "Snelste"
+  IDS_FAST,                   "Snel"
+  IDS_NORMAL,                 "Normaal"
+  IDS_MAXIMUM,                "Maximum"
+  IDS_ULTRA,                  "Ultra"
+  IDS_METHOD_LZMA,            "LZMA"
+  IDS_METHOD_LZMA2,           "LZMA2"
+  IDS_METHOD_PPMD,            "PPMd"
+  IDS_PACK_UPDATE_ERROR,      "Er is een fout opgetreden tijdens het inpakken/bijwerken van het archiefbestand."
+  IDS_UNPACK_ERROR,           "Er is een fout opgetreden tijdens het uitpakken van het archiefbestand."
+  IDS_TEST_ERROR,             "Er is een fout opgetreden tijdens het testen van het archiefbestand."
+  IDS_UNSUPPORTED_ARCHIVE,    "Niet ondersteund of niet-herkend archiefbestand type.\nHet archiefbestand kan zwaar beschadigd zijn."
+  IDS_7Z_FATAL_ERROR          "Het archiefbstand is niet aangemaakt ten gevolge van een fatale fout."
+  IDS_7Z_UPDATE_UNKNOWN_ERROR "Het archiefbestand is niet bijgewerkt ten gevolge van een onbekende fout %x."
+  IDS_7Z_CREATE_UNKNOWN_ERROR "Het archiefbestand is niet aangemaakt ten gevolge van een onbekende fout %x."
+//  IDS_7Z_SOLID_UPDATE_UNSUP   "Updating files in solid archives is not supported."
+  IDS_LISTINFO_PAKEDSIZE      "Ingepakt"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Ingepakte bestandsgrootte"
+  IDS_LISTINFO_METHOD         "Methode"
+  IDS_LISTINFO_METHOD_DESC    "Compressie methode"
+  IDS_ARCLOCK_ERROR           "Archief vergrendelingsfout"
+  IDS_ERRADDFILE_TOOLONG,     "Kan één of meerdere bestanden niet toevoegen aan de lijst. Het totale pad is te lang.\nSommige directories of bestanden kunnen ontbreken in het achiefbestand."
+  IDS_ERRADDDIR_TOOLONG,      "Één of meerdere mappen kunnen niet toegevoegd worden aan de lijst. Het totale pad is te lang.\nEnkele mappen of bestanden kunnen ontbreken in het achiefbestand."
+  IDS_NAMEISTOOLONG,          "Naam ""%s"" met kompleet pad is te lang.\n\nPad: %s"
+}

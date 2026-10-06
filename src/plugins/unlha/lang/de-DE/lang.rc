@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// German (de-DE) resources for unlha. Translation: Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Durchsucht und entpackt LHA Archive."
+ IDS_ABOUT, "Über Plugin"
+ IDS_FILECORRUPT, "Ungültige LZH-Datei oder unbekanntes Dateiformat."
+ IDS_CHECKSUMERROR, "Dateikopf-Prüfsummenfehler.\nDas Archiv ist fehlerhaft - es können nicht alle Dateien aufgelistet werden."
+ IDS_LOWMEM, "Nicht genügend Speicher."
+ IDS_WRITEERROR, "Schreibfehler"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "Fehler beim Öffnen des Archivs."
+ IDS_LIST, "Kann den Archiveintrag nicht zur Dateiliste hinzufügen."
+ IDS_SYMLINK, "Das Archiv enthält eine oder mehr UNIX symbolische Verknüpfungen, diese können nicht angezeigt werden."
+ IDS_UNPACKERROR, "Fehler beim Entpacken der Datei."
+ IDS_CRCERROR, "Fehler in den komprimierten Daten. CRC stimmt nicht überein."
+ IDS_READERROR, "Fehler beim Lesen des Archivs."
+ IDS_EXTRPROGTITLE, "Entpacke LHA Archiv - %s"
+ IDS_PREPAREDATA, "Bereite die Daten vor und erstelle Verzeichnisse..."
+ IDS_UNPACKING, "Entpacke: "
+ IDS_EXTRACTFILES, "Entpacke..."
+ IDS_TOOLONGNAME, "Kann den Vorgang wegen zu langem Pfadnamen nicht beenden."
+ IDS_TOOLONGMASK, "Kann den Vorgang wegen zu langer Maske nicht beenden."
+ IDS_METHOD, "Unbekannte Kompressionsmethode. Die Datei kann nicht entpackt werden."
+ IDS_METHOD2, "Unbekannte Methode übersprungen..."
+}

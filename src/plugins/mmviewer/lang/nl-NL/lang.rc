@@ -1,0 +1,343 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for mmviewer. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/mmviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\mmviewer.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_ABOUT DIALOGEX 87, 50, 369, 132
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Over plugin"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Sluiten",IDCANCEL,311,113,50,14
+    ICON            "",IDC_MAIN_ICON,11,9,20,20
+    LTEXT           "MMViewer %s - Multimedia Viewer voor Sally",IDC_ABOUT_TITLE,46,9,318,8
+    LTEXT           "dummy",IDC_ABOUT_COPYRIGHT,46,19,177,8,SS_NOPREFIX
+    ICON            "",IDC_DISKEXPLORER_ICON,11,42,20,20
+    LTEXT           "MPEG, ID3 Tag versie 1 en 2, OGG, WMA, VQF en Tracker parsers",IDC_STATIC_1,46,41,238,8
+    LTEXT           "zijn gelicenseerd onder",IDC_STATIC_2,46,51,80,8
+    LTEXT           "Disk Explorer Professional",IDC_ABOUT_DEPRO,127,51,200,8
+    LTEXT           "Copyright 2003-2016 door",IDC_STATIC_3,46,67,89,8
+    LTEXT           "Tomas Jelinek",IDC_STATIC_4,135,67,60,8
+    LTEXT           "E-mail:",IDC_STATIC_5,46,78,30,8
+    LTEXT           "tomas@tjelinek.com",IDC_ABOUT_EMAIL,135,78,119,8,WS_TABSTOP
+    LTEXT           "Webpagina:",IDC_STATIC_6,46,89,49,8
+    LTEXT           "www.tjelinek.com",IDC_ABOUT_WWW,135,89,118,8,WS_TABSTOP
+    LTEXT           "",IDC_STATIC_7,2,107,360,1,SS_ETCHEDHORZ | WS_GROUP
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_PLUGIN_DESCRIPTION  "Toon informatie over multimedia bestanden zoals MP3, OGG, WAV, etc."
+    IDS_ABOUT               "Over plugin"
+    IDS_PLUGIN_NAME         "Multimedia Viewer"
+    IDS_OPENED_WINDOWS      "Er zijn Multimedia Viewer vensters geopend. Wilt u ze sluiten?"
+    IDS_ERROR_OPENING       "Fout bij het openen van %s.\nDit formaat wordt niet ondersteunt door Multimedia Viewer."
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_FILES          "&Bestand"
+    IDS_MENU_FILES_OPEN     "&Openen...\tCtr+O"
+    IDS_MENU_FILES_EXPORT_HTML     "Exporteer naar &HTML...\tCtr+H"
+    //IDS_MENU_FILES_EXPORT_XML     "Export to &XML...\tCtr+X"
+    IDS_MENU_FILES_PROPERTIES "Eigenschapp&en...\tCtrl+F1"
+    IDS_MENU_FILES_EXIT     "Afs&luiten\tAlt+F4"
+
+    IDS_MENU_FILE_OTHER     "A&ndere bestanden"
+    IDS_MENU_FILE_FIRST     "Ee&rste\tShift+Backspace"
+    IDS_MENU_FILE_LAST      "&Laatste\tShift+Spatie"
+    IDS_MENU_FILE_PREV      "&Vorige\tBackspace"
+    IDS_MENU_FILE_NEXT      "Vol&gende\tSpatie"
+
+    IDS_MENU_EDIT           "Bewer&ken"
+    IDS_MENU_EDIT_COPY      "Kopieer &alles\tCtrl+A"
+    //IDS_MENU_EDIT_SELECT_ALL "&Select All\tCtrl+A"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_VIEW           "Bee&ld"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_VIEW_FULLSCREEN "&Volledig scherm\tF11"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_OPTIONS        "&Opties"
+    IDS_MENU_OPTIONS_CONFIG "&Configuratie..."
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MENU_HELP           "&Help"
+    IDS_MENU_HELP_ABOUT     "&Over..."
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_TBTT_COPY           "Kopieer alles\tCtrl+A"
+    IDS_TBTT_OPEN           "Openen\tCtrl+O"
+    IDS_TBTT_EXP_HTML       "Exporteer naar HTML\tCtrl+H"
+    //IDS_TBTT_EXP_XML        "Export to XML\tCtrl+X"
+    IDS_TBTT_FIND           "Zoeken\tCtrl+F"
+    IDS_TBTT_PROPERTIES     "Eigenschappen\tCtrl+F1"
+    IDS_TBTT_FULLSCREEN     "Volledig scherm\tF11"
+    IDS_TBTT_PREV           "Open vorige\tBackspace"
+    IDS_TBTT_NEXT           "Open volgende\tSpatie"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_VIEWERFILTER        "Multimedia bestanden (*.mp3;*.mp2;*.ogg;*.vqf;*.wma;*.wav;*.669;*.it;*.mod;*.mtm;*s3m;*.stm;*.xm)|*.mp3;*.mp2;*.ogg;*.wma;*.wav;*.wave;*.vqf;*.669;*.it;*.mod;*.mtm;*s3m;*.stm;*.xm|Alle bestanden (*.*)|*.*||"
+    IDS_HTMLEXPFILTER   "HTML bestanden (*.htm;*.html)|*.htm;*.html|All Files (*.*)|*.*||"
+    IDS_EXPORTOPEN          "Wilt u de geëxporteerde gegevens openen?"
+    IDS_EXPORTHTML          "Exporteer de informatie in &HTML..."
+    IDS_AUDIOINFO     "Audio eigenschappen"
+    IDS_HTMLEXT       ".html"
+    IDS_PROCESSINGFILES   "Verwerken van bestanden, een ogenblik geduld..."
+    IDS_FILESPROCESSED    "%lu van %lu bestanden zijn met succes verwerkt."
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_YES                 "Ja"
+    IDS_NO                  "Nee"
+
+    IDS_VQF_INFO            "VQF Informatie"
+    IDS_VQF_COPYRIGHT       "Copyright"
+    IDS_VQF_AUTHOR          "Auteur"
+    IDS_VQF_TITLE           "Titel"
+    IDS_VQF_COMMENTS        "Opmerkingen"
+    IDS_VQF_YEAR            "Jaar"
+    IDS_VQF_ALBUM           "Album"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_VQF_TRACK           "Nummer"
+    IDS_VQF_ORIGFILENAME    "Orig. bestandsnaam"
+    IDS_VQF_LYRC            "LYRC"
+    IDS_VQF_WORD            "WORD"
+    IDS_VQF_MUSC            "MUSC"
+    IDS_VQF_ARNG            "ARNG"
+    IDS_VQF_PROD            "PROD"
+    IDS_VQF_REMX            "REMX"
+    IDS_VQF_CDCT            "CDCT"
+    IDS_VQF_SING            "SING"
+    IDS_VQF_LABL            "LABL"
+    IDS_VQF_NOTE            "NOTE"
+    IDS_VQF_PRSN            "PRSN"
+    IDS_VQF_BAND            "BAND"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+  IDS_WMA_INFO            "Windows Media Audio Informatie"
+    IDS_WMA_BINARY          "binair (%luB)"
+    IDS_WMA_DURATION        "Duur"
+    IDS_WMA_BITRATE         "Bitrate (kbps)"
+    IDS_WMA_SEEKABLE        "Doorzoekbaar"
+    IDS_WMA_STRIDABLE       "Snel doorzoekbaar"
+    IDS_WMA_BROADCAST       "Uitzending"
+    IDS_WMA_PROTECTED       "Beveiligd"
+    IDS_WMA_TRUSTED         "Vertrouwd"
+    IDS_WMA_SIGNATURENAME   "Handtekening naam"
+    IDS_WMA_TITLE           "Titel"
+    IDS_WMA_AUTHOR          "Auteur"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_WMA_DESCRIPTION     "Beschrijving"
+    IDS_WMA_RATING          "Waardering"
+    IDS_WMA_COPYRIGHT       "Copyright"
+    IDS_WMA_ALBUMTITLE      "Album"
+    IDS_WMA_TRACK           "Nummer"
+    IDS_WMA_PROMOTIONURL    "Promotie URL"
+    IDS_WMA_ALBUMCOVERURL   "Albumhoes URL"
+    IDS_WMA_GENRE           "Genre"
+    IDS_WMA_YEAR            "Jaar"
+    IDS_WMA_MCDI            "MCDI"
+    IDS_WMA_BANNERIMAGETYPE "Banner afbeelding type"
+    IDS_WMA_BANNERIMAGEDATA "Banner afbeelding gegevens"
+    IDS_WMA_BANNERIMAGEURL  "Banner afbeelding URL"
+    IDS_WMA_COPYRIGHTURL    "Copyright URL"
+    IDS_WMA_NSCNAME         "NSC Naam"
+    IDS_WMA_NSCADDRESS      "NSC Adres"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_WMA_NSCPHONE        "NSC telefoon"
+    IDS_WMA_NSCEMAIL        "NSC e-mail"
+    IDS_WMA_NSCDESCRIPTION  "NSC beschrijving"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MOD_INFO            "Tracker Module Informatie"
+    IDS_MOD_PATTERNS        "Patronen"
+    IDS_MOD_SAMPLES         "Voorbeelden"
+    IDS_MOD_INSTRUMENTS     "Instrumenten"
+    IDS_MOD_TITLE           "Titel"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_OGG_INFO            "OGG Vorbis Informatie"
+    IDS_OGG_VERSION         "Versie"
+    IDS_OGG_BITRATE         "Nominale bitrate (kbps)"
+    IDS_OGG_FREQUENCY       "Frequentie (Hz)"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_OGG_CHANNELS        "Kanalen"
+    IDS_OGG_COPYRIGHT       "Copyright"
+    IDS_OGG_VERSIONS        "Versie"
+    IDS_OGG_CONTACT         "Contact"
+    IDS_OGG_ISRC            "ISRC"
+    IDS_OGG_AUTHOR          "Auteur"
+    IDS_OGG_TITLE           "Titel"
+    IDS_OGG_GENRE           "Genre"
+    IDS_OGG_COMMENTS        "Commentaar"
+    IDS_OGG_DATE            "Datum"
+    IDS_OGG_ALBUM           "Album"
+    IDS_OGG_TRACK           "Nummer"
+    IDS_OGG_PERFORMER       "Zanger"
+    IDS_OGG_ORGANIZATION    "Organisatie"
+    IDS_OGG_DESCRIPTION     "Beschrijving"
+    IDS_OGG_DETAILS         "Details"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_OGG_LOCATION        "Locatie"
+    IDS_OGG_SAMPLES         "Voorbeelden"
+    IDS_OGG_LENGTH          "Lengte"
+    IDS_OGG_ADDINFO         "Additionele informatie"
+    IDS_OGG_DISCID          "Schijf ID"
+    IDS_OGG_VENDOR          "Verkoper"
+    IDS_OGG_STDTAGS         "Standaard label"
+    IDS_OGG_OTHERTAG        "Andere labels"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MP4_AACINFO         "AAC Informatie"
+    IDS_MP4_BITRATE         "Bitrate (bps)"
+    IDS_MP4_SAMPLINGRATE    "Samplefrequentie (Hz)"
+    IDS_MP4_CHANNELS        "Kanalen"
+    IDS_MP4_DURATION        "Duur"
+    IDS_MP4_AACHEADERTYPE   "Koptype"
+    IDS_MP4_MPEGVERSION     "MPEG Versie"
+    IDS_MP4_OBJTYPE_MAIN    "HOOFD"
+    IDS_MP4_OBJTYPE_LC      "LC"
+    IDS_MP4_OBJTYPE_SSR     "SSR"
+    IDS_MP4_OBJTYPE_LTP     "LTP"
+    IDS_MP4_HEADTYPE_RAW    "RAW"
+    IDS_MP4_HEADTYPE_ADIF   "ADIF"
+    IDS_MP4_HEADTYPE_ADTS   "ADTS"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_WAV_INFO            "WAVE Informatie"
+    IDS_WAV_BITRATE         "Bitrate (bps)"
+    IDS_WAV_FREQUENCY       "Frequentie (Hz)"
+    IDS_WAV_MODE            "Modus"
+    IDS_WAV_COMPRESSION     "Compressie"
+    IDS_WAV_STEREO          "Stereo"
+    IDS_WAV_MONO            "Mono"
+    IDS_WAV_LENGTH          "Lengte"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MP3_MP3VERSION      "Versie"
+    IDS_MP3_MP3VERSIONFMT   "MPEG %u.%u Laag %s"
+    IDS_MP3_BITRATE         "Bitrate (kbps)"
+    IDS_MP3_FREQUENCY       "Frequentie (Hz)"
+    IDS_MP3_MODE            "Modus"
+    IDS_MP3_COPYRIGHT       "Copyright (c)"
+    IDS_MP3_ORIGINAL        "Origineel"
+    IDS_MP3_AUTHOR          "Auteur"
+    IDS_MP3_TITLE           "Titel"
+    IDS_MP3_GENRE           "Genre"
+    IDS_MP3_COMMENTS        "Commentaar"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MP3_YEAR            "Jaar"
+    IDS_MP3_ALBUM           "Album"
+    IDS_MP3_EMPHASIS        "Nadruk"
+    IDS_MP3_ID3TAGV         "ID3 label v%u.%u"
+    IDS_MP3_MP3INFO         "MPEG Audio informatie"
+    IDS_MP3_FRAMES          "Frames"
+    IDS_MP3_LENGTH          "Lengte"
+    IDS_MP3_AVERAGE         "Variabel, gemiddelde "
+    IDS_MP3_TRACK           "Track"
+    IDS_MP3_DASH            "-"
+    IDS_MP3_5015MS          "50/15 microseconden"
+    IDS_MP3_CCITTJ17        "CCITT J 17"
+    IDS_MP3_QUESTIONMARK    "?"
+    IDS_MP3_STEREO          "Stereo"
+    IDS_MP3_JSTEREO         "Joint Stereo"
+    IDS_MP3_DCHANNEL        "Dual Channel"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MP3_SCHANNEL        "Enkelkanaals"
+    IDS_MP3_COMPOSER        "Componist"
+    IDS_MP3_ORIGARTIST      "Orig. Artiest"
+    IDS_MP3_ENCODEDBY       "Gecodeerd door"
+    IDS_MP3_URL_COMINFO     "Commerciële informatie URL"
+    IDS_MP3_URL_COPYRIGHT   "Copyright/wettelijke informatie URL"
+    IDS_MP3_URL_OFFICIAL    "Officieel audio bestand URL"
+    IDS_MP3_URL_ARTIST      "Officiële artiest/zanger URL"
+    IDS_MP3_URL_ASOURCE     "Officiële audio bron URL"
+    IDS_MP3_URL_IRADIO      "Officieel internet radio station URL"
+    IDS_MP3_URL_PAYMENT     "Betaling URL"
+    IDS_MP3_URL_PUBLISHER   "Officiële uitgevers URL"
+    IDS_MP3_PUBLISHER       "Uitgever"
+    IDS_MP3_USERURL         "Aangepast URL"
+    IDS_MP3_USERTEXT        "Aangepaste tekst"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MMV_OOM             "Onvoldoende geheugen"
+    IDS_MMV_UNKNOWN_FILE    "Onbekend bestand"
+    IDS_MMV_OPEN_ERROR      "Fout bij openen"
+    IDS_MMV_READ_ERROR      "Leesfout"
+    IDS_MMV_WRITE_ERROR     "Schrijffout"
+    IDS_MMV_SEEK_ERROR      "Zoek fout"
+    IDS_MMV_CORRUPTED_FILE  "Beschadigd bestand"
+END
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_MMV_EXTENSION_ERROR "Kan de Windows uitbreidingen niet initialiseren"
+END

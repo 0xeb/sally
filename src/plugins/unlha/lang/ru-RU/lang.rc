@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for unlha. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Просмотр и извлечение архивов LHA."
+ IDS_ABOUT, "О модуле"
+ IDS_FILECORRUPT, "Некорректный LZH-файл или неизвестный формат файла."
+ IDS_CHECKSUMERROR, "Ошибка контрольной суммы заголовка.\nАрхив поврежден, не все файлы будут отображены."
+ IDS_LOWMEM, "Недостаточно памяти."
+ IDS_WRITEERROR, "Ошибка записи"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "Ошибка открытия архива."
+ IDS_LIST, "Не удалось добавить запись в список файлов."
+ IDS_SYMLINK, "Архив содержит одну или несколько символических ссылок UNIX, которые не могут быть отображены."
+ IDS_UNPACKERROR, "Не удается распаковать архив."
+ IDS_CRCERROR, "Ошибка сжатия данных. Контрольная сумма (CRC) не совпадает."
+ IDS_READERROR, "Ошибка чтения архива."
+ IDS_EXTRPROGTITLE, "Распаковка LHA-архива - %s"
+ IDS_PREPAREDATA, "подготовка данных и создание папок..."
+ IDS_UNPACKING, "распаковка: "
+ IDS_EXTRACTFILES, "распаковка..."
+ IDS_TOOLONGNAME, "Невозможно закончить операцию из-за слишком длинного пути."
+ IDS_TOOLONGMASK, "Невозможно закончить операцию из-за слишком длинной маски."
+ IDS_METHOD, "Неизвестный алгоритм сжатия. Невозможно распаковать файл."
+ IDS_METHOD2, "неизвестный алгоритм пропущен..."
+}

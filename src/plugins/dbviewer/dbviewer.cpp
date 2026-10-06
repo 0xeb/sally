@@ -19,7 +19,7 @@
 #define DBVIEWER_WIDEN2(x) L##x
 #define DBVIEWER_WIDEN(x) DBVIEWER_WIDEN2(x)
 
-// untranslated plugin name (used before the language module is loaded + for debug cases where translation would be harmful)
+// untranslated plugin name (used before the translated resources are needed + for debug cases where translation would be harmful)
 const wchar_t* READABLE_EN_PLUGIN_NAME = L"Database Viewer";
 
 /*
@@ -34,7 +34,7 @@ CPluginInterface PluginInterface;
 CPluginInterfaceForViewer InterfaceForViewer;
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
-HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources
+HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 HACCEL HAccel = NULL;
 
 // generic Salamander interface - valid from plugin start until shutdown
@@ -346,10 +346,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL;
     }
 
-    // let Salamander load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), READABLE_EN_PLUGIN_NAME);
-    if (HLanguage == NULL)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    HLanguage = DLLInstance;
 
     // obtain the generic Salamander interface
     SalGeneral = salamander->GetSalamanderGeneral();

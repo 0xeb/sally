@@ -10,7 +10,6 @@
 // Add manually edited resources here...
 
 #include "..\versinfo.rh2"
-#include "versinfo.rc2"
 
 STRINGTABLE
 {
@@ -205,6 +204,7 @@ STRINGTABLE
   IDS_SIZE_KB, "KB"
   IDS_SIZE_MB, "MB"
   IDS_MODIFICATION_NOT_SUPPORTED, "The ZIP file uses data format which is not supported for modification by the current version of the ZIP plugin"
+  IDS_WAITFOR_INFO, "It is necessary only if the installation program launch another executable which continues installation while the original installation program is finished.\nIn this manner behaves e.g some versions of Install Shield."
 }
 
 STRINGTABLE

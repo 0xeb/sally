@@ -1,0 +1,110 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// French (fr-FR) resources for automation. Translation: Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/automation/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_INPUTBOX DIALOGEX 75, 140, 205, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Boîte d'entrée"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Invite:",IDC_PROMPT,8,8,189,8
+    EDITTEXT        IDC_INPUTBOX,8,18,189,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",1,48,42,50,14,WS_GROUP
+    PUSHBUTTON      "Annuler",2,107,42,50,14
+END
+
+IDD_CONFIG DIALOGEX 75, 140, 332, 143
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuration de l'automatisation"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Répertoires des &scripts:",IDC_DIRLISTHEADER,8,9,81,8
+    CONTROL         "",IDC_DIRLIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,8,19,316,73
+    CONTROL         "Activer le &débogage de script",IDC_ENABLEDBG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,102,110,10
+    DEFPUSHBUTTON   "OK",IDOK,75,121,50,14,WS_GROUP
+    PUSHBUTTON      "Annuler",IDCANCEL,141,121,50,14
+    PUSHBUTTON      "&Aide",IDHELP,207,121,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_BROWSE MENU
+BEGIN
+    POPUP "[POPUP]"
+    BEGIN
+        MENUITEM "Parcourir…",                     ID_BROWSE
+        MENUITEM SEPARATOR
+        MENUITEM "Répertoire de Sally",        ID_SALDIR
+        MENUITEM "Variable d'environnement",        ID_ENVVAR
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+BEGIN
+    IDS_SCRIPTERROR         "Erreur de script d'automatisation"
+    IDS_LINE                "Ligne:\t%u\r\n"
+    IDS_COLUMN              "Colonne:\t%u\r\n"
+    IDS_ERROR               "Erreur:\t%s"
+    IDS_RUNFOCUSED          "Exécuter le script désigné"
+    IDS_PROGRESSTITLE       "Progression de l'opération"
+    IDS_SOURCE              "Source:\t%s\r\n"
+    IDS_SCRIPTPOPUPMENU     "Ouvrir le menu de script"
+    IDS_MENUEMPTY           "(pas de script)"
+    IDS_LOADERRFMT          "Impossible d'exécuter le script '%s'.\r\n%s"
+    IDS_UNKERROR            "Erreur inconnue."
+    IDS_ABORT               "1\t&Interrompre"
+    IDS_DEBUGABORT          "1\t&Déboguer\t2\t&Annuler"
+    IDS_ADDDIRTITLE         "Répertoire du script"
+    IDS_ADDDIRDESCR         "Sélectionnez le répertoire d'enregistrement du script."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGINNAME          "Automatisation"
+    IDS_DESCRIPTION         "Automatise les tâches régulières à l'aide de scripts."
+    IDS_ABOUT               "A propos du module"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_E_INVALIDARCHIVE    "Archive invalide."
+    IDS_E_CANNOTCLOSEPATH   "Impossible de fermer le chemin en cours."
+    IDS_E_SHORTERPATH       "Le chemin a été tronqué."
+    IDS_E_READONLYWHILEPROGRESSSHOWN 
+                            "Modification de la propriété ou appel de la méthode %s impossible si la fenêtre est ouverte."
+    IDS_E_READONLYWHILEPROGRESSHIDDEN 
+                            "Modification de la propriété ou appel de la méthode %s impossible si la fenêtre est cachée."
+    IDS_E_PLUGLOADFAIL      "Chargement du module impossible."
+    IDS_E_PLUGERROR         "Echec du module."
+    IDS_E_CACHEERROR        "Impossible de déplacer le fichier vers le cache disque."
+    IDS_E_FILEMASKSYNTAX    "Erreur de syntaxe dans le masque de fichier."
+    IDS_E_NOTCOMPONENT      "Seul des composants peuvent être ajoutés au conteneur."
+    IDS_E_FORMPUT           "Impossible d'ajouter des formulaires au conteneur."
+    IDS_E_SCRIPTABORTED     "L'exécution du script a été interrompue par l'utilisateur."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABORTCAPTION        "Interrompre le script"
+    IDS_ABORTTIP            "Interrompre l'exécution du script\tCtrl+Break"
+    IDS_MAINWINDOWLOCKED    "La fenêtre Sally est bloquée par le module Automatisation. Veuillez terminer le script en, cours d'exécution."
+    IDS_ENGINECREATEFAIL    "Echec du lancement du moteur de scripting."
+END

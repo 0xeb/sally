@@ -1,0 +1,116 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for unarj. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unarj/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unarj.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CHANGEDISK DIALOGEX 6, 15, 194, 110
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Következő kötet"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Kérem helyezze be a következő kötet lemezét vagy keresse ki a következő fájlt.\n\nOK ha kész.",IDC_STATIC_1,12,9,170,32
+    LTEXT           "Előző kötet:",IDC_STATIC_2,12,48,60,8
+    EDITTEXT        IDC_PREVVOL,73,48,109,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | NOT WS_TABSTOP
+    LTEXT           "&Következő kötet:",IDC_STATIC_3,12,62,57,8
+    EDITTEXT        IDC_FILENAME,12,72,155,12
+    PUSHBUTTON      "...",IDC_BROWSE,170,72,13,12
+    DEFPUSHBUTTON   "OK",IDOK,39,91,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,102,91,50,14
+END
+
+IDD_ERROR DIALOGEX 15, 34, 350, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Hiba"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Név:",IDC_STATIC_1,8,10,22,8
+    LTEXT           "",IDS_FILENAME,34,10,309,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Hiba:",IDC_STATIC_2,8,23,22,8,NOT WS_GROUP
+    LTEXT           "A fájl nem tömöríthető ki, mert egy előző kötet folytatása. A fájl kibontásához, azzal a kötettel kell indítania, ahol a fájl kezdődik.",IDC_STATIC_3,34,23,309,16,SS_NOPREFIX | NOT WS_GROUP
+    CONTROL         "&Ne mutassa ezt az üzenetet.",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,34,44,183,12
+    DEFPUSHBUTTON   "OK",IDOK,120,63,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,180,63,50,14
+END
+
+IDD_CONFIG DIALOGEX 22, 38, 220, 85
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ beállítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "folytatandó fájlokat.",IDC_STATIC_1,23,22,154,8
+    CONTROL         "Kibontáskor &automatikusan hagyja ki az előző kötetből",IDC_SKIPCONTINUED,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,10,195,12
+    LTEXT           "listázható ki.",IDC_STATIC_2,23,44,111,8
+    CONTROL         "&Ne figyelmeztessen, ha az archívum teljes tartalma nem",IDC_NOVOLATTENTION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,32,199,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,6,60,208,1
+    DEFPUSHBUTTON   "OK",IDOK,57,66,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,112,66,50,14
+END
+
+IDD_WARNING DIALOGEX 6, 15, 213, 107
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnARJ - Figyelmeztetés"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "A több-kötetes archívum nem minden fájlja listázható (és látható a panelben), mert néhány archívum kötet nem található.",IDC_STATIC_1,11,10,194,24
+    LTEXT           "A archívum teljes tartalmához, az archívum minden kötetét másoljon egy mappába.",IDC_STATIC_2,11,41,192,16
+    CONTROL         "&Ne mutassa ezt az üzenetet",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,66,157,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,5,83,203,1
+    DEFPUSHBUTTON   "OK",IDOK,153,89,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnARJ"
+  IDS_PLUGIN_DESCRIPTION, "ARJ archívumok böngészése és kibontása."
+  IDS_ABOUT, "Plugin névjegy"
+  IDS_LOWMEM, "Kevés memória."
+  IDS_ARCEOF, "Nem várt archívum vég."
+  IDS_BADDATA, "Az archívum sérült."
+  IDS_BADARC, "A fájl ismeretlen formátumú vagy nem érvényes ARJ archívum."
+  IDS_ERROPENARC, "Az archívum nem nyitható meg."
+  IDS_UNKNOWN, "Ismeretlen hiba lépett fel."
+  IDS_ERRACCESSARC, "Az archívum nem érhető el."
+  IDS_ARJARCHIVES, "ARJ archívum (*.A*)"
+  IDS_ALLFILES, "Minden fájl (*.*)"
+  IDS_BROWSEARCHIVETITLE, "Válasszon archívumot"
+  IDS_CRC, "Hiba a tömörített adatban. A CRC nem egyezik."
+  IDS_LIST, "Nem adható archívum bejegyzés a fájl listához."
+  IDS_EXTRPROGTITLE, "ARJ archívum kibontása - %s"
+  IDS_PREPAREDATA, "adat előkészítése és mappák létrehozása..."
+  IDS_EXTRACTFILES, "kibontás..."
+  IDS_EXTRACTING, "kibontás: "
+  IDS_UNABLEGETFIELPOS, "Nem szerezhető meg a fájlmutató: "
+  IDS_UNABLEWRITE, "Nem lehet a fájlba írni:"
+  IDS_UNABLESEEK, "Nem állítható be a fájlmutató: "
+  IDS_TOOLONGNAME, "Nem fejezhető be a művelet, mert túl hosszú az elérési név."
+  IDS_TOOLONGMASK, "Nem fejezhető be a művelet, mert a maszk túl hosszú."
+  IDS_VERSION, "Ismeretlen verziójú tömörített fájl."
+  IDS_TYPE, "Ismeretlen tömörítési típusú fájl."
+  IDS_METHOD,  "Az UnARJ plugin által nem támogatott tömörítési módot használ a fájl."
+  IDS_ENCRYPT, "Sajnálom, a titkosított fájlok nem támogatottak."
+  IDS_BADVOL, "Érvénytelen kötet vagy ismeretlen archívum szerkezet."
+  IDS_EXPIRE, "Sajnálom, a plugin lejárt. Látogassa meg weboldalunk az új verzióhoz."
+  IDS_NOTFOUND, "A fájl nem található."
+  IDS_ERROR, "Hiba"
+}

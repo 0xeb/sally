@@ -1,0 +1,110 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for automation. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/automation/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_INPUTBOX DIALOGEX 75, 140, 205, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Vstupný box"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Výzva:",IDC_PROMPT,8,8,189,8
+    EDITTEXT        IDC_INPUTBOX,8,18,189,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",1,48,42,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",2,107,42,50,14
+END
+
+IDD_CONFIG DIALOGEX 75, 140, 332, 143
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Automatizácia - Konfigurácia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Adresáre &skriptov:",IDC_DIRLISTHEADER,8,9,67,8
+    CONTROL         "",IDC_DIRLIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,8,19,316,73
+    CONTROL         "Povoliť &ladenie skriptu",IDC_ENABLEDBG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,102,105,10
+    DEFPUSHBUTTON   "OK",IDOK,75,121,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,141,121,50,14
+    PUSHBUTTON      "&Nápoveda",IDHELP,207,121,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_BROWSE MENU
+BEGIN
+    POPUP "[POPUP]"
+    BEGIN
+        MENUITEM "Prechádzať…",                     ID_BROWSE
+        MENUITEM SEPARATOR
+        MENUITEM "Adresár Sally",        ID_SALDIR
+        MENUITEM "Premenná prostredia",        ID_ENVVAR
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+BEGIN
+    IDS_SCRIPTERROR         "Chyba skriptu automatizácie"
+    IDS_LINE                "Riadok:\t%u\r\n"
+    IDS_COLUMN              "Stĺpec:\t%u\r\n"
+    IDS_ERROR               "Chyba:\t%s"
+    IDS_RUNFOCUSED          "Spustiť zameraný skript"
+    IDS_PROGRESSTITLE       "Proces operácie"
+    IDS_SOURCE              "Zdroj:\t%s\r\n"
+    IDS_SCRIPTPOPUPMENU     "Otvoriť ponuku skriptov"
+    IDS_MENUEMPTY           "(žiadny skript)"
+    IDS_LOADERRFMT          "Zlyhalo vykonanie skriptu '%s'.\r\n%s"
+    IDS_UNKERROR            "Neznáma chyba."
+    IDS_ABORT               "1\t&Prerušiť"
+    IDS_DEBUGABORT          "1\t&Ladiť\t2\t&Prerušiť"
+    IDS_ADDDIRTITLE         "Adresár skriptu"
+    IDS_ADDDIRDESCR         "Vyberte adresár úložiska skriptu."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGINNAME          "Automatizácia"
+    IDS_DESCRIPTION         "Automatizuje bežné úlohy použitím skriptov."
+    IDS_ABOUT               "O plugine"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_E_INVALIDARCHIVE    "Neplatný archív."
+    IDS_E_CANNOTCLOSEPATH   "Nie je možné zatvoriť aktuálnu cestu."
+    IDS_E_SHORTERPATH       "Cesta bola skrátená."
+    IDS_E_READONLYWHILEPROGRESSSHOWN 
+                            "Nie je možné zmeniť vlastnosť alebo metódu volania %s pri zobrazenom okne."
+    IDS_E_READONLYWHILEPROGRESSHIDDEN 
+                            "Nie je možné zmeniť vlastnosť alebo metódu volania %s pri skrytom okne."
+    IDS_E_PLUGLOADFAIL      "Zlyhalo načítanie pluginu."
+    IDS_E_PLUGERROR         "Zlyhanie pluginu."
+    IDS_E_CACHEERROR        "Zlyhal presun súboru do pamäti disku."
+    IDS_E_FILEMASKSYNTAX    "Syntaktická chyba v súborovej maske."
+    IDS_E_NOTCOMPONENT      "Do kontajnera môžu byť pridané iba komponenty."
+    IDS_E_FORMPUT           "Formy nie je možné pridať do kontejnera."
+    IDS_E_SCRIPTABORTED     "Beh skriptu bol prerušený používateľom."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABORTCAPTION        "Prerušiť skript"
+    IDS_ABORTTIP            "Prerušiť spustený skript\tCtrl+Break"
+    IDS_MAINWINDOWLOCKED    "Okno Sally je uzamknuté pluginom automatizácie. Prosím ukončite spustený skript."
+    IDS_ENGINECREATEFAIL    "Nie je možné inicializovať skriptovací stroj."
+END

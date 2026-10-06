@@ -24,7 +24,7 @@
 /// Plugin module instance handle.
 HINSTANCE g_hInstance;
 
-/// Language module instance handle.
+/// Module with the language-dependent resources (this DLL; it carries every language).
 HINSTANCE g_hLangInst;
 
 /// Salamander general interface.
@@ -42,7 +42,7 @@ CSalamanderGUIAbstract* SalamanderGUI;
 /// Instance of our plugin.
 CAutomationPluginInterface g_oAutomationPlugin;
 
-/// Caption for the dialog boxes before we load the language module.
+/// Caption for the dialog boxes shown before the plugin is initialized.
 const wchar_t MSGBOX_CAPTION_W[] = L"Automation";
 
 /// Entry point of the SPL module.
@@ -101,11 +101,8 @@ CPluginInterfaceAbstract*
         return NULL;
     }
 
-    g_hLangInst = salamander->LoadLanguageModule(
-        salamander->GetParentWindow(),
-        MSGBOX_CAPTION_W);
-    if (!g_hLangInst)
-        return NULL;
+    // the plugin's resources (every language) are in its own DLL
+    g_hLangInst = g_hInstance;
 
     if (!InitializeWinLib(MSGBOX_CAPTION_W, g_hInstance))
     {

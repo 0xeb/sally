@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for tar. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/tar/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\tar.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "Unix archívumok böngészése és kibontása."
+ IDS_ABOUT, "Plugin névjegy"
+ IDS_TARERR_TITLE, "TAR Plugin Hiba"
+ IDS_TARERR_UNKNOWN, "Az archívum formátuma nem ismerhető fel vagy nem támogatott."
+ IDS_TARERR_HEADER, "Érvénytelen adat a TAR fejlécben - sérült archívum."
+ IDS_TARERR_CHECKSUM, "Rossz fájl vagy fejléc összeg - sérült archívum."
+ IDS_TARERR_FDATA, "Belső hiba: sérült fájl adatszerkezet."
+ IDS_TARERR_BADSIG, "Ismeretlen blokk jelzés - kihagyás."
+ IDS_TARERR_NOTFOUND, "A szükséges fájl nincs az archívumban."
+ IDS_TARERR_MEMORY, "Memóriakiosztási hiba."
+ IDS_UNPACKPROGRESS_TITLE, "Kitömörítés"
+ IDS_UNPACKPROGRESS_TEXT, "Kibontás "
+ IDS_SKIPPROGRESS_TEXT, "Kihagyás "
+ IDS_GZERR_TITLE, "GZip hiba"
+ IDS_GZERR_BADMETHOD, "Ismeretlen tömörítési módot használ, nem tömöríthető ki."
+ IDS_GZERR_ENCRYPTED, "A fájl titkosított. A titkosítás nem támogatott GZip archívumokban."
+ IDS_GZERR_MULTIPART, "A fájl egy többrészes archívum része. A többrészes GZip archívumok nem támogatottak."
+ IDS_GZERR_BADFLAGS, "Ismeretlen jelzés a GZip fejlécben, nem tömöríthető ki."
+ IDS_GZERR_FOPEN, "Archívum megnyitási hiba: "
+ IDS_ERR_FREAD, "Archívum olvasási hiba: "
+ IDS_TARERR_FWRITE, "Kimeneti fájl írási hiba: "
+ IDS_TARERR_WRSIZE, "A WriteFile funkció visszautasított minden írást."
+ IDS_GZERR_BADBLOCKTYPE, "Érvénytelen blokk a GZip folyamban, nem tömöríthető ki."
+ IDS_ERR_INTERNAL, "Belső hiba a TAR pluginban, kérjük, jelentse itt: https://github.com/0xeb/sally/issues."
+ IDS_ERR_MEMORY, "Memóriakiosztási hiba."
+ IDS_GZERR_CRC, "CRC hiba."
+ IDS_ERR_CORRUPT, "Nem várt adat a tömörített folyamban, az archívum sérült."
+ IDS_ERR_EOF, "Korán lett vége a fájlnak."
+ IDS_GZERR_SEEK, "Keresési hiba az archívumban: "
+ IDS_RPM_VIEWTITLE, "RPM Néző"
+ IDS_ERR_RPMTITLE, "RPM hiba"
+ IDS_RPMERR_TMPNAME, "Ideiglenes fájlnév létrehozási hiba."
+ IDS_RPMERR_TMPFILE, "Ideiglenes fájl létrehozási hiba."
+ IDS_ERR_NORPM, "A fájl nem ismerhető fel RPM archívumként."
+ IDS_ERR_BADRPMVERSION, "Az archívum által kért  RPM verzió nem támogatott."
+ IDS_ERR_BADSIGNATURE, "Ismeretlen RPM archívum jelzés."
+ IDS_CPIOERR_BADSIG, "Rossz jelzésű fájl."
+ IDS_CPIOERR_HEADER, "Sérült fejléc."
+ IDS_CPIOERR_FORMAT, "Ismeretlen formátumú cpio fejléc."
+ IDS_LZH_NOT_IMPLEMENTED, "LZH archívumok még nem támogatottak."
+}

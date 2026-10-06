@@ -1,0 +1,197 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for 7zip. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/7zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\7zip.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 23, 38, 220, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configurare 7-Zip"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Setari panou",IDC_STATIC_1,5,6,45,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,52,10,165,1
+    CONTROL         "Afisare dialog cu &optiuni extinse inainte de arhivare",IDC_CFG_SHOWEXTENDEDOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,19,196,10
+    CONTROL         "Afiseaza &informatie suplimentara cand listezi o arhiva",IDC_CFG_EXTENDEDLISTINFO,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,31,190,10
+    CONTROL         "Arhivat",IDC_CFG_LISTINFOPACKEDSIZE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,43,60,10
+    CONTROL         "Metoda",IDC_CFG_LISTINFOMETHOD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,26,55,38,10
+    LTEXT           "Parametri default de compresie",IDC_STATIC_3,5,70,107,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,114,74,103,1
+    LTEXT           "&Nivelul de compresie:",IDC_STATIC_5,10,85,74,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,88,83,86,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Metoda comprimare:",IDC_STATIC_6,10,103,72,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,88,101,86,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Marimea &dictionarului:",IDC_STATIC_7,10,121,77,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,88,119,86,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Marimea &cuvantului:",IDC_STATIC_8,10,139,76,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,88,137,86,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Creaza arhiva &solida",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,155,80,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,3,175,214,1
+    DEFPUSHBUTTON   "OK",IDOK,53,181,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,108,181,50,14
+    PUSHBUTTON      "Help",IDHELP,163,181,50,14
+END
+
+IDD_NEWARCHIVE DIALOGEX 27, 37, 291, 224
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Creaza o Noua Arhiva"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Arhiva:",IDC_STATIC_1,16,7,28,8
+    LTEXT           "",IDC_NA_ARCHIVE,47,7,235,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,8,21,275,1
+    CONTROL         "Crip&teaza fisiere",IDC_NA_ENCRYPTFILES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,28,67,10
+    LTEXT           "&Parola:",IDC_NA_PASSWORD_TXT,105,29,25,8
+    EDITTEXT        IDC_NA_PASSWORD,165,27,78,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Confirma p&arola:",IDC_NA_CONFIRMPASSWORD_TXT,105,46,58,8
+    EDITTEXT        IDC_NA_CONFIRMPASSWORD,165,44,78,12,ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Parametri comprimare",IDC_STATIC_3,8,67,77,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,87,71,196,1
+    LTEXT           "&Nivel comprimare:",IDC_STATIC_5,16,85,64,8
+    COMBOBOX        IDC_CFG_COMPRESS_LEVEL,96,83,95,85,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Metoda comprimare:",IDC_STATIC_6,16,103,72,8
+    COMBOBOX        IDC_CFG_COMPRESS_METHOD,96,101,95,41,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Marimea d&ictionarului:",IDC_STATIC_7,16,121,77,8
+    COMBOBOX        IDC_CFG_DICT_SIZE,96,119,95,114,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Marimea c&uvantului:",IDC_STATIC_8,16,139,71,8
+    COMBOBOX        IDC_CFG_WORD_SIZE,96,137,95,104,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Creaza arhiva &solida",IDC_CFG_SOLID_ARCHIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,159,80,12
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,8,181,275,1
+    CONTROL         "Nu a&rata acest dialog din nou (poti schimba apoi in dialogul de confirmare)",IDC_NA_NOTAGAIN,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,187,264,12
+    PUSHBUTTON      "C&onfigurare...",IDC_SHOW_CONFIG,10,204,60,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,121,204,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,176,204,50,14
+    PUSHBUTTON      "Help",IDHELP,231,204,50,14
+END
+
+IDD_ENTERPASSWORD DIALOGEX 6, 15, 277, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Introdu parola pentru 7-Zip"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,16,12,20,20
+    LTEXT           "Acest fisier este criptat. Te rog introdu parola pentru decriptare.",IDC_STATIC_1,48,12,218,8
+/*    LTEXT           "File:",IDC_STATIC_2,48,26,17,8
+    LTEXT           "",IDC_FILE,65,26,175,8 */
+    LTEXT           "Parola:",IDC_STATIC_3,48,40,25,8
+    EDITTEXT        IDC_PASSWORD,77,38,181,12,ES_PASSWORD | ES_AUTOHSCROLL
+/*
+ // preparation for skip and skip all
+    DEFPUSHBUTTON   "OK",IDOK,12,63,50,14
+    PUSHBUTTON      "Skip",IDC_SKIP,72,63,50,14
+    PUSHBUTTON      "Skip all",IDC_SKIPALL,132,63,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,192,63,50,14
+*/    
+    DEFPUSHBUTTON   "OK",IDOK,152,63,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,212,63,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME,             "7-Zip"
+  IDS_ABOUT,                  "Despre Plugin"
+  IDS_PLUGIN_DESCRIPTION,     "Creaza, cauta calea, si extrage arhivele 7-Zip."
+  IDS_INSUFFICIENT_MEMORY,    "Memorie insuficienta."
+  IDS_CANT_LOAD_LIBRARY,      "Nu pot incarca libraria 7za.dll."
+  IDS_CANT_GET_CRATEOBJECT,   "Nu pot folosi metoda CreateObject."
+  IDS_CANT_GET_CLASS_OBJECT,  "Nu pot obtine clasa obiectului."
+  IDS_CANT_OPEN_ARCHIVE,      "Nu pot deschide arhiva '%s'."
+  IDS_CANT_OPEN_ARCHIVE_PWD,  "Nu pot deschide arhiva '%s'.\nPoate ati introdus din greseala parola in mod eronat."
+  IDS_ERROR,                  "Eroare interna."
+  IDS_PACKING_ARCHIVE,        "Arhivarea arhivei 7-Zip"
+  IDS_UNPACKING_ARCHIVE,      "Dezarhivarea arhivei 7-Zip"
+  IDS_UPDATING_ARCHIVE,       "Actualizarea Arhivei 7-Zip"
+  IDS_TESTING_ARCHIVE,        "Testarea arhivei 7-Zip"
+  IDS_TESTING_ARCHIVE_NAME    "Testez arhiva '%s'..."
+  IDS_READING_DIRTREE,        "Citirea arborelui directoarelor..."
+  IDS_CANT_CREATE_ARCHIVE,    "Nu pot crea arhiva."
+  IDS_TESTARCHIVE,            "Testeaza arhiva"
+  IDS_TESTARCHIVECORRUPTED,   "Arhiva '%s' e corupta."
+  IDS_TESTARCHIVEOK,          "Arhiva '%s' e OK."
+  IDS_INCORRECTPASSWORD,      "Parola incorecta"
+  IDS_INCORRECTPASSWORDBODY,  "Parola e incorecta. Va rog retastati parola. Literele din parola trebuie\nsa fie tastate folosind exact aceleasi caractere. Asigurati-va ca CapsLock nu e aprins (ON) din greseala."
+  IDS_PASSWORDSNOTMATCH,      "Parola care ati introdus-o nu se potriveste."
+  IDS_EMPTYPASSWORD,          "Parola trebuie sa fie de cel putin un caracter."
+  IDS_UPDATE_NOT_SUPPORTED,   "Operatiunile de actualizare pentru aceasta arhiva nu sunt suportate."
+  IDS_CANT_MOVE_TMPARCHIVE,   "Nu pot muta arhiva '%s' temporara."
+  IDS_CANT_DELETE_TMPARCHIVE, "Nu pot sterge arhiva '%s' temporara."
+  IDS_7Z_UPDATE_ERROR,        "A avut loc o eroare cand s-a actualizat arhiva.\n\nAceasta nu e din cauza plugin 7zip lui Sally. Problema este in 7za.dll,\ndeci NU NE raportati bug-uri, pentru ca stim de aceasta problema."
+  IDS_7Z_SOLID_DELETE_UNSUP,  "Stergerea fisierelor din arhive solide nu este suportata."
+  IDS_CANT_UPDATE_ARCHIVE,    "Nu pot actualiza arhiva '%s'."
+  IDS_CANT_CREATE_TMPFILE,    "Nu pot crea fisierul temporar."
+//  IDS_CANT_CREATEMUTEX,       "Cannot create mutex."
+  IDS_ARCHIVE_CHANGED,        "Fisierul '%s' arhiva s-a modificat. Arhiva va fi redeschisa in panou."
+  IDS_DELETE_ERROR,           "Sterge Eroare"
+  IDS_ADD_FILES_TO_ARCHIVE,   "Adauga Fisiere la Arhiva"
+  IDS_CREATE_NEW_ARCHIVE,     "Creaza o Noua Arhiva"
+  IDS_REMOVING_FILES,         "Eliminarea fisierelor..."
+  IDS_READING_ARCHIVEITEMS,   "Citirea obiectelor arhivei..."
+  IDS_UNPACKING,              "Dezarhivarea..."
+  IDS_PACKING,                "Arhivarea..."
+  IDS_REMOVING,               "Eliminarea..."
+  IDS_UPDATING,               "Actualizare..."
+  IDS_CANCELING_OPERATION,    "Anularea operatiunei, va rugam asteptati..."
+  IDS_UNSUPPORTED_METHOD,     "Metoda nesuportata."
+  IDS_CRC_FAILED,             "CRC a esuat."
+  IDS_UNKNOWN_ERROR,          "Eroare necunoscuta."
+  IDS_DATA_ERROR,             "O eroare a datelor a avut loc cand dezarhivam fisierul '%s'."
+  IDS_DATA_ERROR_PWD,         "O eroare a datelor a avut loc cand dezarhivam fisierul '%s'.\nPoate s-a introdus parola gresit."
+  IDS_BTN_DELETE,             "&Sterge"
+  IDS_BTN_DELETE_ALL,         "St&erge tot"
+  IDS_BTN_KEEP,               "&Pastreaza"
+  IDS_BTN_KEEP_ALL,           "P&astreaza tot"
+  IDS_ERROR_PROCESSING_FILE,  "Eroare in procesarea fisierului '%s'.\n\nVrei sa stergi sau sa pastrezi acest fisier?"
+  IDS_ERROR_PROCESSING_FILE_PWD, "Eroare in procesarea fisierului '%s'.\nPoate s-a introdus parola gresit.\n\nVrei sa stergi sau sa pastrezi acest fisier?"
+  IDS_OVERWRITE_FILE,         "Suprascrierea Fisierului";
+  IDS_READONLY_ARCHIVE,       "Fisierul arhiva este in mod ""doar citire"".Va rog scoateti mai intai atributul ""doar citire""."
+  IDS_CANT_REMOVE_DIRECTORY,  "Nu pot elimina directorul '%s'"
+  IDS_CANT_READ_ARCHIVE       "Eroare in citirea din fisierul arhiva."
+  IDS_CANT_READ               "Eroare in citirea fisierului sursa."
+  IDS_CANT_WRITE              "{!}Nu pot scrie %d byte{|1|s}."
+  IDS_BTN_RETRY               "Mai Incearca"
+  IDS_BTN_ABORT               "Renunt"
+  IDS_STORE,                  "Stocheaza"
+  IDS_FASTEST,                "Cea mai rapida"
+  IDS_FAST,                   "Rapida"
+  IDS_NORMAL,                 "Normala"
+  IDS_MAXIMUM,                "Maxim"
+  IDS_ULTRA,                  "Ultra"
+  IDS_METHOD_LZMA,            "LZMA"
+  IDS_METHOD_LZMA2,           "LZMA2"
+  IDS_METHOD_PPMD,            "PPMd"
+  IDS_PACK_UPDATE_ERROR,      "O eroare a avut loc in timp ce arhivam/dezarhivam arhiva."
+  IDS_UNPACK_ERROR,           "O eroare a avut loc in timp ce dezarhivam arhiva."
+  IDS_TEST_ERROR,             "O eroare a avut loc in timp ce testam arhiva."
+  IDS_UNSUPPORTED_ARCHIVE,    "Tip arhiva nerecunoscuta sau nesuportata.\nFisierul arhiva poate ca este serios corupt."
+  IDS_7Z_FATAL_ERROR          "Arhiva nu a fost creata datorita unei erori fatale."
+  IDS_7Z_UPDATE_UNKNOWN_ERROR "Arhiva nu a fost actualizata datorita unei erori necunoscute %x."
+  IDS_7Z_CREATE_UNKNOWN_ERROR "Arhiva nu a fost creata datorita unei erori necunoscute %x."
+//  IDS_7Z_SOLID_UPDATE_UNSUP   "Updating files in solid archives is not supported."
+  IDS_LISTINFO_PAKEDSIZE      "Arhivat"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Marimea fisierului arhivat"
+  IDS_LISTINFO_METHOD         "Metoda"
+  IDS_LISTINFO_METHOD_DESC    "Metoda de comprimare"
+  IDS_ARCLOCK_ERROR           "Eroare de Blocare a Arhivei"
+  IDS_ERRADDFILE_TOOLONG,     "Nu pot adauga 1 sau mai multe fisiere la lista. Calea finala e prea lunga.\nCateva directoare sau fisiere pot lipsi in listarea arhivei."
+  IDS_ERRADDDIR_TOOLONG,      "Nu pot adauga 1 sau mai multe fisiere la lista. Calea finala e prea lunga.\nCateva directoare sau fisiere pot lipsi in listarea arhivei."
+  IDS_NAMEISTOOLONG,          "Nume ""%s"" cu calea intreaga e prea lunga.\n\nCale: %s"
+}

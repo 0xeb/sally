@@ -1,0 +1,57 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for unmime. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unmime/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unmime.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 0, 0, 271, 111
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuración de UnMIME"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Opciones de listado",IDC_STATIC_1,7,7,67,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ,76,11,189,1
+    CONTROL         "Listar &encabezados de correo",IDC_CHECK_HEADERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,20,110,10
+    CONTROL         "Listar &cuerpos de mensajes",IDC_CHECK_BODIES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,35,104,10
+    CONTROL         "Añadir &info de caracteres al nombre de fichero si no es US-ASCII",IDC_CHECK_APPEND,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,31,50,230,10
+    CONTROL         "Listar &adjuntos",IDC_CHECK_ATTACHMENTS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,18,65,62,10
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ,6,82,259,1
+    DEFPUSHBUTTON   "Aceptar",IDOK,157,90,50,14
+    PUSHBUTTON      "Cancelar",IDCANCEL,214,90,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "UnMIME"
+ IDS_OPENERROR, "No se pudo abrir el fichero."
+ IDS_LOWMEM, "Memoria insuficiente."
+ IDS_LIST, "No se pudo añadir entrada de archivo a la lista de ficheros."
+ IDS_UNKNOWN, "Este fichero contiene uno o más bloques con codificación desconocida.\nEstos bloques no serán decodificados."
+ IDS_WRITEERROR, "Error de escritura"
+ IDS_EXTRTITLE, "Desempaquetando fichero de correo - %s"
+ IDS_UNPACKING, "desempaquetando: "
+ IDS_PARSE, "Analizando fichero..."
+ IDS_BADBLOCK_DAMAGED, "Uno o más bloques %s están dañados o tienen\nformato desconocido y no se decodificarán."
+ IDS_BADBLOCK_CRC, "CRC mal en uno o más bloques %s.\nEstos bloques no serán decodificados."
+ IDS_PLUGIN_DESCRIPTION, "Hojear y extraer ficheros MIME/Base64, UU/XXEncode, yEncode y BinHex."
+ IDS_ABOUT_TITLE, "Acerca del Plugin"
+ IDS_RESOURCE_FORK_LOST, "Aviso: este fichero contiene un resource fork de Mac.\nEste fork no será desempaquetado."
+ IDS_DONT_SHOW_AGAIN, "&No mostrar esto de nuevo"
+}

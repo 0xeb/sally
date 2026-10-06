@@ -90,7 +90,7 @@ public:
 };
 
 extern HINSTANCE DLLInstance; // handle to the SPL module - language-independent resources
-extern HINSTANCE HLanguage;   // handle to the SLG module - language-dependent resources
+extern HINSTANCE HLanguage;   // handle to the module with language-dependent resources (this DLL)
 
 //extern DWORD Options;// configuration
 struct COptions
