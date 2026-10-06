@@ -183,7 +183,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    ZIP7_WIDEN(VERSINFO_VERSION_NO_PLATFORM), ZIP7_WIDEN(VERSINFO_COPYRIGHT),
                                    SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(), L"7zip", L"7z");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     return &PluginInterface;
 }
@@ -1110,7 +1110,7 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
 
     // delete files afterwards if we are moving them into the archive
     if (move && ret)
-    { // first lock the archive file so we cannot delete it ourselves (bug: https://forum.altap.cz/viewtopic.php?f=3&t=3859)
+    { // first lock the archive file so we cannot delete it ourselves
         while (1)
         {
             hArchive = ::CreateFileW(fileName, GENERIC_READ /* I tried 0, but the system then allowed deleting the file */,

@@ -234,7 +234,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_DESCRIPTION).c_str(),
                                    L"Renamer" /* do not translate! */);
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     return &PluginInterface;
 }

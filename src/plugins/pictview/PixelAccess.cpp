@@ -13,7 +13,7 @@
 #include "PixelAccess.h"
 
 #pragma runtime_checks("", off)
-// false RTC error for PV_COLOR_HC16 mode - see https://forum.altap.cz/viewtopic.php?f=16&t=5577
+// false RTC error for PV_COLOR_HC16 mode
 bool GetRGBAtCursor(LPPVHandle PVHandle, DWORD Colors, int x, int y, RGBQUAD* pRGB, int* pIndex)
 {
     LPPVImageHandles pHandles;

@@ -6,7 +6,7 @@ VERSION,"1,1,1,180"
 [TRANSLATION]
 LANGID,1049
 AUTHOR,"Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6166"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Русская версия"
 
 [DIALOG 1000]

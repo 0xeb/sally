@@ -437,7 +437,6 @@ BOOL PackUniversalCompress(HWND parent, const wchar_t* command, TPackErrorTable*
     }
 
     // hack for RAR 4.x+ that dislikes "-ap""" when addressing the archive root; this cleanup works with older RAR too
-    // see https://forum.altap.cz/viewtopic.php?f=2&t=5487
     if (rootPath.empty() && wcsstr(command, L"$(Rar32bitExecutable) ") == command)
     {
         const size_t ap = cmdLine.find(L"\" -ap\"\" @\"");
@@ -445,7 +444,6 @@ BOOL PackUniversalCompress(HWND parent, const wchar_t* command, TPackErrorTable*
             cmdLine.replace(ap + 1, 7, 7, L' '); // remove "-ap"" that causes issues with newer RAR
     }
     // hack for copying into a directory in RAR - it fails if the path begins with a backslash; it created e.g. \Test directory but Salam shows it as Test
-    // https://forum.altap.cz/viewtopic.php?p=24586#p24586
     if (!rootPath.empty() && rootPath[0] == L'\\' &&
         wcsstr(command, L"$(Rar32bitExecutable) ") == command)
     {

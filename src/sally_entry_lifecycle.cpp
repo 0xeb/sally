@@ -334,7 +334,6 @@ HINSTANCE Shell32DLL = NULL;        // handle to shell32.dll (icons)
 HINSTANCE ImageResDLL = NULL;       // handle to imageres.dll (icons - Vista)
 HINSTANCE User32DLL = NULL;         // handle to user32.dll (DisableProcessWindowsGhosting)
 HINSTANCE HLanguage = NULL;         // handle to language-dependent resources (.SPL file)
-std::wstring CurrentHelpDir; // after first use of help, this contains path to help directory (location of all .chm files)
 WORD LanguageID = 0;                // language-id of .SPL file
 
 std::wstring OpenReadmeInNotepad; // used only when launched from installer: filename to open in notepad during IDLE (start notepad)
@@ -3792,9 +3791,7 @@ FIND_NEW_SLG_FILE:
             if (langIndex == -1) // this installation doesn't contain language matching current user-locale in Windows
             {
 
-// if this is commented out, we won't send people to download language versions from web (e.g. when there are none)
-// JRY: for AS 2.53, which comes with Czech, German and English, for other languages we'll send them to forum section
-//      "Translations" https://forum.altap.cz/viewforum.php?f=23 - maybe it will motivate someone to create their translation
+// if this is commented out, we won't send people to look for other language versions on the web (e.g. when there are none)
 #define OFFER_OTHERLANGUAGE_VERSIONS
 
 #ifndef OFFER_OTHERLANGUAGE_VERSIONS
@@ -4386,7 +4383,6 @@ FIND_NEW_SLG_FILE:
                         // files in TEMP can remain)
                         // we must test on global (across all sessions) variable, so that two
                         // Salamander instances launched under FastUserSwitching can see each other
-                        // Problem reported on forum: https://forum.altap.cz/viewtopic.php?t=2643
                         if (FirstInstance_3_or_later)
                         {
                             DiskCache.ClearTEMPIfNeeded(MainWindow->HWindow, MainWindow->GetActivePanelHWND());

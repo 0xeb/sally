@@ -794,7 +794,7 @@ public:
     // can be called from any thread
     virtual HBITMAP WINAPI LoadRawPNGBitmap(const void* rawPNG, DWORD rawPNGSize, DWORD flags, COLORREF unused) = 0;
 
-    // note 1: loaded PNG should be compressed using PNGSlim, see https://forum.altap.cz/viewtopic.php?f=15&t=3278
+    // note 1: loaded PNG should be compressed using PNGSlim
     // note 2: example of direct DIB data access see Demoplugin, AlphaBlend function
     // note 3: supported are non-interlaced PNG types: Greyscale, Greyscale with alpha, Truecolour, Truecolour with alpha, Indexed-colour
     //         condition is 8 bits per channel

@@ -184,7 +184,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    L"ZIP" /* neprekladat! */, L"zip;pk3;pk4;jar");
 
     // register the plugin home page URL
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
 #undef ZIP_WIDEN
 #undef ZIP_WIDEN2

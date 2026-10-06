@@ -413,7 +413,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINDESCR).c_str(),
                                    L"FTP", NULL, L"ftp");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     // we want to receive messages about creation/change/removal of the master password
     SalamanderGeneral->SetPluginUsesPasswordManager();

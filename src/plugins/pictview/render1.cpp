@@ -2730,8 +2730,7 @@ void GetInfo(LPTSTR buffer, HANDLE file)
 void MakeValidFileName(TCHAR* path)
 {
     // trim spaces at the beginning and spaces/dots at the end of the name; Explorer does it this way
-    // and users pushed for the same behaviour, see https://forum.altap.cz/viewtopic.php?f=16&t=5891
-    // and https://forum.altap.cz/viewtopic.php?f=2&t=4210
+    // and users pushed for the same behaviour
     TCHAR* n = path;
     while (*n != 0 && *n <= ' ')
         n++;

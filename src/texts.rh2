@@ -2223,6 +2223,7 @@
 #define IDS_MENU_HELP_ABOUT          13200
 #define IDS_MENU_HELP_FORUM          13202
 #define IDS_MENU_HELP_CHECKNEWVERSION 13203
+#define IDS_MENU_HELP_WEBSITE        13204
 
 //
 // find file menu

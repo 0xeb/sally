@@ -3610,7 +3610,6 @@ CCfgPageKeyboard::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CHyperLink* hl = new CHyperLink(HWindow, IDC_KEYBOARD_SHORTCUTS);
         if (hl != NULL)
             hl->SetActionPostCommand(CM_HELP_KEYBOARD);
-        //        hl->SetActionOpen("https://www.altap.cz/salam_en/features/keyboard.html"); // beware, one more occurrence
         break;
     }
 

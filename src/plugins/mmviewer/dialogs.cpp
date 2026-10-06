@@ -84,7 +84,7 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_ABOUT_WWW, STF_UNDERLINE | STF_HYPERLINK_COLOR);
         if (hl != NULL)
-            hl->SetActionOpen(L"http://www.tjelinek.com/");
+            hl->SetActionOpen(L"https://www.tjelinek.com/");
 
         break;
     }

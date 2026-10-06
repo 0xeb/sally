@@ -2678,7 +2678,7 @@ COPY_ADS_AGAIN:
                             const FileResult closeOutResult =
                                 CloseWorkerTrackedFile(out);
                             if (!closeOutResult.success) // even after a failed call we assume the handle is closed,
-                            {                               // see https://forum.altap.cz/viewtopic.php?f=6&t=8455
+                            {
                                 in = out = NULL;            // (reports that the target file can be deleted, so its handle was not left open)
                                 written = read = 0;
                                 pendingWriteError = closeOutResult.errorCode;
@@ -7264,7 +7264,7 @@ CONVERT_AGAIN:
                         const FileResult closeTargetResult =
                             GetWorkerFileSystem()->CloseFileHandle(hTarget);
                         if (!closeTargetResult.success) // even after a failed call we assume the handle is closed,
-                        {                                   // see https://forum.altap.cz/viewtopic.php?f=6&t=8455
+                        {
                             pendingWriteError = closeTargetResult.errorCode;
                             hSource = hTarget = NULL;       // (it states that the target file can be deleted, so the handle was not left open)
                             goto WRITE_ERROR_CONVERT;

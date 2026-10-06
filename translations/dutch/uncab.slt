@@ -6,7 +6,7 @@ VERSION,"1,2,7,180"
 [TRANSLATION]
 LANGID,1043
 AUTHOR,"Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7009"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Nederlandse versie"
 
 [DIALOG 100]

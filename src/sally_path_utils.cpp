@@ -2342,7 +2342,6 @@ BOOL PostMouseWheelMessage(MSG* pMSG)
             // some versions of synaptics touchpad (for example on HP notebooks) show their window with scrolling symbol under cursor
             // in such case we won't try to route to "correct" window under cursor, because
             // touchpad will handle it itself
-            // https://forum.altap.cz/viewtopic.php?f=24&t=6039
             if (wcscmp(className, L"SynTrackCursorWindowClass") == 0 || wcscmp(className, L"Syn Visual Class") == 0)
             {
                 //TRACE_I("Synaptics touchpad detected className="<<className);
@@ -2403,7 +2402,7 @@ LRESULT CALLBACK MenuWheelHookProc(int nCode, WPARAM wParam, LPARAM lParam)
     // in panels and commandline.
 
     // 30.11.2012 - someone appeared on forum for whom WM_MOUSEHWEEL doesn't go through message hook (same as before
-    // with Manison in case of WM_MOUSEHWHEEL): https://forum.altap.cz/viewtopic.php?f=24&t=6039
+    // with Manison in case of WM_MOUSEHWHEEL),
     // so now we'll also catch message in individual windows where it can potentially go (according to focus)
     // and subsequently route it so it's delivered to window under cursor, as we've always done
 

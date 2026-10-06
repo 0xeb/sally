@@ -6,7 +6,7 @@ VERSION,"1,2,7,183"
 [TRANSLATION]
 LANGID,1036
 AUTHOR,"Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6162"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Version française"
 
 [DIALOG 100]

@@ -162,7 +162,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"UnISO" /* do not translate! */, L"iso;isz;nrg;bin;img;pdi;cdi;cif;ncd;c2d;dmg");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     return &PluginInterface;
 }

@@ -26,7 +26,7 @@ RECT SanitizeMainWindowNormalRect(RECT rect);
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise conflicts with CSalamanderGeneral::PathIsPrefix
 
-#include <htmlhelp.h>
+#include "web_help_url.h"
 #include "stswnd.h"
 #include "editwnd.h"
 #include "usermenu.h"
@@ -400,207 +400,51 @@ void CSalamanderHelp::OnContextMenu(HWND hWindow, WORD xPos, WORD yPos)
 {
 }
 
-typedef struct tagHH_LAST_ERROR
-{
-    int cbStruct;
-    HRESULT hr;
-    BSTR description;
-} HH_LAST_ERROR;
+// Help context IDs -> manual pages (generated from the manual's topic maps).
+static const WebHelpTopic WebHelpTopics[] = {
+#include "help_topics.inc"
+};
 
+// Sally's manual lives on the website; every help request opens the matching page there. Plugins
+// pass their registered help file name ("7zip.chm"), which names their manual.
 BOOL OpenHtmlHelp(const wchar_t* helpFileName, HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet)
 {
-    //  SalMessageBox(parent, "This beta version doesn't contain help.\nPlease wait for the next beta version.",
-    //                "Open Salamander Help", MB_OK | MB_ICONINFORMATION);
-
-    HANDLES(EnterCriticalSection(&OpenHtmlHelpCS));
-
-    std::wstring helpPath;
-    if (CurrentHelpDir.empty())
-    {
-        std::wstring helpSubdir;
-        CLanguage language;
-        if (language.Init(Configuration.LoadedSLGName.c_str(), NULL))
-        {
-            helpSubdir = language.HelpDir;
-            language.Free();
-        }
-        if (helpSubdir.empty())
-        {
-            TRACE_E("OpenHtmlHelp(): unable to get (or empty) SLGHelpDir!");
-            helpSubdir = L"english";
-        }
-        BOOL ok = FALSE;
-        std::wstring modulePath;
-        if (gPathService->GetModuleFileName(HInstance, modulePath).success &&
-            CutDirectoryW(modulePath))
-        {
-            SalPathAppendW(modulePath, L"help");
-            if (DirExistsW(modulePath.c_str()))
-            { // the directory from the current .slg file does not exist
-                CurrentHelpDir = modulePath;
-                helpPath = CurrentHelpDir;
-                SalPathAppendW(helpPath, helpSubdir.c_str());
-                if (!DirExistsW(helpPath.c_str()))
-                { // the directory from the current .slg file does not exist
-                    helpPath = CurrentHelpDir;
-                    SalPathAppendW(helpPath, L"english");
-                    if (_wcsicmp(helpSubdir.c_str(), L"english") == 0 || // we already tested "english" and it does not exist so no point in trying again
-                        !DirExistsW(helpPath.c_str()))
-                    { // the ENGLISH directory does not exist
-                        HENUM find = gFileEnumerator->StartEnum(CurrentHelpDir.c_str(), L"*");
-                        if (find != INVALID_HENUM)
-                        {
-                            FileEnumEntry data;
-                            for (;;)
-                            {
-                                const EnumResult next = gFileEnumerator->NextFile(find, data);
-                                if (!next.success || next.noMoreFiles)
-                                    break;
-                                if (data.name != L"." && data.name != L".." && data.IsDirectory())
-                                {
-                                    helpPath = CurrentHelpDir;
-                                    SalPathAppendW(helpPath, data.name.c_str());
-                                    ok = TRUE;
-                                    break;
-                                }
-                            }
-                            gFileEnumerator->EndEnum(find);
-                        }
-                    }
-                    else
-                        ok = TRUE;
-                }
-                else
-                    ok = TRUE;
-                if (ok)
-                    CurrentHelpDir = helpPath;
-            }
-        }
-        if (!ok)
-        {
-            CurrentHelpDir.clear();
-
-            HANDLES(LeaveCriticalSection(&OpenHtmlHelpCS));
-
-            if (!quiet)
-            {
-                gPrompter->ShowError(LoadStrW(IDS_HELPERROR), LoadStrW(IDS_FAILED_TO_FIND_HELP));
-            }
-            return FALSE;
-        }
-    }
-
-    HANDLES(LeaveCriticalSection(&OpenHtmlHelpCS));
-
-    HH_FTS_QUERY query;
-    DWORD uCommand = 0;
+    const std::wstring manual = WebHelpManualKey(helpFileName);
+    WebHelpRequest request = WebHelpRequest::Contents;
+    const wchar_t* page = nullptr;
     switch (command)
     {
     case HHCDisplayTOC:
-    {
-        uCommand = HH_DISPLAY_TOC;
         break;
-    }
 
     case HHCDisplayIndex:
-    {
-        uCommand = HH_DISPLAY_INDEX;
-        if (dwData == 0)
-            dwData = 0;
-        break;
-    }
-
     case HHCDisplaySearch:
-    {
-        uCommand = HH_DISPLAY_SEARCH;
-        if (dwData == 0)
-        {
-            ZeroMemory(&query, sizeof(query));
-            query.cbStruct = sizeof(query);
-            dwData = (DWORD_PTR)&query;
-        }
+        request = WebHelpRequest::Search;
         break;
-    }
 
     case HHCDisplayContext:
-    {
-        uCommand = HH_HELP_CONTEXT;
+        request = WebHelpRequest::Topic;
+        page = FindWebHelpPage(WebHelpTopics, _countof(WebHelpTopics), manual, (unsigned long)dwData);
+        if (page == nullptr)
+            TRACE_IW(L"OpenHtmlHelp(): no page for help ID " << (unsigned long)dwData << L" in the " << manual.c_str() << L" manual; opening its start");
         break;
-    }
 
     default:
-    {
         TRACE_E("OpenHtmlHelp(): unknown command = " << command);
         return FALSE;
     }
-    }
 
-    if (helpFileName != NULL) // plugin help: to open the window in the right position
-    {                         // with remembered Favorites, we must open "sally.chm" first (then
-                              // the plugin help opens in this same window)
-        helpPath = CurrentHelpDir;
-        SalPathAppendW(helpPath, L"sally.chm");
-        if (FileExistsW(helpPath.c_str()))
-        {
-            HtmlHelpW(NULL, helpPath.c_str(), HH_DISPLAY_TOC, 0); // ignore potential error
-        }
-    }
-
-    BOOL ret = FALSE;
-
-    helpPath = CurrentHelpDir;
-    SalPathAppendW(helpPath, helpFileName == NULL ? L"sally.chm" : helpFileName);
-    if (FileExistsW(helpPath.c_str()))
+    const std::wstring url = BuildWebHelpUrl(L"https://sally-filemanager.app", manual, request, page);
+    if ((INT_PTR)ShellExecuteW(parent, L"open", url.c_str(), NULL, NULL, SW_SHOWNORMAL) > 32)
+        return TRUE;
+    if (!quiet)
     {
-        if (HtmlHelpW(NULL, helpPath.c_str(), uCommand, dwData) == NULL)
-        {
-            BOOL errorHandled = FALSE;
-            HH_LAST_ERROR lasterror;
-            lasterror.cbStruct = sizeof(lasterror);
-            // HH_GET_LAST_ERROR carries no string, so this compiled either way -
-            // which is exactly why the unsuffixed macro survived here. HtmlHelpA and HtmlHelpW are
-            // separate exports; this queries the error left by the HtmlHelpW call above, so it has
-            // to be the W form too.
-            if (HtmlHelpW(NULL, NULL, HH_GET_LAST_ERROR, (DWORD_PTR)&lasterror) != NULL)
-            {
-                // Only report an error if we found one:
-                if (FAILED(lasterror.hr))
-                {
-                    // Is there a text message to display...
-                    if (lasterror.description)
-                    {
-                        if (!quiet)
-                        {
-                            // Display - lasterror.description is already wide
-                            gPrompter->ShowError(LoadStrW(IDS_HELPERROR), lasterror.description);
-                            SysFreeString(lasterror.description);
-                        }
-                        else
-                        {
-                            SysFreeString(lasterror.description);
-                        }
-                        errorHandled = TRUE;
-                    }
-                }
-            }
-            if (!errorHandled && !quiet)
-            {
-                gPrompter->ShowError(LoadStrW(IDS_HELPERROR), LoadStrW(IDS_FAILED_TO_LAUNCH_HELP));
-            }
-        }
-        else
-        {
-            ret = TRUE;
-        }
+        std::wstring text = LoadStrW(IDS_FAILED_TO_LAUNCH_HELP);
+        text += L"\n\n";
+        text += url;
+        gPrompter->ShowError(LoadStrW(IDS_HELPERROR), text.c_str());
     }
-    else
-    {
-        if (!quiet)
-        {
-            gPrompter->ShowError(LoadStrW(IDS_HELPERROR), LoadStrW(IDS_FAILED_TO_FIND_HELP));
-        }
-    }
-    return ret;
+    return FALSE;
 }
 
 //****************************************************************************
@@ -1151,7 +995,7 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
 {
     // tweak the icon size
 
-    LoadSaveToRegistryMutex.Enter(); // users reported shrunken icons, see https://forum.altap.cz/viewtopic.php?t=638
+    LoadSaveToRegistryMutex.Enter(); // users reported shrunken icons
     // this synchronization ensures that two Salamanders do not interfere with each other
     // unfortunately the trick with changing "Shell Icon Size" to rebuild the cache is used by many tools (including Tweak UI),
     // so if they refresh at the same time as Salamander, conflicts occur
@@ -2357,7 +2201,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     {
         // we catch messages coming especially from newer mice (4th button and above)
         // and multimedia keyboards
-        // see https://forum.altap.cz/viewtopic.php?t=192
         DWORD cmd = GET_APPCOMMAND_LPARAM(lParam);
         switch (cmd)
         {
@@ -2882,13 +2725,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             return 0;
         }
 
-            /*
-        case CM_HELP_KEYBOARD:
+        case CM_WEBSITE:
         {
-          ShellExecute(HWindow, "open", "https://www.altap.cz/salam_en/features/keyboard.html", NULL, NULL, SW_SHOWNORMAL);
-          return 0;
+            ShellExecuteW(HWindow, L"open", L"https://sally-filemanager.app/", NULL, NULL, SW_SHOWNORMAL);
+            return 0;
         }
-*/
+
         case CM_FORUM:
         {
             ShellExecuteW(HWindow, L"open", L"https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
@@ -6366,7 +6208,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 // until 2.53b1 only this branch existed and the timer version was commented out
                 // on Windows 7 users reported activation issues when icon grouping was enabled
                 // and Salamander was minimized; sometimes clicking its preview (or Alt+Tab)
-                // would not restore Salamander, only a beep; see https://forum.altap.cz/viewtopic.php?f=6&t=3791
+                // would not restore Salamander, only a beep
                 //
                 // so we enable the delayed variant (200ms) again, but only on W7 and only if the window is minimized
                 PostMessage(HWindow, WM_USER_END_SUSPMODE, 0, 0); // if ActivateSuspMode is not >= 1, nothing happens

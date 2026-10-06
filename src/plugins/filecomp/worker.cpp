@@ -236,7 +236,6 @@ void CFilecompWorker::GuardedBody()
     {
         // Patera 2008.12.28: FILE_SHARE_WRITE added to support files locked by others
         // NOTE: IntViewer can open such files, users wants FC to support them as well
-        // See https://forum.altap.cz/viewtopic.php?t=2675
         // See also CHexFileViewWindow::SetData()
         // Use CreateFileW with wide path to support Unicode/long path filenames
         Files[i].File = CreateFileW(Files[i].Name.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,

@@ -528,7 +528,7 @@ BOOL CFindIgnore::Contains(const wchar_t* path, int startPathLen)
     for (i = 0; i < Items.Count; i++)
     {
         // startPathLen is the path length entered in the Find dialog (search root);
-        // only its subpaths are ignored, see https://forum.altap.cz/viewtopic.php?f=7&t=7434
+        // only its subpaths are ignored
         CFindIgnoreItem* item = Items[i];
         switch (item->Type)
         {

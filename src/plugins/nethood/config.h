@@ -14,7 +14,7 @@
 // SuggestedFSName/HomePageUrl/SuggestedConfigKey are native-wide SDK metadata.
 static const wchar_t SuggestedFSName[] = L"net";
 
-static const wchar_t HomePageUrl[] = L"https://github.com/0xeb/sally";
+static const wchar_t HomePageUrl[] = L"https://sally-filemanager.app/";
 
 // Do not translate, per the original comment. The note that used to sit here -
 // "stays narrow, entry.cpp's InitializeWinLib is a genuine narrow consumer" - was already false

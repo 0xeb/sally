@@ -1,5 +1,3 @@
-# see https://forum.altap.cz/viewtopic.php?f=6&t=31928
-
 class TestScope
   attr_reader :wscript_obj
   def initialize(wscript_obj)

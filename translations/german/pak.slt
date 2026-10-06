@@ -6,7 +6,7 @@ VERSION,"1,7,1,180"
 [TRANSLATION]
 LANGID,1031
 AUTHOR,"Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7334"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Deutsche Version"
 
 [DIALOG 100]

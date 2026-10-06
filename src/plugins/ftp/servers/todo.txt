@@ -20,7 +20,7 @@
 - klavesa Enter by mela v progress dialogu v listview Operations i Connections otevirat
   Solve Error dialogy
 - automaticke rolovani v listview Operations, aby user videl na operace, ktery se prave
-  provadeji (ted je nutne rolovat rucne), viz https://forum.altap.cz/viewtopic.php?f=2&t=3433
+  provadeji (ted je nutne rolovat rucne)
 - upload/download in lower/UPPER case - omrknout konkurenci
 - pri zmene bookmarku v Connect dialogu pridat potvrzeni (lidi si to meni nechtene)
 - pri reconnectech zjistovat znovu IP adresu serveru (muze byt dynamicka a zmenit se),

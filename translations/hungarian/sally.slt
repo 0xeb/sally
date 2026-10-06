@@ -1,12 +1,12 @@
 ﻿[EXPORTINFO]
 PROJECTNAME,"translator\sally 4.0\projects\hungarian\sally.atp"
-TEXTVERSION,"1.0.31"
-VERSION,"1,0,31,188"
+TEXTVERSION,"1.0.32"
+VERSION,"1,0,32,188"
 
 [TRANSLATION]
 LANGID,1038
 AUTHOR,"Török József"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6164"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Magyar változat"
 HELPDIR,"ENGLISH"
 SLGINCOMPLETE,""
@@ -300,10 +300,12 @@ SLGINCOMPLETE,""
 1,124,162,50,14,1,"Bezárás"
 271,10,86,201,8,1,"Verzió"
 1150,10,97,196,8,1,"Copyright © 1997-2023 Open Salamander Authors"
-1152,10,108,28,8,1,"Web:"
-272,40,108,160,8,1,"github.com/0xeb/sally"
-1153,10,119,214,8,1,"Sally modifications © 2025-2026 Elias Bachaalany"
-1154,10,130,214,8,1,"Licencelve a GNU General Public License 2. vagy újabb verziója alapján"
+1155,10,108,40,8,1,"Weboldal:"
+273,52,108,148,8,1,"sally-filemanager.app"
+1152,10,119,40,8,1,"GitHub:"
+272,52,119,148,8,1,"github.com/0xeb/sally"
+1153,10,130,280,8,1,"Sally modifications © 2025-2026 Elias Bachaalany"
+1154,10,141,280,8,1,"Licencelve a GNU General Public License 2. vagy újabb verziója alapján"
 286,2,154,294,1,1,""
 
 [DIALOG 300]
@@ -2516,7 +2518,7 @@ SLGINCOMPLETE,""
 
 [STRINGTABLE 68]
 11209,1,"Súgó hiba"
-11210,1,"HtmlHelp nem indítható."
+11210,1,"A kézikönyv nem nyitható meg webböngészőben. Elérhető itt:"
 11211,1,"Súgó fájl nem található."
 11215,1,"A szerkesztő mezőből menü nyitásához, nyomja meg az Alt+Jobbra gombot"
 
@@ -3081,6 +3083,7 @@ SLGINCOMPLETE,""
 13200,1,"&Sally névjegy"
 13202,1,"Hivatalos támogatási &fórum"
 13203,1,"&Új verziók ellenőrzése..."
+13204,1,"Sally &weboldal"
 
 [STRINGTABLE 119]
 13300,1,"&Fájlok"

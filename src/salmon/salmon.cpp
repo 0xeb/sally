@@ -1102,8 +1102,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
         case WAIT_OBJECT_0 + 4: // a message arrived in the message queue, pump it out
         {
             // salmon.exe uses the Win32 subsystem where Windows expects a message loop, which we do not have.
-            // After starting salmon.exe a wait cursor was shown for about 5 seconds, see
-            // https://forum.altap.cz/viewtopic.php?f=16&t=5572.
+            // After starting salmon.exe a wait cursor was shown for about 5 seconds.
             // To get rid of it we had two options: switch to the "console" subsystem
             // or pump the message loop, which I chose as the cleaner solution (when launched by the user it shows no shell window, only a message box).
             MSG msg;

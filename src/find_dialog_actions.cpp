@@ -104,8 +104,7 @@ void CFindDialog::OnHideSelection()
     }
     if (deletedCount > 0)
     {
-        // hack hack: https://forum.altap.cz/viewtopic.php?f=2&t=3112&p=14801#p14801
-        // without resetting to zero, the listview remembers the previous selection state
+        // hack hack: without resetting to zero, the listview remembers the previous selection state
         ListView_SetItemCount(FoundFilesListView->HWindow, 0);
         // notify the listview of the new number of items
         ListView_SetItemCount(FoundFilesListView->HWindow, totalCount - deletedCount);
@@ -1683,7 +1682,6 @@ void CFindDialog::OnOpen(BOOL onlyFocused)
         // Honza 4/2014: when found files come from different submenus, the "Open" command
         // from the context menu does not work for them, so we removed the old behavior
         // where all files were opened with one Enter. A new command "Open Selected" is introduced.
-        // Forum bug: https://forum.altap.cz/viewtopic.php?f=6&t=7449
         index = ListView_GetNextItem(FoundFilesListView->HWindow, index, onlyFocused ? LVNI_FOCUSED : LVNI_SELECTED);
         if (index != -1)
         {

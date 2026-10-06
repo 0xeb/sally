@@ -3046,7 +3046,6 @@ BOOL CanUseShellExecuteWndAsParent(const wchar_t* cmdName)
         return FALSE;
 
     // under Windows 8 Open With was problematic - when choosing custom program, Open dialog didn't appear
-    // https://forum.altap.cz/viewtopic.php?f=16&t=6730 and https://forum.altap.cz/viewtopic.php?t=6782
     // the problem is that code returns from invoke, but later MS accesses the parent window which we already destroyed
     // TODO: a solution would be to keep ShellExecuteWnd alive (child window, stretched over entire Salamander area, completely in its background)
     // we would just verify it's alive (that someone didn't destroy it) before passing it

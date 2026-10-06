@@ -267,7 +267,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    String<wchar_t>::LangStr(IDS_DESCRIPTION).c_str(),
                                    L"UNDELETE" /* DO NOT TRANSLATE! */, NULL, L"del");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     // get our FS-name (it could be different than "del", Salamander could change it)
     AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);

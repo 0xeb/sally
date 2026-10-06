@@ -1,7 +1,7 @@
 ==================================================================================================
 
 In Salamander 3.07 we finally updated 7za.dll to the latest 16.02 after many years.
-Users reported security holes in the old build: https://forum.altap.cz/viewtopic.php?t=32446
+Users reported security holes in the old build.
 We maintain two branches in the E:\Source\7zip repository: default and ALTAP. Procedure:
 1. download the current 7-Zip sources (for example 7z1602-src.7z)
 2. update the working copy in E:\Source\7zip to the default branch

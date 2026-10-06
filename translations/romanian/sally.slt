@@ -1,12 +1,12 @@
 ﻿[EXPORTINFO]
 PROJECTNAME,"translator\sally 4.0\projects\romanian\sally.atp"
-TEXTVERSION,"1.0.31"
-VERSION,"1,0,31,188"
+TEXTVERSION,"1.0.32"
+VERSION,"1,0,32,188"
 
 [TRANSLATION]
 LANGID,1048
 AUTHOR,"Ioan Stefancu, Donca Radu"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6165"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Versiunea romana"
 HELPDIR,"ENGLISH"
 SLGINCOMPLETE,""
@@ -300,10 +300,12 @@ SLGINCOMPLETE,""
 1,124,162,50,14,1,"Inchide"
 271,10,86,201,8,1,"Versiune"
 1150,10,97,196,8,1,"Copyright © 1997-2023 Open Salamander Authors"
-1152,10,108,28,8,1,"Web:"
-272,40,108,160,8,1,"github.com/0xeb/sally"
-1153,10,119,214,8,1,"Sally modifications © 2025-2026 Elias Bachaalany"
-1154,10,130,214,8,1,"Licentiat sub GNU General Public License versiunea 2 sau ulterioara"
+1155,10,108,40,8,1,"Site web:"
+273,52,108,148,8,1,"sally-filemanager.app"
+1152,10,119,40,8,1,"GitHub:"
+272,52,119,148,8,1,"github.com/0xeb/sally"
+1153,10,130,280,8,1,"Sally modifications © 2025-2026 Elias Bachaalany"
+1154,10,141,280,8,1,"Licentiat sub GNU General Public License versiunea 2 sau ulterioara"
 286,2,154,294,1,1,""
 
 [DIALOG 300]
@@ -2516,7 +2518,7 @@ SLGINCOMPLETE,""
 
 [STRINGTABLE 68]
 11209,1,"Eroare in Help"
-11210,1,"Nu pot lansa HtmlHelp."
+11210,1,"Manualul nu poate fi deschis într-un browser web. Este disponibil la:"
 11211,1,"Nu pot gasi fisierul help."
 11215,1,"Pentru a deschide meniul din campul edit apasa Alt+Right"
 
@@ -3081,6 +3083,7 @@ SLGINCOMPLETE,""
 13200,1,"&Despre Sally"
 13202,1,"&Forum Oficial de Suport"
 13203,1,"&Verifica actualizari..."
+13204,1,"Site-ul &web Sally"
 
 [STRINGTABLE 119]
 13300,1,"&Fisiere"

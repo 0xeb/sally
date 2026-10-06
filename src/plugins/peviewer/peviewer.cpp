@@ -129,7 +129,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"PEVIEWER");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     // Default configuration.
     BuildDefaultDumperChain();

@@ -65,7 +65,7 @@ BEGIN
             VALUE "SLGCRCofImpSLT", "none\0"
 #ifdef _LANG_SALLY
             VALUE "SLGHelpDir", "ENGLISH\0"
-            VALUE "SLGIncomplete", "\0" // pri nekompletnim prekladu davat: "https://forum.altap.cz/viewforum.php?f=23\0"
+            VALUE "SLGIncomplete", "\0" // for an incomplete translation, put the URL where translators can help here
 #endif
 #endif
         END

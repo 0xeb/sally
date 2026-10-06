@@ -89,7 +89,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"UnLHA" /* do not translate! */, L"lzh;lha;lzs");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     return &PluginInterface;
 }

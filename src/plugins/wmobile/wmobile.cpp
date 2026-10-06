@@ -201,7 +201,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"WMOBILE" /* do not translate! */, NULL, L"CE");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     // obtain our FS name (it may not be "cefs"; Salamander can adjust it)
     AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);

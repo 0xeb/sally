@@ -130,7 +130,7 @@ CPluginInterfaceAbstract*
         NULL);
 
     // Setup plugin home page.
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     return &g_oAutomationPlugin;
 }

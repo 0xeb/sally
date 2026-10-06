@@ -170,6 +170,7 @@ STRINGTABLE
 // IDS_MENU_HELP_TIP,          "&Tip of the Day"
  IDS_MENU_HELP_TASKLIST,     "Task &List..."
  IDS_MENU_HELP_REPORTBUG,    "&Report a Bug..."
+ IDS_MENU_HELP_WEBSITE,      "Sally W&ebsite"
  IDS_MENU_HELP_FORUM,        "Official Support &Forum"
  IDS_MENU_HELP_ABOUTPLUGINS, "About &Plugin"
  IDS_MENU_HELP_CHECKNEWVERSION, "&Check For New Versions..."
@@ -873,7 +874,7 @@ STRINGTABLE
 // IDS_EOF_CRLF,                 "CRL&F (DOS, Windows, OS/2)"
 
  IDS_HELPERROR,               "Help Error"
- IDS_FAILED_TO_LAUNCH_HELP,   "Unable to launch HtmlHelp."
+ IDS_FAILED_TO_LAUNCH_HELP,   "Unable to open the manual in a web browser. It is available at:"
  IDS_FAILED_TO_FIND_HELP,     "Unable to find help file."
 
 // choose color context menu items

@@ -34,7 +34,7 @@ const wchar_t* CONFIG_PATHFORMAT = L"Tooltip Path Format";
 
 std::wstring LangStr(int resID);
 
-const wchar_t szPluginWebsite[] = L"https://github.com/0xeb/sally"; // original domain not running: http://salamander.diskmap.net
+const wchar_t szPluginWebsite[] = L"https://sally-filemanager.app/"; // original domain not running: http://salamander.diskmap.net
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources

@@ -104,6 +104,7 @@
 #define IDD_ABOUT                       270
 #define IDS_ABOUT_SALAMANDER            271
 #define IDC_ABOUT_WWW                   272
+#define IDC_ABOUT_WEBSITE               273
 #define IDC_ABOUT_BOTTOM                286
 #define IDC_ABOUT_OPENSAL               289
 #define IDC_ABOUT_LOGO                  290

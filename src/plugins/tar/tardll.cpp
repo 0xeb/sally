@@ -166,7 +166,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"TAR" /* do not translate! */, L"tar;tgz;taz;tbz;gz;bz;bz2;z;rpm;cpio;deb");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     return &PluginInterface;
 }

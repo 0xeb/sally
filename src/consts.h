@@ -60,7 +60,6 @@ BOOL SalamanderIsNotBusy(DWORD* lastIdleTime);
 // If 'quiet' is TRUE, no error message is shown. Returns TRUE on success, otherwise FALSE.
 BOOL OpenHtmlHelp(const wchar_t* helpFileName, HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet);
 
-extern CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
 
 /* Simple way to ensure execution within a critical section, usage example:
   static CCriticalSection cs;
@@ -208,8 +207,7 @@ HANDLE SalCreateFileEx(const wchar_t* fileName, DWORD desiredAccess, // wide
 BOOL CutSpacesFromBothSidesW(wchar_t* path);
 
 // Trims spaces from beginning and spaces and dots from end of name, Explorer does this
-// and people insisted they want it too, see https://forum.altap.cz/viewtopic.php?f=16&t=5891
-// and https://forum.altap.cz/viewtopic.php?f=2&t=4210
+// and people insisted they want it too
 // returns TRUE if contents of 'path' change
 // 2026-08-26: the narrow MakeValidFileName(char*) was deleted - confirmed-dead
 // (zero callers anywhere). MakeValidFileNameW is the real, widely-used implementation.
@@ -1401,7 +1399,6 @@ extern HINSTANCE Shell32DLL;          // handle to shell32.dll (icons)
 extern HINSTANCE ImageResDLL;         // handle to imageres.dll (icons - Vista+)
 extern HINSTANCE User32DLL;           // handle to user32.dll (DisableProcessWindowsGhosting)
 extern HINSTANCE HLanguage;           // handle to language-dependent resources (path: Configuration.LoadedSLGName)
-extern std::wstring CurrentHelpDir; // after first use of help contains path to help directory (location of all .chm files)
 extern WORD LanguageID;               // language-id of language-dependent resources (.SLG file)
 
 extern BOOL UseCustomPanelFont; // if TRUE, Font and FontUL come from LogFont structure; otherwise from system font (default)

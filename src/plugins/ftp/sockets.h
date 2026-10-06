@@ -9,8 +9,8 @@
 // ****************************************************************************
 
 // if defined, DATACON_SNDBUF_SIZE and DATACON_RCVBUF_SIZE are set for data connections
-// solves the problem: https://forum.altap.cz/viewtopic.php?f=6&t=31923
-// help for the forum: ver1 = 8k (version without setting buffers), ver2 = 4m (4MB RECV buffer, 256KB SEND buffer)
+// solves a slow-transfer problem reported by users
+// test builds: ver1 = 8k (version without setting buffers), ver2 = 4m (4MB RECV buffer, 256KB SEND buffer)
 #define DATACON_USES_OUR_BUF_SIZES
 
 #define DATACON_SNDBUF_SIZE (256 * 1024)      // value taken from WinSCP (download 2.2MB/s instead of 1.6MB/s)

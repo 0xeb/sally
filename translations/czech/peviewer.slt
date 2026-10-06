@@ -6,7 +6,7 @@ VERSION,"3,0,0,180"
 [TRANSLATION]
 LANGID,1029
 AUTHOR,"Hynek Mikulič"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7008"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Česká verze"
 
 [DIALOG 8501]

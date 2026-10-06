@@ -216,7 +216,6 @@ void CMenuPopup::AssignHotKeys()
 
                 // During the first round, we try to avoid characters with diacritics so the user
                 // does not have to switch from an English keyboard
-                // see https://forum.altap.cz/viewtopic.php?f=23&t=4025
                 WCHAR buffw[10];
                 buffw[1] = 0; // so that we pass in the second round
 

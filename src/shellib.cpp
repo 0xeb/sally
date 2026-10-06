@@ -332,7 +332,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
             UINT CF_FileMapA = RegisterClipboardFormat(CFSTR_FILENAMEMAPA);
             UINT CF_FileMapW = RegisterClipboardFormat(CFSTR_FILENAMEMAPW);
 
-            // Windows XP Remote Desktop problem, see https://forum.altap.cz/viewtopic.php?p=13176#13176
+            // Windows XP Remote Desktop problem
             // If we detect truncated format names, it's most likely Remote Desktop
             // and we must not call pDataObject->GetData(), because it would trigger copying
             // files to our temp on the remote machine and we would be frozen during that time

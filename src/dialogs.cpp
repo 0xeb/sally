@@ -1534,7 +1534,6 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
         // messes up the Z-order and the system without the following hack after closing the progress window
         // activates the top-most window that is the highest; see \Source\zorder and
         // \Source\windowtest utilities.
-        // Issue reported here: https://forum.altap.cz/viewtopic.php?t=2922&start=15
         if (NextForegroundWindow != NULL && NextForegroundWindow != GetForegroundWindow())
         {
             DWORD pid;

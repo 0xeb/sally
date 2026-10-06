@@ -2,12 +2,12 @@
 
 [![Release](https://img.shields.io/github/v/release/0xeb/sally)](https://github.com/0xeb/sally/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/0xeb/sally/pr-cmake.yml?label=build)](https://github.com/0xeb/sally/actions)
-[![Stars](https://img.shields.io/github/stars/0xeb/sally?style=social)](https://github.com/0xeb/sally/stargazers)
+[![Stars](https://img.shields.io/github/stars/0xeb/sally?style=social)](https://github.com/0xeb/sally)
 [![License: GPL v2](https://img.shields.io/badge/License-GPLv2-blue.svg)](LICENSE)
 
 Sally is a fast, keyboard-first dual-panel file manager for Windows power users. It keeps the classic [Open Salamander](https://github.com/OpenSalamander/salamander) workflow alive and moves it forward for current machines: Unicode and long paths, dark mode, Windows Terminal integration, native ARM64, modern viewing, active plugin packaging, Wine compatibility, maintained language packs, and a real release pipeline.
 
-**Download:** [latest release](https://github.com/0xeb/sally/releases/latest) | **Star:** [help Sally get discovered](https://github.com/0xeb/sally) | **Support:** [PayPal](https://paypal.me/EliasBachaalany) or [Buy Me a Coffee](https://buymeacoffee.com/0xeb)
+**Website:** [sally-filemanager.app](https://sally-filemanager.app/) | **Manual:** [online](https://sally-filemanager.app/manual/), [keyboard shortcuts](https://sally-filemanager.app/manual/sally/shortcuts_keyboard.html) | **Download:** [latest release](https://github.com/0xeb/sally/releases/latest), [changelog](https://sally-filemanager.app/changelog/) | **Star:** [help Sally get discovered](https://github.com/0xeb/sally) | **Support:** [PayPal](https://paypal.me/EliasBachaalany) or [Buy Me a Coffee](https://buymeacoffee.com/0xeb)
 
 <p align="center">
   <img src="doc/images/sally-dark-unicode-long-path.png" alt="Sally in dark mode showing Unicode filenames and a long path" width="900">
@@ -126,7 +126,7 @@ required. The screenshot below is Sally on Ubuntu 24.04 (x64) under Wine.
 
 Grab an x64 runtime zip from the [Releases](https://github.com/0xeb/sally/releases)
 page and launch it with `wine sally.exe`. Sally needs no .NET or Wine Mono/Gecko.
-See the [Wine guide](doc/WINE.md) for install steps, a download/run walkthrough,
+See [Linux and Wine](https://sally-filemanager.app/download/#wine) on the website and the [Wine guide](doc/WINE.md) for install steps, a download/run walkthrough,
 a launcher wrapper, and troubleshooting.
 
 ## Support Sally
@@ -169,6 +169,9 @@ Contributions are welcome. See the [Developer Guide](doc/DEV.md) for repository 
 If you want to help with UI translations, update the relevant `.slt` archives
 under `translations/` and open a pull request.
 
+Spotted a mistake in the [manual](https://sally-filemanager.app/manual/)? Open an issue with the
+page address and the correction.
+
 Good issue reports include the Sally version, architecture, exact path or filename shape when relevant, steps to reproduce, and whether the bug happens with the latest release.
 
 ## About
@@ -188,4 +191,4 @@ Individual components and libraries have separate but compatible licenses, and s
 
 ## Resources
 
-[Altap Website](https://www.altap.cz/) | [Features](https://www.altap.cz/salamander/features/) | [Documentation](https://www.altap.cz/salamander/help/) | [Community Forum](https://forum.altap.cz/) | [Upstream Repository](https://github.com/OpenSalamander/salamander) | [Wikipedia](https://en.wikipedia.org/wiki/Altap_Salamander)
+[Sally Website](https://sally-filemanager.app/) | [Releases](https://github.com/0xeb/sally/releases) | [Discussions](https://github.com/0xeb/sally/discussions) | [Issues](https://github.com/0xeb/sally/issues) | [Upstream Repository](https://github.com/OpenSalamander/salamander) | [Wikipedia](https://en.wikipedia.org/wiki/Altap_Salamander)

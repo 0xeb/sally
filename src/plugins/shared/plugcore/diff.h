@@ -63,7 +63,7 @@
 //
 // ****************************************************************************
 //
-// Ported to C++ by Lukas Cerman <lukas.cerman altap.cz> in January 2006.
+// Ported to C++ by Lukas Cerman in January 2006.
 //
 // Original copyright notice:
 //

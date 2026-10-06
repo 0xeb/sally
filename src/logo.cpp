@@ -421,6 +421,14 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // if the environment is in Czech or in Slovak, show the Czech website automatically
         BOOL english = LanguageID != 0x405 /* Czech */ && LanguageID != 0x41B /* Slovak */;
 
+        hl = new CHyperLink(HWindow, IDC_ABOUT_WEBSITE);
+        if (hl != NULL)
+        {
+            const wchar_t* url = L"https://sally-filemanager.app/";
+            SetDlgItemTextW(HWindow, IDC_ABOUT_WEBSITE, L"sally-filemanager.app");
+            hl->SetActionOpen(url);
+        }
+
         hl = new CHyperLink(HWindow, IDC_ABOUT_WWW);
         if (hl != NULL)
         {

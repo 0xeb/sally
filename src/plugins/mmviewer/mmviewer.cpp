@@ -313,7 +313,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"MMVIEWER");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     return &PluginInterface;
 }

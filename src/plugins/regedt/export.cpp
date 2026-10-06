@@ -97,7 +97,7 @@ BOOL ExportKey(const wchar_t* fullName)
         std::wstring command;
         if (root != -1) // regedit.exe can do "export all", so we'll use it for this task even after XP
         {
-            // starting with XP we invoke the reg.exe command line, see https://forum.altap.cz/viewtopic.php?f=24&t=5682
+            // starting with XP we invoke the reg.exe command line
             // the advantage of reg.exe is that from Vista onward it does not require UAC elevation for exports
             std::wstring sysdir;
             SPLGetSystemDirectoryOwned(sysdir);

@@ -7,7 +7,6 @@
 \cmake           CMake build modules and cross-compilation toolchains
 \convert         Conversion tables for the Convert command
 \doc             Documentation
-\help            User manual source files
 \src             Sally core source code
 \src\common      Shared libraries
 \src\common\dep  Shared third-party libraries
@@ -23,6 +22,10 @@
 \tools           Minor utilities
 \translations    Translations into other languages
 ```
+
+The user manual is published at https://sally-filemanager.app/manual/. Help commands (F1, What's
+This?, dialog Help buttons, the Help menu, plugin help) open the matching page there:
+`src/web_help_url.h` builds the address and `src/help_topics.inc` maps help context IDs to pages.
 
 ## Missing Plugins
 

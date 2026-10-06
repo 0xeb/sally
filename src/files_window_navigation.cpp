@@ -636,7 +636,7 @@ int CFilesWindow::GetSelItems(int itemsCountMax, int* items, BOOL /*focusedItemF
         return index;
 
     int firstItem = 0;
-    /* Due to a considerable wave of disapproval, we have reverted this approximation to Explorer's behavior (https://forum.altap.cz/viewtopic.php?t=3044)
+    /* Due to a considerable wave of disapproval, we have reverted this approximation to Explorer's behavior
   if (focusedItemFirst)
   {
     // the focused item will be the first in the array: this is necessary for the correct functioning of Map Network Drive, at least for context menus with multiple selected shares in Network (e.g., on \\petr-pc)
@@ -2879,7 +2879,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
                                     {
                                         if (focusFirstNewItem) // found a new item
                                         {
-                                            if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
+                                            if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately)
                                             {
                                                 NextFocusNameW = newData->Name;
                                                 firstNewItemIsDir = 0 /* is file */;
@@ -2911,7 +2911,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
                 {
                     if (focusFirstNewItem) // found a new item
                     {
-                        if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
+                        if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately)
                         {
                             NextFocusNameW = newData->Name;
                             firstNewItemIsDir = 0 /* is file */;
@@ -2927,7 +2927,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     }
     if (focusFirstNewItem && i == Files->Count - 1) // found a new item
     {
-        if (!Is(ptDisk) || (Files->At(i).Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) //  on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
+        if (!Is(ptDisk) || (Files->At(i).Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) //  on disk, we ignore tmp files (they disappear immediately)
         {
             NextFocusNameW = Files->At(i).Name;
             firstNewItemIsDir = 0 /* is file */;

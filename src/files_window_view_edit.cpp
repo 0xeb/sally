@@ -1541,8 +1541,7 @@ void CFilesWindow::EditNewFile()
         // Some users always create .txt and are satisfied with overwriting just the extension; others create various files and want to overwrite the whole name,
         // so we compromised and introduced a dedicated option for Edit New File in the configuration.
         // ------------------
-        // For EditNew, the smart selection of only the name makes no sense because people also change the extension, see our forum:
-        // https://forum.altap.cz/viewtopic.php?t=2655
+        // For EditNew, the smart selection of only the name makes no sense because people also change the extension.
         // -----------------
         // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
         // the same code appears here four times

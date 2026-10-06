@@ -126,7 +126,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    SPLLoadStrOwned(SG, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"File Comparator" /* do not translate! */);
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     // must be after salamander->SetBasicPluginData because worker threads use the plugin
     // version at startup and salamander->SetBasicPluginData updates that value (it used to

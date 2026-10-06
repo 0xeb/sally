@@ -1,4 +1,3 @@
-# Courtesy https://forum.altap.cz/viewtopic.php?f=2&t=6934
 import time
 Salamander.WaitWindow.Text = "Please wait, processing ..."
 Salamander.WaitWindow.Show()

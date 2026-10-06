@@ -411,7 +411,7 @@ namespace Fx
 
     void WINAPI CFxPluginInterface::GetPluginHomePageUrl(CFxString& url) const
     {
-        url = L"https://github.com/0xeb/sally";
+        url = L"https://sally-filemanager.app/";
     }
 
     bool WINAPI CFxPluginInterface::NeedsWinLib() const

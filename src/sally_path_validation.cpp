@@ -174,18 +174,10 @@ static DWORD RunWideCheckPathWorker(const wchar_t* path)
     return result;
 }
 
-CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
-
 // non-blocking reading of volume-name from CD drive:
 CRITICAL_SECTION ReadCDVolNameCS;        // critical section for data access
 UINT_PTR ReadCDVolNameReqUID = 0;        // UID of request (to recognize if anyone is still waiting for result)
 std::wstring ReadCDVolNameBuffer; // IN/OUT value (root/volume name), protected by ReadCDVolNameCS
-
-struct CInitOpenHtmlHelpCS
-{
-    CInitOpenHtmlHelpCS() { HANDLES(InitializeCriticalSection(&OpenHtmlHelpCS)); }
-    ~CInitOpenHtmlHelpCS() { HANDLES(DeleteCriticalSection(&OpenHtmlHelpCS)); }
-} __InitOpenHtmlHelpCS;
 
 BOOL InitializeCheckThread()
 {

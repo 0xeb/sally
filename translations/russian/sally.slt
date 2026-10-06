@@ -1,12 +1,12 @@
 ﻿[EXPORTINFO]
 PROJECTNAME,"translator\sally 4.0\projects\russian\sally.atp"
-TEXTVERSION,"1.0.31"
-VERSION,"1,0,31,188"
+TEXTVERSION,"1.0.32"
+VERSION,"1,0,32,188"
 
 [TRANSLATION]
 LANGID,1049
 AUTHOR,"Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6166"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Русская версия"
 HELPDIR,"ENGLISH"
 SLGINCOMPLETE,""
@@ -300,10 +300,12 @@ SLGINCOMPLETE,""
 1,124,162,50,14,1,"Закрыть"
 271,10,86,201,8,1,"Версия"
 1150,10,97,196,8,1,"Copyright © 1997-2023 Open Salamander Authors"
-1152,10,108,28,8,1,"Сайт:"
-272,40,108,160,8,1,"github.com/0xeb/sally"
-1153,10,119,214,8,1,"Sally modifications © 2025-2026 Elias Bachaalany"
-1154,10,130,214,8,1,"Распространяется по лицензии GNU General Public License версии 2 или более поздней"
+1155,10,108,40,8,1,"Сайт:"
+273,52,108,148,8,1,"sally-filemanager.app"
+1152,10,119,40,8,1,"GitHub:"
+272,52,119,148,8,1,"github.com/0xeb/sally"
+1153,10,130,280,8,1,"Sally modifications © 2025-2026 Elias Bachaalany"
+1154,10,141,280,8,1,"Распространяется по лицензии GNU General Public License версии 2 или более поздней"
 286,2,154,294,1,1,""
 
 [DIALOG 300]
@@ -2516,7 +2518,7 @@ SLGINCOMPLETE,""
 
 [STRINGTABLE 68]
 11209,1,"Ошибка отображения справки"
-11210,1,"Не удается запустить приложение HtmlHelp."
+11210,1,"Не удается открыть руководство в веб-браузере. Оно доступно по адресу:"
 11211,1,"Не найден файл справки."
 11215,1,"Для открытия меню из поля редактирования нажмите Alt+Стрелка вправо"
 
@@ -3081,6 +3083,7 @@ SLGINCOMPLETE,""
 13200,1,"О програ&мме Sally"
 13202,1,"О&фициальный форум поддержки"
 13203,1,"&Проверить обновления..."
+13204,1,"&Сайт Sally"
 
 [STRINGTABLE 119]
 13300,1,"&Файлы"

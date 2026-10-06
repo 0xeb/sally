@@ -1878,7 +1878,7 @@ public:
     // creates based on the provided PNG resource; 'hInstance' and 'lpBitmapName' specify the resource,
     // 'imageWidth' specifies single icon width in pixels; returns TRUE on success, otherwise FALSE
     // note: PNG must be a strip of icons one row high
-    // note: PNG should be compressed using PNGSlim, see https://forum.altap.cz/viewtopic.php?f=15&t=3278
+    // note: PNG should be compressed using PNGSlim
     // LPCTSTR -> LPCWSTR. Safe despite this being a resource name that
     // callers usually pass as MAKEINTRESOURCE(id): the W form encodes an integer id in
     // the low word exactly as the A form does, so an id-valued pointer is unaffected and
@@ -1896,7 +1896,7 @@ public:
     // (for example loaded from file) and 'rawPNGSize' specifies PNG memory size in bytes,
     // 'imageWidth' specifies single icon width in pixels; returns TRUE on success, otherwise FALSE
     // note: PNG must be a strip of icons one row high
-    // note: PNG should be compressed using PNGSlim, see https://forum.altap.cz/viewtopic.php?f=15&t=3278
+    // note: PNG should be compressed using PNGSlim
     virtual BOOL WINAPI CreateFromRawPNG(const void* rawPNG, DWORD rawPNGSize, int imageWidth) = 0;
 
     // creates as a copy of another (created) icon list; if 'grayscale' is TRUE,

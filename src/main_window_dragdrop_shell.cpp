@@ -1268,7 +1268,6 @@ void CMainWindow::FocusPanel(CFilesWindow* focus, BOOL testIfMainWndActive)
         // fixes a bug (present in 2.5b10) when users had one panel active with focus on UpDir
         // and then right-clicked a file in the passive panel and chose DELETE from the context menu
         // nothing happened because the EnablerFilesDelete enabler was FALSE (not updated for the new panel)
-        // see https://forum.altap.cz/viewtopic.php?t=181
 
         // repaint the directory line of both panels
         if (old->DirectoryLine != NULL)

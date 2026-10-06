@@ -701,7 +701,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // to the focused window; I disabled the hook and now we must catch the messages in windows that may get focus
         // so the forwarding continues.
         // 30.11.2012 - someone on the forum reported that WM_MOUSEHWHEEL no longer flows through the message hook (the same as
-        // Manison previously had with WM_MOUSEHWHEEL): https://forum.altap.cz/viewtopic.php?f=24&t=6039
+        // Manison previously had with WM_MOUSEHWHEEL),
         // so now we also catch the message in each window where it can flow to (depends on focus)
         // and then route it so it reaches the window under the cursor as we've always done
 

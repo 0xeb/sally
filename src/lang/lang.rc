@@ -633,10 +633,12 @@ BEGIN
     DEFPUSHBUTTON   "Close",IDOK,124,162,50,14,WS_GROUP
     LTEXT           "Version",IDS_ABOUT_SALAMANDER,10,86,201,8
     LTEXT           "Copyright © 1997-2023 Open Salamander Authors",IDC_STATIC_1,10,97,196,8
-    LTEXT           "GitHub:",IDC_STATIC_3,10,108,28,8
-    LTEXT           "github.com/0xeb/sally",IDC_ABOUT_WWW,40,108,160,8,WS_TABSTOP
-    LTEXT           "Sally modifications © 2025-2026 Elias Bachaalany",IDC_STATIC_4,10,119,214,8
-    LTEXT           "Licensed under GNU General Public License version 2 or later",IDC_STATIC_5,10,130,214,8
+    LTEXT           "Website:",IDC_STATIC_6,10,108,40,8
+    LTEXT           "sally-filemanager.app",IDC_ABOUT_WEBSITE,52,108,148,8,WS_TABSTOP
+    LTEXT           "GitHub:",IDC_STATIC_3,10,119,40,8
+    LTEXT           "github.com/0xeb/sally",IDC_ABOUT_WWW,52,119,148,8,WS_TABSTOP
+    LTEXT           "Sally modifications © 2025-2026 Elias Bachaalany",IDC_STATIC_4,10,130,280,8
+    LTEXT           "Licensed under GNU General Public License version 2 or later",IDC_STATIC_5,10,141,280,8
     CONTROL         "",IDC_ABOUT_BOTTOM,"Static",SS_ETCHEDHORZ | WS_GROUP,2,154,294,1
 END
 

@@ -40,8 +40,7 @@ version 3.21: (28/04/2005) J.Patera
   -(packed) TARs used to be refused if w/o terminating block (bug #183)
 
 version 3.22: (23/01/2006) J.Patera
-  -GZIP: EXTRA_FIELD correctly split into EXTRA_FIELD & CONTINUATION,
-   see https://forum.altap.cz/viewtopic.php?t=187
+  -GZIP: EXTRA_FIELD correctly split into EXTRA_FIELD & CONTINUATION
 
 version 3.24: (15/05/2008) J.Patera
   -GZIP: if original file name contains Unix path

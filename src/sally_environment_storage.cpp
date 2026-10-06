@@ -20,8 +20,8 @@
 // Windows Explorer can regenerate env variables in real time as soon as someone changes them via Control Panel
 // or in the registry and broadcasts WM_SETTINGCHANGE / lParam == "Environment".
 // Regeneration is done via the undocumented SHELL32.DLL / RegenerateUserEnvironment function, which builds
-// env variables for a new process. We used this function for years, but while investigating the issue reported
-// on the forum https://forum.altap.cz/viewtopic.php?f=2&t=6188 we found it is not ideal for Salamander.
+// env variables for a new process. We used this function for years, but while investigating a reported issue
+// we found it is not ideal for Salamander.
 // It has two problems: when called from an x86 process on x64 Windows it drops several important variables:
 // "CommonProgramFiles(x86)", "CommonProgramW6432", "ProgramFiles(x86)", "ProgramW6432".
 // The second problem is that it drops variables that the process inherited on startup. For Windows Explorer

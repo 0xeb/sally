@@ -111,7 +111,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"FOLDERS" /* neprekladat! */, NULL, L"fld");
 
-    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
 
     // obtain our FS name (it may not be "fld", Salamander can adjust it)
     AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);

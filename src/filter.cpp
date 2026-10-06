@@ -1092,8 +1092,7 @@ void CFilterCriteria::PrepareForTest()
         }
         if (SystemTimeToFileTime(&stCurrent, (FILETIME*)&MaxTime))
         {
-            // since 2.52b1, we do not include future files in "Modified during"; see report on the forum
-            // https://forum.altap.cz/viewtopic.php?t=2818
+            // since 2.52b1, we do not include future files in "Modified during" (reported by users)
             UseMaxTime = TRUE;
         }
     }

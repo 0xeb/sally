@@ -1,12 +1,12 @@
 ﻿[EXPORTINFO]
 PROJECTNAME,"translator\sally 4.0\projects\spanish\sally.atp"
-TEXTVERSION,"1.0.31"
-VERSION,"1,0,31,188"
+TEXTVERSION,"1.0.32"
+VERSION,"1,0,32,188"
 
 [TRANSLATION]
 LANGID,3082
 AUTHOR,"Juan Pablo Barrio Lera"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6168"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Versión en español"
 HELPDIR,"ENGLISH"
 SLGINCOMPLETE,""
@@ -300,10 +300,12 @@ SLGINCOMPLETE,""
 1,124,162,50,14,1,"Cerrar"
 271,10,86,201,8,1,"Versión"
 1150,10,97,196,8,1,"Copyright © 1997-2023 Open Salamander Authors"
-1152,10,108,28,8,1,"Web:"
-272,40,108,160,8,1,"github.com/0xeb/sally"
-1153,10,119,214,8,1,"Sally modifications © 2025-2026 Elias Bachaalany"
-1154,10,130,214,8,1,"Licenciado bajo la Licencia Pública General de GNU versión 2 o posterior"
+1155,10,108,40,8,1,"Sitio web:"
+273,52,108,148,8,1,"sally-filemanager.app"
+1152,10,119,40,8,1,"GitHub:"
+272,52,119,148,8,1,"github.com/0xeb/sally"
+1153,10,130,280,8,1,"Sally modifications © 2025-2026 Elias Bachaalany"
+1154,10,141,280,8,1,"Licenciado bajo la Licencia Pública General de GNU versión 2 o posterior"
 286,2,154,294,1,1,""
 
 [DIALOG 300]
@@ -2516,7 +2518,7 @@ SLGINCOMPLETE,""
 
 [STRINGTABLE 68]
 11209,1,"Error en la ayuda"
-11210,1,"Imposible lanzar HtmlHelp."
+11210,1,"No se puede abrir el manual en un navegador web. Está disponible en:"
 11211,1,"Imposible encontrar fichero de ayuda."
 11215,1,"Para abrir menú desde el campo de edición pulse Alt+Dcha"
 
@@ -3081,6 +3083,7 @@ SLGINCOMPLETE,""
 13200,1,"&Acerca de Sally"
 13202,1,"Foro de a&sistencia oficial"
 13203,1,"&Comprobar actualizaciones..."
+13204,1,"Sitio &web de Sally"
 
 [STRINGTABLE 119]
 13300,1,"&Ficheros"

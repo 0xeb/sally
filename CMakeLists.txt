@@ -127,7 +127,7 @@ target_compile_definitions(sally PRIVATE
 )
 
 target_link_libraries(sally PRIVATE
-  htmlhelp comctl32 mpr ws2_32 netapi32 msimg32 shlwapi
+  comctl32 mpr ws2_32 netapi32 msimg32 shlwapi
   yyjson
   ${SAL_COMMON_LIBS}
 )

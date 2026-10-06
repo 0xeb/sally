@@ -17,6 +17,7 @@
 #include "mainwnd.h"
 #include "gui.h"
 #include "shellib.h"
+#include "web_link_url.h"
 
 #include <uxtheme.h>
 
@@ -1350,11 +1351,7 @@ void CLanguageSelectorDialog::FillControls()
         if (PluginName == NULL)
             SetDlgItemTextW(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir);
         if (Web != NULL)
-        {
-            wchar_t buff[300];
-            swprintf_s(buff, _countof(buff), L"http://%s", Items[index].Web);
-            Web->SetActionOpen(buff);
-        }
+            Web->SetActionOpen(MakeOpenableWebUrl(Items[index].Web).c_str());
     }
 }
 
@@ -1518,9 +1515,6 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-
-        // JRY: For AS 2.53 which ships with Czech, German and English we send other translations to the "Translations" section on the forum
-        //     https://forum.altap.cz/viewforum.php?f=23 - in the hope that someone will be motivated to create a translation.
 
         // There is no download page for languages yet, so this button is disabled
         // EnableWindow(GetDlgItem(HWindow, IDB_GETMORELANGS), FALSE);

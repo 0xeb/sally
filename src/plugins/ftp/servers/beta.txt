@@ -18,8 +18,7 @@ FTP released with Altap Salamanderem 2.52 beta 2: (08/21/2009)
  FTP spojeni se uz neukazuji cachovana data)
 -podpora komprese datoveho spojeni (MODE Z)
 -drag&drop bez modifikatoru (ani Shift, ani Ctrl) z FTP v panelu do Explorera
- na disk s TEMP adresarem nabizel necekane Move misto Copy, viz
- https://forum.altap.cz/viewtopic.php?f=7&t=3303
+ na disk s TEMP adresarem nabizel necekane Move misto Copy
 -cache listingu rozlisuje prikazy, kterymi byl listing ziskan (drive se chybne
  pouzivaly vysledky z cache i po zmene listovaciho prikazu)
 -automaticke aktivovani logu v Logs okne nefungovalo dobre pri pripojeni FTP do

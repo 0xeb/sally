@@ -289,6 +289,8 @@
 
 #define CM_SEC_PERMISSIONS     921
 
+#define CM_WEBSITE             922
+
 #define CM_DIRMENU             924        // otevre CtxMenu pro aktualni adresar aktivniho panelu
 
 #define CM_CUSTOMIZE_HOTPATHS  925

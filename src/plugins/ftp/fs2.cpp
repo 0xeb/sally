@@ -681,7 +681,7 @@ BOOL CPluginFSInterface::ChangePathBytes(int currentFSNameIndex, std::wstring& f
             TransferMode = stagedTransferMode;
             ClearHostFromListingCacheIfFirstCon(Host.c_str(), Port, User.c_str());
         }
-        else // connection based on changing the path in the FTP file system (e.g. Shift+F7 + "ftp://ftp.altap.cz/")
+        else // connection based on changing the path in the FTP file system (e.g. Shift+F7 + "ftp://ftp.example.com/")
         {
             if (Config.UseConnectionDataFromConfig)
                 TRACE_E("Unexpected situation in CPluginFSInterface::ChangePath() - UseConnectionDataFromConfig + nonempty userpart.");

@@ -6,7 +6,7 @@ VERSION,"3,0,1,180"
 [TRANSLATION]
 LANGID,1051
 AUTHOR,"Roman Paholík"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6167"
+WEB,"https://github.com/0xeb/sally/discussions"
 COMMENT,"Slovenská verzia"
 
 [DIALOG 100]

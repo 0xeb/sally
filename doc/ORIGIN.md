@@ -1,6 +1,6 @@
 # Origin
 
-The original version of Servant Salamander was developed by Petr Šolín during his studies at the Czech Technical University. He released it as freeware in 1997. After graduation, Petr Šolín founded the company [Altap](https://www.altap.cz/) in cooperation with Jan Ryšavý. In 2001 they released the first shareware version of the program. In 2007 a new version was renamed to Altap Salamander 2.5. Many other programmers and translators [contributed](./AUTHORS) to the project. In 2019, Altap was acquired by [Fine](https://www.finesoftware.eu/). After this acquisition, Altap Salamander 4.0 was released as freeware. In 2023, the project was open sourced under the GPLv2 license as Open Salamander 5.0.
+The original version of Servant Salamander was developed by Petr Šolín during his studies at the Czech Technical University. He released it as freeware in 1997. After graduation, Petr Šolín founded the company Altap in cooperation with Jan Ryšavý. In 2001 they released the first shareware version of the program. In 2007 a new version was renamed to Altap Salamander 2.5. Many other programmers and translators [contributed](./AUTHORS) to the project. In 2019, Altap was acquired by [Fine](https://www.finesoftware.eu/). After this acquisition, Altap Salamander 4.0 was released as freeware. In 2023, the project was open sourced under the GPLv2 license as Open Salamander 5.0.
 
 ## The Name
 
@@ -17,9 +17,6 @@ We would like to thank [Fine company](https://www.finesoftware.eu/) for making t
 
 ## Resources
 
-- [Altap Salamander Website](https://www.altap.cz/)
-- [Features](https://www.altap.cz/salamander/features/)
-- [Documentation](https://www.altap.cz/salamander/help/)
-- [Changelogs](https://www.altap.cz/salamander/changelogs/)
-- [Community Forum](https://forum.altap.cz/)
+- [Open Salamander on GitHub](https://github.com/OpenSalamander/salamander)
+- [Sally Website](https://sally-filemanager.app/)
 - [Wikipedia](https://en.wikipedia.org/wiki/Altap_Salamander)

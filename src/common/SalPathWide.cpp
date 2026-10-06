@@ -347,8 +347,8 @@ BOOL CutSpacesFromBothSidesW(wchar_t* path)
 }
 
 // Wide sibling of MakeValidFileName (files_window_view_edit.cpp) - trims
-// leading spaces and trailing spaces/dots, same Explorer-parity rule
-// (https://forum.altap.cz/viewtopic.php?f=16&t=5891), which RenameFileInternal never
+// leading spaces and trailing spaces/dots, same Explorer-parity rule,
+// which RenameFileInternal never
 // applied: a Unicode rename could leave a trailing dot/space Explorer itself would strip.
 BOOL MakeValidFileNameW(std::wstring& name)
 {
