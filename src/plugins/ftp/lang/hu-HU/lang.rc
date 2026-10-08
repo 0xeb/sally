@@ -2254,8 +2254,8 @@ STRINGTABLE
  IDS_PRXSCRERR_INVPORT, "A portot csak számként vagy $(ProxyPort) illetve $(Port) változóként adhat meg."
  IDS_PRXSCRERR_3XXONFIRSTLINE, "Nem használhatja a ""3xx:"" állapotot az első parancshoz, néhány parancs (tipikusan ""USER"") szükséges."
  IDS_PRXSCRERR_NONECMDS, "A proxy szkriptnek tartalmaznia kell legalább egy parancsot."
- IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+ IDS_PRXSCRERR_CANNOTENCODE, "A felhasználónév, a jelszó vagy a fiók olyan karaktereket tartalmaz, amelyek nem ábrázolhatók a kapcsolat szövegkódolásával."
+ IDS_PRXHOST_CANNOTENCODE, "A proxy szerver címe nem ábrázolható a jelenlegi rendszerkódolással, vagy túl hosszú."
 
  IDS_EDITPROXYSRVTITLE, "Proxy szerver szerkesztése"
  IDS_PORTISUSHORT, "A port számának 1 és 65535 közé kell esnie."
@@ -2364,10 +2364,10 @@ STRINGTABLE
  IDS_CLEARPASSWORD_CONFIRMATION, "Biztos törölni akarja a jelszót?"
  IDS_SHOWPASSWORD_CONFIRMATION, "Biztos meg akarja jeleníteni a jelszót?"
  IDS_PASSWORDIS, "A jelszó: %s\n\nBiztos vágólapra másolja a jelszót?"
- IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
- IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
- IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+ IDS_SRVTYPENAME_CANNOTENCODE, "A szervertípus neve olyan karaktereket tartalmaz, amelyek nem ábrázolhatók a jelenlegi konfigurációs kódolással."
+ IDS_PRXSCRIPT_CANNOTENCODE, "A proxy szkript olyan karaktereket tartalmaz, amelyek nem ábrázolhatók a jelenlegi konfigurációs kódolással."
+ IDS_FTPCOMMAND_CANNOTENCODE, "Az FTP parancs olyan karaktereket tartalmaz, amelyek nem ábrázolhatók a kapcsolat szövegkódolásával."
+ IDS_NEWNAME_CANNOTENCODE, "Az új név olyan karaktereket tartalmaz, amelyek nem ábrázolhatók a kapcsolat szövegkódolásával, ezért nem használható fájlnévként a szerveren.\n\nAz elem hibás állapotban maradt."
+ IDS_DIRNAME_CANNOTENCODE, "A mappanév olyan karaktereket tartalmaz, amelyek nem ábrázolhatók a kapcsolat szövegkódolásával, ezért a mappa nem hozható létre a szerveren."
+ IDS_RENAMENAME_CANNOTENCODE, "Az új név olyan karaktereket tartalmaz, amelyek nem ábrázolhatók a kapcsolat szövegkódolásával, ezért az elem nem nevezhető át a szerveren."
 }

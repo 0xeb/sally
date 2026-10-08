@@ -477,6 +477,6 @@ STRINGTABLE
   IDS_EXP_BROWSE, "浏览..."
   IDS_EXP_SALDIR, "Sally 目录"
   IDS_CFG_CONFLICT, "配置已经打开。"
-  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
-  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+  IDS_EXP_ENVVARNOTFOUND, "找不到环境变量“%s”。"
+  IDS_EXP_ENVVARTOOLARGE, "环境变量“%s”的值过大。"
 }

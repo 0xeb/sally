@@ -65,6 +65,20 @@
 {L"ftp", 2014u, L"using_showcert"}, // IDH_SHOWCERT
 {L"mmviewer", 13500u, L"using_export"}, // IDH_EXPORT
 {L"nethood", 102u, L"dlgboxes_config"}, // IDD_CONFIG
+{L"pictview", 2020u, L"config_appearance"}, // DLG_CFGPAGE_APPEARANCE
+{L"pictview", 2040u, L"config_advanced"}, // DLG_CFGPAGE_ADVANCED
+{L"pictview", 2060u, L"config_keybandmouse"}, // DLG_CFGPAGE_KEYBOARD
+{L"pictview", 2070u, L"config_tools"}, // DLG_CFGPAGE_TOOLS
+{L"pictview", 2080u, L"config_colors"}, // DLG_CFGPAGE_COLORS
+{L"pictview", 2100u, L"dlgboxes_imgproperties"}, // DLG_IMGPROP
+{L"pictview", 2120u, L"dlgboxes_exif"}, // DLG_IMGEXIF
+{L"pictview", 2150u, L"dlgboxes_screencapture"}, // DLG_CAPTURE
+{L"pictview", 2400u, L"dlgboxes_copyto"}, // IDD_COPYTO
+{L"pictview", 2500u, L"dlgboxes_print"}, // IDD_PRINT
+{L"pictview", 3500u, L"introduction_intro"}, // IDH_INTRODUCTION
+{L"pictview", 3502u, L"advanced_screencapture"}, // IDH_SCREENCAPTURE
+{L"pictview", 3504u, L"advanced_updatethumbnail"}, // IDH_UPDATETHUMBNAIL
+{L"pictview", 3505u, L"advanced_viewbmpfromclip"}, // IDH_VIEWBMPFROMCLIP
 {L"regedt", 135u, L"dlgboxes_search"}, // IDD_SEARCH
 {L"regedt", 1500u, L"using_searchreg"}, // IDH_SEARCHREG
 {L"regedt", 1501u, L"using_newkey"}, // IDH_NEWKEY
@@ -383,3 +397,5 @@
 {L"zip", 1000u, L"usingzip_comments"}, // IDH_COMMENT
 {L"zip", 1001u, L"sfx_creating"}, // IDH_CREATESFX
 {L"zip", 1002u, L"usingzip_test"}, // IDH_TEST
+
+// pictview: CMD_HELP_MOUSE is not defined in the sources (page basic_usingmouse)

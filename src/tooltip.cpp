@@ -7,7 +7,6 @@
 #include "tooltip.h"
 #include "mainwnd.h"
 #include "darkmode.h"
-#include "common/text/LegacyTooltipTextEncoding.h"
 
 // wchar_t-generic - registered/created through CWindow::RegisterUniversalClass/
 // CreateEx's own LPCWSTR parameters, which resolve wide under _UNICODE.
@@ -315,24 +314,6 @@ BOOL CToolTip::GetText()
         Text[0] = 0;
         SendMessage(HNotifyWindow, WM_USER_TTGETTEXTW, LastID, (LPARAM)Text);
         TextLen = (int)wcslen(Text);
-
-        if (TextLen == 0)
-        {
-            // The window did not answer the wide message. Retry only through the frozen v107
-            // message adapter; live senders use WM_USER_TTGETTEXTW.
-            char narrow[TOOLTIP_TEXT_MAX];
-            narrow[0] = 0;
-            SendMessage(HNotifyWindow, WM_USER_TTGETTEXT, LastID, (LPARAM)narrow);
-            if (narrow[0] != 0)
-            {
-                std::wstring wide;
-                if (sally::legacy_tooltip::DecodeV107Payload(narrow, _countof(narrow), wide))
-                {
-                    lstrcpynW(Text, wide.c_str(), TOOLTIP_TEXT_MAX);
-                    TextLen = (int)wcslen(Text);
-                }
-            }
-        }
     }
     if (TextLen == 0)
     {

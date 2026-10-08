@@ -1115,8 +1115,8 @@ BEGIN
     LTEXT           "Tamaño:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "pixels",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " &Theme ",IDC_STATIC_7,1,192,295,30 // UNTRANSLATED
-    LTEXT           "Mode:",IDC_STATIC_8,8,206,21,8 // UNTRANSLATED
+    GROUPBOX        " &Tema ",IDC_STATIC_7,1,192,295,30
+    LTEXT           "Modo:",IDC_STATIC_8,8,206,45,8
     COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
 END
 
@@ -1272,7 +1272,7 @@ BEGIN
     CONTROL         "Buscar &subdirectorios",IDC_FIND_INCLUDE_SUBDIR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,55,87,12
     // This layout slot is intentionally reused by IDC_FIND_FILETYPE; archives remain hidden at runtime.
     CONTROL         "Buscar archivos",IDC_FIND_INCLUDE_ARCHIVES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,55,87,12
-    LTEXT           "T&ype:",IDC_FIND_FILETYPE_TEXT,150,58,22,8 // UNTRANSLATED
+    LTEXT           "&Tipo:",IDC_FIND_FILETYPE_TEXT,150,58,22,8
     COMBOBOX        IDC_FIND_FILETYPE,176,55,112,48,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     CONTROL         "Buscar por &contenido",IDC_FIND_GREP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,69,75,12
     CONTROL         "",IDC_FIND_LINE2,"Static",SS_ETCHEDHORZ | WS_GROUP,83,75,199,1
@@ -2053,13 +2053,13 @@ END
 
 IDD_DEFAULT_SHELL DIALOGEX 0, 0, 244, 72
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Default Shell" // UNTRANSLATED
+CAPTION "Shell por defecto"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Open &Command Shell with:",IDC_STATIC_1,8,9,228,8 // UNTRANSLATED
+    LTEXT           "Abrir la shell de &comandos con:",IDC_STATIC_1,8,9,228,8
     COMBOBOX        IDC_DEFAULT_SHELL_TARGET,8,20,228,108,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14 // UNTRANSLATED
-    PUSHBUTTON      "Cancel",IDCANCEL,186,50,50,14 // UNTRANSLATED
+    DEFPUSHBUTTON   "Aceptar",IDOK,128,50,50,14
+    PUSHBUTTON      "Cancelar",IDCANCEL,186,50,50,14
 END
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2531,7 +2531,7 @@ STRINGTABLE
  IDS_FIND_RESULTS_LOAD_EMPTY, "No se cargó ningún resultado de búsqueda."
  IDS_FIND_RESULTS_LOAD_REPORT, "Se cargaron %u resultado(s) de búsqueda. Se omitieron %u ruta(s) inexistente(s) o incorrecta(s)."
  IDS_FIND_RESULTS_ANSI_ONLY, "El nombre de este elemento no se puede representar en la página de códigos del sistema, y este comando todavía no soporta nombres Unicode.\nBorrar y Guardar resultados sí lo soportan."
- IDS_FIND_HEX_INVALID, "The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes." // UNTRANSLATED
+ IDS_FIND_HEX_INVALID, "El texto '%s' no es un patrón hexadecimal válido.\nUse pares de dígitos hexadecimales y escriba el texto literal entre comillas dobles."
 
  IDS_SEARCHFORCOLUMN1, "Plantilla"
  IDS_SEARCHFORCOLUMN2, "Ruta"
@@ -4016,7 +4016,7 @@ IDS_OLDPLUGINVERSION2, "El plugin (%s) no está soportado en esta versión de Sa
  IDS_MASTERPASSWORD_REMOVED, "Ha borrado su contraseña maestra. Sus contraseñas guardadas (por ejemplo para FTP y WinSCP) no estarán protegidas."
  IDS_MASTERPASSWORD_SET, "Contraseña maestra cambiada con éxito. Sus contraseñas guardadas (por ejemplo para FTP y WinSCP) están seguras ahora por cifrado AES."
  IDS_WRONG_MASTERPASSWORD, "No introdujo la contraseña maestra actual correctamente. Inténtelo de nuevo."
- IDS_MASTERPASSWORD_TOO_LONG, "The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password." // UNTRANSLATED
+ IDS_MASTERPASSWORD_TOO_LONG, "La contraseña maestra codificada en UTF-8 supera el límite del cifrado.\nUse una contraseña más corta."
 
  IDS_BROWSEDIRECTORY_TITLE, "Hojear directorio"
  IDS_BROWSEDIRECTORY_TEXT, "Escoja el directorio que quiera usar."

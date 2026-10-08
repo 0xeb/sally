@@ -2254,8 +2254,8 @@ STRINGTABLE
  IDS_PRXSCRERR_INVPORT, "Порт можно вводить только в виде числа или переменной $(ProxyPort) либо $(Port)."
  IDS_PRXSCRERR_3XXONFIRSTLINE, "Нельзя использовать условие ""3xx:"" для первой команды, необходима какая-нибудь предшествующая ей команда (обычно, ""USER"")."
  IDS_PRXSCRERR_NONECMDS, "Сценарий прокси должен содержать хотя бы одну команду."
- IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+ IDS_PRXSCRERR_CANNOTENCODE, "Имя пользователя, пароль или учетная запись содержат символы, которые невозможно представить в текстовой кодировке этого соединения."
+ IDS_PRXHOST_CANNOTENCODE, "Адрес прокси-сервера невозможно представить в текущей системной кодировке, или он слишком длинный."
 
  IDS_EDITPROXYSRVTITLE, "Настройка прокси-сервера"
  IDS_PORTISUSHORT, "Номер порта должен находиться в диапазоне от 1 до 65535."
@@ -2364,10 +2364,10 @@ STRINGTABLE
  IDS_CLEARPASSWORD_CONFIRMATION, "Вы действительно хотите сбросить этот пароль?"
  IDS_SHOWPASSWORD_CONFIRMATION, "Вы действительно хотите показать этот пароль?"
  IDS_PASSWORDIS, "Пароль: %s\n\nСкопировать его в буфер обмена?"
- IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
- IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
- IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+ IDS_SRVTYPENAME_CANNOTENCODE, "Название типа сервера содержит символы, которые невозможно представить в текущей кодировке конфигурации."
+ IDS_PRXSCRIPT_CANNOTENCODE, "Сценарий прокси-сервера содержит символы, которые невозможно представить в текущей кодировке конфигурации."
+ IDS_FTPCOMMAND_CANNOTENCODE, "Команда FTP содержит символы, которые невозможно представить в текстовой кодировке этого соединения."
+ IDS_NEWNAME_CANNOTENCODE, "Новое имя содержит символы, которые невозможно представить в текстовой кодировке этого соединения, поэтому его нельзя использовать в качестве имени файла на сервере.\n\nЭлемент оставлен в состоянии ошибки."
+ IDS_DIRNAME_CANNOTENCODE, "Имя папки содержит символы, которые невозможно представить в текстовой кодировке этого соединения, поэтому папку нельзя создать на сервере."
+ IDS_RENAMENAME_CANNOTENCODE, "Новое имя содержит символы, которые невозможно представить в текстовой кодировке этого соединения, поэтому элемент нельзя переименовать на сервере."
 }

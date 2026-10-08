@@ -2254,8 +2254,8 @@ STRINGTABLE
  IDS_PRXSCRERR_INVPORT, "Puteti seta port doar ca numar sau ca $(ProxyPort) sau $(Port) ca si variabila."
  IDS_PRXSCRERR_3XXONFIRSTLINE, "Nu puteti folosi  ""3xx:"" conditia pentru prima comanda, o comanda precedenta (de obicei ""UTILIZATOR"") e necesar."
  IDS_PRXSCRERR_NONECMDS, "Script-ul proxy trebuie sa contina cel putin o comanda."
- IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+ IDS_PRXSCRERR_CANNOTENCODE, "Un nume de utilizator, o parolă sau un cont conține caractere care nu pot fi reprezentate în codificarea de text a acestei conexiuni."
+ IDS_PRXHOST_CANNOTENCODE, "Adresa serverului proxy nu poate fi reprezentată în codificarea curentă a sistemului sau este prea lungă."
 
  IDS_EDITPROXYSRVTITLE, "Editez Server-ul Proxy"
  IDS_PORTISUSHORT, "Numarul port-ului trebuie sa fie de la 1 la 65535."
@@ -2364,10 +2364,10 @@ STRINGTABLE
  IDS_CLEARPASSWORD_CONFIRMATION, "Sunteti sigur-a ca doriti sa stergeti parola?"
  IDS_SHOWPASSWORD_CONFIRMATION, "Suneti sigur-a ca doriti sa aratati aceasta parola?"
  IDS_PASSWORDIS, "Parola este: %s\n\nDoriti sa copiati parola in clipboard?"
- IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
- IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
- IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+ IDS_SRVTYPENAME_CANNOTENCODE, "Numele tipului de server conține caractere care nu pot fi reprezentate în codificarea curentă a configurației."
+ IDS_PRXSCRIPT_CANNOTENCODE, "Script-ul proxy conține caractere care nu pot fi reprezentate în codificarea curentă a configurației."
+ IDS_FTPCOMMAND_CANNOTENCODE, "Comanda FTP conține caractere care nu pot fi reprezentate în codificarea de text a acestei conexiuni."
+ IDS_NEWNAME_CANNOTENCODE, "Noul nume conține caractere care nu pot fi reprezentate în codificarea de text a acestei conexiuni, deci nu poate fi folosit pentru a denumi un fișier pe server.\n\nElementul a fost lăsat în starea de eroare."
+ IDS_DIRNAME_CANNOTENCODE, "Numele directorului conține caractere care nu pot fi reprezentate în codificarea de text a acestei conexiuni, deci directorul nu poate fi creat pe server."
+ IDS_RENAMENAME_CANNOTENCODE, "Noul nume conține caractere care nu pot fi reprezentate în codificarea de text a acestei conexiuni, deci elementul nu poate fi redenumit pe server."
 }

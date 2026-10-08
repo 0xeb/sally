@@ -96,7 +96,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     _CrtMemCheckpoint(&___CrtMemState);
 #endif //DUMP_MEM
 
-    if (!InitLCUtils(salamander, "File Comparator" /* do not translate! */))
+    if (!InitLCUtils(salamander, L"File Comparator" /* do not translate! */))
         return NULL;
 
     CALL_STACK_MESSAGE1("SalamanderPluginEntry()");

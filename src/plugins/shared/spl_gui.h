@@ -53,17 +53,11 @@
 #define WM_USER_TBENUMBUTTON2 WM_APP + 227 // [HWND hToolBar, TLBI_ITEM_INFO2 *tii]
 
 // tooltip messages
-#define TOOLTIP_TEXT_MAX 5000          // maximum length of tool tip string (WM_USER_TTGETTEXT message)
-#define WM_USER_TTGETTEXT WM_APP + 240 // [ID passed in SetCurrentToolTip, buffer limited to TOOLTIP_TEXT_MAX]
-// Wide form of WM_USER_TTGETTEXT: lParam is a 'wchar_t*' buffer, again limited to
-// TOOLTIP_TEXT_MAX *characters*. Deliberately a SEPARATE message number rather than a
-// reinterpretation of WM_USER_TTGETTEXT's lParam: a window message carries no compile-time
-// type, so widening the old message in place would leave every not-yet-ported handler
-// writing narrow bytes into a wide buffer -- it would still compile, still run, and produce
-// mojibake. With a distinct number an unported window simply never answers, and the tooltip
-// falls back to the narrow message below. Silence is recoverable; silent corruption is not.
-// Salamander asks for the wide text FIRST and only falls back to WM_USER_TTGETTEXT when the
-// window leaves the wide buffer empty, so v107 plugins keep working unchanged.
+#define TOOLTIP_TEXT_MAX 5000 // maximum length of tool tip string, in characters (WM_USER_TTGETTEXTW)
+// WM_APP + 240 was the narrow WM_USER_TTGETTEXT of plugin SDK 107 and older; Sally no longer
+// sends it. The number stays reserved so an old handler can never receive a different message.
+#define WM_USER_TTGETTEXT WM_APP + 240 // reserved: no longer sent
+// lParam is a 'wchar_t*' buffer limited to TOOLTIP_TEXT_MAX characters.
 #define WM_USER_TTGETTEXTW WM_APP + 241 // [ID passed in SetCurrentToolTip, wchar_t buffer limited to TOOLTIP_TEXT_MAX]
 
 // button pressed
@@ -2125,7 +2119,7 @@ public:
     // ToolTip
     //
     // This method starts a timer and if it is not called again before expiration
-    // requests text from window 'hNotifyWindow' via WM_USER_TTGETTEXT message,
+    // requests text from window 'hNotifyWindow' via WM_USER_TTGETTEXTW message,
     // which is then displayed below the cursor at its current coordinates.
     // Variable 'id' serves to distinguish areas when communicating with window 'hNotifyWindow'.
     // If this method is called multiple times with the same 'id' parameter, these

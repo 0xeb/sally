@@ -10,7 +10,7 @@
 #include "Salamand.h"
 #include "SalamandConfiguration.h"
 #include "Salamander.rh"
-#include "plugin_narrow_compat.h"
+#include "SalamandText.h"
 
 #include <Common.h>
 #include <Security.h>
@@ -190,7 +190,7 @@ AnsiString __fastcall TSalamandConfiguration::ModuleFileName()
         return AnsiString();
     }
     std::string EncodedFileName;
-    if (!WideToLegacyTextExact(FileName.c_str(), EncodedFileName))
+    if (!SalNarrowExact(FileName.c_str(), EncodedFileName))
     {
         assert(false);
         return AnsiString();
@@ -263,7 +263,7 @@ AnsiString __fastcall TSalamandConfiguration::StronglyRecryptPassword(AnsiString
         {
             BYTE* Encrypted;
             int EncryptedSize;
-            if (!PasswordManager->EncryptPassword(ToWideArg(Password.c_str()).c_str(),
+            if (!PasswordManager->EncryptPassword(SalWide(Password.c_str()).c_str(),
                                                   &Encrypted, &EncryptedSize, TRUE))
             {
                 assert(false);

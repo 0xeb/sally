@@ -37,7 +37,7 @@
 // absent in a fresh clone before configure. A plain header it can always read.
 #define VERSINFO_SALAMANDER_MAJOR 1
 #define VERSINFO_SALAMANDER_MINORA 0
-#define VERSINFO_SALAMANDER_MINORB 33
+#define VERSINFO_SALAMANDER_MINORB 34
 // Sally versions are three dotted parts (1.0.25). Open Salamander used "hundredths",
 // concatenating MINORB with no separator - 2,5,1 read as "2.51" - and suppressing a zero
 // MINORB so 2,5,0 read as "2.5". Under that scheme 1,0,25 would render as "1.025".
@@ -234,16 +234,6 @@
 //   109 - Sally 1.0.33: LoadLanguageModule removed; a plugin's resources (all languages) are in its own DLL.
 
 #define LAST_VERSION_OF_SALAMANDER 109
-#define SALLY_PLUGIN_WIDE_ABI_VERSION 108
-#define SALLY_PLUGIN_BROKEN_WIDE_FS_VERSION 104
-#define SALLY_PLUGIN_WIDE_FS_VERSION 105
-#define SALLY_PLUGIN_THEME_INFO_VERSION 106
-// A plugin built against this version or later is known to initialize
-// CFileData::NameW, so Salamander may read it from a CFileData the plugin filled in.
-// Older plugins were compiled against a struct that had no such field, or had it and
-// never wrote to it, so the core has to keep clearing it for them - see
-// CSalamanderDirectory::AddFile.
-#define SALLY_PLUGIN_ARCHIVE_NAMEW_VERSION 107
 #define REQUIRE_LAST_VERSION_OF_SALAMANDER "This plugin requires Sally 1.0 (" SAL_VER_PLATFORM ") or later."
 
 #endif // __SPL_VERS_H

@@ -11,7 +11,7 @@
 //****************************************************************************
 
 #include "precomp.h"
-#include "plugin_narrow_compat.h"
+#include "plugin_text_encoding.h"
 #include <new>
 //#include <windows.h>
 //#include <commctrl.h>
@@ -226,11 +226,15 @@ DWORD WINAPI __TraceMsgBoxThread(void* param)
     try
     {
         std::wstring msg = L"TRACE_C message received!\n\nFile: ";
-        msg += ToWideArg(data->File);
+        std::wstring part;
+        sally::plugin_text::DecodeAcp(data->File, part); // __FILE__ and message bytes are ACP
+        msg += part;
         msg += L"\nLine: ";
         msg += std::to_wstring(data->Line);
         msg += L"\n\nMessage: ";
-        msg += ToWideArg(data->Msg);
+        part.clear();
+        sally::plugin_text::DecodeAcp(data->Msg, part);
+        msg += part;
         msg += L"\n\nTRACE_C message means that fatal error has occured. "
                L"Application will be crashed by \"access violation\" exception after "
                L"clicking OK. Please send us bug report to help us fix this problem. "
@@ -298,8 +302,10 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
         }
         else
         {
-            const std::wstring fileW = ToWideArg(File);
-            const std::wstring textW = ToWideArg(TraceStringBuf.c_str());
+            std::wstring fileW;
+            std::wstring textW;
+            sally::plugin_text::DecodeAcp(File, fileW); // NULL File leaves fileW empty
+            sally::plugin_text::DecodeAcp(TraceStringBuf.c_str(), textW);
             if (information)
                 SalamanderDebug->TraceI(File != NULL ? fileW.c_str() : NULL,
                                         Line, textW.c_str());

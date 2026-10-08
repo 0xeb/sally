@@ -23,10 +23,7 @@ function(sal_add_plugin_languages)
   endif()
 
   set(LANG_RC "${LANG_LANG_DIR}/languages.rc")
-  # RC files need defines set via source properties
-  set_source_files_properties(${LANG_RC} PROPERTIES
-    COMPILE_DEFINITIONS "_LANG;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
-  )
+  sal_set_rc_platform_defines(${LANG_RC})
   target_sources(${LANG_TARGET} PRIVATE ${LANG_RC})
   get_filename_component(LANG_PARENT "${LANG_LANG_DIR}" DIRECTORY)
   target_include_directories(${LANG_TARGET} PRIVATE
@@ -87,9 +84,11 @@ function(sal_add_plugin)
     )
   endif()
 
-  # Add resource file if specified
+  # Add resource file if specified. rc.exe does not define _WIN64/_M_ARM64 itself, and the
+  # version resource (shared/versinfo.rc2 via spl_vers.h) names the platform from them.
   if(PLUGIN_RC)
     list(APPEND ALL_SOURCES "${PLUGIN_RC}")
+    sal_set_rc_platform_defines("${PLUGIN_RC}")
   endif()
 
   # Create the plugin as a MODULE (shared library loaded at runtime)

@@ -205,7 +205,6 @@ jobs:
               'src/plugins/webviewer/cmark-gfm/build/extensions',
               'src/plugins/webviewer/cmark-gfm/extensions',
               'src/plugins/webviewer/cmark-gfm/src',
-              'src/plugins/pictview/exif',
               'src/plugins/tar',
               'src/plugins/undelete/library',
               'src/plugins/zip',

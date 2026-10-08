@@ -1,486 +1,131 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
-// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
 // SPDX-License-Identifier: GPL-2.0-or-later
+
+// PictView's dialogs: Sally (WinLib) dialogs on the templates in lang/lang.rc, so they look,
+// translate and follow dark mode like every other Sally dialog.
 
 #pragma once
 
-void CleanNonNumericChars(HWND hWnd, BOOL bComboBox, BOOL bKeepSeparator, BOOL bAllowMinus = FALSE);
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
-//****************************************************************************
-//
-// CCommonDialog
-//
-// Dialog centered to the parent
-//
+#include <cstdint>
+#include <string>
+#include <vector>
 
-class CCommonDialog : public CDialog
+#include "viewer.h"
+#include "engine/wic_engine.h"
+#include "print_layout.h"
+
+class CSalamanderGeneralAbstract;
+class CSalamanderGUIAbstract;
+
+namespace pictview
 {
-public:
-    CCommonDialog(HINSTANCE hInstance, int resID, HWND hParent, CObjectOrigin origin = ooStandard);
-    CCommonDialog(HINSTANCE hInstance, int resID, int helpID, HWND hParent, CObjectOrigin origin = ooStandard);
 
-protected:
-    INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+void InitializeDialogs(HINSTANCE instance, CSalamanderGeneralAbstract* general, CSalamanderGUIAbstract* gui);
+CSalamanderGeneralAbstract* DialogsGeneral();
+CSalamanderGUIAbstract* DialogsGui();
 
-    virtual void NotifDlgJustCreated();
+// Zoom To (DLG_ZOOM): the current zoom in percent in, the chosen one out.
+bool PromptForZoomPercent(HWND owner, int currentPercent, int& selectedPercent);
+
+// Go To Page (DLG_PAGE): zero-based pages.
+bool PromptForFrameNumber(HWND owner, uint32_t frameCount, uint32_t currentFrame, uint32_t& selectedFrame);
+
+// Rename (IDD_RENAMEDIALOG): 'initialName' is the file name; the result may come from a mask
+// such as "*.jpg" applied to it.
+bool PromptForRenameFileName(HWND owner, const std::wstring& initialName, bool selectWholeName, std::wstring& selectedName);
+
+// Screen Capture (DLG_CAPTURE).
+bool PromptForCaptureOptions(HWND owner, ViewerCaptureOptions& options);
+
+// Copy File To (IDD_COPYTO): five remembered target directories; returns the full target path.
+bool PromptForCopyToTargetPath(HWND owner, const std::wstring& sourcePath, std::wstring& targetPath);
+
+// About (DLG_ABOUT).
+void ShowAboutPictViewDialog(HWND parent);
+
+// What Image Properties (DLG_IMGPROP) shows about the current page.
+struct ImagePropertiesInfo
+{
+    uint32_t Page = 0; // zero-based
+    uint32_t PageCount = 1;
+    bool Animation = false; // pages are animation frames
+    uint32_t Width = 0;
+    uint32_t Height = 0;
+    GUID PixelFormat = GUID_NULL;
+    uint32_t BitsPerPixel = 0;
+    uint32_t ChannelCount = 0;
+    uint64_t MemoryBytes = 0;
+    uint64_t FileBytes = 0; // 0 when the image has no file (clipboard, capture)
+    double DpiX = 0.0;
+    double DpiY = 0.0;
+    std::wstring Format;
+    std::wstring Compression;
+    std::wstring Comment;
+};
+void ShowImagePropertiesDialog(HWND owner, const ImagePropertiesInfo& info);
+
+// EXIF (DLG_IMGEXIF): every tag of the image, with the user's highlighted tags.
+void ShowExifDialog(HWND owner, const std::vector<ImageExifEntry>& entries);
+
+enum class SaveAsRotation
+{
+    None,
+    Clockwise90,
+    Rotate180,
+    Clockwise270,
 };
 
-// ****************************************************************************
-//
-// CCommonPropSheetPage
-//
-
-class CCommonPropSheetPage : public CPropSheetPage
+enum class SaveAsFlip
 {
-public:
-    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID,
-                         DWORD flags /* = PSP_USETITLE*/, HICON icon,
-                         CObjectOrigin origin = ooStatic)
-        : CPropSheetPage(title, modul, resID, flags, icon, origin) {}
-    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID, UINT helpID,
-                         DWORD flags /* = PSP_USETITLE*/, HICON icon,
-                         CObjectOrigin origin = ooStatic)
-        : CPropSheetPage(title, modul, resID, helpID, flags, icon, origin) {}
-
-protected:
-    virtual void NotifDlgJustCreated();
+    None,
+    Vertical,
+    Horizontal,
 };
 
-//****************************************************************************
-//
-// CAboutDialog
-//
-
-class CAboutDialog : public CCommonDialog
+// One entry of the Save As "Compression" list. 'TextId' is a translated name, otherwise 'Text'
+// (the codec's own name).
+struct SaveAsCompressionChoice
 {
-public:
-    CAboutDialog(HWND hParent);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    UINT TextId = 0;
+    const wchar_t* Text = nullptr;
+    ViewerTiffCompression Value = ViewerTiffCompression::Default;
 };
 
-//****************************************************************************
-//
-// CImgPropDialog
-//
+// What WIC can write for a format: TIFF offers its compressions, the others their only one.
+std::vector<SaveAsCompressionChoice> SaveAsCompressionChoices(ImageSaveFormat format);
 
-class CImgPropDialog : public CCommonDialog
+// Save As: the system Save dialog with PictView's option panel (IDD_SAVEEX) below it, limited
+// to what WIC writes: compression, JPEG quality and subsampling, rotation and flip.
+struct SaveAsRequest
 {
-protected:
-    const PVImageInfo* PVII;
-    const char* Comment;
-    int nFrames;
-
-public:
-    CImgPropDialog(HWND hParent, const PVImageInfo* pvii, const char* comment, int frames);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    std::wstring Filter;                     // "name|patterns|..." rows
+    std::vector<ImageSaveFormat> FilterFormats; // the format of each filter row
+    DWORD FilterIndex = 1;                   // one-based, in and out
+    std::wstring InitialDirectory;
+    std::wstring FileName; // suggested name in, chosen full path out
+    ViewerTiffCompression TiffCompression = ViewerTiffCompression::Default;
+    int JpegQuality = 75;
+    ViewerJpegSubsampling JpegSubsampling = ViewerJpegSubsampling::TwoToOneOne;
+    SaveAsRotation Rotation = SaveAsRotation::None;
+    SaveAsFlip Flip = SaveAsFlip::None;
 };
+bool PromptForSaveAs(HWND owner, SaveAsRequest& request);
 
-//****************************************************************************
-//
-// CExifDialog
-//
-
-struct CExifItem
+// Print (IDD_PRINT): the printer (Setup... changes it for the session), the image's position and
+// size on the page with a live preview. On OK 'Printer' is a DC for the chosen printer, which
+// the caller deletes, and 'Settings' holds the choices.
+struct PrintRequest
 {
-    DWORD Tag;
-    wchar_t* TagTitle;
-    wchar_t* TagDescription;
-    wchar_t* Value;
+    const ImageSurface* Image = nullptr;
+    const ImageSurface* SelectionImage = nullptr; // the selected part, when there is a selection
+    double ImageDpiX = 0;
+    double ImageDpiY = 0;
+    PrintSettings Settings;
+    HDC Printer = nullptr;
 };
+bool PromptForPrint(HWND owner, PrintRequest& request);
 
-class CExifDialog : public CCommonDialog
-{
-protected:
-    LPCTSTR FileName;
-    int Format; // PVF_xxx
-    BOOL DisableNotification;
-    HWND HListView;
-    TDirectArray<CExifItem> Items;
-    TDirectArray<DWORD> Highlights;
-
-    int ListX, ListY;
-    int InfoX, InfoHeight, InfoBorder;
-    int CtrlX[6], CtrlY[6];
-    int MinX, MinY;
-
-public:
-    CExifDialog(HWND hParent, LPCTSTR fileName, int format);
-    ~CExifDialog();
-
-    BOOL AddItem(CExifItem* item);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-    virtual void Transfer(CTransferInfo& ti);
-    void InitListView();
-    void FillListView();
-    LPARAM GetFocusedItemLParam();
-    void OnContextMenu(int x, int y);
-
-    // returns -1 if the tag is not found in the ExifHighlights array, otherwise returns its index
-    int GetHighlightIndex(DWORD tag);
-    void ToggleHighlight(DWORD tag);
-
-    void InitLayout(int id[], int n, int m);
-    void RecalcLayout(int cx, int cy, int id[], int n, int m);
-};
-
-//****************************************************************************
-//
-// CConfigPageAppearance
-//
-
-class CConfigPageAppearance : public CCommonPropSheetPage
-{
-public:
-    CConfigPageAppearance();
-
-    virtual void Transfer(CTransferInfo& ti);
-};
-
-//****************************************************************************
-//
-// CConfigPageColors
-//
-
-class CConfigPageColors : public CCommonPropSheetPage
-{
-public:
-    CGUIColorArrowButtonAbstract* ButtonBackground;
-    CGUIColorArrowButtonAbstract* ButtonTransparent;
-    CGUIColorArrowButtonAbstract* ButtonFSBackground;
-    CGUIColorArrowButtonAbstract* ButtonFSTransparent;
-
-    // local copy from G.* in case the user ends with Cancel
-    SALCOLOR Colors[vceCount];
-
-public:
-    CConfigPageColors();
-
-    virtual void Transfer(CTransferInfo& ti);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-};
-
-//****************************************************************************
-//
-// CConfigPageKeyboard
-//
-
-class CConfigPageKeyboard : public CCommonPropSheetPage
-{
-public:
-    CConfigPageKeyboard();
-
-    virtual void Transfer(CTransferInfo& ti);
-};
-
-//****************************************************************************
-//
-// CConfigPageTools
-//
-
-class CConfigPageTools : public CCommonPropSheetPage
-{
-public:
-    CConfigPageTools();
-
-    virtual void Transfer(CTransferInfo& ti);
-    virtual void Validate(CTransferInfo& ti);
-
-protected:
-    void EnableControls();
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-};
-
-//****************************************************************************
-//
-// CConfigPageAdvanced
-//
-
-class CConfigPageAdvanced : public CCommonPropSheetPage
-{
-public:
-    CConfigPageAdvanced();
-
-    virtual void Transfer(CTransferInfo& ti);
-};
-
-//****************************************************************************
-//
-// CConfigDialog
-//
-
-class CConfigDialog : public CPropertyDialog
-{
-protected:
-    CConfigPageAppearance PageAppearance;
-    CConfigPageColors PageColors;
-    CConfigPageKeyboard PageKeyboard;
-    CConfigPageTools PageTools;
-    CConfigPageAdvanced PageAdvanced;
-
-public:
-    CConfigDialog(HWND parent);
-};
-
-//****************************************************************************
-//
-// CZoomDialog
-//
-
-class CZoomDialog : public CCommonDialog
-{
-protected:
-    int* Zoom;
-
-public:
-    CZoomDialog(HWND hParent, int* zoom);
-
-    virtual void Transfer(CTransferInfo& ti);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-};
-
-//****************************************************************************
-//
-// CPageDialog
-//
-
-class CPageDialog : public CCommonDialog
-{
-protected:
-    DWORD* Page;
-    DWORD NumOfPages;
-
-public:
-    CPageDialog(HWND hParent, DWORD* page, DWORD numOfPages);
-
-    virtual void Transfer(CTransferInfo& ti);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-};
-
-//****************************************************************************
-//
-// CCaptureDialog
-//
-
-class CCaptureDialog : public CCommonDialog
-{
-public:
-    CCaptureDialog(HWND hParent);
-
-    virtual void Validate(CTransferInfo& ti);
-    virtual void Transfer(CTransferInfo& ti);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-    void EnableControls();
-};
-
-//****************************************************************************
-//
-// CRenameDialog
-//
-
-class CRenameDialog : public CCommonDialog
-{
-protected:
-    std::wstring& Path;
-    BOOL bFirstShow;
-
-public:
-    CRenameDialog(HWND hParent, std::wstring& path);
-
-    virtual void Transfer(CTransferInfo& ti);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-};
-
-//****************************************************************************
-//
-// COverwriteDlg
-//
-
-class COverwriteDlg : public CCommonDialog
-{
-public:
-    COverwriteDlg(HWND parent, LPCTSTR sourceName, LPCTSTR sourceAttr,
-                  LPCTSTR targetName, LPCTSTR targetAttr);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-    LPCTSTR SourceName,
-        SourceAttr,
-        TargetName,
-        TargetAttr;
-};
-
-//****************************************************************************
-//
-// CCopyToDlg
-//
-
-class CCopyToDlg : public CCommonDialog
-{
-protected:
-    const wchar_t* SrcName;
-    std::wstring& DstName;
-
-public:
-    // If Execute() returns IDOK, dstName contains the full path to the file
-    // we should write to (the user also confirmed overwriting if it already exists).
-    CCopyToDlg(HWND parent, const wchar_t* srcName, std::wstring& dstName);
-
-    virtual void Validate(CTransferInfo& ti);
-    virtual void Transfer(CTransferInfo& ti);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-    void EnableControls();
-};
-
-//****************************************************************************
-//
-// CPrintDlg
-//
-
-class CPreviewWnd : public CWindow
-{
-public:
-    // hDlg is the parent window (dialog or window)
-    // ctrlID is the ID of the child window
-    CPreviewWnd(HWND hDlg, int ctrlID, CPrintDlg* printDlg);
-    ~CPreviewWnd();
-
-    CPrintDlg* pPrintDlg; // pointer to the owner so we can query through GetPrinterInfo()
-
-    void Paint(HDC hDC); // hDC can be NULL for explicit repainting
-
-protected:
-    HBITMAP hPreview;
-    int previousPrevWidth, previousPrevHeight;
-
-    virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-};
-
-enum CUnitsEnum
-{
-    untInches,
-    untCM,
-    untMM,
-    untPoints,
-    untPicas
-};
-
-class CPrintDlg;
-
-class CPrintParams
-{
-public:
-    // CAST1: the caller of CPrintDlg is responsible for filling it
-    LPPVImageInfo pPVII;
-    LPPVHandle PVHandle;
-    // selected area in image coordinates
-    const RECT* ImageCage; // if NULL, no selection exists
-
-    // CAST2: can set default values via the Clear() method
-    // parameters chosen in the print dialog
-    BOOL bCenter;      // image will be centered relative to the paper
-    double Left;       // desired image position relative to the paper origin (X)
-    double Top;        // desired image position relative to the paper origin (Y)
-    double Width;      // desired image dimensions
-    double Height;     // desired image dimensions
-    double Scale;      // scaling in percentage of original dimension
-    BOOL bBoundingBox; // show a frame around the image (preview only)
-    BOOL bSelection;   // print selection only
-    BOOL bFit;         // stretch the image across the available area
-    BOOL bKeepAspect;  // used only when bFit is TRUE
-    CUnitsEnum Units;  // units used by all editboxes
-    BOOL bMirrorHor, bMirrorVert;
-
-public:
-    CPrintParams()
-    {
-        Clear();
-    }
-
-    void Clear(); // sets default values
-};
-
-#define PRNINFO_ORIENTATION 1 // DMORIENT_PORTRAIT or DMORIENT_LANDSCAPE
-//#define PRNINFO_PAGE_SIZE    2 // index into the page array
-#define PRNINFO_PAPER_WIDTH 3       // physical paper width in millimeters
-#define PRNINFO_PAPER_HEIGHT 4      // physical paper height in millimeters
-#define PRNINFO_PAGE_LEFTMARGIN 5   //
-#define PRNINFO_PAGE_TOPMARGIN 6    //
-#define PRNINFO_PAGE_RIGHTMARGIN 7  //
-#define PRNINFO_PAGE_BOTTOMMARGIN 8 //
-
-// constant for converting inches to millimeters (number of mm in one inch)
-#define INCH_TO_MM ((double)25.4)
-
-//#define PRNINFO_PAGE_MINLEFTMARGIN
-//#define PRNINFO_PAGE_MINTOPMARGIN
-//#define PRNINFO_PAGE_MINRIGHTMARGIN
-//#define PRNINFO_PAGE_MINBOTTOMMARGIN
-
-class CPrintDlg : public CCommonDialog
-{
-protected:
-    //    CPrintParams *PrintParams;    // for communication with the outside world
-    CPrintParams Params; // for temporary internal use
-    CPreviewWnd* Preview;
-
-    // printer settings
-    HANDLE HDevMode;
-    HANDLE HDevNames;
-    HDC HPrinterDC;
-    TCHAR printerName[2 * CCHDEVICENAME];
-    double origImgWidth, origImgHeight;
-
-public:
-    CPrintDlg(HWND parent, CPrintParams* printParams);
-    ~CPrintDlg();
-
-    virtual void Validate(CTransferInfo& ti);
-    virtual void Transfer(CTransferInfo& ti);
-
-    // called before calling Execute()
-    BOOL MyGetDefaultPrinter(); // retrieves information about the default printer and returns TRUE on success
-                                // if it returns FALSE, it shows an error; in that case Execute() for the dialog is not called
-
-    BOOL GetPrinterInfo(DWORD index, void* value, DWORD& size);
-
-    void UpdateImageParams(CPrintParams* printParams);
-
-protected:
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-    void EnableControls();
-    void OnPrintSetup();
-
-    void ReleasePrinterHandles(); // releases and clears printer information handles
-
-    void FillUnits();
-    double GetNumber(HWND hCombo);
-    void SetScale();
-    void SetAspect();
-
-    void CalcImgSize(double* pImgWidth, double* pImgHeight);
-
-    friend class CPreviewWnd;
-    friend class CRendererWindow;
-};
+} // namespace pictview

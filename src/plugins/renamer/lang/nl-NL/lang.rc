@@ -477,6 +477,6 @@ STRINGTABLE
   IDS_EXP_BROWSE, "Bladeren..."
   IDS_EXP_SALDIR, "Sally map"
   IDS_CFG_CONFLICT, "De configuratie is reeds geopend."
-  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
-  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+  IDS_EXP_ENVVARNOTFOUND, "Omgevingsvariabele ""%s"" is niet gevonden."
+  IDS_EXP_ENVVARTOOLARGE, "De waarde van omgevingsvariabele ""%s"" is te groot."
 }

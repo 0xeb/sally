@@ -477,6 +477,6 @@ STRINGTABLE
   IDS_EXP_BROWSE, "Tallóz..."
   IDS_EXP_SALDIR, "Sally mappa"
   IDS_CFG_CONFLICT, "A beállítás már meg van nyitva."
-  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
-  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+  IDS_EXP_ENVVARNOTFOUND, "A(z) ""%s"" környezeti változó nem található."
+  IDS_EXP_ENVVARTOOLARGE, "A(z) ""%s"" környezeti változó értéke túl nagy."
 }

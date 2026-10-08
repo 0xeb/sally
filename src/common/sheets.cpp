@@ -1436,7 +1436,7 @@ int CTreePropDialog::Execute(const WCHAR* buttonOK,
         *lpw++ = 8;                                 // font size
         *lpw++ = FW_NORMAL;                         // font weight
         *(BYTE*)lpw = FALSE;                        // is font italic?
-        *((BYTE*)lpw + 1) = ANSI_CHARSET;           // font charset
+        *((BYTE*)lpw + 1) = DEFAULT_CHARSET;        // font charset (any script, as the .rc dialogs)
         lpw++;
         lpwsz = (LPWSTR)lpw; // font typeface
         lpw += WinLibCopyText(lpwsz, L"MS Shell Dlg 2", 50);

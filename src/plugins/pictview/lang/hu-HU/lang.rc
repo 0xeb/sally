@@ -1,0 +1,1033 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Hungarian (hu-HU) resources for pictview. Translation: Török József.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pictview/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pictview.rh2"
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+DLG_WIAPROGRESS DIALOGEX 0, 0, 214, 63
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_CENTER
+CAPTION "Kép vizsgálata"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Mégse",IDCANCEL,157,43,50,14
+    LTEXT           "",IDC_WIAPROGR_MESSAGE,7,7,200,8
+    CONTROL         "",IDC_WIAPROGR_BAR,"msctls_progress32",WS_BORDER,7,22,200,14
+END
+
+DLG_ABOUT DIALOGEX 87, 50, 343, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Plugin névjegy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Bezárás",IDCANCEL,284,114,50,14
+    ICON            "",IDC_ABOUT_ICON,11,9,20,20
+    LTEXT           "PictView %s - Képnéző Sally-hez",IDC_ABOUT_TITLE,46,9,290,8
+    LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,290,8,SS_NOPREFIX
+    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,123,8
+    LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,279,8
+    LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
+    LTEXT           "Email:",IDC_STATIC_6,46,81,23,8
+    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,76,81,85,8,WS_TABSTOP
+    LTEXT           "Honlap:",IDC_STATIC_7,46,92,29,8
+    LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,76,92,122,8,WS_TABSTOP
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,341,1
+END
+
+DLG_CFGPAGE_APPEARANCE DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Megjelenés"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Ablak mérete",IDC_STATIC_1,6,5,253,53,WS_GROUP
+    CONTROL         "&Mint az Sally-é",IDC_CFGAPP_WINPOS_SAME,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,151,12
+    CONTROL         "Nagyobb, ha ke&ll, de kisebb nem",IDC_CFGAPP_WINPOS_LARGER,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,148,12
+    CONTROL         "&Amekkora szükséges",IDC_CFGAPP_WINPOS_ANY,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,41,148,12
+    GROUPBOX        "Alapértelmezett nagyítás",IDC_STATIC_2,6,60,253,67,WS_GROUP
+    CONTROL         "&Teljes igazítás (nincs görgetősáv)",IDC_CFGAPP_ZOOM_WHOLE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,72,151,12
+    CONTROL         "S&zélességhez igazítás (nincs vízszintes görgetősáv)",IDC_CFGAPP_ZOOM_WIDTH,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,84,183,12
+    CONTROL         "&Eredeti méret",IDC_CFGAPP_ZOOM_ORIG,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,96,148,12
+    CONTROL         "Telje&s képernyő",IDC_CFGAPP_ZOOM_FSCREEN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,108,148,12
+    CONTROL         "Ké&p elérési útja a címsorban",IDC_CFGAPP_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,167,12
+END
+
+DLG_CFGPAGE_COLORS DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Színek"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Ablak mód",IDC_STATIC_1,6,5,253,50,WS_GROUP
+    LTEXT           "&Háttér",IDC_STATIC_2,17,19,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_BORDER,128,16,27,14
+    LTEXT           "Át&látszó",IDC_STATIC_3,17,36,91,8
+    PUSHBUTTON      "",IDC_CFGCLR_BKGND,128,33,27,14
+    GROUPBOX        "Teljes képernyős mód",IDC_STATIC_4,6,60,253,50,WS_GROUP
+    LTEXT           "Hátté&r",IDC_STATIC_5,17,75,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BORDER,128,72,27,14
+    LTEXT           "Á&tlátszó",IDC_STATIC_6,17,92,44,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BKGND,128,89,27,14
+END
+
+DLG_CFGPAGE_KEYBOARD DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Billentyűzet és egér"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "PageUp és PageDown gombok, egér görgő",IDC_STATIC_1,6,5,253,43,WS_GROUP
+    CONTROL         "Kép görgeté&séhez",IDC_CFGKBD_PGDNUP_SCR,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,203,12
+    CONTROL         "&Előző/következő kép váltásához",IDC_CFGKBD_PGDNUP_PREV,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,218,12
+END
+
+DLG_CFGPAGE_TOOLS DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Eszközök"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Kijelölő eszköz",IDC_STATIC_1,6,5,253,94,WS_GROUP
+    LTEXT           "A terület a Shift gomb nyomva tartásával jelölhető ki:",IDC_STATIC_2,17,18,180,8
+    CONTROL         "&Négyzet",IDC_CFGTOOLS_SQUARE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,24,27,203,12
+    CONTROL         "&4:3-as téglalap",IDC_CFGTOOLS_4_3,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,40,218,12
+    CONTROL         "&3:2-es téglalap",IDC_CFGTOOLS_3_2,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,53,218,12
+    CONTROL         "&16:9-es téglalap",IDC_CFGTOOLS_16_9,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,66,218,12
+    CONTROL         "&Egyéb:",IDC_CFGTOOLS_OTHER,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,79,35,12
+    EDITTEXT        IDC_CFGTOOLS_RATIO_X,60,79,17,12,ES_NUMBER | WS_GROUP
+    LTEXT           ":",IDC_STATIC_3,79,81,4,8
+    EDITTEXT        IDC_CFGTOOLS_RATIO_Y,83,79,17,12,ES_NUMBER
+    CONTROL         "He&xadecimális színfelvevő eszköz",IDC_CFGTOOLS_PIPHEX,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,106,167,12
+END
+
+DLG_CFGPAGE_ADVANCED DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Haladó"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Bélyegképek a fájl panelekben",IDC_STATIC_7,6,5,253,69,WS_GROUP
+    LTEXT           "Néhány kép hibás bélyegképet tartalmaz, melyek nem forgathatók helyesen vagy nem állíthatók vissza az utolsó módosítások.",IDC_STATIC_8,14,18,225,16
+    CONTROL         "Eredet&i bélyegképek, képbe tárolásának kihagyása (lassabb)",IDC_CFGADV_CREATE_THUMBNAILS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,35,214,12
+    LTEXT           "",IDC_STATIC_9,14,51,237,1,SS_ETCHEDHORZ | WS_GROUP
+    LTEXT           "Ne készí&tsen bélyegképet a képről, ha nagyobb",IDC_STATIC_10,14,59,160,8
+    EDITTEXT        IDC_CFGADV_THUMB_MP,175,57,17,12,ES_NUMBER
+    LTEXT           "megapixelnél.",IDC_STATIC_11,195,59,49,8
+    CONTROL         "EXIF JPEG képek automata fo&rgatása (digitális kamerás képek)",IDC_CFGADV_AUTOROTATE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,77,222,12
+    CONTROL         "Üzenet, &sikeres fájl mentés esetén",IDC_CFGADV_SAVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,89,128,12
+    CONTROL         "Ké&pernyőmentés, szkennelés, vágólapbeszúráskor elérési út megőrzése",IDC_CFGADV_REMEMBER_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,101,250,12
+END
+
+DLG_IMGPROP DIALOGEX 106, 34, 173, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "Kép tulajdonságok"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Bezárás",1,62,182,50,14,WS_GROUP
+    PUSHBUTTON      "Súgó",IDHELP,118,182,50,14
+    LTEXT           "&Oldal:",IDC_IMGPROP_PAGENUM_LBL,7,10,49,8
+    EDITTEXT        IDC_IMGPROP_PAGENUM,65,8,100,12,ES_READONLY
+    LTEXT           "S&zéles:",IDC_STATIC_1,7,24,49,8
+    EDITTEXT        IDC_IMGPROP_WIDTH,65,22,100,12,ES_READONLY
+    LTEXT           "M&agas:",IDC_STATIC_2,7,38,49,8
+    EDITTEXT        IDC_IMGPROP_HEIGHT,65,36,100,12,ES_READONLY
+    LTEXT           "&Szín:",IDC_STATIC_3,7,52,42,8
+    EDITTEXT        IDC_IMGPROP_COLORS,65,50,100,12,ES_READONLY
+    LTEXT           "M&emóriában:",IDC_STATIC_4,7,66,51,8
+    EDITTEXT        IDC_IMGPROP_SIZE,65,64,100,12,ES_READONLY
+    LTEXT           "&Fájlméret:",IDC_STATIC_5,7,80,42,8
+    EDITTEXT        IDC_IMGPROP_FSIZE,65,78,100,12,ES_READONLY
+    LTEXT           "&DPI:",IDC_STATIC_6,7,94,50,8
+    EDITTEXT        IDC_IMGPROP_DPI,65,92,100,12,ES_READONLY
+    LTEXT           "Fo&rmátum:",IDC_STATIC_7,7,108,50,8
+    EDITTEXT        IDC_IMGPROP_FMT,65,106,100,12,ES_READONLY
+    LTEXT           "&Tömörítés:",IDC_STATIC_8,7,122,50,8
+    EDITTEXT        IDC_IMGPROP_COMPR,65,120,100,12,ES_READONLY
+    LTEXT           "&Megjegyzés:",IDC_STATIC_9,7,136,50,8
+    EDITTEXT        IDC_IMGPROP_COMMENT,65,134,100,36,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY
+    LTEXT           "",IDC_STATIC_10,2,176,169,1,SS_ETCHEDHORZ | WS_GROUP
+END
+
+DLG_IMGEXIF DIALOGEX 57, 60, 401, 151
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "EXIF"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_IMGEXIF_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_BORDER | WS_GROUP | WS_TABSTOP,5,4,391,80
+    EDITTEXT        IDC_IMGEXIF_INFO,5,89,391,38,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_CLIPSIBLINGS | WS_VSCROLL | WS_GROUP
+    CONTROL         "K&iemelt elem csoportosítás",IDC_IMGEXIF_GROUP,"Button",BS_AUTOCHECKBOX | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,5,133,103,12
+    CONTROL         "&Kiemel",IDC_IMGEXIF_HIGHLIGHT,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,120,132,50,14
+    PUSHBUTTON      "&Másolás",IDC_IMGEXIF_COPY,176,132,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "OK",IDOK,232,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Mégse",IDCANCEL,288,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Súgó",IDHELP,344,132,50,14
+END
+
+DLG_ZOOM DIALOGEX 85, 100, 121, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nagyítás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Nagyítás:",IDC_STATIC_1,8,13,49,8,NOT WS_GROUP
+    COMBOBOX        IDC_ZOOM_ZOOM,57,11,44,156,CBS_DROPDOWN | WS_TABSTOP
+    LTEXT           "%",IDC_STATIC_2,105,13,9,8
+    PUSHBUTTON      "OK",IDOK,7,37,50,14,BS_CENTER
+    PUSHBUTTON      "Mégse",IDCANCEL,63,37,50,14,BS_CENTER
+END
+
+DLG_PAGE DIALOGEX 85, 100, 121, 54
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Oldalra ugrás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Oldal:",IDC_STATIC_1,8,9,25,8,NOT WS_GROUP
+    COMBOBOX        IDC_PAGE_PAGE,38,7,74,124,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "OK",IDOK,7,32,50,14,BS_CENTER
+    PUSHBUTTON      "Mégse",IDCANCEL,64,32,50,14,BS_CENTER
+END
+
+DLG_CAPTURE DIALOGEX 98, 61, 179, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Képernyőmentés"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Mentés",IDC_STATIC_1,6,6,167,81,WS_GROUP
+    CONTROL         "&Teljes képernyő",IDC_CAPTURE_FULL,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,19,110,12
+    CONTROL         "&Program előtere",IDC_CAPTURE_APPL,"Button",BS_AUTORADIOBUTTON,16,31,110,12
+    CONTROL         "A&blak előtere",IDC_CAPTURE_WINDOW,"Button",BS_AUTORADIOBUTTON,16,43,120,12
+    CONTROL         "&Ablak előterének tartalma ",IDC_CAPTURE_CLIENT,
+                    "Button",BS_AUTORADIOBUTTON,16,55,135,12
+    CONTROL         "&Virtuális képernyő (több monitornál)",IDC_CAPTURE_VIRTUAL,
+                    "Button",BS_AUTORADIOBUTTON,16,67,142,12
+    GROUPBOX        "Mentési jel",IDC_STATIC_2,6,92,167,49,WS_GROUP
+    CONTROL         "&Gyorsbill",IDC_CAPTURE_HOTKEY,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,106,42,12
+    CONTROL         "I&dőzítő",IDC_CAPTURE_TIMER,"Button",BS_AUTORADIOBUTTON,16,121,35,12
+    CONTROL         "",IDC_CAPTURE_HOTKEY_VAL,"msctls_hotkey32",WS_GROUP | WS_TABSTOP,59,106,77,12
+    EDITTEXT        IDC_CAPTURE_TIMER_VAL,59,121,21,12
+    LTEXT           "másodperc",IDC_STATIC_3,84,123,39,8
+    CONTROL         "Egérmutató &is",IDC_CAPTURE_CURSOR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,147,85,12
+    LTEXT           "",IDC_STATIC_4,2,167,166,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "&Mentés",IDOK,8,172,50,14,BS_CENTER | WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,64,172,50,14,BS_CENTER
+    PUSHBUTTON      "Súgó",IDHELP,120,172,50,14,BS_CENTER
+END
+
+IDD_RENAMEDIALOG DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fájl átnevezése"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_PATH,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,59,43,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,118,43,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 15, 34, 354, 89
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fájl felülírásának megerősítése"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Felülírandó fájl:",IDC_STATIC_1,4,14,54,8
+    LTEXT           "",IDS_SOURCENAME,62,14,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_SOURCEATTR,62,24,286,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Ezzel:",IDC_STATIC_2,4,37,54,8,NOT WS_GROUP
+    LTEXT           "",IDS_TARGETNAME,62,37,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_TARGETATTR,62,47,286,8,SS_NOPREFIX | NOT WS_GROUP
+    DEFPUSHBUTTON   "&Igen",IDYES,93,66,50,14,WS_GROUP
+    PUSHBUTTON      "&Nem",IDNO,152,66,50,14
+    PUSHBUTTON      "Mégse",IDCANCEL,211,66,50,14
+END
+
+IDD_COPYTO DIALOGEX 15, 34, 316, 121
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Fájl másolása ide"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&1",IDC_COPYTO_RB_1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,8,10,18,12
+    CONTROL         "&2",IDC_COPYTO_RB_2,"Button",BS_AUTORADIOBUTTON,8,27,18,12
+    CONTROL         "&3",IDC_COPYTO_RB_3,"Button",BS_AUTORADIOBUTTON,8,44,18,12
+    CONTROL         "&4",IDC_COPYTO_RB_4,"Button",BS_AUTORADIOBUTTON,8,61,18,12
+    CONTROL         "&5",IDC_COPYTO_RB_5,"Button",BS_AUTORADIOBUTTON,8,78,18,12
+    EDITTEXT        IDC_COPYTO_EL_1,29,10,221,12,WS_GROUP
+    PUSHBUTTON      "&Tallóz...",IDC_COPYTO_BR_1,256,9,50,14
+    EDITTEXT        IDC_COPYTO_EL_2,29,27,221,12
+    PUSHBUTTON      "T&allóz...",IDC_COPYTO_BR_2,256,26,50,14
+    EDITTEXT        IDC_COPYTO_EL_3,29,44,221,12
+    PUSHBUTTON      "Ta&llóz...",IDC_COPYTO_BR_3,256,43,50,14
+    EDITTEXT        IDC_COPYTO_EL_4,29,61,221,12
+    PUSHBUTTON      "Talló&z...",IDC_COPYTO_BR_4,256,60,50,14
+    EDITTEXT        IDC_COPYTO_EL_5,29,78,221,12
+    PUSHBUTTON      "Tall&óz...",IDC_COPYTO_BR_5,256,77,50,14
+    DEFPUSHBUTTON   "OK",IDOK,142,100,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,199,100,50,14
+    PUSHBUTTON      "Súgó",IDHELP,256,100,50,14
+END
+
+IDD_SAVEEX DIALOGEX 0, 0, 400, 20
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CLIPSIBLINGS
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Tömöríté&s:",IDC_SAVE_COMPRESSION_LABEL,5,2,49,8
+    COMBOBOX        IDC_SAVE_COMPRESSION,54,0,170,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "Beállítás&ok",IDC_SAVE_ADVANCED,230,0,55,14,WS_GROUP
+    LTEXT           "S&zínmélység:",IDC_STATIC_2,5,26,49,8
+    COMBOBOX        IDC_SAVE_BIT_DEPTH,54,24,70,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Fo&rgatás:",IDC_STATIC_3,5,46,49,8
+    COMBOBOX        IDC_SAVE_ROTATION,54,44,70,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Tükrözés:",IDC_STATIC_4,5,66,49,8
+    COMBOBOX        IDC_SAVE_FLIP,54,64,70,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "Fordított szí&nek (negatív)",IDC_SAVE_INVERT,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_GROUP | WS_TABSTOP,5,82,109,12
+    LTEXT           "M&egjegyzés:",IDC_SAVE_COMMENT_STATIC,5,94,49,8
+    EDITTEXT        IDC_SAVE_COMMENT,5,104,118,41,ES_MULTILINE | WS_GROUP
+    GROUPBOX        "GIF",IDC_SAVE_GROUP_GIF,130,20,144,25,WS_GROUP
+    CONTROL         "&Váltott-soros",IDC_SAVE_GIF_INTERLACED,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,135,30,56,12
+    CONTROL         "&GIF89a készítés",IDC_SAVE_GIF_89a,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,201,30,66,12
+    GROUPBOX        "JPEG, TIFF-JPEG",IDC_SAVE_GROUP_JPEG,130,50,144,45,WS_GROUP
+    LTEXT           "&Minőség:",IDC_SAVE_JPEG_STATIC1,135,61,40,8
+    EDITTEXT        IDC_SAVE_JPEG_QUALITY,182,59,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "%",IDC_SAVE_JPEG_STATIC2,205,61,40,8
+    LTEXT           "&Almintavétel:",IDC_SAVE_JPEG_STATIC3,135,80,46,8
+    COMBOBOX        IDC_SAVE_JPEG_SUBSAMPLING,182,78,33,40,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    GROUPBOX        "TIFF",IDC_SAVE_GROUP_TIFF,130,100,144,45,WS_GROUP
+    CONTROL         "&Darabokban",IDC_SAVE_TIFF_MAKE_STRIPS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,135,110,52,12
+    LTEXT           "Dara&bméret:",IDC_SAVE_TIFF_STATIC1,145,126,45,8
+    EDITTEXT        IDC_SAVE_TIFF_STRIP_SIZE,191,124,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "KB",IDC_SAVE_TIFF_STATIC2,214,126,40,8
+END
+
+IDD_PRINT DIALOGEX 10, 24, 419, 227
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nyomtatás"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_PRINT_PREVIEW,"Static",SS_WHITEFRAME | SS_NOPREFIX | WS_GROUP,6,7,211,195
+    GROUPBOX        " Nyomtató ",IDC_STATIC_4,225,4,186,27
+    LTEXT           "",IDC_PRINT_PRINTER,232,15,118,8
+    PUSHBUTTON      "Beállítá&s...",IDC_PRINT_SETUP,354,12,50,14,WS_GROUP
+    GROUPBOX        " Pozíció ",IDC_STATIC_1,225,35,186,62
+    RTEXT           "Ba&l:",IDC_STATIC_2,233,49,27,8
+    EDITTEXT        IDC_PRINT_LEFT,264,47,45,12
+    COMBOBOX        IDC_PRINT_LEFT_UNITS,315,47,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "&Fent:",IDC_STATIC_3,233,68,27,8
+    EDITTEXT        IDC_PRINT_TOP,264,66,45,12
+    COMBOBOX        IDC_PRINT_TOP_UNITS,315,66,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Ké&p középre",IDC_PRINT_CENTER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,264,82,60,12
+    GROUPBOX        " Nyomtatási méret ",IDC_STATIC_5,225,102,186,100
+    RTEXT           "&Nyújt:",IDC_STATIC_6,233,118,27,8
+    EDITTEXT        IDC_PRINT_SCALE,264,116,35,12
+    LTEXT           "%",IDC_STATIC_7,302,118,10,8
+    CONTROL         "N&yújtás",IDC_PRINT_FIT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,315,111,67,12
+    CONTROL         "&Képarány megtartása",IDC_PRINT_ASPECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,315,123,84,12
+    RTEXT           "S&zéles:",IDC_STATIC_8,233,139,27,8
+    EDITTEXT        IDC_PRINT_WIDTH,264,137,45,12
+    COMBOBOX        IDC_PRINT_WIDTH_UNITS,315,137,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "&Magas:",IDC_STATIC_9,233,158,27,8
+    EDITTEXT        IDC_PRINT_HEIGHT,264,156,45,12
+    COMBOBOX        IDC_PRINT_HEIGHT_UNITS,315,156,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Határ do&boz",IDC_PRINT_BOX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,264,173,77,12
+    CONTROL         "Kijelölt terület nyomtatás&a",IDC_PRINT_SELECTION,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,264,185,101,12
+    DEFPUSHBUTTON   "OK",IDOK,252,208,50,14,WS_GROUP
+    PUSHBUTTON      "Mégse",IDCANCEL,307,208,50,14
+    PUSHBUTTON      "Súgó",IDHELP,362,208,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "PictView"
+  IDS_PLUGIN_DESCRIPTION, "Gyors képnéző és -konvertáló."
+  IDS_LOWMEMORY, "Kevés memória"
+  IDS_SOME_WINS_OPENED, "Néhány PictView ablak nyitva van. Bezárja őket?"
+  IDS_ERROR_OPENING, "A fájl nem nyitható meg: %s:\n%s"
+  IDS_ERROR_OPENING_CONTINUE, "(%d) %hs A fájl nem dolgozható fel. Folytatja?"
+  IDS_TITLE, "%s (%d x %d x %s - %i%%) - %s"
+  IDS_TITLE_MULTI, "%s (%d x %d x %s [%d / %d] - %i%%) - %s"
+  IDS_NCOLORS, "{!}%d szín{|1|}"
+  IDS_NCOLORS_CMYK, "CMYK"
+  IDS_NCOLORS_LAB, "LAB"
+
+  IDS_ERROR_CALLING_PVW32_DLL, "Hibás PVW32Cnv.DLL meghívás"
+  IDS_CLIPBOARD_TITLE, "<Vágólap>"
+  IDS_CAPTURE_TITLE, "<Képernyőmentés>"
+  IDS_SCAN_TITLE, "<Vizsgálat>"
+  IDS_DELETED_TITLE, "<Törölt>"
+  IDS_CLIPBOARD_FNAME, "Vágólap"
+  IDS_CAPTURE_FNAME, "Elfogva"
+  IDS_SCAN_FNAME, "Vizsgálat"
+  IDS_RGB, "Vörös: %i, Zöld: %i, Kék: %i"
+  IDS_RGB_HEX, "Vörös: %#02x, Zöld: %#02x, Kék: %#02x"
+  IDS_RGBXY, "(%i, %i): Vörös: %i, Zöld: %i, Kék: %i"
+  IDS_RGBXY_HEX, "(%i, %i): Vörös: %#02x, Zöld: %#02x, Kék: %#02x"
+  IDS_INDEX, ", Index: %i"
+
+  IDS_VIEW_BMP_IN_CLIPBOARD, "&Vágólapi Bitmap megnézése"
+  IDS_PLUGINSMENU_SCREEN_CAPTURE, "Képernyőmenté&s..."
+  IDS_PLUGINSMENU_REGENERATE_THUMBNAIL, "&Bélyegkép frissítése"
+  IDS_PLUGINSMENU_SCAN, "Kép szkennelés&e..."
+  IDS_PIXELS, "{!}%d pixel{|1|}"
+  IDS_BYTES, "{!}%d bájt{|1|}"
+  IDS_OF, "%d / %d"
+  IDS_FRAMES, "F&rame:"
+  IDS_IMGPROP_GRAY_NBIT, "Szürke árnyalat %dBit"
+  IDS_UNKNOWN, "Ismeretlen"
+  IDS_CFG_CONFLICT, "A beállítás már meg van nyitva."
+  IDS_CONFIGURATION_TITLE, "PictView beállítás"
+  IDS_ERRORTITLE, "PictView hiba"
+  IDS_BADTIMER, "A késleltetési értéknek 1 és 360 mp között kell lennie."
+  IDS_BADHOTKEY, "Társítson elérhető gyorsbillentyűt."
+  IDS_CAPTURECANCELED, "Képernyőmentés megszakítva."
+  IDS_CAPTURING, "Képernyőmentés"
+  IDS_EMPTY, "Üres"
+  IDS_SELECTTARGETDIR, "Válassza ki a cél mappát."
+  IDS_SPECIFYPATH, "Az érvényes abszolút vagy relatív elérési utat meg kell itt adni."
+  IDS_PICTVIEWPLUGINNAME, "PictView Plugin (képnéző és konvertáló)"
+
+
+  // !WARNING! 2 following variables must be synchronized with IDS_SAVEASFILTERMONO & IDS_SAVEASFILTERCOLOR:
+  // G.LastSaveAsFilterIndexMono  = 14; // index is 1-based (IDS_SAVEASFILTERMONO: 14=BMP)
+  // G.LastSaveAsFilterIndexColor = 13; // index is 1-based (IDS_SAVEASFILTERCOLOR: 13=BMP)
+  // !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING!
+
+  IDS_SAVEASFILTERMONO, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pbm,*.ppm)|*.pbm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|Wireless Bitmap (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEASFILTERCOLOR, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pnm,*.ppm)|*.pnm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEERROR, "A kép nem menthető.\nHiba: %hs"
+  IDS_SAVE_AS_SUCCESS, "A kép sikeresen mentve."
+  IDS_SAVE_LOST_ALPHA, "Az eredeti kép alfa csatornát tartalmaz. Azonban össze lett vonva a képi adattal és az aktuális háttérrel.\nEmiatt az alfa csatorna nem lesz mentve. Így is menti?"
+  IDS_CANCELED_BY_USER, "A kép mentése meg lett szakítva. A kimeneti fájl nem jött létre."
+  IDS_OPENFILTER, "Gyakori grafikus fájlok (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|Minden fájl (*.*)|*.*|"
+  IDS_CUSTOM_COLOR, "&Egyéni szín..."
+  IDS_AUTOMATIC_COLOR, "&Automata szín"
+  IDS_SAL_IS_BUSY, "Az Sally elfoglalt. A kért parancs nem hajtható végre, próbálja meg később."
+  IDS_RENAME_TO, """%s"" fájl átnevezése erre"
+  IDS_ERRORRENAMINGFILE, "Átnevezési hiba"
+  IDS_TOOLONGNAME, "a művelet nem fejezhető be, mert a név túl hosszú."
+  IDS_LOADEXIF, "Nem tölthető be a(z) %s EXIF könyvtár."
+  IDS_EXIF_TAG, "Jel"
+  IDS_EXIF_VALUE, "Érték"
+  IDS_EXIF_LOCALIZATION_FNAME, "hu.po"
+
+  IDS_MENU_FILE, "&Fájl"
+  IDS_MENU_FILE_OPEN, "&Megnyitás...\tCtrl+O"
+  IDS_MENU_FILE_REFRESH, "Vissz&aáll\tCtrl+R"
+  IDS_MENU_FILE_PREV, "Elő&ző\tBackspace"
+  IDS_MENU_FILE_NEXT, "&Következő\tSpace"
+  IDS_MENU_FILE_SAVEAS, "Menté&s mint...\tCtrl+S"
+  IDS_MENU_FILE_WALLPAPER, "&Háttérképként"
+  IDS_MENU_WALLPARER_CENTER, "&Középen"
+  IDS_MENU_WALLPARER_TILE, "&Mozaik"
+  IDS_MENU_WALLPARER_STRETCH, "Nyújtá&s"
+  IDS_MENU_WALLPARER_RESTORE, "&Előző visszaállítása"
+  IDS_MENU_WALLPARER_NONE, "&Nincs"
+  IDS_MENU_FILE_CAPTURE, "Ké&pernyőmentés...\tQ"
+  IDS_MENU_FILE_SCAN, "Kép szk&ennelése...\tW"
+  IDS_MENU_FILE_SCAN_SOURCE, "Szkenner forrás kije&lölése..."
+  IDS_MENU_FILE_PROP, "T&ulajdonságok...\tI"
+  IDS_MENU_FILE_EXIF, "E&XIF adatok...\tE"
+  IDS_MENU_FILE_HISTOGRAM, "Hiszto&gram...\tCtrl+H"
+  IDS_MENU_FILE_PAGE, "&Oldalbeállítás...\tCtrl+Shift+P"
+  IDS_MENU_FILE_PRINT, "Ny&omtatás...\tCtrl+P"
+  IDS_MENU_FILE_FILES, "F&riss fájlok"
+  IDS_MENU_FILE_DIRS, "Fr&iss mappák"
+  IDS_MENU_FILE_EXIT, "&Kilépés\tEsc"
+  IDS_MENU_FILE_OTHER, "Egyé&b fájlok"
+  IDS_MENU_FILE_FIRST, "El&ső\tShift+Backspace"
+  IDS_MENU_FILE_LAST, "Uto&lsó\tShift+Space"
+  IDS_MENU_FILE_FOCUS, "&Fókusz\tF"
+  IDS_MENU_FILE_SELCRCFILE, "Meg&nyitott fájl kijelölése a panelen vagy keresése\tInsert"
+  IDS_MENU_FILE_RENAME, "Átne&vezés...\tF2"
+  IDS_MENU_FILE_DELETE, "&Törlés\tDel"
+  IDS_MENU_FILE_PREVSEL, "Előző k&ijelölt\tCtrl+Backspace"
+  IDS_MENU_FILE_NEXTSEL, "Köv&etkező kijelölt\tCtrl+Space"
+  IDS_MENU_FILE_COPYTO, "Másolás i&de...\tX"
+
+  IDS_MENU_EDIT, "Sz&erkesztés"
+  IDS_MENU_EDIT_COPY, "&Másolás\tCtrl+C"
+  IDS_MENU_EDIT_PASTE, "&Beillesztés\tCtrl+V"
+  IDS_MENU_EDIT_SELECTALL, "M&ind kijelöl\tCtrl+A"
+  IDS_MENU_EDIT_DESELECT, "&Kijelölés törlése\tCtrl+D"
+  IDS_MENU_EDIT_CROP, "Vá&gás\tC"
+  IDS_MENU_EDIT_180, "&180°-os forgatás\tT"
+  IDS_MENU_EDIT_RIGHT, "Forgatás jobb&ra\tR"
+  IDS_MENU_EDIT_LEFT, "Forgatás ba&lra\tL"
+  IDS_MENU_EDIT_FLIPH, "&Vízszintes tükrözés\tH"
+  IDS_MENU_EDIT_FLIPV, "&Függőleges tükrözés\tV"
+
+  IDS_MENU_VIEW, "&Nézet"
+  IDS_MENU_VIEW_ZOOMIN, "&Nagyítás\t+"
+  IDS_MENU_VIEW_ZOOMOUT, "&Kicsinyítés\t-"
+  IDS_MENU_VIEW_ZOOM, "Na&gyítás...\tM"
+  IDS_MENU_VIEW_WHOLE, "A&blakhoz igazítás\tF5"
+  IDS_MENU_VIEW_WIDTH, "S&zélességhez igazítás\tF6"
+  IDS_MENU_VIEW_ACTUAL, "&Aktuális méret (1:1)\tF7"
+  IDS_MENU_VIEW_WINDOW, "Ablak mé&retezése igazításhoz\tF8"
+  IDS_MENU_VIEW_TOOLBAR, "Eszköz&tár\tF9"
+  IDS_MENU_VIEW_STATUSBAR, "Állapots&or"
+  IDS_MENU_VIEW_FULLSCREEN, "Telje&s képernyő\tF11"
+
+  IDS_MENU_MULTIPAGE, "Többo&ldalas képek"
+  IDS_MENU_NEXTPAGE, "&Következő oldal\tCtrl+Page Down"
+  IDS_MENU_PREVPAGE, "Elő&ző oldal\tCtrl+Page Up"
+  IDS_MENU_FIRSTPAGE, "&Első oldal\tCtrl+Home"
+  IDS_MENU_LASTPAGE, "Uto&lsó oldal\tCtrl+End"
+  IDS_MENU_PAGE, "Oldalra u&grás...\tG"
+  IDS_MENU_ANIMATION, "&Animáció lejátszása/szüneteltetése"
+
+  IDS_MENU_TOOLS, "Eszközö&k"
+  IDS_MENU_TOOLS_HAND, "&Kéz\tA"
+  IDS_MENU_TOOLS_ZOOM, "&Nagyítás\tZ"
+  IDS_MENU_TOOLS_SELECT, "Kijelölé&s\tS"
+  IDS_MENU_TOOLS_PICK, "S&zín felszedő\tP"
+  IDS_MENU_TOOLS_OPTIONS, "&Beállítás..."
+
+  IDS_MENU_HELP, "&Súgó"
+  IDS_MENU_HELP_CONTENTS, "&Tartalomjegyzék\tF1"
+  IDS_MENU_HELP_INDEX, "&Index..."
+  IDS_MENU_HELP_SEARCH, "Kere&sés..."
+//  IDS_MENU_HELP_KEYBOARD, "&Keyboard Shortcuts"
+//  IDS_MENU_HELP_MOUSE, "&Mouse Shortcuts"
+  IDS_MENU_HELP_ABOUT, "&PictView névjegy..."
+
+  IDS_TT_OPEN, "Megnyitás\tCtrl+O"
+  IDS_TT_SAVE, "Mentés mint\tCtrl+S"
+  IDS_TT_PROPERTIES, "Kép tulajdonságok\tI"
+  IDS_TT_PREV, "Előző fájl megnyitása\tBackspace"
+  IDS_TT_NEXT, "Következő fájl megnyitása\tSpace"
+  IDS_TT_PREVSELFILE, "Előző kijelölt fájl megnyitása\tCtrl+Backspace"
+  IDS_TT_NEXTSELFILE, "Következő kijelölt fájl megnyitása\tCtrl+Space"
+  IDS_TT_COPY, "Másolás\tCtrl+C"
+  IDS_TT_PASTE, "Beillesztés\tCtrl+V"
+  IDS_TT_TOOL_HAND, "Kéz\tA"
+  IDS_TT_TOOL_ZOOM, "Nagyítás\tZ"
+  IDS_TT_TOOL_SELECT, "Kijelölés\tS"
+  IDS_TT_TOOL_PIPETTE, "Pipetta\tP"
+  IDS_TT_LEFT, "Forgatás balra\tL"
+  IDS_TT_RIGHT, "Forgatás jobbra\tR"
+  IDS_TT_CROP, "Vágás\tC"
+  IDS_TT_ZOOM_OUT, "Kicsinyítés\t-"
+  IDS_TT_ZOOM_IN, "Nagyítás\t+"
+  IDS_TT_ZOOM_TO, "Nagyítás\tM"
+  IDS_TT_ZOOM_WIDTH, "Teljes szélesség\tF6"
+  IDS_TT_ZOOM_WHOLE, "Teljes méret\tF5"
+  IDS_TT_ZOOM_ACTUAL, "Aktuális méret\tF7"
+  IDS_TT_FULL_SCREEN, "Teljes képernyő\tF11"
+  IDS_TT_SELSRCFILE, "Megnyitott fájl kijelölés a panelben vagy keresése ablakban\tInsert"
+  IDS_TT_PRINT, "Nyomtatás\tCtrl+P"
+
+  IDS_TWAIN_OPEN, "Nem lehet megnyitni a TWAIN forrás kezelőt.\nHa a szkennere egy TWAIN támogatású szkenner,\ntelepítse újra a szkenner szoftverét."
+  IDS_TWAIN_ERROR, "Twain hiba"
+  IDS_TWCC_BUMMER, "Ismeretlen okból származó sikertelen kérés."
+  IDS_TWCC_LOWMEMORY, "Nincs elég memória a művelet végrehajtásához."
+  IDS_TWCC_NODS, "Nincs adatforrás."
+  IDS_TWCC_MAXCONNECTIONS, "DS a maximális számú programhoz csatlakozott."
+  IDS_TWCC_OPERATIONERROR, "DS vagy DSM hibát jelentett."
+  IDS_TWCC_BADCAP, "Ismeretlen képesség."
+  IDS_TWCC_BADPROTOCOL, "Felismerhetetlen MSG DG DAT kombináció."
+  IDS_TWCC_BADVALUE, "Adatparaméter intervallumon kívül."
+  IDS_TWCC_SEQERROR, "DG DAT MSG túllépte a várt szekvenciát."
+  IDS_TWCC_BADDEST, "Ismeretlen cél alkalmazás/Forrás a DSM_Entry."
+  IDS_TWCC_CAPUNSUPPORTED, "A képességet nem támogatja a forrás."
+  IDS_TWCC_CAPBADOPERATION, "A műveletet nem támogatja a képesség."
+  IDS_TWCC_CAPSEQERROR, "A képesség egy másiktól függ."
+  IDS_TWCC_DENIED, "A fájlrendszer művelet megtagadva (védett fájl)."
+  IDS_TWCC_FILEEXISTS, "A művelet sikertelen, mert a fájl már létezik."
+  IDS_TWCC_FILENOTFOUND, "A fájl nem található."
+  IDS_TWCC_NOTEMPTY, "Sikertelen művelet, mert a mappa nem üres."
+  IDS_TWCC_PAPERJAM, "Az adagoló elakadt."
+  IDS_TWCC_PAPERDOUBLEFEED, "Az adagoló több oldalt érzékelt."
+  IDS_TWCC_FILEWRITEERROR, "Fájl írási hiba (tele a lemez?)."
+  IDS_TWCC_CHECKDEVICEONLINE, "Az eszköz  korábban vagy a művelet során kapcsolat nélkülivé vált."
+
+  IDS_CAPTHINT_APPL, "Az egész alkalmazás ablaka, al-ablakokkal és utódablakokkal együtt."
+  IDS_CAPTHINT_WINDOW, "Az éppen aktív ablak (párbeszédablak, üzenet...)."
+  IDS_CAPTHINT_CLIENT, "Mint az ablak előtere, de az ablak címsora, kerete és menüje már nem lesz benne."
+
+  IDS_DONT_SHOW_AGAIN, "&Ne mutassa újra"
+  IDS_DONT_SHOW_AGAIN_SLA, "&Ne mutassa újra és mentse alfa csatorna nélkül"
+  IDS_DONT_SHOW_AGAIN_UTH, "&Bélyegkép frissítése kérdés nélkül"
+  IDS_REGENERATE_THUMBNAIL_TITLE, "PictView - Bélyegképek frissítése..."
+  IDS_REGENERATE_THUMB_WARNING, "Ez a funkció frissíteni fogja a kép fájl(ok) Exif részében található bélyegképet. A többi fájl nem módosul. Végrehajtja?"
+  IDS_REGENERATE_THUMB_WRITEFILE, "Nem hozható létre a fájl az új bélyegképpel. Megtelt a lemez? A régi '%s' fájl változatlan maradt."
+
+  IDS_N_OF_N_FILES_PROCESSED "{!}Csak %d került{|1|} feldolgozásra a(z) %d fájlból. A többi fájl{|1|} nem került módosításra."
+  IDS_NO_FILES_FOUND, "Nincs EXIF adatot tartalmazó JPEG kép. Nincs módosult fájl."
+  IDS_NOT_JPEG_FILE, "Ez nem JPEG fájl, nincs frissítendő bélyegkép."
+  IDS_NOT_EXIF_CREATE_JFXX, "A fájl nem tartalmaz EXIF adatot, így nincs frissítendő EXIF bélyegkép. Inkább létrehoz helyette egy JFIF JFXX bélyegképet?"
+  IDS_READ_ONLY_MODIFY, "A fájl írásvédett. Biztos módosítja?"
+  IDS_READ_ONLY_REWRITE, "A(z) %s fájl írásvédett. Biztos felülírja?"
+
+  IDS_CLRS_MONO, "2 szín"
+  IDS_CLRS_16, "16 szín"
+  IDS_CLRS_256, "256 szín"
+  IDS_CLRS_HC15, "15bit HiColor"
+  IDS_CLRS_HC16, "16bit HiColor"
+  IDS_CLRS_TC24, "24bit TrueColor"
+  IDS_CLRS_TC32, "32bit TrueColor"
+  IDS_CLRS_256GR, "256 szürke"
+  IDS_FLIP_NONE, "Nincs"
+  IDS_FLIP_VERT, "Függőleges"
+  IDS_FLIP_HOR, "Vízszintes"
+  IDS_ROT_NONE, "Nincs"
+  IDS_ROT_90, "90 fok jobbra"
+  IDS_ROT_180, "180 fok"
+  IDS_ROT_270, "270 fok jobbra"
+  IDS_SAVE_DEFAULT, "Alapbeállítás"
+
+  IDS_HIST_HISTOGRAM, "Hisztogram"
+  IDS_HIST_LUMINOSITY, "Fényesség"
+  IDS_HIST_RED, "Vörös"
+  IDS_HIST_GREEN, "Zöld"
+  IDS_HIST_BLUE, "Kék"
+  IDS_HIST_RGBSUM, "RGB"
+  IDS_HIST_MENU_LUMINOSITY, "Fényesség\tL"
+  IDS_HIST_MENU_RED, "Vörös\tR"
+  IDS_HIST_MENU_GREEN, "Zöld\tG"
+  IDS_HIST_MENU_BLUE, "Kék\tB"
+  IDS_HIST_MENU_RGBSUM, "RGB\tA"
+  IDS_HIST_TIP_LUMINOSITY, "Fényesség (L)"
+  IDS_HIST_TIP_RED, "Vörös (R)"
+  IDS_HIST_TIP_GREEN, "Zöld (G)"
+  IDS_HIST_TIP_BLUE, "Kék (B)"
+  IDS_HIST_TIP_RGBSUM, "RGB (A)"
+  IDS_HIST_TIP_OTHERCHANELS, "Többi csatorna (O)"
+  IDS_DLL_NOTFOUND, "A képfeldolgozó PVW32Cnv.dll nem tölthető be."
+  IDS_DLL_WRONG_VERSION, "Rossz verziós PVW32Cnv.dll fájl."
+  IDS_SELECT_REGION, "Előbb válasszon egy területet."
+  IDS_SAVE_ERR_EXISTS_OVERWRITE, "A(z) ""%s"" fájl már létezik.\nLe akarja cserélni?"
+
+  IDS_SB_XY, "X:%d  Y:%d"
+  IDS_SB_WH, "SZ:%d  M:%d"
+  IDS_SB_RGB, "V:%d  Z:%d  K:%d"
+  IDS_SB_CAGE, "Rajzoljon egy négyszögletes kijelölési körvonalat. A Shift és Space további beállítást adnak."
+  IDS_SB_ZOOM, "Kattintson a képen a nagyításhoz; kattintson és rajzoljon nagyítási mezőt. Space a mező mozgatásához."
+  IDS_SB_HAND, "Kattintson és vigye a kilógó képet a kívánt irányba."
+
+  IDS_SB_AUTOROTATING, "Forgatás..."
+
+  IDS_UNIT_INCHES, "hüvelyk"
+  IDS_UNIT_CM, "cm"
+  IDS_UNIT_MM, "mm"
+  IDS_UNIT_POINTS, "pont"
+  IDS_UNIT_PICAS, "pica"
+
+  IDS_PRINT_NODEFPRINTER, "Nem található alapértelmezett nyomtató. Telepítsen egy nyomtatót."
+  IDS_PRINT_NOPRINTERS, "Nincs nyomtató telepítve."
+  IDS_PRINT_SETUPFAILED, "Nyomtatási beállítások ablak hiba."
+  IDS_PRINTING, "Nyomtatás..."
+  IDS_PRINTING_FAILED,  "Sikertelen nyomtatás.\n%s"
+  IDS_UNKNOWN_ERROR,    "Ismeretlen hiba lépett fel.\n"
+  IDS_CHECK_EVENTLOG,   "Ellenőrizze az Eseménynaplót a pontos hibaüzenet megtekintéséhez."
+  // The following 2 strings are concatenated together
+  IDS_EXCEPT_INFO1,     "Kivétel lépett fel a PictView-ben, lépjen kapcsolatba a készítőkkel!\nHa éppen képekkel dolgozott, mikor ez a hiba fellépett,\n"
+  IDS_EXCEPT_INFO2,     "próbálja újra előhozni ezt a hibát a képpel és ha a kivétel\nújra előjön, küldje el  képet nekünk (előidézzük és javítjuk a hibát).\nKöszönjük az együttműködést!"
+
+  IDS_NO_MORE_IMAGES,   "Nincs több kép"
+  IDS_UNSUPPORTED_IMAGE_TYPE, "Ez a kép nem támogatott formátumban van."
+  IDS_MUSTBEPOSITIVE,   "Nullánál nagyobb számot adjon meg."
+  IDS_SB_TIP_SELECT_SQUARE, "Tipp: Az eszközök beállításaiban kiválaszthat kötött nem négyzetes téglalapot."
+  
+  IDS_WIA_ERROR_ACQUIREIMG, "A kép nem kérhető le az eszközről. Ellenőrizze, hogy az eszköz megfelelően van-e csatlakoztatva, majd próbálja újra. Hiba: (0x%08X) %s"
+  IDS_WIA_WAIT, "Várjon..."
+  IDS_WIA_STATUS_TRANSFER_FROM_DEVICE, "Adatok olvasása az eszközről (%d%% kész)"
+  IDS_WIA_STATUS_PROCESSING_DATA, "Adatok feldolgozása (%d%% kész)"
+  IDS_WIA_STATUS_TRANSFER_TO_CLIENT, "Adatok átvitele (%d%% kész)"
+  
+  IDS_SCAN_OPEN_EXTRA_IMGS, "Több képet is beszkennelt. Az első kép nyílt meg ebben az ablakban. Szeretné a többi képet is a saját ablakukban megnyitni? Ha nem, a képek figyelmen kívül lesznek hagyva.\n\nÚj ablakok száma: %d"
+}
+
+STRINGTABLE
+{
+  IDS_RENAME_EMPTY, "Adjon meg egy fájlnevet vagy átnevezési maszkot."
+  IDS_RENAME_BAD_MASK, "A fájlnév vagy az átnevezési maszk nem tartalmazhat útvonal-elválasztót és a következő karaktereket: < > : "" / \\ |"
+  IDS_RENAME_MASK_EMPTY, "Az átnevezési maszk üres fájlnevet eredményezett."
+  IDS_RENAME_BAD_NAME, "Az eredményül kapott fájlnév nem tartalmazhat útvonal-elválasztót és a következő karaktereket: < > : "" / \\ | ? *"
+  IDS_COPYTO_SAME_FOLDER, "A fájl már ebben a mappában van. Válasszon másik célmappát."
+}
+
+STRINGTABLE
+{
+  IDS_PV_IMAGE_LOAD_WAS_CANCELED, "A kép betöltése megszakítva."
+  IDS_PV_UNABLE_TO_OPEN_IMAGE_FILE, "A képfájl nem nyitható meg"
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE, "A képfájl mérete nem olvasható be"
+  IDS_PV_IMAGE_FILE_EXCEEDS_THE_CURRENT, "A képfájl meghaladja a PictView jelenlegi bemeneti korlátját."
+  IDS_PV_UNABLE_TO_ALLOCATE_AN_IN, "Nem foglalható le memóriabeli képadatfolyam."
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE_2, "A képfájl nem olvasható be"
+  IDS_PV_UNABLE_TO_LOCK_IMAGE_STREAM, "A képadatfolyam memóriája nem zárolható"
+  IDS_PV_UNABLE_TO_CREATE_AN_IMAGE, "Nem hozható létre képadatfolyam a WIC számára."
+  IDS_PV_IMAGE_OPERATION_FAILED, "A képművelet sikertelen."
+  IDS_PV_CLIPBOARD_IMAGE, "Vágólapi kép"
+  IDS_PV_UNABLE_TO_CREATE_A_COMPATIBLE, "Nem hozható létre kompatibilis képernyőmentési puffer."
+  IDS_PV_UNABLE_TO_SELECT_THE_COMPATIBLE, "A kompatibilis képernyőmentési puffer nem jelölhető ki."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN, "A képernyő nem menthető"
+  IDS_PV_UNABLE_TO_READ_PIXELS_FROM, "A képpontok nem olvashatók be a képernyőmentési pufferből."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING, "Nem hozható létre rajzolási környezet a képernyőmentéshez."
+  IDS_PV_UNABLE_TO_CREATE_A_FALLBACK, "Nem hozható létre tartalék rajzolási környezet a képernyőmentéshez."
+  IDS_PV_UNABLE_TO_INITIALIZE_DXGI_SCREEN, "A DXGI képernyőmentés nem inicializálható"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_2, "A képernyő nem menthető DXGI-vel"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_3, "A képernyő nem menthető DXGI-vel."
+  IDS_PV_SCREEN_CAPTURE_BOUNDS_ARE_INVALID, "A képernyőmentés határai érvénytelenek."
+  IDS_PV_SCREEN_CAPTURE, "Képernyőmentés"
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_UNAVAILABLE, "A vágólapi képadatok nem érhetők el."
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_INCOMPLETE, "A vágólapi képadatok hiányosak."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE, "A vágólapi képadatok nem zárolhatók"
+  IDS_PV_CLIPBOARD_IMAGE_FORMAT_IS_UNSUPPORTED, "A vágólapi kép formátuma nem támogatott."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_2, "Nem hozható létre rajzolási környezet a vágólapi kép átalakításához."
+  IDS_PV_UNABLE_TO_CREATE_CLIPBOARD_IMAGE, "Nem hozható létre puffer a vágólapi kép átalakításához."
+  IDS_PV_UNABLE_TO_CONVERT_CLIPBOARD_IMAGE, "A vágólapi képadatok nem alakíthatók át."
+  IDS_PV_CLIPBOARD_BITMAP, "Vágólapi bitkép"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_FALLBACK, "A tartalék ablak nem menthető."
+  IDS_PV_FALLBACK_WINDOW_DIMENSIONS_ARE_INVALID, "A tartalék ablak méretei érvénytelenek."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_3, "Nem hozható létre rajzolási környezet a tartalék ablak mentéséhez."
+  IDS_PV_UNABLE_TO_PRINT_THE_FALLBACK, "A tartalék ablak nem rajzolható ki."
+  IDS_PV_IMAGE_SOURCE_DATA_IS_UNAVAILABLE, "A kép forrásadatai nem érhetők el."
+  IDS_PV_NO_IMAGE_LOADED, "Nincs betöltött kép"
+  IDS_PV_PICK_COLOR_MOVE_MOUSE_OVER, "Szín felszedése: vigye az egeret a kép fölé"
+  IDS_PV_UNABLE_TO_START_ANIMATED_GIF, "Az animált GIF lejátszása nem indítható el."
+  IDS_PV_SOURCE_NAVIGATION_IS_NO_LONGER, "A forrásban való navigálás már nem érhető el."
+  IDS_PV_SOURCE_SELECTION_IS_NO_LONGER, "A forrásbeli kijelölés már nem érhető el."
+  IDS_PV_OPENED_FILE_IS_SELECTED_IN, "A megnyitott fájl ki van jelölve a forrásban."
+  IDS_PV_OPENED_FILE_IS_UNSELECTED_IN, "A megnyitott fájl nincs kijelölve a forrásban."
+  IDS_PV_FILE_NAME_UNCHANGED, "A fájlnév nem változott."
+  IDS_PV_UNABLE_TO_RENAME_THE_FILE, "A fájl nem nevezhető át"
+  IDS_PV_RENAME_CANCELED, "Az átnevezés megszakítva."
+  IDS_PV_FILE_WAS_RENAMED_BUT_THE, "A fájl átnevezve, de az új elérési út nem érhető el."
+  IDS_PV_FILE_RENAMED, "A fájl átnevezve."
+  IDS_PV_COPY_CANCELED, "A másolás megszakítva."
+  IDS_PV_UNABLE_TO_COPY_THE_FILE, "A fájl nem másolható."
+  IDS_PV_FILE_COPIED, "A fájl átmásolva."
+  IDS_PV_COPY_WAS_NOT_COMPLETED, "A másolás nem fejeződött be."
+  IDS_PV_UNABLE_TO_DELETE_THE_FILE, "A fájl nem törölhető."
+  IDS_PV_FILE_MOVED_TO_THE_RECYCLE, "A fájl a Lomtárba került."
+  IDS_PV_FILE_DELETED, "A fájl törölve."
+  IDS_PV_DELETE_CANCELED, "A törlés megszakítva."
+  IDS_PV_FILE_WAS_NOT_DELETED, "A fájl nem lett törölve."
+  IDS_PV_SOURCE_FOCUS_IS_NO_LONGER, "A fókuszálás a forrásban már nem érhető el."
+  IDS_PV_FOCUSING_OPENED_FILE_IN_THE, "A megnyitott fájl fókuszálása a forrásban."
+  IDS_PV_PREVIOUS_WALLPAPER_RESTORED, "Az előző háttérkép visszaállítva."
+  IDS_PV_WALLPAPER_CLEARED, "A háttérkép eltávolítva."
+  IDS_PV_WALLPAPER_UPDATED, "A háttérkép frissítve."
+  IDS_PV_NO_IMAGE_IS_LOADED, "Nincs betöltött kép."
+  IDS_PV_UNABLE_TO_CREATE_A_WALLPAPER, "Nem hozható létre elérési út a háttérkép mentéséhez."
+  IDS_PV_UNABLE_TO_UPDATE_THE_DESKTOP, "Az asztal háttérképe nem frissíthető."
+  IDS_PV_UNABLE_TO_OPEN_THE_DESKTOP, "Az asztal háttérképének beállításkulcsa nem nyitható meg."
+  IDS_PV_OPEN_IMAGE, "Kép megnyitása"
+  IDS_PV_UNABLE_TO_OPEN_THE_HISTOGRAM, "A hisztogram ablak nem nyitható meg."
+  IDS_PV_UNABLE_TO_REGISTER_THE_SCREEN, "A képernyőmentés gyorsbillentyűje nem regisztrálható."
+  IDS_PV_UNABLE_TO_START_THE_SCREEN, "A képernyőmentés időzítője nem indítható el."
+  IDS_PV_CAPTURING_PICTVIEW, "Képernyőmentés - PictView"
+  IDS_PV_SCREEN_CAPTURE_IS_WAITING_FOR, "A képernyőmentés a gyorsbillentyűre vár."
+  IDS_PV_SCREEN_CAPTURE_TIMER_STARTED, "A képernyőmentés időzítője elindult."
+  IDS_PV_SCREEN_CAPTURED, "A képernyő mentve."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_4, "A képernyő nem menthető."
+  IDS_PV_SCREEN_CAPTURED_FROM_THE_VIEWER, "A képernyő a képnéző ablakából mentve; az asztal mentése nem volt elérhető."
+  IDS_PV_THE_CLIPBOARD_DOES_NOT_CONTAIN, "A vágólap nem tartalmaz képet."
+  IDS_PV_UNABLE_TO_OPEN_THE_CLIPBOARD, "A vágólap nem nyitható meg."
+  IDS_PV_UNABLE_TO_PASTE_THE_CLIPBOARD, "A vágólapi kép nem illeszthető be."
+  IDS_PV_PICTVIEW_IMAGE, "PictView kép"
+  IDS_PV_UNABLE_TO_PRINT_THE_IMAGE, "A kép nem nyomtatható ki."
+  IDS_PV_UNABLE_TO_READ_PRINTER_PAGE, "A nyomtató lapméretei nem olvashatók be."
+  IDS_PV_UNABLE_TO_ALLOCATE_CLIPBOARD_IMAGE, "Nem foglalható le hely a vágólapi képadatoknak."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE_2, "A vágólapi képadatok nem zárolhatók."
+  IDS_PV_UNABLE_TO_COPY_IMAGE_DATA, "A képadatok nem másolhatók a vágólapra."
+  IDS_PV_UNABLE_TO_START_THE_IMAGE, "A képbetöltő folyamat nem indítható el."
+  IDS_PV_FILE_DIALOG_FAILED, "A fájl párbeszédablak nem nyitható meg.\nHiba: 0x%X"
+  IDS_PV_ALLOCATE_PIXELS_FAILED, "Nem foglalhatók le képpontok ehhez: %s."
+  IDS_PV_CONVERSION_CONTEXT_FAILED, "Nem hozható létre rajzolási környezet a(z) %s átalakításához."
+  IDS_PV_READ_PIXELS_FAILED, "A képpontok nem olvashatók be innen: %s."
+  IDS_PV_SAVED, "Mentve: %s"
+  IDS_PV_LOADING, "Betöltés..."
+  IDS_PV_LOADING_PERCENT, "Betöltés... %u%%"
+  IDS_PV_IMAGE_FILES, "Képfájlok"
+  IDS_PV_ALL_FILES, "Minden fájl"
+  IDS_PV_ERR_WIC_UNAVAILABLE, "A Windows Imaging Component nem érhető el."
+  IDS_PV_ERR_OPEN, "A kép nem nyitható meg."
+  IDS_PV_ERR_DECODE, "A kép sérült vagy nem dekódolható."
+  IDS_PV_ERR_FRAME, "A kért oldal vagy képkocka nem létezik."
+  IDS_PV_ERR_TOO_LARGE, "A kép túl nagy."
+  IDS_PV_ERR_CANCELED, "A művelet megszakítva."
+  IDS_PV_ERR_MEMORY, "Nincs elég memória a kép feldolgozásához."
+  IDS_PV_ERR_SAVE, "A kép nem menthető."
+  IDS_PV_SAVEAS_FILTER, "Portable Network Graphics (*.png)|*.png|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|TIFF (*.tif)|*.tif;*.tiff|Windows bitkép (*.bmp)|*.bmp|CompuServe GIF (*.gif)|*.gif|"
+  IDS_EXIF_TAG_0001, "Együttműködési index"
+  IDS_EXIF_TAG_0002, "Együttműködési verzió"
+  IDS_EXIF_TAG_00FE, "Új alfájltípus"
+  IDS_EXIF_TAG_0100, "Képszélesség"
+  IDS_EXIF_TAG_0101, "Képmagasság"
+  IDS_EXIF_TAG_0102, "Bit/minta"
+  IDS_EXIF_TAG_0103, "Tömörítés"
+  IDS_EXIF_TAG_0106, "Fotometriai értelmezés"
+  IDS_EXIF_TAG_010D, "Dokumentum neve"
+  IDS_EXIF_TAG_010E, "Kép leírása"
+  IDS_EXIF_TAG_010F, "Fényképezőgép gyártója"
+  IDS_EXIF_TAG_0110, "Fényképezőgép típusa"
+  IDS_EXIF_TAG_0111, "Sáveltolások"
+  IDS_EXIF_TAG_0112, "Tájolás"
+  IDS_EXIF_TAG_0115, "Minta/képpont"
+  IDS_EXIF_TAG_0116, "Sor/sáv"
+  IDS_EXIF_TAG_0117, "Sávok bájtszáma"
+  IDS_EXIF_TAG_011A, "Vízszintes felbontás"
+  IDS_EXIF_TAG_011B, "Függőleges felbontás"
+  IDS_EXIF_TAG_011C, "Síkkonfiguráció"
+  IDS_EXIF_TAG_0128, "Felbontás mértékegysége"
+  IDS_EXIF_TAG_012D, "Átviteli függvény"
+  IDS_EXIF_TAG_0131, "Szoftver"
+  IDS_EXIF_TAG_0132, "Dátum és idő"
+  IDS_EXIF_TAG_013B, "Szerző"
+  IDS_EXIF_TAG_013C, "Gazdaszámítógép"
+  IDS_EXIF_TAG_013E, "Fehérpont"
+  IDS_EXIF_TAG_013F, "Elsődleges színkoordináták"
+  IDS_EXIF_TAG_0201, "Bélyegkép eltolása"
+  IDS_EXIF_TAG_0202, "Bélyegkép hossza"
+  IDS_EXIF_TAG_0211, "YCbCr-együtthatók"
+  IDS_EXIF_TAG_0212, "YCbCr-almintavételezés"
+  IDS_EXIF_TAG_0213, "YCbCr-pozicionálás"
+  IDS_EXIF_TAG_0214, "Fekete/fehér referencia"
+  IDS_EXIF_TAG_4746, "Értékelés"
+  IDS_EXIF_TAG_4749, "Értékelés (százalék)"
+  IDS_EXIF_TAG_8298, "Szerzői jog"
+  IDS_EXIF_TAG_829A, "Expozíciós idő"
+  IDS_EXIF_TAG_829D, "Rekeszérték"
+  IDS_EXIF_TAG_8769, "Exif IFD-mutató"
+  IDS_EXIF_TAG_8822, "Expozíciós program"
+  IDS_EXIF_TAG_8824, "Spektrális érzékenység"
+  IDS_EXIF_TAG_8825, "GPS IFD-mutató"
+  IDS_EXIF_TAG_8827, "ISO-érzékenység"
+  IDS_EXIF_TAG_8828, "OECF"
+  IDS_EXIF_TAG_8830, "Érzékenység típusa"
+  IDS_EXIF_TAG_8831, "Szabványos kimeneti érzékenység"
+  IDS_EXIF_TAG_8832, "Javasolt expozíciós index"
+  IDS_EXIF_TAG_8833, "ISO-érzékenységi érték"
+  IDS_EXIF_TAG_9000, "Exif-verzió"
+  IDS_EXIF_TAG_9003, "Felvétel dátuma"
+  IDS_EXIF_TAG_9004, "Digitalizálás dátuma"
+  IDS_EXIF_TAG_9010, "Időzóna"
+  IDS_EXIF_TAG_9011, "Időzóna (felvétel)"
+  IDS_EXIF_TAG_9012, "Időzóna (digitalizálás)"
+  IDS_EXIF_TAG_9101, "Összetevők konfigurációja"
+  IDS_EXIF_TAG_9102, "Tömörített bit/képpont"
+  IDS_EXIF_TAG_9201, "Záridő"
+  IDS_EXIF_TAG_9202, "Rekesznyílás"
+  IDS_EXIF_TAG_9203, "Fényerő"
+  IDS_EXIF_TAG_9204, "Expozíciókorrekció"
+  IDS_EXIF_TAG_9205, "Legnagyobb rekesznyílás"
+  IDS_EXIF_TAG_9206, "Tárgytávolság"
+  IDS_EXIF_TAG_9207, "Fénymérési mód"
+  IDS_EXIF_TAG_9208, "Fényforrás"
+  IDS_EXIF_TAG_9209, "Vaku"
+  IDS_EXIF_TAG_920A, "Gyújtótávolság"
+  IDS_EXIF_TAG_9214, "Tárgy területe"
+  IDS_EXIF_TAG_927C, "Gyártói megjegyzés"
+  IDS_EXIF_TAG_9286, "Felhasználói megjegyzés"
+  IDS_EXIF_TAG_9290, "Másodperc törtrésze"
+  IDS_EXIF_TAG_9291, "Másodperc törtrésze (felvétel)"
+  IDS_EXIF_TAG_9292, "Másodperc törtrésze (digitalizálás)"
+  IDS_EXIF_TAG_9C9B, "Cím"
+  IDS_EXIF_TAG_9C9C, "Megjegyzések"
+  IDS_EXIF_TAG_9C9D, "Szerző"
+  IDS_EXIF_TAG_9C9E, "Kulcsszavak"
+  IDS_EXIF_TAG_9C9F, "Tárgy"
+  IDS_EXIF_TAG_A000, "FlashPix-verzió"
+  IDS_EXIF_TAG_A001, "Színtér"
+  IDS_EXIF_TAG_A002, "Szélesség (képpont)"
+  IDS_EXIF_TAG_A003, "Magasság (képpont)"
+  IDS_EXIF_TAG_A004, "Kapcsolódó hangfájl"
+  IDS_EXIF_TAG_A005, "Együttműködési IFD-mutató"
+  IDS_EXIF_TAG_A20B, "Vakuenergia"
+  IDS_EXIF_TAG_A20C, "Térbeli frekvenciaválasz"
+  IDS_EXIF_TAG_A20E, "Fókuszsík vízszintes felbontása"
+  IDS_EXIF_TAG_A20F, "Fókuszsík függőleges felbontása"
+  IDS_EXIF_TAG_A210, "Fókuszsík felbontásának mértékegysége"
+  IDS_EXIF_TAG_A214, "Tárgy helye"
+  IDS_EXIF_TAG_A215, "Expozíciós index"
+  IDS_EXIF_TAG_A217, "Érzékelési mód"
+  IDS_EXIF_TAG_A300, "Fájl forrása"
+  IDS_EXIF_TAG_A301, "Jelenet típusa"
+  IDS_EXIF_TAG_A302, "CFA-minta"
+  IDS_EXIF_TAG_A401, "Egyéni feldolgozás"
+  IDS_EXIF_TAG_A402, "Expozíciós mód"
+  IDS_EXIF_TAG_A403, "Fehéregyensúly"
+  IDS_EXIF_TAG_A404, "Digitális zoom aránya"
+  IDS_EXIF_TAG_A405, "Gyújtótávolság (35 mm-es egyenérték)"
+  IDS_EXIF_TAG_A406, "Jelenetrögzítés típusa"
+  IDS_EXIF_TAG_A407, "Erősítésvezérlés"
+  IDS_EXIF_TAG_A408, "Kontraszt"
+  IDS_EXIF_TAG_A409, "Telítettség"
+  IDS_EXIF_TAG_A40A, "Élesség"
+  IDS_EXIF_TAG_A40B, "Eszközbeállítás leírása"
+  IDS_EXIF_TAG_A40C, "Tárgytávolság-tartomány"
+  IDS_EXIF_TAG_A420, "Egyedi képazonosító"
+  IDS_EXIF_TAG_A430, "Fényképezőgép tulajdonosa"
+  IDS_EXIF_TAG_A431, "Fényképezőgép sorozatszáma"
+  IDS_EXIF_TAG_A432, "Objektív adatai"
+  IDS_EXIF_TAG_A433, "Objektív gyártója"
+  IDS_EXIF_TAG_A434, "Objektív típusa"
+  IDS_EXIF_TAG_A435, "Objektív sorozatszáma"
+  IDS_EXIF_TAG_A460, "Összetett kép"
+  IDS_EXIF_TAG_A500, "Gamma"
+  IDS_EXIF_GPS_0000, "GPS-verzió"
+  IDS_EXIF_GPS_0001, "Szélesség iránya"
+  IDS_EXIF_GPS_0002, "Földrajzi szélesség"
+  IDS_EXIF_GPS_0003, "Hosszúság iránya"
+  IDS_EXIF_GPS_0004, "Földrajzi hosszúság"
+  IDS_EXIF_GPS_0005, "Magasság viszonyítása"
+  IDS_EXIF_GPS_0006, "Tengerszint feletti magasság"
+  IDS_EXIF_GPS_0007, "GPS-idő (UTC)"
+  IDS_EXIF_GPS_0008, "GPS-műholdak"
+  IDS_EXIF_GPS_0009, "GPS-vevő állapota"
+  IDS_EXIF_GPS_000A, "GPS-mérési mód"
+  IDS_EXIF_GPS_000B, "GPS-pontosság (DOP)"
+  IDS_EXIF_GPS_000C, "Sebesség mértékegysége"
+  IDS_EXIF_GPS_000D, "Sebesség"
+  IDS_EXIF_GPS_000E, "Mozgásirány viszonyítása"
+  IDS_EXIF_GPS_000F, "Mozgásirány"
+  IDS_EXIF_GPS_0010, "Képirány viszonyítása"
+  IDS_EXIF_GPS_0011, "Képirány"
+  IDS_EXIF_GPS_0012, "Geodéziai dátum"
+  IDS_EXIF_GPS_0013, "Cél szélességének iránya"
+  IDS_EXIF_GPS_0014, "Cél földrajzi szélessége"
+  IDS_EXIF_GPS_0015, "Cél hosszúságának iránya"
+  IDS_EXIF_GPS_0016, "Cél földrajzi hosszúsága"
+  IDS_EXIF_GPS_0017, "Cél irányszögének viszonyítása"
+  IDS_EXIF_GPS_0018, "Cél irányszöge"
+  IDS_EXIF_GPS_0019, "Cél távolságának mértékegysége"
+  IDS_EXIF_GPS_001A, "Cél távolsága"
+  IDS_EXIF_GPS_001B, "GPS-feldolgozási módszer"
+  IDS_EXIF_GPS_001C, "GPS-területinformáció"
+  IDS_EXIF_GPS_001D, "GPS-dátum"
+  IDS_EXIF_GPS_001E, "GPS-differenciálkorrekció"
+  IDS_EXIF_GPS_001F, "Vízszintes GPS-helymeghatározási hiba"
+  IDS_EXIF_VALUE_COMPRESSION_NONE, "Tömörítetlen"
+  IDS_EXIF_VALUE_COMPRESSION_JPEG, "JPEG"
+  IDS_EXIF_VALUE_PHOTOMETRIC_RGB, "RGB"
+  IDS_EXIF_VALUE_PHOTOMETRIC_YCBCR, "YCbCr"
+  IDS_EXIF_VALUE_ORIENTATION_1, "Normál"
+  IDS_EXIF_VALUE_ORIENTATION_2, "Vízszintesen tükrözve"
+  IDS_EXIF_VALUE_ORIENTATION_3, "180°-kal elforgatva"
+  IDS_EXIF_VALUE_ORIENTATION_4, "Függőlegesen tükrözve"
+  IDS_EXIF_VALUE_ORIENTATION_5, "Vízszintesen tükrözve, 270°-kal elforgatva az óramutató járásával megegyezően"
+  IDS_EXIF_VALUE_ORIENTATION_6, "90°-kal elforgatva az óramutató járásával megegyezően"
+  IDS_EXIF_VALUE_ORIENTATION_7, "Vízszintesen tükrözve, 90°-kal elforgatva az óramutató járásával megegyezően"
+  IDS_EXIF_VALUE_ORIENTATION_8, "270°-kal elforgatva az óramutató járásával megegyezően"
+  IDS_EXIF_VALUE_PLANAR_CHUNKY, "Folytonos"
+  IDS_EXIF_VALUE_PLANAR_PLANAR, "Síkonkénti"
+  IDS_EXIF_VALUE_UNIT_NONE, "Nincs"
+  IDS_EXIF_VALUE_UNIT_INCH, "Hüvelyk"
+  IDS_EXIF_VALUE_UNIT_CM, "Centiméter"
+  IDS_EXIF_VALUE_YCBCR_CENTERED, "Középre igazított"
+  IDS_EXIF_VALUE_YCBCR_COSITED, "Együtt elhelyezett"
+  IDS_EXIF_VALUE_PROGRAM_0, "Nincs megadva"
+  IDS_EXIF_VALUE_PROGRAM_1, "Kézi"
+  IDS_EXIF_VALUE_PROGRAM_2, "Normál program"
+  IDS_EXIF_VALUE_PROGRAM_3, "Rekesz-előválasztás"
+  IDS_EXIF_VALUE_PROGRAM_4, "Záridő-előválasztás"
+  IDS_EXIF_VALUE_PROGRAM_5, "Kreatív program"
+  IDS_EXIF_VALUE_PROGRAM_6, "Akcióprogram"
+  IDS_EXIF_VALUE_PROGRAM_7, "Portré mód"
+  IDS_EXIF_VALUE_PROGRAM_8, "Tájkép mód"
+  IDS_EXIF_VALUE_METERING_0, "Ismeretlen"
+  IDS_EXIF_VALUE_METERING_1, "Átlagoló"
+  IDS_EXIF_VALUE_METERING_2, "Középre súlyozott átlagoló"
+  IDS_EXIF_VALUE_METERING_3, "Szpot"
+  IDS_EXIF_VALUE_METERING_4, "Többpontos szpot"
+  IDS_EXIF_VALUE_METERING_5, "Mátrix"
+  IDS_EXIF_VALUE_METERING_6, "Részleges"
+  IDS_EXIF_VALUE_METERING_255, "Egyéb"
+  IDS_EXIF_VALUE_LIGHT_0, "Ismeretlen"
+  IDS_EXIF_VALUE_LIGHT_1, "Nappali fény"
+  IDS_EXIF_VALUE_LIGHT_2, "Fénycső"
+  IDS_EXIF_VALUE_LIGHT_3, "Volfrám (izzólámpa)"
+  IDS_EXIF_VALUE_LIGHT_4, "Vaku"
+  IDS_EXIF_VALUE_LIGHT_9, "Derült idő"
+  IDS_EXIF_VALUE_LIGHT_10, "Felhős idő"
+  IDS_EXIF_VALUE_LIGHT_11, "Árnyék"
+  IDS_EXIF_VALUE_LIGHT_12, "Nappali fényű fénycső"
+  IDS_EXIF_VALUE_LIGHT_13, "Nappali fehér fénycső"
+  IDS_EXIF_VALUE_LIGHT_14, "Hideg fehér fénycső"
+  IDS_EXIF_VALUE_LIGHT_15, "Fehér fénycső"
+  IDS_EXIF_VALUE_LIGHT_16, "Meleg fehér fénycső"
+  IDS_EXIF_VALUE_LIGHT_17, "A szabványfény"
+  IDS_EXIF_VALUE_LIGHT_18, "B szabványfény"
+  IDS_EXIF_VALUE_LIGHT_19, "C szabványfény"
+  IDS_EXIF_VALUE_LIGHT_20, "D55"
+  IDS_EXIF_VALUE_LIGHT_21, "D65"
+  IDS_EXIF_VALUE_LIGHT_22, "D75"
+  IDS_EXIF_VALUE_LIGHT_23, "D50"
+  IDS_EXIF_VALUE_LIGHT_24, "ISO stúdiós volfrámfény"
+  IDS_EXIF_VALUE_LIGHT_255, "Egyéb fényforrás"
+  IDS_EXIF_VALUE_COLORSPACE_SRGB, "sRGB"
+  IDS_EXIF_VALUE_COLORSPACE_UNCALIBRATED, "Kalibrálatlan"
+  IDS_EXIF_VALUE_FPUNIT_NONE, "Nincs"
+  IDS_EXIF_VALUE_FPUNIT_INCH, "Hüvelyk"
+  IDS_EXIF_VALUE_FPUNIT_CM, "Centiméter"
+  IDS_EXIF_VALUE_SENSING_1, "Nincs megadva"
+  IDS_EXIF_VALUE_SENSING_2, "Egylapkás színes területérzékelő"
+  IDS_EXIF_VALUE_SENSING_3, "Kétlapkás színes területérzékelő"
+  IDS_EXIF_VALUE_SENSING_4, "Háromlapkás színes területérzékelő"
+  IDS_EXIF_VALUE_SENSING_5, "Színszekvenciális területérzékelő"
+  IDS_EXIF_VALUE_SENSING_7, "Trilineáris érzékelő"
+  IDS_EXIF_VALUE_SENSING_8, "Színszekvenciális lineáris érzékelő"
+  IDS_EXIF_VALUE_FILESOURCE_DSC, "Digitális fényképezőgép"
+  IDS_EXIF_VALUE_SCENETYPE_DIRECT, "Közvetlenül fényképezett"
+  IDS_EXIF_VALUE_RENDERED_0, "Normál feldolgozás"
+  IDS_EXIF_VALUE_RENDERED_1, "Egyéni feldolgozás"
+  IDS_EXIF_VALUE_EXPMODE_0, "Automatikus expozíció"
+  IDS_EXIF_VALUE_EXPMODE_1, "Kézi expozíció"
+  IDS_EXIF_VALUE_EXPMODE_2, "Automatikus expozíciós sorozat"
+  IDS_EXIF_VALUE_WB_0, "Automatikus fehéregyensúly"
+  IDS_EXIF_VALUE_WB_1, "Kézi fehéregyensúly"
+  IDS_EXIF_VALUE_SCENE_0, "Normál"
+  IDS_EXIF_VALUE_SCENE_1, "Tájkép"
+  IDS_EXIF_VALUE_SCENE_2, "Portré"
+  IDS_EXIF_VALUE_SCENE_3, "Éjszakai jelenet"
+  IDS_EXIF_VALUE_GAIN_0, "Nincs"
+  IDS_EXIF_VALUE_GAIN_1, "Kis mértékű növelés"
+  IDS_EXIF_VALUE_GAIN_2, "Nagy mértékű növelés"
+  IDS_EXIF_VALUE_GAIN_3, "Kis mértékű csökkentés"
+  IDS_EXIF_VALUE_GAIN_4, "Nagy mértékű csökkentés"
+  IDS_EXIF_VALUE_CONTRAST_0, "Normál"
+  IDS_EXIF_VALUE_CONTRAST_1, "Lágy"
+  IDS_EXIF_VALUE_CONTRAST_2, "Kemény"
+  IDS_EXIF_VALUE_SATURATION_0, "Normál"
+  IDS_EXIF_VALUE_SATURATION_1, "Alacsony telítettség"
+  IDS_EXIF_VALUE_SATURATION_2, "Magas telítettség"
+  IDS_EXIF_VALUE_SHARPNESS_0, "Normál"
+  IDS_EXIF_VALUE_SHARPNESS_1, "Lágy"
+  IDS_EXIF_VALUE_SHARPNESS_2, "Kemény"
+  IDS_EXIF_VALUE_DISTANCE_0, "Ismeretlen"
+  IDS_EXIF_VALUE_DISTANCE_1, "Makró"
+  IDS_EXIF_VALUE_DISTANCE_2, "Közeli"
+  IDS_EXIF_VALUE_DISTANCE_3, "Távoli"
+  IDS_EXIF_VALUE_GPS_ABOVE_SEA, "Tengerszint felett"
+  IDS_EXIF_VALUE_GPS_BELOW_SEA, "Tengerszint alatt"
+  IDS_EXIF_VALUE_GPS_NO_CORRECTION, "Korrekció nélkül"
+  IDS_EXIF_VALUE_GPS_CORRECTION, "Korrekcióval"
+  IDS_EXIF_VALUE_FLASH_FIRED, "A vaku villant"
+  IDS_EXIF_VALUE_FLASH_NOT_FIRED, "A vaku nem villant"
+  IDS_EXIF_VALUE_FLASH_COMPULSORY, "kényszerített vakumód"
+  IDS_EXIF_VALUE_FLASH_SUPPRESSED, "vaku kényszerített tiltása"
+  IDS_EXIF_VALUE_FLASH_AUTO, "automatikus mód"
+  IDS_EXIF_VALUE_FLASH_RETURN_DETECTED, "visszavert vakufény érzékelve"
+  IDS_EXIF_VALUE_FLASH_RETURN_NOT_DETECTED, "visszavert vakufény nem érzékelve"
+  IDS_EXIF_VALUE_FLASH_RED_EYE, "vörösszem-csökkentés"
+  IDS_EXIF_VALUE_FLASH_NO_FUNCTION, "Nincs vakufunkció"
+}

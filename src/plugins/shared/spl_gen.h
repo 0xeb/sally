@@ -1878,8 +1878,8 @@ public:
     //
     // WIDE IS THE PRIMARY. This took char* before v108 and had a
     // CopyTextToClipboardW sibling; the sibling is gone and this is it. NOTE that
-    // 'textLen' now counts WCHARs - a caller holding a byte count must convert the
-    // string with ToWideArg(text, byteLen) and pass -1, not reuse the old number.
+    // 'textLen' now counts WCHARs - a caller holding a byte count must convert those
+    // bytes to UTF-16 first and pass -1, not reuse the old number.
     virtual BOOL WINAPI CopyTextToClipboard(const wchar_t* text, int textLen, BOOL showEcho, HWND echoParent) = 0;
 
     // executes menu command with identification number 'id' in main thread (calling
@@ -3136,10 +3136,7 @@ public:
     // returns text "ERROR LOADING STRING" (and debug/SDK version outputs TRACE_E)
     // can be called from any thread
     // WIDE IS THE PRIMARY. This returned char* before v108 and had a
-    // WCHAR* sibling named LoadStrW; the sibling is gone and this is it. Plugins
-    // that still want a narrow string during the transition use
-    // the LoadStrNarrow helper in plugins/shared/plugin_narrow_compat.h, which is deleted
-    // as each plugin goes wide internally.
+    // WCHAR* sibling named LoadStrW; the sibling is gone and this is it.
     virtual BOOL WINAPI LoadStr(HINSTANCE module, int resID,
                                 CSalamanderStringBuffer* text) = 0;
 

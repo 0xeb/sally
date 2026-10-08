@@ -1115,8 +1115,8 @@ BEGIN
     LTEXT           "大小:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "像素",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " &Theme ",IDC_STATIC_7,1,192,295,30 // UNTRANSLATED
-    LTEXT           "Mode:",IDC_STATIC_8,8,206,21,8 // UNTRANSLATED
+    GROUPBOX        " 主题(&T) ",IDC_STATIC_7,1,192,295,30
+    LTEXT           "模式:",IDC_STATIC_8,8,206,45,8
     COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
 END
 
@@ -1272,7 +1272,7 @@ BEGIN
     CONTROL         "搜索子目录(&s)",IDC_FIND_INCLUDE_SUBDIR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,55,87,12
     // This layout slot is intentionally reused by IDC_FIND_FILETYPE; archives remain hidden at runtime.
     CONTROL         "搜索压缩包",IDC_FIND_INCLUDE_ARCHIVES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,55,87,12
-    LTEXT           "T&ype:",IDC_FIND_FILETYPE_TEXT,150,58,22,8 // UNTRANSLATED
+    LTEXT           "类型(&y):",IDC_FIND_FILETYPE_TEXT,150,58,22,8
     COMBOBOX        IDC_FIND_FILETYPE,176,55,112,48,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     CONTROL         "搜索文件内容(&r)",IDC_FIND_GREP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,69,75,12
     CONTROL         "",IDC_FIND_LINE2,"Static",SS_ETCHEDHORZ | WS_GROUP,83,75,199,1
@@ -2053,13 +2053,13 @@ END
 
 IDD_DEFAULT_SHELL DIALOGEX 0, 0, 244, 72
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Default Shell" // UNTRANSLATED
+CAPTION "默认外壳"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Open &Command Shell with:",IDC_STATIC_1,8,9,228,8 // UNTRANSLATED
+    LTEXT           "打开命令外壳的方式(&C):",IDC_STATIC_1,8,9,228,8
     COMBOBOX        IDC_DEFAULT_SHELL_TARGET,8,20,228,108,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14 // UNTRANSLATED
-    PUSHBUTTON      "Cancel",IDCANCEL,186,50,50,14 // UNTRANSLATED
+    DEFPUSHBUTTON   "确定",IDOK,128,50,50,14
+    PUSHBUTTON      "取消",IDCANCEL,186,50,50,14
 END
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2531,7 +2531,7 @@ STRINGTABLE
  IDS_FIND_RESULTS_LOAD_EMPTY, "未加载任何查找结果。"
  IDS_FIND_RESULTS_LOAD_REPORT, "已加载 %u 个查找结果。已跳过 %u 个缺失或无效的路径。"
  IDS_FIND_RESULTS_ANSI_ONLY, "此项目的名称无法在系统代码页中表示，并且此命令尚不支持 Unicode 名称。\n“删除”和“保存结果”命令则支持此类名称。"
- IDS_FIND_HEX_INVALID, "The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes." // UNTRANSLATED
+ IDS_FIND_HEX_INVALID, "文本 '%s' 不是有效的十六进制模式。\n请使用成对的十六进制数字，并用双引号括起文字文本。"
 
  IDS_SEARCHFORCOLUMN1, "掩码"
  IDS_SEARCHFORCOLUMN2, "路径"
@@ -4016,7 +4016,7 @@ IDS_OLDPLUGINVERSION2, "这个插件 (%s) 不被 Sally 的这个版本所支持�
  IDS_MASTERPASSWORD_REMOVED, "你已经删除了你的主密码。你的已存储的密码(例如 FTP 和 WinSCP) 将不再被保护。"
  IDS_MASTERPASSWORD_SET, "主密码更改成功。你的存储的密码现(例如 FTP 和 WinSCP)在由 AES 加密算法保护。"
  IDS_WRONG_MASTERPASSWORD, "你没有输入正确的当前主密码。请再试一次。"
- IDS_MASTERPASSWORD_TOO_LONG, "The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password." // UNTRANSLATED
+ IDS_MASTERPASSWORD_TOO_LONG, "UTF-8 编码的主密码超出了加密限制。\n请使用较短的密码。"
 
  IDS_BROWSEDIRECTORY_TITLE, "浏览目录"
  IDS_BROWSEDIRECTORY_TEXT, "选择你要使用的目录。"

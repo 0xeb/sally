@@ -31,7 +31,8 @@
 #include "spl_base.h"
 #include "dbg.h"
 #include "plugindarkmode.h"
-#include "plugin_narrow_compat.h"
+#include "plugin_text_encoding.h"
+#include "plugin_window_text.h"
 
 #ifdef ENABLE_PROPERTYDIALOG
 #include "arraylt.h"
@@ -1202,7 +1203,7 @@ void CTransferInfo::EditLine(int ctrlID, char* buffer, DWORD bufferSize, BOOL se
             case ttDataToWindow:
             {
                 std::wstring wide;
-                if (!LegacyTextToWide(buffer, wide))
+                if (!sally::plugin_text::DecodeAcp(buffer, wide))
                 {
                     ErrorOn(ctrlID);
                     break;
@@ -1222,10 +1223,14 @@ void CTransferInfo::EditLine(int ctrlID, char* buffer, DWORD bufferSize, BOOL se
             case ttDataFromWindow:
             {
                 std::wstring wide;
+                std::string encoded;
                 if (!ReadWindowTextOwnedW(HWindow, wide))
                     ErrorOn(ctrlID);
-                else if (!CopyWideToLegacyTextExact(wide.c_str(), buffer, bufferSize))
-                    ReportTextNotStorable(ctrlID);
+                else if (!sally::plugin_text::EncodeAcpExact(wide.c_str(), encoded) ||
+                         encoded.size() + 1 > bufferSize)
+                    ReportTextNotStorable(ctrlID); // the caller's bytes stay untouched
+                else
+                    memcpy(buffer, encoded.c_str(), encoded.size() + 1);
                 break;
             }
             }
@@ -1249,7 +1254,7 @@ void CTransferInfo::EditLine(int ctrlID, std::string& value, BOOL select)
             case ttDataToWindow:
             {
                 std::wstring wide;
-                if (!LegacyTextToWide(value.c_str(), wide))
+                if (!sally::plugin_text::DecodeAcp(value.c_str(), wide))
                 {
                     ErrorOn(ctrlID);
                     break;
@@ -1263,8 +1268,10 @@ void CTransferInfo::EditLine(int ctrlID, std::string& value, BOOL select)
 
             case ttDataFromWindow:
             {
+                std::wstring wide;
                 std::string staged;
-                if (!ReadWindowLegacyTextExact(HWindow, staged))
+                if (!ReadWindowTextOwnedW(HWindow, wide) ||
+                    !sally::plugin_text::EncodeAcpExact(wide.c_str(), staged))
                     ReportTextNotStorable(ctrlID); // no length cap here - the owner
                                                    // grows; only the code page refuses
                 else

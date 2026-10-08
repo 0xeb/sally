@@ -150,9 +150,7 @@ elseif(MINGW)
 endif()
 
 # Resource file settings
-set_source_files_properties(${sally_RC} PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
-)
+sal_set_rc_platform_defines(${sally_RC})
 
 # bzip2 C sources need BZ_NO_STDIO
 file(GLOB BZIP2_C_SOURCES "${SAL_SRC}/common/dep/bzip2/*.c")
@@ -200,9 +198,7 @@ set_target_properties(sally PROPERTIES
 
 set(SAL_CORE_LANG_RC "${SAL_SRC}/lang/languages.rc")
 # RC files need defines set via source properties, not target_compile_definitions
-set_source_files_properties(${SAL_CORE_LANG_RC} PROPERTIES
-  COMPILE_DEFINITIONS "_LANG;_LANG_SALLY;WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
-)
+sal_set_rc_platform_defines(${SAL_CORE_LANG_RC})
 target_sources(sally PRIVATE ${SAL_CORE_LANG_RC})
 
 # ==============================================================================
@@ -227,6 +223,7 @@ add_executable(salmon WIN32
   "${SAL_SRC}/common/handles.cpp"
   "${SAL_SRC}/common/array.cpp"
 )
+sal_set_rc_platform_defines("${SAL_SRC}/salmon/salmon.rc")
 
 target_include_directories(salmon PRIVATE
   "${SAL_SRC}/salmon"
@@ -278,6 +275,7 @@ add_executable(salspawn
   "${SAL_SRC}/salspawn/salspawn.cpp"
   "${SAL_SRC}/salspawn/salspawn.rc"
 )
+sal_set_rc_platform_defines("${SAL_SRC}/salspawn/salspawn.rc")
 
 target_include_directories(salspawn PRIVATE
   "${SAL_SRC}/salspawn"
@@ -392,9 +390,7 @@ elseif(MINGW)
   target_link_options(tserver PRIVATE -Wl,--subsystem,windows)
 endif()
 
-set_source_files_properties("${SAL_SRC}/tserver/tserver.rc" PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
-)
+sal_set_rc_platform_defines("${SAL_SRC}/tserver/tserver.rc")
 
 set_target_properties(tserver PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
@@ -433,9 +429,7 @@ target_compile_definitions(salext PRIVATE
   $<${SAL_IS_RELEASE}:NDEBUG>
 )
 
-set_source_files_properties("${SAL_SRC}/shellext/shellext.rc" PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
-)
+sal_set_rc_platform_defines("${SAL_SRC}/shellext/shellext.rc")
 
 if(MSVC)
   # No CRT — standalone COM DLL (like salspawn)

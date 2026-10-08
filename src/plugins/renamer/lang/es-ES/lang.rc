@@ -477,6 +477,6 @@ STRINGTABLE
   IDS_EXP_BROWSE, "Hojear..."
   IDS_EXP_SALDIR, "Directorio de Sally"
   IDS_CFG_CONFLICT, "La configuración ya está abierta."
-  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
-  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+  IDS_EXP_ENVVARNOTFOUND, "No se encontró la variable de entorno ""%s""."
+  IDS_EXP_ENVVARTOOLARGE, "El valor de la variable de entorno ""%s"" es demasiado largo."
 }

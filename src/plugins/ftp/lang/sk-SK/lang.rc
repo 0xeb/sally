@@ -2254,8 +2254,8 @@ STRINGTABLE
  IDS_PRXSCRERR_INVPORT, "Port môžete nastaviť len ako číslo alebo ako $(ProxyPort) alebo $(Port) premennú."
  IDS_PRXSCRERR_3XXONFIRSTLINE, "Nemôžete používať ""3xx:"" podmienku pre prvý príkaz, je potrebný nejaký predošlý príkaz (typicky ""USER"")."
  IDS_PRXSCRERR_NONECMDS, "Proxy skript musí obsahovať aspoň jeden príkaz."
- IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+ IDS_PRXSCRERR_CANNOTENCODE, "Užívateľské meno, heslo alebo účet obsahuje znaky, ktoré nie je možné vyjadriť v kódovaní textu tohto spojenia."
+ IDS_PRXHOST_CANNOTENCODE, "Adresu proxy servera nie je možné vyjadriť v aktuálnom systémovom kódovaní alebo je príliš dlhá."
 
  IDS_EDITPROXYSRVTITLE, "Úpravy proxy servera"
  IDS_PORTISUSHORT, "Číslo portu musí byť v rozsahu 1 až 65535."
@@ -2364,10 +2364,10 @@ STRINGTABLE
  IDS_CLEARPASSWORD_CONFIRMATION, "Naozaj chcete odstrániť toto heslo?"
  IDS_SHOWPASSWORD_CONFIRMATION, "Naozaj chcete zobraziť toto heslo?"
  IDS_PASSWORDIS, "Heslo je: %s\n\nChcete nakopírovať heslo do schránky?"
- IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
- IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
- IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+ IDS_SRVTYPENAME_CANNOTENCODE, "Názov typu servera obsahuje znaky, ktoré nie je možné vyjadriť v aktuálnom kódovaní konfigurácie."
+ IDS_PRXSCRIPT_CANNOTENCODE, "Proxy skript obsahuje znaky, ktoré nie je možné vyjadriť v aktuálnom kódovaní konfigurácie."
+ IDS_FTPCOMMAND_CANNOTENCODE, "FTP príkaz obsahuje znaky, ktoré nie je možné vyjadriť v kódovaní textu tohto spojenia."
+ IDS_NEWNAME_CANNOTENCODE, "Nový názov obsahuje znaky, ktoré nie je možné vyjadriť v kódovaní textu tohto spojenia, a preto ho nie je možné použiť ako názov súboru na serveri.\n\nPoložka zostala v chybovom stave."
+ IDS_DIRNAME_CANNOTENCODE, "Názov adresára obsahuje znaky, ktoré nie je možné vyjadriť v kódovaní textu tohto spojenia, a preto adresár nie je možné na serveri vytvoriť."
+ IDS_RENAMENAME_CANNOTENCODE, "Nový názov obsahuje znaky, ktoré nie je možné vyjadriť v kódovaní textu tohto spojenia, a preto položku nie je možné na serveri premenovať."
 }

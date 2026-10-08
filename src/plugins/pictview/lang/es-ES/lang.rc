@@ -1,0 +1,1033 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Spanish (es-ES) resources for pictview. Translation: Juan Pablo Barrio Lera.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pictview/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pictview.rh2"
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+DLG_WIAPROGRESS DIALOGEX 0, 0, 214, 63
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_CENTER
+CAPTION "Escanear imagen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Cancelar",IDCANCEL,157,43,50,14
+    LTEXT           "",IDC_WIAPROGR_MESSAGE,7,7,200,8
+    CONTROL         "",IDC_WIAPROGR_BAR,"msctls_progress32",WS_BORDER,7,22,200,14
+END
+
+DLG_ABOUT DIALOGEX 87, 50, 361, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Acerca del Plugin"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Cerrar",IDCANCEL,302,114,50,14
+    ICON            "",IDC_ABOUT_ICON,11,9,20,20
+    LTEXT           "PictView %s - Visor de imágenes para Sally",IDC_ABOUT_TITLE,46,9,308,8
+    LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,308,8,SS_NOPREFIX
+    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,129,8
+    LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,297,8
+    LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
+    LTEXT           "Email:",IDC_STATIC_6,46,81,30,8
+    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,91,81,85,8,WS_TABSTOP
+    LTEXT           "Página web:",IDC_STATIC_7,46,92,44,8
+    LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,91,92,122,8,WS_TABSTOP
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,359,1
+END
+
+DLG_CFGPAGE_APPEARANCE DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Aspecto"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Tamaño de ventana",IDC_STATIC_1,6,5,253,53,WS_GROUP
+    CONTROL         "&Como Sally",IDC_CFGAPP_WINPOS_SAME,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,151,12
+    CONTROL         "&Mayor si es necesario pero no menor",IDC_CFGAPP_WINPOS_LARGER,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,148,12
+    CONTROL         "&Según sea necesario",IDC_CFGAPP_WINPOS_ANY,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,41,148,12
+    GROUPBOX        "Tamaño por defecto",IDC_STATIC_2,6,60,253,67,WS_GROUP
+    CONTROL         "&Ajustar entero (sin barras)",IDC_CFGAPP_ZOOM_WHOLE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,72,151,12
+    CONTROL         "Ajustar al a&ncho (sin barra horizontal)",IDC_CFGAPP_ZOOM_WIDTH,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,84,148,12
+    CONTROL         "Tamaño &original",IDC_CFGAPP_ZOOM_ORIG,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,96,148,12
+    CONTROL         "&Pantalla completa",IDC_CFGAPP_ZOOM_FSCREEN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,108,148,12
+    CONTROL         "Ver &ruta de fichero imagen en barra de título",IDC_CFGAPP_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,167,12
+END
+
+DLG_CFGPAGE_COLORS DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Colores"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Modo ventana",IDC_STATIC_1,6,5,253,50,WS_GROUP
+    LTEXT           "&Fondo",IDC_STATIC_2,17,19,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_BORDER,128,16,27,14
+    LTEXT           "&Transparente",IDC_STATIC_3,17,36,91,8
+    PUSHBUTTON      "",IDC_CFGCLR_BKGND,128,33,27,14
+    GROUPBOX        "Modo pantalla completa",IDC_STATIC_4,6,60,253,50,WS_GROUP
+    LTEXT           "F&ondo",IDC_STATIC_5,17,75,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BORDER,128,72,27,14
+    LTEXT           "T&ransparente",IDC_STATIC_6,17,92,46,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BKGND,128,89,27,14
+END
+
+DLG_CFGPAGE_KEYBOARD DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Teclado && ratón"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Teclas RePág && AvPág, rueda del ratón",IDC_STATIC_1,6,5,253,43,WS_GROUP
+    CONTROL         "Usado para &desplazamiento de imagen",IDC_CFGKBD_PGDNUP_SCR,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,203,12
+    CONTROL         "Usado para acceder a la &imagen previa/siguiente",IDC_CFGKBD_PGDNUP_PREV,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,218,12
+END
+
+DLG_CFGPAGE_TOOLS DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Herramientas"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Herramienta seleccionar",IDC_STATIC_1,6,5,253,94,WS_GROUP
+    LTEXT           "Area seleccionada cuando se mantiene pulsada Mays:",IDC_STATIC_2,17,18,183,8
+    CONTROL         "&Cuadrado",IDC_CFGTOOLS_SQUARE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,24,27,203,12
+    CONTROL         "Rectángulo &4:3",IDC_CFGTOOLS_4_3,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,40,218,12
+    CONTROL         "Rectángulo &3:2",IDC_CFGTOOLS_3_2,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,53,218,12
+    CONTROL         "Rectángulo &16:9",IDC_CFGTOOLS_16_9,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,66,218,12
+    CONTROL         "&Otra:",IDC_CFGTOOLS_OTHER,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,79,30,12
+    EDITTEXT        IDC_CFGTOOLS_RATIO_X,56,79,17,12,ES_NUMBER | WS_GROUP
+    LTEXT           ":",IDC_STATIC_3,75,81,4,8
+    EDITTEXT        IDC_CFGTOOLS_RATIO_Y,79,79,17,12,ES_NUMBER
+    CONTROL         "La pipeta recoge colores en he&xadecimal",IDC_CFGTOOLS_PIPHEX,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,106,167,12
+END
+
+DLG_CFGPAGE_ADVANCED DIALOGEX 66, 53, 265, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Avanzado"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Miniaturas en paneles de ficheros",IDC_STATIC_7,6,5,253,69,WS_GROUP
+    LTEXT           "Algunas imágenes pueden contener miniatura imprecisa, no rotada adecuadamente o no reflejar los últimos cambios.",IDC_STATIC_8,14,18,225,16
+    CONTROL         "&Ignorar miniaturas originales incluidas en ficheros imagen (lento)",IDC_CFGADV_CREATE_THUMBNAILS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,35,231,12
+    LTEXT           "",IDC_STATIC_9,14,51,237,1,SS_ETCHEDHORZ | WS_GROUP
+    LTEXT           "No generar &miniaturas de imágenes con más de",IDC_STATIC_10,14,59,164,8
+    EDITTEXT        IDC_CFGADV_THUMB_MP,179,57,17,12,ES_NUMBER
+    LTEXT           "megapixels.",IDC_STATIC_11,199,59,42,8
+    CONTROL         "Autorotar imágenes &JPEG EXIF (imágenes de cámara digital)",IDC_CFGADV_AUTOROTATE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,77,216,12
+    CONTROL         "&Ver cuadro de mensaje tras grabación con éxito",IDC_CFGADV_SAVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,89,173,12
+    CONTROL         "Recordar &ruta al guardar capturas de pantalla, escaneos, portapapeles",IDC_CFGADV_REMEMBER_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,101,250,12
+END
+
+DLG_IMGPROP DIALOGEX 106, 34, 180, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "Propiedades de la imagen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Cerrar",1,69,182,50,14,WS_GROUP
+    PUSHBUTTON      "Ayuda",IDHELP,125,182,50,14
+    LTEXT           "&Página:",IDC_IMGPROP_PAGENUM_LBL,7,10,49,8
+    EDITTEXT        IDC_IMGPROP_PAGENUM,72,8,100,12,ES_READONLY
+    LTEXT           "&Anchura:",IDC_STATIC_1,7,24,49,8
+    EDITTEXT        IDC_IMGPROP_WIDTH,72,22,100,12,ES_READONLY
+    LTEXT           "A&ltura:",IDC_STATIC_2,7,38,49,8
+    EDITTEXT        IDC_IMGPROP_HEIGHT,72,36,100,12,ES_READONLY
+    LTEXT           "&Colores:",IDC_STATIC_3,7,52,42,8
+    EDITTEXT        IDC_IMGPROP_COLORS,72,50,100,12,ES_READONLY
+    LTEXT           "&Tamaño memoria:",IDC_STATIC_4,7,66,64,8
+    EDITTEXT        IDC_IMGPROP_SIZE,72,64,100,12,ES_READONLY
+    LTEXT           "Tamaño &fichero:",IDC_STATIC_5,7,80,58,8
+    EDITTEXT        IDC_IMGPROP_FSIZE,72,78,100,12,ES_READONLY
+    LTEXT           "&DPI:",IDC_STATIC_6,7,94,50,8
+    EDITTEXT        IDC_IMGPROP_DPI,72,92,100,12,ES_READONLY
+    LTEXT           "Fo&rmato:",IDC_STATIC_7,7,108,50,8
+    EDITTEXT        IDC_IMGPROP_FMT,72,106,100,12,ES_READONLY
+    LTEXT           "C&ompresión:",IDC_STATIC_8,7,122,50,8
+    EDITTEXT        IDC_IMGPROP_COMPR,72,120,100,12,ES_READONLY
+    LTEXT           "Co&mentarios:",IDC_STATIC_9,7,136,50,8
+    EDITTEXT        IDC_IMGPROP_COMMENT,72,134,100,36,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY
+    LTEXT           "",IDC_STATIC_10,2,176,176,1,SS_ETCHEDHORZ | WS_GROUP
+END
+
+DLG_IMGEXIF DIALOGEX 57, 60, 386, 151
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "EXIF"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_IMGEXIF_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_BORDER | WS_GROUP | WS_TABSTOP,5,4,376,80
+    EDITTEXT        IDC_IMGEXIF_INFO,5,89,376,38,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_CLIPSIBLINGS | WS_VSCROLL | WS_GROUP
+    CONTROL         "&Agrupar resaltados",IDC_IMGEXIF_GROUP,"Button",BS_AUTOCHECKBOX | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,5,133,88,12
+    CONTROL         "&Resaltar",IDC_IMGEXIF_HIGHLIGHT,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,105,132,50,14
+    PUSHBUTTON      "&Copiar",IDC_IMGEXIF_COPY,161,132,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "Aceptar",IDOK,217,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Cancelar",IDCANCEL,273,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Ayuda",IDHELP,329,132,50,14
+END
+
+DLG_ZOOM DIALOGEX 85, 100, 121, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Cambiar visualización"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Aumento:",IDC_STATIC_1,8,13,49,8,NOT WS_GROUP
+    COMBOBOX        IDC_ZOOM_ZOOM,57,11,44,156,CBS_DROPDOWN | WS_TABSTOP
+    LTEXT           "%",IDC_STATIC_2,105,13,9,8
+    PUSHBUTTON      "Aceptar",IDOK,7,37,50,14,BS_CENTER
+    PUSHBUTTON      "Cancelar",IDCANCEL,63,37,50,14,BS_CENTER
+END
+
+DLG_PAGE DIALOGEX 85, 100, 121, 54
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ir a página"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Página:",IDC_STATIC_1,8,9,28,8,NOT WS_GROUP
+    COMBOBOX        IDC_PAGE_PAGE,38,7,74,124,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Aceptar",IDOK,7,32,50,14,BS_CENTER
+    PUSHBUTTON      "Cancelar",IDCANCEL,64,32,50,14,BS_CENTER
+END
+
+DLG_CAPTURE DIALOGEX 98, 61, 179, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Camptura de pantalla"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Capturar",IDC_STATIC_1,6,6,167,81,WS_GROUP
+    CONTROL         "&Pantalla completa",IDC_CAPTURE_FULL,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,19,110,12
+    CONTROL         "Ap&licación en primer plano",IDC_CAPTURE_APPL,"Button",BS_AUTORADIOBUTTON,16,31,110,12
+    CONTROL         "Ve&ntana en primer plano",IDC_CAPTURE_WINDOW,"Button",BS_AUTORADIOBUTTON,16,43,120,12
+    CONTROL         "&Area cliente de ventana en primer plano ",IDC_CAPTURE_CLIENT,
+                    "Button",BS_AUTORADIOBUTTON,16,55,150,12
+    CONTROL         "Pantalla &virtual (para varios monitores)",IDC_CAPTURE_VIRTUAL,
+                    "Button",BS_AUTORADIOBUTTON,16,67,142,12
+    GROUPBOX        "Disparador de captura",IDC_STATIC_2,6,92,167,49,WS_GROUP
+    CONTROL         "&Tecla rápida",IDC_CAPTURE_HOTKEY,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,106,54,12
+    CONTROL         "T&emporizador",IDC_CAPTURE_TIMER,"Button",BS_AUTORADIOBUTTON,16,121,60,12
+    CONTROL         "",IDC_CAPTURE_HOTKEY_VAL,"msctls_hotkey32",WS_GROUP | WS_TABSTOP,77,106,77,12
+    EDITTEXT        IDC_CAPTURE_TIMER_VAL,77,121,21,12
+    LTEXT           "segundos",IDC_STATIC_3,102,123,33,8
+    CONTROL         "&Incluir cursor del ratón",IDC_CAPTURE_CURSOR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,147,89,12
+    LTEXT           "",IDC_STATIC_4,3,167,174,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "&Capturar",IDOK,8,172,50,14,BS_CENTER | WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,64,172,50,14,BS_CENTER
+    PUSHBUTTON      "Ayuda",IDHELP,120,172,50,14,BS_CENTER
+END
+
+IDD_RENAMEDIALOG DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Cambiar de nombre a fichero"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_PATH,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "Aceptar",IDOK,59,43,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,118,43,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 15, 34, 350, 89
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Confirmar sustitución de fichero"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Reemplazar:",IDC_STATIC_1,6,14,48,8
+    LTEXT           "",IDS_SOURCENAME,58,14,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_SOURCEATTR,58,24,286,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Con fichero:",IDC_STATIC_2,9,37,45,8,NOT WS_GROUP
+    LTEXT           "",IDS_TARGETNAME,58,37,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_TARGETATTR,58,47,286,8,SS_NOPREFIX | NOT WS_GROUP
+    DEFPUSHBUTTON   "&Sí",IDYES,91,66,50,14,WS_GROUP
+    PUSHBUTTON      "&No",IDNO,150,66,50,14
+    PUSHBUTTON      "Cancelar",IDCANCEL,209,66,50,14
+END
+
+IDD_COPYTO DIALOGEX 15, 34, 316, 121
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Copiar fichero a"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&1",IDC_COPYTO_RB_1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,8,10,18,12
+    CONTROL         "&2",IDC_COPYTO_RB_2,"Button",BS_AUTORADIOBUTTON,8,27,18,12
+    CONTROL         "&3",IDC_COPYTO_RB_3,"Button",BS_AUTORADIOBUTTON,8,44,18,12
+    CONTROL         "&4",IDC_COPYTO_RB_4,"Button",BS_AUTORADIOBUTTON,8,61,18,12
+    CONTROL         "&5",IDC_COPYTO_RB_5,"Button",BS_AUTORADIOBUTTON,8,78,18,12
+    EDITTEXT        IDC_COPYTO_EL_1,29,10,221,12,WS_GROUP
+    PUSHBUTTON      "&Hojear...",IDC_COPYTO_BR_1,256,9,50,14
+    EDITTEXT        IDC_COPYTO_EL_2,29,27,221,12
+    PUSHBUTTON      "H&ojear...",IDC_COPYTO_BR_2,256,26,50,14
+    EDITTEXT        IDC_COPYTO_EL_3,29,44,221,12
+    PUSHBUTTON      "Ho&jear...",IDC_COPYTO_BR_3,256,43,50,14
+    EDITTEXT        IDC_COPYTO_EL_4,29,61,221,12
+    PUSHBUTTON      "Hoj&ear...",IDC_COPYTO_BR_4,256,60,50,14
+    EDITTEXT        IDC_COPYTO_EL_5,29,78,221,12
+    PUSHBUTTON      "Hoje&ar...",IDC_COPYTO_BR_5,256,77,50,14
+    DEFPUSHBUTTON   "Aceptar",IDOK,142,100,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,199,100,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,256,100,50,14
+END
+
+IDD_SAVEEX DIALOGEX 0, 0, 400, 20
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CLIPSIBLINGS
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Compresión:",IDC_SAVE_COMPRESSION_LABEL,5,2,49,8
+    COMBOBOX        IDC_SAVE_COMPRESSION,54,0,180,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Opciones",IDC_SAVE_ADVANCED,240,0,50,14,WS_GROUP
+    LTEXT           "&Profund. color:",IDC_STATIC_2,5,26,52,8
+    COMBOBOX        IDC_SAVE_BIT_DEPTH,58,24,80,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Rotación:",IDC_STATIC_3,5,46,52,8
+    COMBOBOX        IDC_SAVE_ROTATION,58,44,80,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Trasp./espejo:",IDC_STATIC_4,5,66,52,8
+    COMBOBOX        IDC_SAVE_FLIP,58,64,80,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "I&nvertir colores (negativo)",IDC_SAVE_INVERT,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_GROUP | WS_TABSTOP,5,82,123,12
+    LTEXT           "Co&mentario:",IDC_SAVE_COMMENT_STATIC,5,94,49,8
+    EDITTEXT        IDC_SAVE_COMMENT,5,104,132,41,ES_MULTILINE | WS_GROUP
+    GROUPBOX        "GIF",IDC_SAVE_GROUP_GIF,144,20,144,25,WS_GROUP
+    CONTROL         "&Entrelazado",IDC_SAVE_GIF_INTERLACED,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,149,30,53,12
+    CONTROL         "Crear &GIF89a",IDC_SAVE_GIF_89a,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,223,30,60,12
+    GROUPBOX        "JPEG, TIFF-JPEG",IDC_SAVE_GROUP_JPEG,144,50,144,45,WS_GROUP
+    LTEXT           "Ca&lidad:",IDC_SAVE_JPEG_STATIC1,149,61,40,8
+    EDITTEXT        IDC_SAVE_JPEG_QUALITY,200,59,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "%",IDC_SAVE_JPEG_STATIC2,223,61,40,8
+    LTEXT           "&Submuestreo:",IDC_SAVE_JPEG_STATIC3,149,80,50,8
+    COMBOBOX        IDC_SAVE_JPEG_SUBSAMPLING,200,78,34,40,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    GROUPBOX        "TIFF",IDC_SAVE_GROUP_TIFF,144,100,144,45,WS_GROUP
+    CONTROL         "&Hacer bandas",IDC_SAVE_TIFF_MAKE_STRIPS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,149,110,59,12
+    LTEXT           "T&amaño bandas:",IDC_SAVE_TIFF_STATIC1,159,126,59,8
+    EDITTEXT        IDC_SAVE_TIFF_STRIP_SIZE,219,124,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "KB",IDC_SAVE_TIFF_STATIC2,242,126,40,8
+END
+
+IDD_PRINT DIALOGEX 10, 24, 427, 227
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Imprimir"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_PRINT_PREVIEW,"Static",SS_WHITEFRAME | SS_NOPREFIX | WS_GROUP,6,7,211,195
+    GROUPBOX        " Impresora ",IDC_STATIC_4,225,4,194,27
+    LTEXT           "",IDC_PRINT_PRINTER,232,15,126,8
+    PUSHBUTTON      "&Disponer...",IDC_PRINT_SETUP,362,12,50,14,WS_GROUP
+    GROUPBOX        " Posición ",IDC_STATIC_1,225,35,194,62
+    RTEXT           "&Izda:",IDC_STATIC_2,232,49,26,8
+    EDITTEXT        IDC_PRINT_LEFT,262,47,45,12
+    COMBOBOX        IDC_PRINT_LEFT_UNITS,313,47,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "&Sup:",IDC_STATIC_3,232,68,26,8
+    EDITTEXT        IDC_PRINT_TOP,262,66,45,12
+    COMBOBOX        IDC_PRINT_TOP_UNITS,313,66,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Ce&ntrar imagen",IDC_PRINT_CENTER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,262,82,65,12
+    GROUPBOX        " Tamaño escalado ",IDC_STATIC_5,225,102,194,100
+    RTEXT           "&Escala:",IDC_STATIC_6,232,118,26,8
+    EDITTEXT        IDC_PRINT_SCALE,262,116,35,12
+    LTEXT           "%",IDC_STATIC_7,300,118,10,8
+    CONTROL         "Escalar: a&justar al soporte",IDC_PRINT_FIT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,313,111,101,12
+    CONTROL         "&Mantener relación aspecto",IDC_PRINT_ASPECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,313,123,101,12
+    RTEXT           "&Ancho:",IDC_STATIC_8,232,139,26,8
+    EDITTEXT        IDC_PRINT_WIDTH,262,137,45,12
+    COMBOBOX        IDC_PRINT_WIDTH_UNITS,313,137,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "A&lto:",IDC_STATIC_9,232,158,26,8
+    EDITTEXT        IDC_PRINT_HEIGHT,262,156,45,12
+    COMBOBOX        IDC_PRINT_HEIGHT_UNITS,313,156,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Ver &cuadro limitante",IDC_PRINT_BOX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,262,173,80,12
+    CONTROL         "Im&primir área escogida",IDC_PRINT_SELECTION,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,262,185,90,12
+    DEFPUSHBUTTON   "Aceptar",IDOK,260,208,50,14,WS_GROUP
+    PUSHBUTTON      "Cancelar",IDCANCEL,315,208,50,14
+    PUSHBUTTON      "Ayuda",IDHELP,370,208,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "PictView"
+  IDS_PLUGIN_DESCRIPTION, "Visor y consersor rápido de imágenes."
+  IDS_LOWMEMORY, "Poca memoria"
+  IDS_SOME_WINS_OPENED, "Algunas ventanas de PictView están abiertas. ¿Desea cerrarlas?"
+  IDS_ERROR_OPENING, "Imposible abrir fichero %s:\n%s"
+  IDS_ERROR_OPENING_CONTINUE, "(%d) %hs Este fichero no puede ser procesado. ¿Continuar?"
+  IDS_TITLE, "%s (%d x %d x %s - %i%%) - %s"
+  IDS_TITLE_MULTI, "%s (%d x %d x %s [%d of %d] - %i%%) - %s"
+  IDS_NCOLORS, "{!}%d color{|1|es}"
+  IDS_NCOLORS_CMYK, "CMYK"
+  IDS_NCOLORS_LAB, "LAB"
+
+  IDS_ERROR_CALLING_PVW32_DLL, "Error llamando a PVW32Cnv.DLL"
+  IDS_CLIPBOARD_TITLE, "<Portapapeles>"
+  IDS_CAPTURE_TITLE, "<Captura de pantalla>"
+  IDS_SCAN_TITLE, "<Escaneo>"
+  IDS_DELETED_TITLE, "<Borrado>"
+  IDS_CLIPBOARD_FNAME, "Portapapeles"
+  IDS_CAPTURE_FNAME, "Captura"
+  IDS_SCAN_FNAME, "Escaneo"
+  IDS_RGB, "Rojo: %i, Verde: %i, Azul: %i"
+  IDS_RGB_HEX, "Rojo: %#02x, Verde: %#02x, Azul: %#02x"
+  IDS_RGBXY, "(%i, %i): Rojo: %i, Verde: %i, Azul: %i"
+  IDS_RGBXY_HEX, "(%i, %i): Rojo: %#02x, Verde: %#02x, Azul: %#02x"
+  IDS_INDEX, ", Indice: %i"
+
+  IDS_VIEW_BMP_IN_CLIPBOARD, "Ver bitmap desde &portapapeles"
+  IDS_PLUGINSMENU_SCREEN_CAPTURE, "&Captura de pantalla..."
+  IDS_PLUGINSMENU_REGENERATE_THUMBNAIL, "&Actualizar miniatura"
+  IDS_PLUGINSMENU_SCAN, "&Escanear imagen..."
+  IDS_PIXELS, "{!}%d pixel{|1|s}"
+  IDS_BYTES, "{!}%d byte{|1|s}"
+  IDS_OF, "%d de %d"
+  IDS_FRAMES, "&Cuadros:"
+  IDS_IMGPROP_GRAY_NBIT, "Escala de grises %dBit"
+  IDS_UNKNOWN, "Desconocido"
+  IDS_CFG_CONFLICT, "La configuración ya está abierta."
+  IDS_CONFIGURATION_TITLE, "Configuración de PictView"
+  IDS_ERRORTITLE, "Error de PictView"
+  IDS_BADTIMER, "El retraso de tiempo debe ser de 1 a 360 segundos."
+  IDS_BADHOTKEY, "Asignar alguna tecla rápida disponible."
+  IDS_CAPTURECANCELED, "Cancelada la copia de pantalla."
+  IDS_CAPTURING, "Captura de pantalla"
+  IDS_EMPTY, "Vacía"
+  IDS_SELECTTARGETDIR, "Seleccione el directorio de destino."
+  IDS_SPECIFYPATH, "Debe especificar una ruta absoluta o relativa válida."
+  IDS_PICTVIEWPLUGINNAME, "Plugin PictView (visor y conversor de imágenes)"
+
+
+  // !WARNING! 2 following variables must be synchronized with IDS_SAVEASFILTERMONO & IDS_SAVEASFILTERCOLOR:
+  // G.LastSaveAsFilterIndexMono  = 14; // index is 1-based (IDS_SAVEASFILTERMONO: 14=BMP)
+  // G.LastSaveAsFilterIndexColor = 13; // index is 1-based (IDS_SAVEASFILTERCOLOR: 13=BMP)
+  // !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING!
+
+  IDS_SAVEASFILTERMONO, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pbm,*.ppm)|*.pbm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|Wireless Bitmap (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEASFILTERCOLOR, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pnm,*.ppm)|*.pnm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEERROR, "Imposible guardar la imagen.\nError: %hs"
+  IDS_SAVE_AS_SUCCESS, "Imagen guardada con éxito."
+  IDS_SAVE_LOST_ALPHA, "La imagen original contiene canal alfa. Sin embargo, ha sido mezclado con los datos de la imagen y el fondo actual.\nPor tanto el canal alfa no se guardará. ¿Guardar de todos modos?"
+  IDS_CANCELED_BY_USER, "La grabación de imagen fue cancelada por el usuario. No se generó fichero de salida."
+  IDS_OPENFILTER, "Ficheros gráficos habituales (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|Todos los ficheros (*.*)|*.*|"
+  IDS_CUSTOM_COLOR, "&Color personalizado..."
+  IDS_AUTOMATIC_COLOR, "Color &automático"
+  IDS_SAL_IS_BUSY, "Sally está ocupado. El comando pedido no puede ser ejecutado; pruebe más tarde."
+  IDS_RENAME_TO, "Cambiar de nombre ""%s"" a"
+  IDS_ERRORRENAMINGFILE, "Error cambiando el nombre del fichero"
+  IDS_TOOLONGNAME, "Imposible terminar la operación por nombre muy largo."
+  IDS_LOADEXIF, "Imposible cargar biblioteca EXIF %s."
+  IDS_EXIF_TAG, "Marca"
+  IDS_EXIF_VALUE, "Valor"
+  IDS_EXIF_LOCALIZATION_FNAME, "es.po"
+
+  IDS_MENU_FILE, "&Fichero"
+  IDS_MENU_FILE_OPEN, "&Abrir...\tCtrl+O"
+  IDS_MENU_FILE_REFRESH, "Re&vertir\tCtrl+R"
+  IDS_MENU_FILE_PREV, "P&revio\tRetroceso"
+  IDS_MENU_FILE_NEXT, "&Siguiente\tEspacio"
+  IDS_MENU_FILE_SAVEAS, "&Guardar como...\tCtrl+S"
+  IDS_MENU_FILE_WALLPAPER, "&Disponer para escritorio"
+  IDS_MENU_WALLPARER_CENTER, "&Centrar"
+  IDS_MENU_WALLPARER_TILE, "A&pilar"
+  IDS_MENU_WALLPARER_STRETCH, "&Estirar"
+  IDS_MENU_WALLPARER_RESTORE, "&Restaurar anterior"
+  IDS_MENU_WALLPARER_NONE, "&Ninguno"
+  IDS_MENU_FILE_CAPTURE, "Capt&urar pantalla...\tQ"
+  IDS_MENU_FILE_SCAN, "Escanear i&magen...\tW"
+  IDS_MENU_FILE_SCAN_SOURCE, "Se&leccione origen de escaneo..."
+  IDS_MENU_FILE_PROP, "Propi&edades...\tI"
+  IDS_MENU_FILE_EXIF, "Ver E&XIF...\tE"
+  IDS_MENU_FILE_HISTOGRAM, "Ver &histograma...\tCtrl+H"
+  IDS_MENU_FILE_PAGE, "Disponer pá&gina...\tCtrl+Mays+P"
+  IDS_MENU_FILE_PRINT, "&Imprimir...\tCtrl+P"
+  IDS_MENU_FILE_FILES, "Ficheros &recientes"
+  IDS_MENU_FILE_DIRS, "Direc&torios recientes"
+  IDS_MENU_FILE_EXIT, "&Salir\tEsc"
+  IDS_MENU_FILE_OTHER, "&Otros ficheros"
+  IDS_MENU_FILE_FIRST, "&Primero\tMays+Retroceso"
+  IDS_MENU_FILE_LAST, "&Ultimo\tMays+Espacio"
+  IDS_MENU_FILE_FOCUS, "&Foco\tF"
+  IDS_MENU_FILE_SELCRCFILE, "Seleccionar/deseleccionar fichero en &panel o buscar\tInsert"
+  IDS_MENU_FILE_RENAME, "Cambiar &nombre...\tF2"
+  IDS_MENU_FILE_DELETE, "&Borrar\tSupr"
+  IDS_MENU_FILE_PREVSEL, "Pre&vio seleccionado\tCtrl+Retroceso"
+  IDS_MENU_FILE_NEXTSEL, "S&iguiente seleccionado\tCtrl+Espacio"
+  IDS_MENU_FILE_COPYTO, "&Copiar a...\tX"
+
+  IDS_MENU_EDIT, "&Editar"
+  IDS_MENU_EDIT_COPY, "&Copiar\tCtrl+C"
+  IDS_MENU_EDIT_PASTE, "Pe&gar\tCtrl+V"
+  IDS_MENU_EDIT_SELECTALL, "Seleccionar &todos\tCtrl+A"
+  IDS_MENU_EDIT_DESELECT, "&Deseleccionar todos\tCtrl+D"
+  IDS_MENU_EDIT_CROP, "&Recortar\tC"
+  IDS_MENU_EDIT_180, "Rotar &180°\tT"
+  IDS_MENU_EDIT_RIGHT, "R&otar a la derecha\tR"
+  IDS_MENU_EDIT_LEFT, "Rotar a la &izquierda\tL"
+  IDS_MENU_EDIT_FLIPH, "Trasponer &horizontal\tH"
+  IDS_MENU_EDIT_FLIPV, "Trasponer &vertical\tV"
+
+  IDS_MENU_VIEW, "&Ver"
+  IDS_MENU_VIEW_ZOOMIN, "&Aumentar\t+"
+  IDS_MENU_VIEW_ZOOMOUT, "&Disminuir\t-"
+  IDS_MENU_VIEW_ZOOM, "Tamaño &visto...\tM"
+  IDS_MENU_VIEW_WHOLE, "A&justar en ventana\tF5"
+  IDS_MENU_VIEW_WIDTH, "Ajustar al a&ncho\tF6"
+  IDS_MENU_VIEW_ACTUAL, "Tamaño &real (1:1)\tF7"
+  IDS_MENU_VIEW_WINDOW, "&Cambiar tamaño de ventana para ajustar\tF8"
+  IDS_MENU_VIEW_TOOLBAR, "&Barra de herramientas\tF9"
+  IDS_MENU_VIEW_STATUSBAR, "Barra de &estado"
+  IDS_MENU_VIEW_FULLSCREEN, "Pan&talla completa\tF11"
+
+  IDS_MENU_MULTIPAGE, "Imágenes &multipáginas"
+  IDS_MENU_NEXTPAGE, "Página &siguiente\tCtrl+AvPág"
+  IDS_MENU_PREVPAGE, "Página &previa\tCtrl+RePág"
+  IDS_MENU_FIRSTPAGE, "P&rimera página\tCtrl+Inicio"
+  IDS_MENU_LASTPAGE, "&Ultima página\tCtrl+Fin"
+  IDS_MENU_PAGE, "&Irt a la página...\tG"
+  IDS_MENU_ANIMATION, "Reproducir/pausar &animación"
+
+  IDS_MENU_TOOLS, "&Herramientas"
+  IDS_MENU_TOOLS_HAND, "&Mano\tA"
+  IDS_MENU_TOOLS_ZOOM, "&Tamaño\tZ"
+  IDS_MENU_TOOLS_SELECT, "&Seleccionar\tS"
+  IDS_MENU_TOOLS_PICK, "&Coger color\tP"
+  IDS_MENU_TOOLS_OPTIONS, "C&onfiguración..."
+
+  IDS_MENU_HELP, "&Ayuda"
+  IDS_MENU_HELP_CONTENTS, "&Contenidos\tF1"
+  IDS_MENU_HELP_INDEX, "&Indice..."
+  IDS_MENU_HELP_SEARCH, "&Buscar..."
+//  IDS_MENU_HELP_KEYBOARD, "&Keyboard Shortcuts"
+//  IDS_MENU_HELP_MOUSE, "&Mouse Shortcuts"
+  IDS_MENU_HELP_ABOUT, "&Acerca de PictView..."
+
+  IDS_TT_OPEN, "Abrir\tCtrl+O"
+  IDS_TT_SAVE, "Guardar como\tCtrl+S"
+  IDS_TT_PROPERTIES, "Propiedades de la imagen\tI"
+  IDS_TT_PREV, "Abrir fichero previo\tRetroceso"
+  IDS_TT_NEXT, "Abrir siguiente fichero\tEspacio"
+  IDS_TT_PREVSELFILE, "Abrir fichero previo seleccionado\tCtrl+Retroceso"
+  IDS_TT_NEXTSELFILE, "Abrir fichero siguiente seleccionado\tCtrl+Espacio"
+  IDS_TT_COPY, "Copiar\tCtrl+C"
+  IDS_TT_PASTE, "Pegar\tCtrl+V"
+  IDS_TT_TOOL_HAND, "Mano\tA"
+  IDS_TT_TOOL_ZOOM, "Tamaño visible\tZ"
+  IDS_TT_TOOL_SELECT, "Seleccionar\tS"
+  IDS_TT_TOOL_PIPETTE, "Pipeta\tP"
+  IDS_TT_LEFT, "Rotar a la izquierda\tL"
+  IDS_TT_RIGHT, "Rotar a la derecha\tR"
+  IDS_TT_CROP, "Recortar\tC"
+  IDS_TT_ZOOM_OUT, "Disminuirr\t-"
+  IDS_TT_ZOOM_IN, "Agrandar\t+"
+  IDS_TT_ZOOM_TO, "Tamaño visual\tM"
+  IDS_TT_ZOOM_WIDTH, "Tamaño visual ajustado al ancho\tF6"
+  IDS_TT_ZOOM_WHOLE, "Tamaño visual ajustado al máximo\tF5"
+  IDS_TT_ZOOM_ACTUAL, "Tamaño visual real\tF7"
+  IDS_TT_FULL_SCREEN, "Pantalla completa\tF11"
+  IDS_TT_SELSRCFILE, "Seleccionar/deseleccionar fichjero abierto en panel o ventana búsqueda\tInsert"
+  IDS_TT_PRINT, "Imprimir\tCtrl+P"
+
+  IDS_TWAIN_OPEN, "Imposible abrir gestor de origen TWAIN.\nSi su escáner admite TWAIN ,\nvuelva a instalar el software para ese escáner."
+  IDS_TWAIN_ERROR, "Error de Twain"
+  IDS_TWCC_BUMMER, "Fallo debido a causas desconocidas."
+  IDS_TWCC_LOWMEMORY, "No hay memoria suficiente para efectuar la operación."
+  IDS_TWCC_NODS, "No hay fuente de datos."
+  IDS_TWCC_MAXCONNECTIONS, "DS conectado a nº máx de aplicaciones posible."
+  IDS_TWCC_OPERATIONERROR, "DS o DSM informan error; la aplicación no debería."
+  IDS_TWCC_BADCAP, "Capacidad desconocida."
+  IDS_TWCC_BADPROTOCOL, "Combinación de MSG DG DAT no reconocida."
+  IDS_TWCC_BADVALUE, "Parámetro de datos fuera de rango."
+  IDS_TWCC_SEQERROR, "DG DAT MSG sin la secuencia esperada."
+  IDS_TWCC_BADDEST, "Aplicación/fuente de destino desconocida en DSM_Entry."
+  IDS_TWCC_CAPUNSUPPORTED, "Capacidad no admitida por origen."
+  IDS_TWCC_CAPBADOPERATION, "Operación no admitida por capacidad."
+  IDS_TWCC_CAPSEQERROR, "La capacidad tiene dependencia de otra capacidad."
+  IDS_TWCC_DENIED, "Operación sobre sistema de ficheros denegada (fichero protegido)."
+  IDS_TWCC_FILEEXISTS, "Operación fallida porque el fichero ya existe."
+  IDS_TWCC_FILENOTFOUND, "Fichero no encontrado."
+  IDS_TWCC_NOTEMPTY, "Operación fallida porque el directorio no está vacío."
+  IDS_TWCC_PAPERJAM, "El alimentador está atascado."
+  IDS_TWCC_PAPERDOUBLEFEED, "El alimentador detectó varias páginas."
+  IDS_TWCC_FILEWRITEERROR, "Error al grabar fichero (¿disco lleno?)."
+  IDS_TWCC_CHECKDEVICEONLINE, "El dispoditivo fue desconectado antes o durante esta operación."
+
+  IDS_CAPTHINT_APPL, "Toda la ventana de aplicación con todas sus ventanas dependientes."
+  IDS_CAPTHINT_WINDOW, "La ventana (diálogo, cuadro de mensajes...) que tiene el foco de entrada."
+  IDS_CAPTHINT_CLIENT, "Como la ventana en primer plano, pero sin título ni borde ni menú."
+
+  IDS_DONT_SHOW_AGAIN, "&No mostrar esto de nuevo"
+  IDS_DONT_SHOW_AGAIN_SLA, "&No ver esto de nuevo y guardar sin el canal alfa"
+  IDS_DONT_SHOW_AGAIN_UTH, "&Actualizar la miniatura sin preguntar de nuevo"
+  IDS_REGENERATE_THUMBNAIL_TITLE, "PictView - actualizando miniaturas..."
+  IDS_REGENERATE_THUMB_WARNING, "Esta función actualizará la miniatura de la sección Exif del fichero de imagen. El resto del fichero no se verá modificado. ¿Continuar?"
+  IDS_REGENERATE_THUMB_WRITEFILE, "Imposible crear un fichero con la nueva miniatura. ¿Disco lleno? El fichero antiguo '%s' queda sin modificar."
+
+  IDS_N_OF_N_FILES_PROCESSED "{!}Sólo %d de %d {fichero fue procesado|1|ficheros fueronn procesados}. El resto no {1:fue|1|fueron} modificado{2:|1|s}."
+  IDS_NO_FILES_FOUND, "No se encontraron imágenes JPEG con datos EXIF. No se modificaron los ficheros."
+  IDS_NOT_JPEG_FILE, "Este fichero no es JPEG, no hay mioniaturas para actualizar."
+  IDS_NOT_EXIF_CREATE_JFXX, "Este fichero no contiene datos EXIF, no hay miniatura EXIF que actualizar. ¿Quiere gnerar una miniatura JFIF JFXX en su lugar?"
+  IDS_READ_ONLY_MODIFY, "El fichero es de sólo lectura. ¿Modificar igualmente?"
+  IDS_READ_ONLY_REWRITE, "El fichero %s es de sólo lectura. ¿Sustituir de todos modos?"
+
+  IDS_CLRS_MONO, "2 colores"
+  IDS_CLRS_16, "16 colores"
+  IDS_CLRS_256, "256 colores"
+  IDS_CLRS_HC15, "15bit HiColor"
+  IDS_CLRS_HC16, "16bit HiColor"
+  IDS_CLRS_TC24, "24bit TrueColor"
+  IDS_CLRS_TC32, "32bit TrueColor"
+  IDS_CLRS_256GR, "256 niveles de gris"
+  IDS_FLIP_NONE, "Ninguno"
+  IDS_FLIP_VERT, "Vertical"
+  IDS_FLIP_HOR, "Horizontal"
+  IDS_ROT_NONE, "Ninguno"
+  IDS_ROT_90, "90 grados CW"
+  IDS_ROT_180, "180 grados"
+  IDS_ROT_270, "270 grados CW"
+  IDS_SAVE_DEFAULT, "Por defecto"
+
+  IDS_HIST_HISTOGRAM, "Histograma"
+  IDS_HIST_LUMINOSITY, "Luminosidad"
+  IDS_HIST_RED, "Rojo"
+  IDS_HIST_GREEN, "Verde"
+  IDS_HIST_BLUE, "Azul"
+  IDS_HIST_RGBSUM, "RGB"
+  IDS_HIST_MENU_LUMINOSITY, "Luminosidad\tL"
+  IDS_HIST_MENU_RED, "Rojo\tR"
+  IDS_HIST_MENU_GREEN, "Verde\tG"
+  IDS_HIST_MENU_BLUE, "Azul\tB"
+  IDS_HIST_MENU_RGBSUM, "RGB\tA"
+  IDS_HIST_TIP_LUMINOSITY, "Luminosidad (L)"
+  IDS_HIST_TIP_RED, "Rojo (R)"
+  IDS_HIST_TIP_GREEN, "Verde (G)"
+  IDS_HIST_TIP_BLUE, "Azul (B)"
+  IDS_HIST_TIP_RGBSUM, "RGB (A)"
+  IDS_HIST_TIP_OTHERCHANELS, "Ver otros canales (O)"
+  IDS_DLL_NOTFOUND, "Imposible cargar la biblioteca de procesado de imágenes PVW32Cnv.dll."
+  IDS_DLL_WRONG_VERSION, "Se encontró una versión errónea de PVW32Cnv.dll."
+  IDS_SELECT_REGION, "Seleccione una región primero."
+  IDS_SAVE_ERR_EXISTS_OVERWRITE, "El fichero ""%s"" ya existe.\n¿Desea reemplazarlo?"
+
+  IDS_SB_XY, "X:%d  Y:%d"
+  IDS_SB_WH, "Ancho:%d  Alto:%d"
+  IDS_SB_RGB, "R:%d  G:%d  B:%d"
+  IDS_SB_CAGE, "Trazar borde de selección rectangular. Mays y Espacio para opciones adicionales."
+  IDS_SB_ZOOM, "Pulse en la imagen para agrandar; pulse y arrastre para agrandar cuadro. Espacio para arrastrar cuadro."
+  IDS_SB_HAND, "Pulse y arrastre para desplazar imagen en la dirección deseada."
+
+  IDS_SB_AUTOROTATING, "Rotando..."
+
+  IDS_UNIT_INCHES, "pulgadas"
+  IDS_UNIT_CM, "cm"
+  IDS_UNIT_MM, "mm"
+  IDS_UNIT_POINTS, "puntos"
+  IDS_UNIT_PICAS, "picas"
+
+  IDS_PRINT_NODEFPRINTER, "No se encontró impresora por defecto. Instale una impresora por defecto."
+  IDS_PRINT_NOPRINTERS, "No hay impresora instalada."
+  IDS_PRINT_SETUPFAILED, "Fallo en diálogo de preparación de impresión."
+  IDS_PRINTING, "Imprimiendo..."
+  IDS_PRINTING_FAILED,  "Impresión fallida.\n%s"
+  IDS_UNKNOWN_ERROR,    "Ha ocurrido un error desconocido.\n"
+  IDS_CHECK_EVENTLOG,   "Compruebe el Visor de Eventos para ver el mensaje exacto de error."
+  // The following 2 strings are concatenated together
+  IDS_EXCEPT_INFO1,     "Ha sucedido una excepción en PictView; por favor, informe a los autores.\nSi estaba trabajando con algún fichero imagen cuando ocurrió la excepción,\n"
+  IDS_EXCEPT_INFO2,     "trate de reproducir el fallo con esta imagen, y si ocurre una excepción de nuevon\nenvíenos esta imagen (reproduciremos y arreglaremos el fallo).\n¡Gracias por su cooperación!"
+
+  IDS_NO_MORE_IMAGES,   "No hay más imágenes disponibles"
+  IDS_UNSUPPORTED_IMAGE_TYPE, "Esta imagen tiene un formato no admitido."
+  IDS_MUSTBEPOSITIVE,   "Escriba un número mayor que cero."
+  IDS_SB_TIP_SELECT_SQUARE, "Ayuda: Use Herramientas Configuración para seleccionar rectángulos fijos no cuadrados."
+  
+  IDS_WIA_ERROR_ACQUIREIMG, "Imposible recoger imagen del dispositivo. Verifique que el dispositivo está bien conectado y pruebe de nuevo. Error: (0x%08X) %s"
+  IDS_WIA_WAIT, "Espere..."
+  IDS_WIA_STATUS_TRANSFER_FROM_DEVICE, "Leyendo datos del dispositivo (completado al %d%%)"
+  IDS_WIA_STATUS_PROCESSING_DATA, "Procesando datos (completado al %d%%)"
+  IDS_WIA_STATUS_TRANSFER_TO_CLIENT, "Transfiriendo datos (completado al %d%%)"
+  
+  IDS_SCAN_OPEN_EXTRA_IMGS, "Ha recibido más imágenes desde el escáner. La primera imagen ha sido abierta en esta ventana. ¿Desea abrir otras imágenes cada una en su propia ventana? Si no, las imágenes serán ignoradas.\n\nNúmero de nuevas ventanas: %d"
+}
+
+STRINGTABLE
+{
+  IDS_RENAME_EMPTY, "Escriba un nombre de fichero o una máscara de cambio de nombre."
+  IDS_RENAME_BAD_MASK, "El nombre de fichero o la máscara de cambio de nombre no puede contener separadores de ruta ni estos caracteres: < > : "" / \\ |"
+  IDS_RENAME_MASK_EMPTY, "La máscara de cambio de nombre ha generado un nombre de fichero vacío."
+  IDS_RENAME_BAD_NAME, "El nombre de fichero resultante no puede contener separadores de ruta ni estos caracteres: < > : "" / \\ | ? *"
+  IDS_COPYTO_SAME_FOLDER, "El fichero ya está en este directorio. Seleccione otro directorio de destino."
+}
+
+STRINGTABLE
+{
+  IDS_PV_IMAGE_LOAD_WAS_CANCELED, "Carga de la imagen cancelada."
+  IDS_PV_UNABLE_TO_OPEN_IMAGE_FILE, "Imposible abrir el fichero de imagen"
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE, "Imposible leer el tamaño del fichero de imagen"
+  IDS_PV_IMAGE_FILE_EXCEEDS_THE_CURRENT, "El fichero de imagen supera el límite de entrada actual de PictView."
+  IDS_PV_UNABLE_TO_ALLOCATE_AN_IN, "Imposible asignar un flujo de imagen en memoria."
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE_2, "Imposible leer el fichero de imagen"
+  IDS_PV_UNABLE_TO_LOCK_IMAGE_STREAM, "Imposible bloquear la memoria del flujo de imagen"
+  IDS_PV_UNABLE_TO_CREATE_AN_IMAGE, "Imposible crear un flujo de imagen para WIC."
+  IDS_PV_IMAGE_OPERATION_FAILED, "Error en la operación con la imagen."
+  IDS_PV_CLIPBOARD_IMAGE, "Imagen del portapapeles"
+  IDS_PV_UNABLE_TO_CREATE_A_COMPATIBLE, "Imposible crear un búfer de captura de pantalla compatible."
+  IDS_PV_UNABLE_TO_SELECT_THE_COMPATIBLE, "Imposible seleccionar el búfer de captura de pantalla compatible."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN, "Imposible capturar la pantalla"
+  IDS_PV_UNABLE_TO_READ_PIXELS_FROM, "Imposible leer los píxeles del búfer de captura de pantalla."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING, "Imposible crear un contexto de dibujo para la captura de pantalla."
+  IDS_PV_UNABLE_TO_CREATE_A_FALLBACK, "Imposible crear un contexto de dibujo alternativo para la captura de pantalla."
+  IDS_PV_UNABLE_TO_INITIALIZE_DXGI_SCREEN, "Imposible inicializar la captura de pantalla DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_2, "Imposible capturar la pantalla con DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_3, "Imposible capturar la pantalla con DXGI."
+  IDS_PV_SCREEN_CAPTURE_BOUNDS_ARE_INVALID, "Los límites de la captura de pantalla no son válidos."
+  IDS_PV_SCREEN_CAPTURE, "Captura de pantalla"
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_UNAVAILABLE, "Los datos de imagen del portapapeles no están disponibles."
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_INCOMPLETE, "Los datos de imagen del portapapeles están incompletos."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE, "Imposible bloquear los datos de imagen del portapapeles"
+  IDS_PV_CLIPBOARD_IMAGE_FORMAT_IS_UNSUPPORTED, "El formato de imagen del portapapeles no está admitido."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_2, "Imposible crear un contexto de dibujo para convertir la imagen del portapapeles."
+  IDS_PV_UNABLE_TO_CREATE_CLIPBOARD_IMAGE, "Imposible crear el búfer de conversión de la imagen del portapapeles."
+  IDS_PV_UNABLE_TO_CONVERT_CLIPBOARD_IMAGE, "Imposible convertir los datos de imagen del portapapeles."
+  IDS_PV_CLIPBOARD_BITMAP, "Bitmap del portapapeles"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_FALLBACK, "Imposible capturar la ventana alternativa."
+  IDS_PV_FALLBACK_WINDOW_DIMENSIONS_ARE_INVALID, "Las dimensiones de la ventana alternativa no son válidas."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_3, "Imposible crear un contexto de dibujo para capturar la ventana alternativa."
+  IDS_PV_UNABLE_TO_PRINT_THE_FALLBACK, "Imposible dibujar la ventana alternativa."
+  IDS_PV_IMAGE_SOURCE_DATA_IS_UNAVAILABLE, "Los datos de origen de la imagen no están disponibles."
+  IDS_PV_NO_IMAGE_LOADED, "No hay ninguna imagen cargada"
+  IDS_PV_PICK_COLOR_MOVE_MOUSE_OVER, "Coger color: mueva el ratón sobre la imagen"
+  IDS_PV_UNABLE_TO_START_ANIMATED_GIF, "Imposible iniciar la reproducción del GIF animado."
+  IDS_PV_SOURCE_NAVIGATION_IS_NO_LONGER, "La navegación por el origen ya no está disponible."
+  IDS_PV_SOURCE_SELECTION_IS_NO_LONGER, "La selección en el origen ya no está disponible."
+  IDS_PV_OPENED_FILE_IS_SELECTED_IN, "El fichero abierto está seleccionado en el origen."
+  IDS_PV_OPENED_FILE_IS_UNSELECTED_IN, "El fichero abierto está deseleccionado en el origen."
+  IDS_PV_FILE_NAME_UNCHANGED, "Nombre de fichero sin cambios."
+  IDS_PV_UNABLE_TO_RENAME_THE_FILE, "Imposible cambiar el nombre del fichero"
+  IDS_PV_RENAME_CANCELED, "Cambio de nombre cancelado."
+  IDS_PV_FILE_WAS_RENAMED_BUT_THE, "Se ha cambiado el nombre del fichero, pero la nueva ruta no está disponible."
+  IDS_PV_FILE_RENAMED, "Nombre de fichero cambiado."
+  IDS_PV_COPY_CANCELED, "Copia cancelada."
+  IDS_PV_UNABLE_TO_COPY_THE_FILE, "Imposible copiar el fichero."
+  IDS_PV_FILE_COPIED, "Fichero copiado."
+  IDS_PV_COPY_WAS_NOT_COMPLETED, "La copia no se ha completado."
+  IDS_PV_UNABLE_TO_DELETE_THE_FILE, "Imposible borrar el fichero."
+  IDS_PV_FILE_MOVED_TO_THE_RECYCLE, "Fichero trasladado a la Papelera."
+  IDS_PV_FILE_DELETED, "Fichero borrado."
+  IDS_PV_DELETE_CANCELED, "Borrado cancelado."
+  IDS_PV_FILE_WAS_NOT_DELETED, "El fichero no se ha borrado."
+  IDS_PV_SOURCE_FOCUS_IS_NO_LONGER, "El foco en el origen ya no está disponible."
+  IDS_PV_FOCUSING_OPENED_FILE_IN_THE, "Enfocando el fichero abierto en el origen."
+  IDS_PV_PREVIOUS_WALLPAPER_RESTORED, "Fondo de escritorio anterior restaurado."
+  IDS_PV_WALLPAPER_CLEARED, "Fondo de escritorio quitado."
+  IDS_PV_WALLPAPER_UPDATED, "Fondo de escritorio actualizado."
+  IDS_PV_NO_IMAGE_IS_LOADED, "No hay ninguna imagen cargada."
+  IDS_PV_UNABLE_TO_CREATE_A_WALLPAPER, "Imposible crear una ruta de salida para el fondo de escritorio."
+  IDS_PV_UNABLE_TO_UPDATE_THE_DESKTOP, "Imposible actualizar el fondo de escritorio."
+  IDS_PV_UNABLE_TO_OPEN_THE_DESKTOP, "Imposible abrir la clave del registro del fondo de escritorio."
+  IDS_PV_OPEN_IMAGE, "Abrir imagen"
+  IDS_PV_UNABLE_TO_OPEN_THE_HISTOGRAM, "Imposible abrir la ventana del histograma."
+  IDS_PV_UNABLE_TO_REGISTER_THE_SCREEN, "Imposible registrar la tecla rápida de captura de pantalla."
+  IDS_PV_UNABLE_TO_START_THE_SCREEN, "Imposible iniciar el temporizador de captura de pantalla."
+  IDS_PV_CAPTURING_PICTVIEW, "Capturando - PictView"
+  IDS_PV_SCREEN_CAPTURE_IS_WAITING_FOR, "La captura de pantalla está esperando la tecla rápida."
+  IDS_PV_SCREEN_CAPTURE_TIMER_STARTED, "Temporizador de captura de pantalla iniciado."
+  IDS_PV_SCREEN_CAPTURED, "Pantalla capturada."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_4, "Imposible capturar la pantalla."
+  IDS_PV_SCREEN_CAPTURED_FROM_THE_VIEWER, "Pantalla capturada desde la ventana del visor; la captura del escritorio no estaba disponible."
+  IDS_PV_THE_CLIPBOARD_DOES_NOT_CONTAIN, "El portapapeles no contiene ninguna imagen."
+  IDS_PV_UNABLE_TO_OPEN_THE_CLIPBOARD, "Imposible abrir el portapapeles."
+  IDS_PV_UNABLE_TO_PASTE_THE_CLIPBOARD, "Imposible pegar la imagen del portapapeles."
+  IDS_PV_PICTVIEW_IMAGE, "Imagen de PictView"
+  IDS_PV_UNABLE_TO_PRINT_THE_IMAGE, "Imposible imprimir la imagen."
+  IDS_PV_UNABLE_TO_READ_PRINTER_PAGE, "Imposible leer las dimensiones de página de la impresora."
+  IDS_PV_UNABLE_TO_ALLOCATE_CLIPBOARD_IMAGE, "Imposible asignar los datos de imagen del portapapeles."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE_2, "Imposible bloquear los datos de imagen del portapapeles."
+  IDS_PV_UNABLE_TO_COPY_IMAGE_DATA, "Imposible copiar los datos de la imagen al portapapeles."
+  IDS_PV_UNABLE_TO_START_THE_IMAGE, "Imposible iniciar el subproceso de carga de la imagen."
+  IDS_PV_FILE_DIALOG_FAILED, "Imposible abrir el diálogo de ficheros.\nError: 0x%X"
+  IDS_PV_ALLOCATE_PIXELS_FAILED, "Imposible asignar píxeles para %s."
+  IDS_PV_CONVERSION_CONTEXT_FAILED, "Imposible crear un contexto de dibujo para convertir %s."
+  IDS_PV_READ_PIXELS_FAILED, "Imposible leer los píxeles de %s."
+  IDS_PV_SAVED, "Guardado: %s"
+  IDS_PV_LOADING, "Cargando..."
+  IDS_PV_LOADING_PERCENT, "Cargando... %u%%"
+  IDS_PV_IMAGE_FILES, "Ficheros de imagen"
+  IDS_PV_ALL_FILES, "Todos los ficheros"
+  IDS_PV_ERR_WIC_UNAVAILABLE, "Windows Imaging Component no está disponible."
+  IDS_PV_ERR_OPEN, "Imposible abrir la imagen."
+  IDS_PV_ERR_DECODE, "La imagen está dañada o no se puede descodificar."
+  IDS_PV_ERR_FRAME, "La página o el fotograma solicitado no existe."
+  IDS_PV_ERR_TOO_LARGE, "La imagen es demasiado grande."
+  IDS_PV_ERR_CANCELED, "La operación se ha cancelado."
+  IDS_PV_ERR_MEMORY, "No hay memoria suficiente para procesar la imagen."
+  IDS_PV_ERR_SAVE, "Imposible guardar la imagen."
+  IDS_PV_SAVEAS_FILTER, "Portable Network Graphics (*.png)|*.png|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|CompuServe GIF (*.gif)|*.gif|"
+  IDS_EXIF_TAG_0001, "Índice de interoperabilidad"
+  IDS_EXIF_TAG_0002, "Versión de interoperabilidad"
+  IDS_EXIF_TAG_00FE, "Tipo de subfichero nuevo"
+  IDS_EXIF_TAG_0100, "Ancho de la imagen"
+  IDS_EXIF_TAG_0101, "Alto de la imagen"
+  IDS_EXIF_TAG_0102, "Bits por muestra"
+  IDS_EXIF_TAG_0103, "Compresión"
+  IDS_EXIF_TAG_0106, "Interpretación fotométrica"
+  IDS_EXIF_TAG_010D, "Nombre del documento"
+  IDS_EXIF_TAG_010E, "Descripción de la imagen"
+  IDS_EXIF_TAG_010F, "Fabricante de la cámara"
+  IDS_EXIF_TAG_0110, "Modelo de cámara"
+  IDS_EXIF_TAG_0111, "Desplazamientos de franjas"
+  IDS_EXIF_TAG_0112, "Orientación"
+  IDS_EXIF_TAG_0115, "Muestras por píxel"
+  IDS_EXIF_TAG_0116, "Filas por franja"
+  IDS_EXIF_TAG_0117, "Bytes por franja"
+  IDS_EXIF_TAG_011A, "Resolución horizontal"
+  IDS_EXIF_TAG_011B, "Resolución vertical"
+  IDS_EXIF_TAG_011C, "Configuración planar"
+  IDS_EXIF_TAG_0128, "Unidad de resolución"
+  IDS_EXIF_TAG_012D, "Función de transferencia"
+  IDS_EXIF_TAG_0131, "Software"
+  IDS_EXIF_TAG_0132, "Fecha y hora"
+  IDS_EXIF_TAG_013B, "Artista"
+  IDS_EXIF_TAG_013C, "Equipo anfitrión"
+  IDS_EXIF_TAG_013E, "Punto blanco"
+  IDS_EXIF_TAG_013F, "Cromaticidades primarias"
+  IDS_EXIF_TAG_0201, "Desplazamiento de la miniatura"
+  IDS_EXIF_TAG_0202, "Longitud de la miniatura"
+  IDS_EXIF_TAG_0211, "Coeficientes YCbCr"
+  IDS_EXIF_TAG_0212, "Submuestreo YCbCr"
+  IDS_EXIF_TAG_0213, "Posicionamiento YCbCr"
+  IDS_EXIF_TAG_0214, "Referencia de blanco y negro"
+  IDS_EXIF_TAG_4746, "Clasificación"
+  IDS_EXIF_TAG_4749, "Porcentaje de clasificación"
+  IDS_EXIF_TAG_8298, "Copyright"
+  IDS_EXIF_TAG_829A, "Tiempo de exposición"
+  IDS_EXIF_TAG_829D, "Número F"
+  IDS_EXIF_TAG_8769, "Puntero IFD de Exif"
+  IDS_EXIF_TAG_8822, "Programa de exposición"
+  IDS_EXIF_TAG_8824, "Sensibilidad espectral"
+  IDS_EXIF_TAG_8825, "Puntero IFD de GPS"
+  IDS_EXIF_TAG_8827, "Velocidad ISO"
+  IDS_EXIF_TAG_8828, "OECF"
+  IDS_EXIF_TAG_8830, "Tipo de sensibilidad"
+  IDS_EXIF_TAG_8831, "Sensibilidad de salida estándar"
+  IDS_EXIF_TAG_8832, "Índice de exposición recomendado"
+  IDS_EXIF_TAG_8833, "Valor de velocidad ISO"
+  IDS_EXIF_TAG_9000, "Versión Exif"
+  IDS_EXIF_TAG_9003, "Fecha de captura"
+  IDS_EXIF_TAG_9004, "Fecha de digitalización"
+  IDS_EXIF_TAG_9010, "Zona horaria"
+  IDS_EXIF_TAG_9011, "Zona horaria (captura)"
+  IDS_EXIF_TAG_9012, "Zona horaria (digitalización)"
+  IDS_EXIF_TAG_9101, "Configuración de componentes"
+  IDS_EXIF_TAG_9102, "Bits comprimidos por píxel"
+  IDS_EXIF_TAG_9201, "Velocidad de obturación"
+  IDS_EXIF_TAG_9202, "Apertura"
+  IDS_EXIF_TAG_9203, "Brillo"
+  IDS_EXIF_TAG_9204, "Compensación de exposición"
+  IDS_EXIF_TAG_9205, "Apertura máxima"
+  IDS_EXIF_TAG_9206, "Distancia al sujeto"
+  IDS_EXIF_TAG_9207, "Modo de medición"
+  IDS_EXIF_TAG_9208, "Fuente de luz"
+  IDS_EXIF_TAG_9209, "Flash"
+  IDS_EXIF_TAG_920A, "Distancia focal"
+  IDS_EXIF_TAG_9214, "Área del sujeto"
+  IDS_EXIF_TAG_927C, "Nota del fabricante"
+  IDS_EXIF_TAG_9286, "Comentario del usuario"
+  IDS_EXIF_TAG_9290, "Fracción de segundo"
+  IDS_EXIF_TAG_9291, "Fracción de segundo (captura)"
+  IDS_EXIF_TAG_9292, "Fracción de segundo (digitalización)"
+  IDS_EXIF_TAG_9C9B, "Título"
+  IDS_EXIF_TAG_9C9C, "Comentarios"
+  IDS_EXIF_TAG_9C9D, "Autor"
+  IDS_EXIF_TAG_9C9E, "Palabras clave"
+  IDS_EXIF_TAG_9C9F, "Asunto"
+  IDS_EXIF_TAG_A000, "Versión FlashPix"
+  IDS_EXIF_TAG_A001, "Espacio de color"
+  IDS_EXIF_TAG_A002, "Ancho en píxeles"
+  IDS_EXIF_TAG_A003, "Alto en píxeles"
+  IDS_EXIF_TAG_A004, "Fichero de sonido relacionado"
+  IDS_EXIF_TAG_A005, "Puntero IFD de interoperabilidad"
+  IDS_EXIF_TAG_A20B, "Energía del flash"
+  IDS_EXIF_TAG_A20C, "Respuesta de frecuencia espacial"
+  IDS_EXIF_TAG_A20E, "Resolución horizontal del plano focal"
+  IDS_EXIF_TAG_A20F, "Resolución vertical del plano focal"
+  IDS_EXIF_TAG_A210, "Unidad de resolución del plano focal"
+  IDS_EXIF_TAG_A214, "Ubicación del sujeto"
+  IDS_EXIF_TAG_A215, "Índice de exposición"
+  IDS_EXIF_TAG_A217, "Método de detección"
+  IDS_EXIF_TAG_A300, "Origen del fichero"
+  IDS_EXIF_TAG_A301, "Tipo de escena"
+  IDS_EXIF_TAG_A302, "Patrón CFA"
+  IDS_EXIF_TAG_A401, "Procesamiento personalizado"
+  IDS_EXIF_TAG_A402, "Modo de exposición"
+  IDS_EXIF_TAG_A403, "Balance de blancos"
+  IDS_EXIF_TAG_A404, "Relación de zoom digital"
+  IDS_EXIF_TAG_A405, "Distancia focal equivalente en 35 mm"
+  IDS_EXIF_TAG_A406, "Tipo de captura de escena"
+  IDS_EXIF_TAG_A407, "Control de ganancia"
+  IDS_EXIF_TAG_A408, "Contraste"
+  IDS_EXIF_TAG_A409, "Saturación"
+  IDS_EXIF_TAG_A40A, "Nitidez"
+  IDS_EXIF_TAG_A40B, "Descripción de ajustes del dispositivo"
+  IDS_EXIF_TAG_A40C, "Rango de distancia al sujeto"
+  IDS_EXIF_TAG_A420, "Id. único de imagen"
+  IDS_EXIF_TAG_A430, "Propietario de la cámara"
+  IDS_EXIF_TAG_A431, "Número de serie de la cámara"
+  IDS_EXIF_TAG_A432, "Especificación del objetivo"
+  IDS_EXIF_TAG_A433, "Fabricante del objetivo"
+  IDS_EXIF_TAG_A434, "Modelo del objetivo"
+  IDS_EXIF_TAG_A435, "Número de serie del objetivo"
+  IDS_EXIF_TAG_A460, "Imagen compuesta"
+  IDS_EXIF_TAG_A500, "Gamma"
+  IDS_EXIF_GPS_0000, "Versión GPS"
+  IDS_EXIF_GPS_0001, "Referencia de latitud"
+  IDS_EXIF_GPS_0002, "Latitud"
+  IDS_EXIF_GPS_0003, "Referencia de longitud"
+  IDS_EXIF_GPS_0004, "Longitud"
+  IDS_EXIF_GPS_0005, "Referencia de altitud"
+  IDS_EXIF_GPS_0006, "Altitud"
+  IDS_EXIF_GPS_0007, "Hora GPS (UTC)"
+  IDS_EXIF_GPS_0008, "Satélites GPS"
+  IDS_EXIF_GPS_0009, "Estado del receptor GPS"
+  IDS_EXIF_GPS_000A, "Modo de medición GPS"
+  IDS_EXIF_GPS_000B, "Precisión GPS (DOP)"
+  IDS_EXIF_GPS_000C, "Unidad de velocidad"
+  IDS_EXIF_GPS_000D, "Velocidad"
+  IDS_EXIF_GPS_000E, "Referencia de dirección de movimiento"
+  IDS_EXIF_GPS_000F, "Dirección de movimiento"
+  IDS_EXIF_GPS_0010, "Referencia de dirección de la imagen"
+  IDS_EXIF_GPS_0011, "Dirección de la imagen"
+  IDS_EXIF_GPS_0012, "Datum geodésico"
+  IDS_EXIF_GPS_0013, "Referencia de latitud de destino"
+  IDS_EXIF_GPS_0014, "Latitud de destino"
+  IDS_EXIF_GPS_0015, "Referencia de longitud de destino"
+  IDS_EXIF_GPS_0016, "Longitud de destino"
+  IDS_EXIF_GPS_0017, "Referencia de rumbo al destino"
+  IDS_EXIF_GPS_0018, "Rumbo al destino"
+  IDS_EXIF_GPS_0019, "Referencia de distancia al destino"
+  IDS_EXIF_GPS_001A, "Distancia al destino"
+  IDS_EXIF_GPS_001B, "Método de procesamiento GPS"
+  IDS_EXIF_GPS_001C, "Información de área GPS"
+  IDS_EXIF_GPS_001D, "Fecha GPS"
+  IDS_EXIF_GPS_001E, "Corrección diferencial GPS"
+  IDS_EXIF_GPS_001F, "Error de posicionamiento horizontal GPS"
+  IDS_EXIF_VALUE_COMPRESSION_NONE, "Sin comprimir"
+  IDS_EXIF_VALUE_COMPRESSION_JPEG, "JPEG"
+  IDS_EXIF_VALUE_PHOTOMETRIC_RGB, "RGB"
+  IDS_EXIF_VALUE_PHOTOMETRIC_YCBCR, "YCbCr"
+  IDS_EXIF_VALUE_ORIENTATION_1, "Normal"
+  IDS_EXIF_VALUE_ORIENTATION_2, "Reflejada horizontalmente"
+  IDS_EXIF_VALUE_ORIENTATION_3, "Girada 180°"
+  IDS_EXIF_VALUE_ORIENTATION_4, "Reflejada verticalmente"
+  IDS_EXIF_VALUE_ORIENTATION_5, "Reflejada horizontalmente, girada 270° en sentido horario"
+  IDS_EXIF_VALUE_ORIENTATION_6, "Girada 90° en sentido horario"
+  IDS_EXIF_VALUE_ORIENTATION_7, "Reflejada horizontalmente, girada 90° en sentido horario"
+  IDS_EXIF_VALUE_ORIENTATION_8, "Girada 270° en sentido horario"
+  IDS_EXIF_VALUE_PLANAR_CHUNKY, "Entrelazado"
+  IDS_EXIF_VALUE_PLANAR_PLANAR, "Planar"
+  IDS_EXIF_VALUE_UNIT_NONE, "Ninguna"
+  IDS_EXIF_VALUE_UNIT_INCH, "Pulgada"
+  IDS_EXIF_VALUE_UNIT_CM, "Centímetro"
+  IDS_EXIF_VALUE_YCBCR_CENTERED, "Centrado"
+  IDS_EXIF_VALUE_YCBCR_COSITED, "Coubicado"
+  IDS_EXIF_VALUE_PROGRAM_0, "No definido"
+  IDS_EXIF_VALUE_PROGRAM_1, "Manual"
+  IDS_EXIF_VALUE_PROGRAM_2, "Programa normal"
+  IDS_EXIF_VALUE_PROGRAM_3, "Prioridad de apertura"
+  IDS_EXIF_VALUE_PROGRAM_4, "Prioridad de obturación"
+  IDS_EXIF_VALUE_PROGRAM_5, "Programa creativo"
+  IDS_EXIF_VALUE_PROGRAM_6, "Programa de acción"
+  IDS_EXIF_VALUE_PROGRAM_7, "Modo retrato"
+  IDS_EXIF_VALUE_PROGRAM_8, "Modo paisaje"
+  IDS_EXIF_VALUE_METERING_0, "Desconocido"
+  IDS_EXIF_VALUE_METERING_1, "Promedio"
+  IDS_EXIF_VALUE_METERING_2, "Promedio ponderado al centro"
+  IDS_EXIF_VALUE_METERING_3, "Puntual"
+  IDS_EXIF_VALUE_METERING_4, "Multipunto"
+  IDS_EXIF_VALUE_METERING_5, "Patrón"
+  IDS_EXIF_VALUE_METERING_6, "Parcial"
+  IDS_EXIF_VALUE_METERING_255, "Otro"
+  IDS_EXIF_VALUE_LIGHT_0, "Desconocida"
+  IDS_EXIF_VALUE_LIGHT_1, "Luz de día"
+  IDS_EXIF_VALUE_LIGHT_2, "Fluorescente"
+  IDS_EXIF_VALUE_LIGHT_3, "Tungsteno (incandescente)"
+  IDS_EXIF_VALUE_LIGHT_4, "Flash"
+  IDS_EXIF_VALUE_LIGHT_9, "Buen tiempo"
+  IDS_EXIF_VALUE_LIGHT_10, "Nublado"
+  IDS_EXIF_VALUE_LIGHT_11, "Sombra"
+  IDS_EXIF_VALUE_LIGHT_12, "Fluorescente de luz día"
+  IDS_EXIF_VALUE_LIGHT_13, "Fluorescente blanco diurno"
+  IDS_EXIF_VALUE_LIGHT_14, "Fluorescente blanco frío"
+  IDS_EXIF_VALUE_LIGHT_15, "Fluorescente blanco"
+  IDS_EXIF_VALUE_LIGHT_16, "Fluorescente blanco cálido"
+  IDS_EXIF_VALUE_LIGHT_17, "Luz estándar A"
+  IDS_EXIF_VALUE_LIGHT_18, "Luz estándar B"
+  IDS_EXIF_VALUE_LIGHT_19, "Luz estándar C"
+  IDS_EXIF_VALUE_LIGHT_20, "D55"
+  IDS_EXIF_VALUE_LIGHT_21, "D65"
+  IDS_EXIF_VALUE_LIGHT_22, "D75"
+  IDS_EXIF_VALUE_LIGHT_23, "D50"
+  IDS_EXIF_VALUE_LIGHT_24, "Tungsteno de estudio ISO"
+  IDS_EXIF_VALUE_LIGHT_255, "Otra fuente de luz"
+  IDS_EXIF_VALUE_COLORSPACE_SRGB, "sRGB"
+  IDS_EXIF_VALUE_COLORSPACE_UNCALIBRATED, "Sin calibrar"
+  IDS_EXIF_VALUE_FPUNIT_NONE, "Ninguna"
+  IDS_EXIF_VALUE_FPUNIT_INCH, "Pulgada"
+  IDS_EXIF_VALUE_FPUNIT_CM, "Centímetro"
+  IDS_EXIF_VALUE_SENSING_1, "No definido"
+  IDS_EXIF_VALUE_SENSING_2, "Sensor de área de color de un chip"
+  IDS_EXIF_VALUE_SENSING_3, "Sensor de área de color de dos chips"
+  IDS_EXIF_VALUE_SENSING_4, "Sensor de área de color de tres chips"
+  IDS_EXIF_VALUE_SENSING_5, "Sensor de área de color secuencial"
+  IDS_EXIF_VALUE_SENSING_7, "Sensor trilineal"
+  IDS_EXIF_VALUE_SENSING_8, "Sensor lineal de color secuencial"
+  IDS_EXIF_VALUE_FILESOURCE_DSC, "Cámara fotográfica digital"
+  IDS_EXIF_VALUE_SCENETYPE_DIRECT, "Fotografiada directamente"
+  IDS_EXIF_VALUE_RENDERED_0, "Proceso normal"
+  IDS_EXIF_VALUE_RENDERED_1, "Proceso personalizado"
+  IDS_EXIF_VALUE_EXPMODE_0, "Exposición automática"
+  IDS_EXIF_VALUE_EXPMODE_1, "Exposición manual"
+  IDS_EXIF_VALUE_EXPMODE_2, "Horquillado automático"
+  IDS_EXIF_VALUE_WB_0, "Balance de blancos automático"
+  IDS_EXIF_VALUE_WB_1, "Balance de blancos manual"
+  IDS_EXIF_VALUE_SCENE_0, "Estándar"
+  IDS_EXIF_VALUE_SCENE_1, "Paisaje"
+  IDS_EXIF_VALUE_SCENE_2, "Retrato"
+  IDS_EXIF_VALUE_SCENE_3, "Escena nocturna"
+  IDS_EXIF_VALUE_GAIN_0, "Ninguno"
+  IDS_EXIF_VALUE_GAIN_1, "Aumento de ganancia bajo"
+  IDS_EXIF_VALUE_GAIN_2, "Aumento de ganancia alto"
+  IDS_EXIF_VALUE_GAIN_3, "Reducción de ganancia baja"
+  IDS_EXIF_VALUE_GAIN_4, "Reducción de ganancia alta"
+  IDS_EXIF_VALUE_CONTRAST_0, "Normal"
+  IDS_EXIF_VALUE_CONTRAST_1, "Suave"
+  IDS_EXIF_VALUE_CONTRAST_2, "Fuerte"
+  IDS_EXIF_VALUE_SATURATION_0, "Normal"
+  IDS_EXIF_VALUE_SATURATION_1, "Saturación baja"
+  IDS_EXIF_VALUE_SATURATION_2, "Saturación alta"
+  IDS_EXIF_VALUE_SHARPNESS_0, "Normal"
+  IDS_EXIF_VALUE_SHARPNESS_1, "Suave"
+  IDS_EXIF_VALUE_SHARPNESS_2, "Fuerte"
+  IDS_EXIF_VALUE_DISTANCE_0, "Desconocida"
+  IDS_EXIF_VALUE_DISTANCE_1, "Macro"
+  IDS_EXIF_VALUE_DISTANCE_2, "Vista cercana"
+  IDS_EXIF_VALUE_DISTANCE_3, "Vista lejana"
+  IDS_EXIF_VALUE_GPS_ABOVE_SEA, "Sobre el nivel del mar"
+  IDS_EXIF_VALUE_GPS_BELOW_SEA, "Bajo el nivel del mar"
+  IDS_EXIF_VALUE_GPS_NO_CORRECTION, "Sin corrección"
+  IDS_EXIF_VALUE_GPS_CORRECTION, "Corrección aplicada"
+  IDS_EXIF_VALUE_FLASH_FIRED, "Flash disparado"
+  IDS_EXIF_VALUE_FLASH_NOT_FIRED, "Flash no disparado"
+  IDS_EXIF_VALUE_FLASH_COMPULSORY, "modo de flash obligatorio"
+  IDS_EXIF_VALUE_FLASH_SUPPRESSED, "supresión obligatoria del flash"
+  IDS_EXIF_VALUE_FLASH_AUTO, "modo automático"
+  IDS_EXIF_VALUE_FLASH_RETURN_DETECTED, "luz de retorno detectada"
+  IDS_EXIF_VALUE_FLASH_RETURN_NOT_DETECTED, "luz de retorno no detectada"
+  IDS_EXIF_VALUE_FLASH_RED_EYE, "reducción de ojos rojos"
+  IDS_EXIF_VALUE_FLASH_NO_FUNCTION, "Sin función de flash"
+}

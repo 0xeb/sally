@@ -3198,9 +3198,6 @@ CAnimate::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_TTGETTEXTW:
     {
-      // CToolTip::GetText asks WM_USER_TTGETTEXTW first and only falls back to the
-      // narrow message for v107 plugins and windows not yet ported. This is a core window, so it
-      // answers the wide form directly instead of routing through that compatibility path.
       wchar_t *text = (wchar_t *)lParam;
       lstrcpynW(text, L"(CAnimate class)\nClick to Start animate, click again to Stop animate.\n\t1\nTab\t2", TOOLTIP_TEXT_MAX);
       return TRUE;

@@ -29,8 +29,8 @@ CThreadQueue CViewerMainWindow::ThreadQueue("WebViewer Viewers");  // list of al
 HINSTANCE DLLInstance = NULL; // handle to the SPL module - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)
 
-int ConfigVersion = 0;           // 0 - default, 1 - SS 1.6 beta 3, 2 - SS 1.6 beta 4, 3 - SS 2.5 beta 1, 4 - AS 3.1 beta 1, 5 - Sally (PNG/SVG)
-#define CURRENT_CONFIG_VERSION 5 // Sally: PNG/SVG viewer support
+int ConfigVersion = 0;           // 0 - default, 1 - SS 1.6 beta 3, 2 - SS 1.6 beta 4, 3 - SS 2.5 beta 1, 4 - AS 3.1 beta 1, 5 - Sally (PNG/SVG), 6 - PNG back to PictView
+#define CURRENT_CONFIG_VERSION 6 // Sally: PNG belongs to PictView again
 const wchar_t* CONFIG_VERSION = L"Version";
 
 // Salamander general interface - valid from startup until the plugin shuts down
@@ -173,7 +173,7 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 }
 
 const wchar_t* MARKDOWN_EXTENSIONS = L"*.md;*.mdown;*.markdown";
-const wchar_t* IMAGE_EXTENSIONS = L"*.png;*.svg";
+const wchar_t* IMAGE_EXTENSIONS = L"*.svg"; // PNG is PictView's (WIC); SVG has no WIC decoder
 
 void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
 {
@@ -202,9 +202,14 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
         salamander->AddViewer(MARKDOWN_EXTENSIONS, TRUE);
     }
 
-    if (ConfigVersion < 5) // Sally: add PNG/SVG viewer support
+    if (ConfigVersion < 5) // Sally: add SVG viewer support
     {
         salamander->AddViewer(IMAGE_EXTENSIONS, TRUE);
+    }
+
+    if (ConfigVersion < 6) // Sally: PNG was viewed here only while PictView could not load
+    {
+        salamander->ForceRemoveViewer(L"*.png");
     }
 }
 

@@ -24,7 +24,7 @@
 #include <Terminal.h>
 #include <VCLCommon.h>
 #include "winliblt.h"
-#include "plugin_narrow_compat.h"
+#include "SalamandText.h"
 //---------------------------------------------------------------------------
 CPluginInterface PluginInterface;
 HINSTANCE DLLInstance = NULL;
@@ -88,9 +88,17 @@ int WINAPI DllEntryPoint(HINSTANCE HInst, unsigned long Reason,
     return Result;
 }
 //---------------------------------------------------------------------------
+// WinSCP formats its messages as AnsiString, so it gets resource strings as code-page bytes.
 char* SalLoadStr(int resID)
 {
-    return LoadStrNarrow(SalamanderGeneral, HLanguage, resID);
+    static char failed[] = "ERROR LOADING STRING";
+    std::wstring wide;
+    std::string bytes;
+    if (SalamanderGeneral == NULL ||
+        !SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID, wide) ||
+        !SalNarrowExact(wide.c_str(), bytes))
+        return failed;
+    return RetainBoundedText(std::move(bytes));
 }
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
@@ -239,9 +247,9 @@ int CSalamanderGeneralLocal::SalamanderMessageDialog(HWND Parent,
 
     BOOL CheckBoxValue = FALSE;
     AnsiString CheckBoxText;
-    const std::wstring CaptionW = ToWideArg(Caption.c_str());
-    const std::wstring TextW = ToWideArg(Text.c_str());
-    const std::wstring AliasBtnNamesW = ToWideArg(AliasBtnNames.c_str());
+    const std::wstring CaptionW = SalWide(Caption.c_str());
+    const std::wstring TextW = SalWide(Text.c_str());
+    const std::wstring AliasBtnNamesW = SalWide(AliasBtnNames.c_str());
     std::wstring CheckBoxTextW;
     MSGBOXEX_PARAMS MsgParams;
     memset(&MsgParams, 0, sizeof(MsgParams));
@@ -258,7 +266,7 @@ int CSalamanderGeneralLocal::SalamanderMessageDialog(HWND Parent,
     {
         MsgParams.CheckBoxValue = &CheckBoxValue;
         CheckBoxText = LoadStr(Answers == qaOK ? NEVER_SHOW_AGAIN : NEVER_ASK_AGAIN);
-        CheckBoxTextW = ToWideArg(CheckBoxText.c_str());
+        CheckBoxTextW = SalWide(CheckBoxText.c_str());
         MsgParams.CheckBoxText = CheckBoxTextW.c_str();
     }
     // TODO: map TMessageParams::Aliases to MSGBOXEX_PARAMS::AliasBtnNames
@@ -625,16 +633,16 @@ void WINAPI CPluginInterface::Connect(HWND Parent,
     {
         SetParentWindow(Parent);
 
-        Salamander->AddMenuItem(-1, ToWideArg(SalLoadStr(SAL_CONNECT)).c_str(),
+        Salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, SAL_CONNECT).c_str(),
                                 SALHOTKEY('W', HOTKEYF_CONTROL | HOTKEYF_SHIFT), pmConnect,
                                 FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-        Salamander->AddMenuItem(-1, ToWideArg(SalLoadStr(SAL_DISCONNECT_F12)).c_str(), SALHOTKEY_HINT, pmDisconnectF12,
+        Salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, SAL_DISCONNECT_F12).c_str(), SALHOTKEY_HINT, pmDisconnectF12,
                                 FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
         Salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL);
-        Salamander->AddMenuItem(-1, ToWideArg(SalLoadStr(SAL_FULL_SYNCHRONIZE)).c_str(), 0, pmFullSynchronize,
+        Salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, SAL_FULL_SYNCHRONIZE).c_str(), 0, pmFullSynchronize,
                                 FALSE, MENU_EVENT_THIS_PLUGIN_FS | MENU_EVENT_TARGET_THIS_PLUGIN_FS,
                                 MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-        Salamander->AddMenuItem(-1, ToWideArg(SalLoadStr(SAL_SYNCHRONIZE)).c_str(), 0, pmSynchronize,
+        Salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, SAL_SYNCHRONIZE).c_str(), 0, pmSynchronize,
                                 FALSE, MENU_EVENT_THIS_PLUGIN_FS | MENU_EVENT_TARGET_THIS_PLUGIN_FS,
                                 MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 

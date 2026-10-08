@@ -64,7 +64,7 @@ struct CCS
 
 // ****************************************************************************
 
-BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const char* pluginName);
+BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const wchar_t* pluginName);
 void ReleaseLCUtils();
 
 // LangStr, wide. The name follows the convention the other 21 plugins adopted:
@@ -143,26 +143,6 @@ protected:
 };
 
 // ****************************************************************************
-
-void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
-                     int historySize, char** history);
-
-// ****************************************************************************
-//
-// utilaux1.cpp
-//
-
-BOOL FileErrorL(int lastError, HWND parent, const char* fileName, int error,
-                BOOL retry, BOOL* skip = NULL, BOOL* skipAll = NULL,
-                int title = -1);
-
-inline BOOL FileError(HWND parent, const char* fileName, int error,
-                      BOOL retry, BOOL* skip = NULL, BOOL* skipAll = NULL,
-                      int title = -1)
-{
-    return FileErrorL(GetLastError(), parent, fileName, error,
-                      retry, skip, skipAll, title);
-}
 
 // ****************************************************************************
 //

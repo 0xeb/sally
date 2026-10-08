@@ -1,0 +1,1033 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Romanian (ro-RO) resources for pictview. Translation: Ioan Stefancu, Donca Radu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pictview/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pictview.rh2"
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+DLG_WIAPROGRESS DIALOGEX 0, 0, 214, 63
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_CENTER
+CAPTION "Scanarea Imaginii"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Anuleaza",IDCANCEL,157,43,50,14
+    LTEXT           "",IDC_WIAPROGR_MESSAGE,7,7,200,8
+    CONTROL         "",IDC_WIAPROGR_BAR,"msctls_progress32",WS_BORDER,7,22,200,14
+END
+
+DLG_ABOUT DIALOGEX 87, 50, 375, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Despre Plugin"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Inchide",IDCANCEL,316,114,50,14
+    ICON            "",IDC_ABOUT_ICON,11,9,20,20
+    LTEXT           "PictView %s - Vizualizator imagini pentru Sally",IDC_ABOUT_TITLE,46,9,322,8
+    LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,322,8,SS_NOPREFIX
+    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,123,8
+    LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,311,8
+    LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
+    LTEXT           "Email:",IDC_STATIC_6,46,81,23,8
+    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,91,81,85,8,WS_TABSTOP
+    LTEXT           "Home page:",IDC_STATIC_7,46,92,44,8
+    LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,91,92,122,8,WS_TABSTOP
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,373,1
+END
+
+DLG_CFGPAGE_APPEARANCE DIALOGEX 66, 53, 255, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Aparenta"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Marime fereastra",IDC_STATIC_1,6,5,243,53,WS_GROUP
+    CONTROL         "La fel ca Open Sala&mander",IDC_CFGAPP_WINPOS_SAME,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,151,12
+    CONTROL         "Mai &larga daca e nevoie dar nu mai mica",IDC_CFGAPP_WINPOS_LARGER,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,148,12
+    CONTROL         "Cat e &nevoie",IDC_CFGAPP_WINPOS_ANY,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,41,148,12
+    GROUPBOX        "Marire implicita",IDC_STATIC_2,6,60,243,67,WS_GROUP
+    CONTROL         "Toata Imaginea (fara bare de de&filare)",IDC_CFGAPP_ZOOM_WHOLE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,72,151,12
+    CONTROL         "Cat latimea (fara &bara orizontala de defilare)",IDC_CFGAPP_ZOOM_WIDTH,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,84,161,12
+    CONTROL         "Marime &originala",IDC_CFGAPP_ZOOM_ORIG,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,96,148,12
+    CONTROL         "Pe tot &ecranul",IDC_CFGAPP_ZOOM_FSCREEN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,108,148,12
+    CONTROL         "Arata &calea fisierului in bara de titlu",IDC_CFGAPP_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,167,12
+END
+
+DLG_CFGPAGE_COLORS DIALOGEX 66, 53, 255, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Culori"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Mod fereasatra",IDC_STATIC_1,6,5,243,50,WS_GROUP
+    LTEXT           "&Fundal",IDC_STATIC_2,17,19,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_BORDER,128,16,27,14
+    LTEXT           "&Transparent",IDC_STATIC_3,17,36,91,8
+    PUSHBUTTON      "",IDC_CFGCLR_BKGND,128,33,27,14
+    GROUPBOX        "Mod pe tot ecranul",IDC_STATIC_4,6,60,243,50,WS_GROUP
+    LTEXT           "Fund&al",IDC_STATIC_5,17,75,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BORDER,128,72,27,14
+    LTEXT           "T&ransparent",IDC_STATIC_6,17,92,44,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BKGND,128,89,27,14
+END
+
+DLG_CFGPAGE_KEYBOARD DIALOGEX 66, 53, 255, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Tastatura && Mouse"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Taste PageUp && PageDown, rotita mouse",IDC_STATIC_1,6,5,243,43,WS_GROUP
+    CONTROL         "Utilizate pentru depla&sare imagine",IDC_CFGKBD_PGDNUP_SCR,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,203,12
+    CONTROL         "Utilizate pentru accesare &imagine anterioara/urmatoare",IDC_CFGKBD_PGDNUP_PREV,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,218,12
+END
+
+DLG_CFGPAGE_TOOLS DIALOGEX 66, 53, 255, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Unelte"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Unealta de selectare",IDC_STATIC_1,6,5,243,94,WS_GROUP
+    LTEXT           "Aria selectata cand tii apasat tasta Shift:",IDC_STATIC_2,17,18,150,8
+    CONTROL         "&Patrat",IDC_CFGTOOLS_SQUARE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,24,27,203,12
+    CONTROL         "&4:3 dreptunghi",IDC_CFGTOOLS_4_3,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,40,218,12
+    CONTROL         "&3:2 dreptunghi",IDC_CFGTOOLS_3_2,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,53,218,12
+    CONTROL         "&16:9 dreptunghi",IDC_CFGTOOLS_16_9,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,66,218,12
+    CONTROL         "&Alta:",IDC_CFGTOOLS_OTHER,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,79,35,12
+    EDITTEXT        IDC_CFGTOOLS_RATIO_X,60,79,17,12,ES_NUMBER | WS_GROUP
+    LTEXT           ":",IDC_STATIC_3,79,81,4,8
+    EDITTEXT        IDC_CFGTOOLS_RATIO_Y,83,79,17,12,ES_NUMBER
+    CONTROL         "Pipeta obtine culorile in he&xadecimal",IDC_CFGTOOLS_PIPHEX,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,106,167,12
+END
+
+DLG_CFGPAGE_ADVANCED DIALOGEX 66, 53, 255, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Avansat"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Miniatura in panourile de fisiere",IDC_STATIC_7,6,5,243,69,WS_GROUP
+    LTEXT           "Unele imagini pot contine o miniatura incorecta, care nu este rotita corect sau care nu reflecta ultimele schimbari.",IDC_STATIC_8,14,18,225,16
+    CONTROL         "&Ignora miniatura originala stocata in fisierul imagine (mai lent)",IDC_CFGADV_CREATE_THUMBNAILS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,35,222,12
+    LTEXT           "",IDC_STATIC_9,14,51,227,1,SS_ETCHEDHORZ | WS_GROUP
+    LTEXT           "Nu face minia&turi a imaginilor mai mari de",IDC_STATIC_10,14,59,144,8
+    EDITTEXT        IDC_CFGADV_THUMB_MP,159,57,17,12,ES_NUMBER
+    LTEXT           "megapixeli.",IDC_STATIC_11,179,59,40,8
+    CONTROL         "Auto&roteste imaginile EXIF JPEG (foto camere digitale)",IDC_CFGADV_AUTOROTATE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,77,200,12
+    CONTROL         "Arata me&saj la salvarea cu succes a fisierului",IDC_CFGADV_SAVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,89,167,12
+    CONTROL         "Retine calea la salvare de ca&pturi de ecran, scanari, clipboard paste",IDC_CFGADV_REMEMBER_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,101,240,12
+END
+
+DLG_IMGPROP DIALOGEX 106, 34, 190, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "Properietati Imagine"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Inchide",1,79,182,50,14,WS_GROUP
+    PUSHBUTTON      "Help",IDHELP,135,182,50,14
+    LTEXT           "&Pagina:",IDC_IMGPROP_PAGENUM_LBL,7,10,49,8
+    EDITTEXT        IDC_IMGPROP_PAGENUM,82,8,100,12,ES_READONLY
+    LTEXT           "&Latime:",IDC_STATIC_1,7,24,49,8
+    EDITTEXT        IDC_IMGPROP_WIDTH,82,22,100,12,ES_READONLY
+    LTEXT           "&Inaltime:",IDC_STATIC_2,7,38,49,8
+    EDITTEXT        IDC_IMGPROP_HEIGHT,82,36,100,12,ES_READONLY
+    LTEXT           "&Culori:",IDC_STATIC_3,7,52,42,8
+    EDITTEXT        IDC_IMGPROP_COLORS,82,50,100,12,ES_READONLY
+    LTEXT           "&Marimea in memorie:",IDC_STATIC_4,7,66,74,8
+    EDITTEXT        IDC_IMGPROP_SIZE,82,64,100,12,ES_READONLY
+    LTEXT           "Marime &fisier:",IDC_STATIC_5,7,80,48,8
+    EDITTEXT        IDC_IMGPROP_FSIZE,82,78,100,12,ES_READONLY
+    LTEXT           "&DPI:",IDC_STATIC_6,7,94,50,8
+    EDITTEXT        IDC_IMGPROP_DPI,82,92,100,12,ES_READONLY
+    LTEXT           "Fo&rmat:",IDC_STATIC_7,7,108,50,8
+    EDITTEXT        IDC_IMGPROP_FMT,82,106,100,12,ES_READONLY
+    LTEXT           "C&ompresie:",IDC_STATIC_8,7,122,50,8
+    EDITTEXT        IDC_IMGPROP_COMPR,82,120,100,12,ES_READONLY
+    LTEXT           "Comen&tarii:",IDC_STATIC_9,7,136,50,8
+    EDITTEXT        IDC_IMGPROP_COMMENT,82,134,100,36,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY
+    LTEXT           "",IDC_STATIC_10,2,176,186,1,SS_ETCHEDHORZ | WS_GROUP
+END
+
+DLG_IMGEXIF DIALOGEX 57, 60, 413, 151
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "EXIF"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_IMGEXIF_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_BORDER | WS_GROUP | WS_TABSTOP,5,4,403,80
+    EDITTEXT        IDC_IMGEXIF_INFO,5,89,403,38,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_CLIPSIBLINGS | WS_VSCROLL | WS_GROUP
+    CONTROL         "&Grupeaza obiectele evidentiate",IDC_IMGEXIF_GROUP,"Button",BS_AUTOCHECKBOX | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,5,133,115,12
+    CONTROL         "&Evidenteaza",IDC_IMGEXIF_HIGHLIGHT,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,125,132,57,14
+    PUSHBUTTON      "&Copie",IDC_IMGEXIF_COPY,188,132,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "OK",IDOK,244,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Anuleaza",IDCANCEL,300,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Help",IDHELP,356,132,50,14
+END
+
+DLG_ZOOM DIALOGEX 85, 100, 121, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Mareste la"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Marire:",IDC_STATIC_1,8,13,49,8,NOT WS_GROUP
+    COMBOBOX        IDC_ZOOM_ZOOM,57,11,44,156,CBS_DROPDOWN | WS_TABSTOP
+    LTEXT           "%",IDC_STATIC_2,105,13,9,8
+    PUSHBUTTON      "OK",IDOK,7,37,50,14,BS_CENTER
+    PUSHBUTTON      "Anuleaza",IDCANCEL,63,37,50,14,BS_CENTER
+END
+
+DLG_PAGE DIALOGEX 85, 100, 121, 54
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Mergi La Pagina"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Pagina:",IDC_STATIC_1,8,9,28,8,NOT WS_GROUP
+    COMBOBOX        IDC_PAGE_PAGE,38,7,74,124,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "OK",IDOK,7,32,50,14,BS_CENTER
+    PUSHBUTTON      "Anuleaza",IDCANCEL,64,32,50,14,BS_CENTER
+END
+
+DLG_CAPTURE DIALOGEX 98, 61, 189, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Captura Ecran"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Captura",IDC_STATIC_1,6,6,177,81,WS_GROUP
+    CONTROL         "Pe &tot ecranul",IDC_CAPTURE_FULL,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,19,110,12
+    CONTROL         "A&plicatia din prim plan",IDC_CAPTURE_APPL,"Button",BS_AUTORADIOBUTTON,16,31,110,12
+    CONTROL         "&Fereastra din prim plan",IDC_CAPTURE_WINDOW,"Button",BS_AUTORADIOBUTTON,16,43,120,12
+    CONTROL         "&Aria selectata a fereastrei din prim plan ",IDC_CAPTURE_CLIENT,
+                    "Button",BS_AUTORADIOBUTTON,16,55,146,12
+    CONTROL         "Ecranul &Virtual (pentru mai multe monitoare)",IDC_CAPTURE_VIRTUAL,
+                    "Button",BS_AUTORADIOBUTTON,16,67,163,12
+    GROUPBOX        "Declansator Captura",IDC_STATIC_2,6,92,177,49,WS_GROUP
+    CONTROL         "Ta&sta",IDC_CAPTURE_HOTKEY,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,106,38,12
+    CONTROL         "Ti&mp ramas",IDC_CAPTURE_TIMER,"Button",BS_AUTORADIOBUTTON,16,121,53,12
+    CONTROL         "",IDC_CAPTURE_HOTKEY_VAL,"msctls_hotkey32",WS_GROUP | WS_TABSTOP,70,106,77,12
+    EDITTEXT        IDC_CAPTURE_TIMER_VAL,70,121,21,12
+    LTEXT           "secunde",IDC_STATIC_3,95,123,33,8
+    CONTROL         "I&nclude cursor mouse",IDC_CAPTURE_CURSOR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,147,85,12
+    LTEXT           "",IDC_STATIC_4,2,167,185,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "&Captura",IDOK,13,172,50,14,BS_CENTER | WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,69,172,50,14,BS_CENTER
+    PUSHBUTTON      "Help",IDHELP,125,172,50,14,BS_CENTER
+END
+
+IDD_RENAMEDIALOG DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Redenumeste Fisier"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_PATH,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,59,43,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,118,43,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 15, 34, 350, 89
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Confirma Suprascriere Fisier"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Suprascrie:",IDC_STATIC_1,6,14,48,8
+    LTEXT           "",IDS_SOURCENAME,58,14,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_SOURCEATTR,58,24,286,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Cu Fisier:",IDC_STATIC_2,9,37,45,8,NOT WS_GROUP
+    LTEXT           "",IDS_TARGETNAME,58,37,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_TARGETATTR,58,47,286,8,SS_NOPREFIX | NOT WS_GROUP
+    DEFPUSHBUTTON   "&Da",IDYES,91,66,50,14,WS_GROUP
+    PUSHBUTTON      "&Nu",IDNO,150,66,50,14
+    PUSHBUTTON      "Anuleaza",IDCANCEL,209,66,50,14
+END
+
+IDD_COPYTO DIALOGEX 15, 34, 321, 121
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Copiaza Fisier In"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&1",IDC_COPYTO_RB_1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,8,10,18,12
+    CONTROL         "&2",IDC_COPYTO_RB_2,"Button",BS_AUTORADIOBUTTON,8,27,18,12
+    CONTROL         "&3",IDC_COPYTO_RB_3,"Button",BS_AUTORADIOBUTTON,8,44,18,12
+    CONTROL         "&4",IDC_COPYTO_RB_4,"Button",BS_AUTORADIOBUTTON,8,61,18,12
+    CONTROL         "&5",IDC_COPYTO_RB_5,"Button",BS_AUTORADIOBUTTON,8,78,18,12
+    EDITTEXT        IDC_COPYTO_EL_1,29,10,221,12,WS_GROUP
+    PUSHBUTTON      "&Rasfoieste...",IDC_COPYTO_BR_1,256,9,55,14
+    EDITTEXT        IDC_COPYTO_EL_2,29,27,221,12
+    PUSHBUTTON      "R&asfoieste...",IDC_COPYTO_BR_2,256,26,55,14
+    EDITTEXT        IDC_COPYTO_EL_3,29,44,221,12
+    PUSHBUTTON      "Ra&sfoieste...",IDC_COPYTO_BR_3,256,43,55,14
+    EDITTEXT        IDC_COPYTO_EL_4,29,61,221,12
+    PUSHBUTTON      "Ras&foieste...",IDC_COPYTO_BR_4,256,60,55,14
+    EDITTEXT        IDC_COPYTO_EL_5,29,78,221,12
+    PUSHBUTTON      "Rasf&oieste...",IDC_COPYTO_BR_5,256,77,55,14
+    DEFPUSHBUTTON   "OK",IDOK,134,100,55,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,195,100,55,14
+    PUSHBUTTON      "Help",IDHELP,256,100,55,14
+END
+
+IDD_SAVEEX DIALOGEX 0, 0, 400, 20
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CLIPSIBLINGS
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Compresie:",IDC_SAVE_COMPRESSION_LABEL,5,2,49,8
+    COMBOBOX        IDC_SAVE_COMPRESSION,54,0,170,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Optiuni",IDC_SAVE_ADVANCED,230,0,50,14,WS_GROUP
+    LTEXT           "A&dancime culoare:",IDC_STATIC_2,5,26,65,8
+    COMBOBOX        IDC_SAVE_BIT_DEPTH,71,24,75,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Rotire:",IDC_STATIC_3,5,46,61,8
+    COMBOBOX        IDC_SAVE_ROTATION,71,44,75,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Flip/Oglinda:",IDC_STATIC_4,5,66,61,8
+    COMBOBOX        IDC_SAVE_FLIP,71,64,75,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "I&nversare culori (negativ)",IDC_SAVE_INVERT,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_GROUP | WS_TABSTOP,5,82,131,12
+    LTEXT           "Com&entariu:",IDC_SAVE_COMMENT_STATIC,5,94,61,8
+    EDITTEXT        IDC_SAVE_COMMENT,5,104,140,41,ES_MULTILINE | WS_GROUP
+    GROUPBOX        "GIF",IDC_SAVE_GROUP_GIF,152,20,144,25,WS_GROUP
+    CONTROL         "&Interlaced",IDC_SAVE_GIF_INTERLACED,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,157,30,50,12
+    CONTROL         "Creaza &GIF89a",IDC_SAVE_GIF_89a,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,225,30,61,12
+    GROUPBOX        "JPEG, TIFF-JPEG",IDC_SAVE_GROUP_JPEG,152,50,144,45,WS_GROUP
+    LTEXT           "Cali&tate:",IDC_SAVE_JPEG_STATIC1,157,61,40,8
+    EDITTEXT        IDC_SAVE_JPEG_QUALITY,202,59,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "%",IDC_SAVE_JPEG_STATIC2,225,61,40,8
+    LTEXT           "&Submodel:",IDC_SAVE_JPEG_STATIC3,157,80,43,8
+    COMBOBOX        IDC_SAVE_JPEG_SUBSAMPLING,202,78,33,40,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    GROUPBOX        "TIFF",IDC_SAVE_GROUP_TIFF,152,100,144,45,WS_GROUP
+    CONTROL         "Fa &bucati",IDC_SAVE_TIFF_MAKE_STRIPS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,157,110,50,12
+    LTEXT           "Marime b&ucata:",IDC_SAVE_TIFF_STATIC1,167,126,55,8
+    EDITTEXT        IDC_SAVE_TIFF_STRIP_SIZE,223,124,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "KB",IDC_SAVE_TIFF_STATIC2,246,126,40,8
+END
+
+IDD_PRINT DIALOGEX 10, 24, 459, 227
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Imprimare"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_PRINT_PREVIEW,"Static",SS_WHITEFRAME | SS_NOPREFIX | WS_GROUP,6,7,211,195
+    GROUPBOX        " Imprimanta ",IDC_STATIC_4,225,4,226,27
+    LTEXT           "",IDC_PRINT_PRINTER,232,15,158,8
+    PUSHBUTTON      "Seta&re...",IDC_PRINT_SETUP,394,12,50,14,WS_GROUP
+    GROUPBOX        " Pozitie ",IDC_STATIC_1,225,35,226,62
+    RTEXT           "Stan&ga:",IDC_STATIC_2,233,49,28,8
+    EDITTEXT        IDC_PRINT_LEFT,265,47,45,12
+    COMBOBOX        IDC_PRINT_LEFT_UNITS,316,47,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "&Sus:",IDC_STATIC_3,233,68,28,8
+    EDITTEXT        IDC_PRINT_TOP,265,66,45,12
+    COMBOBOX        IDC_PRINT_TOP_UNITS,316,66,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "&Centreaza imaginea",IDC_PRINT_CENTER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,265,82,79,12
+    GROUPBOX        " Marime Scalata a Imprimarii ",IDC_STATIC_5,225,102,226,100
+    RTEXT           "Scalar&e:",IDC_STATIC_6,230,118,31,8
+    EDITTEXT        IDC_PRINT_SCALE,265,116,35,12
+    LTEXT           "%",IDC_STATIC_7,303,118,10,8
+    CONTROL         "Mareste sa se p&otriveasca pe media",IDC_PRINT_FIT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,316,111,132,12
+    CONTROL         "Mentine ra&port aspect",IDC_PRINT_ASPECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,316,123,86,12
+    RTEXT           "&Latime:",IDC_STATIC_8,230,139,31,8
+    EDITTEXT        IDC_PRINT_WIDTH,265,137,45,12
+    COMBOBOX        IDC_PRINT_WIDTH_UNITS,316,137,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "&Inaltime:",IDC_STATIC_9,230,158,31,8
+    EDITTEXT        IDC_PRINT_HEIGHT,265,156,45,12
+    COMBOBOX        IDC_PRINT_HEIGHT_UNITS,316,156,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Arata caseta cu &margini",IDC_PRINT_BOX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,265,173,92,12
+    CONTROL         "Imprima &aria selectata",IDC_PRINT_SELECTION,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,265,185,88,12
+    DEFPUSHBUTTON   "OK",IDOK,292,208,50,14,WS_GROUP
+    PUSHBUTTON      "Anuleaza",IDCANCEL,347,208,50,14
+    PUSHBUTTON      "Help",IDHELP,402,208,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "PictView"
+  IDS_PLUGIN_DESCRIPTION, "Vizualizator rapid de imagini si convertor."
+  IDS_LOWMEMORY, "Memorie mica"
+  IDS_SOME_WINS_OPENED, "Unele ferestre PictView sunt deschise. Doriti sa le inchideti?"
+  IDS_ERROR_OPENING, "Nu pot deschide fisier %s:\n%s"
+  IDS_ERROR_OPENING_CONTINUE, "(%d) %hs Acest fisier nu poate fi procesat. Continuu?"
+  IDS_TITLE, "%s (%d x %d x %s - %i%%) - %s"
+  IDS_TITLE_MULTI, "%s (%d x %d x %s [%d of %d] - %i%%) - %s"
+  IDS_NCOLORS, "{!}%d culori{|1|s}"
+  IDS_NCOLORS_CMYK, "CMYK"
+  IDS_NCOLORS_LAB, "LAB"
+
+  IDS_ERROR_CALLING_PVW32_DLL, "Eroare apelare PVW32Cnv.DLL"
+  IDS_CLIPBOARD_TITLE, "<Clipboard>"
+  IDS_CAPTURE_TITLE, "<Captura Ecran>"
+  IDS_SCAN_TITLE, "<Scanare>"
+  IDS_DELETED_TITLE, "<Sters>"
+  IDS_CLIPBOARD_FNAME, "Cipbrd"
+  IDS_CAPTURE_FNAME, "Captura"
+  IDS_SCAN_FNAME, "Scanare"
+  IDS_RGB, "Rosu: %i, Verde: %i, Albastru: %i"
+  IDS_RGB_HEX, "Rosu: %#02x, Verde: %#02x, Albastru: %#02x"
+  IDS_RGBXY, "(%i, %i): Rosu: %i, Verde: %i, Albastru: %i"
+  IDS_RGBXY_HEX, "(%i, %i): Rosu: %#02x, Verde: %#02x, Albastru: %#02x"
+  IDS_INDEX, ", Index: %i"
+
+  IDS_VIEW_BMP_IN_CLIPBOARD, "Vezi &Bitmap din Clipboard"
+  IDS_PLUGINSMENU_SCREEN_CAPTURE, "Captura &Ecran..."
+  IDS_PLUGINSMENU_REGENERATE_THUMBNAIL, "Ac&tualizeaza Miniatura"
+  IDS_PLUGINSMENU_SCAN, "&Scaneaza Imagine..."
+  IDS_PIXELS, "{!}%d pixel{|1|s}"
+  IDS_BYTES, "{!}%d byte{|1|s}"
+  IDS_OF, "%d din %d"
+  IDS_FRAMES, "F&rames:"
+  IDS_IMGPROP_GRAY_NBIT, "Nuante gri %dBit"
+  IDS_UNKNOWN, "Necunoscut"
+  IDS_CFG_CONFLICT, "Configuratia este deja deschisa."
+  IDS_CONFIGURATION_TITLE, "Configurare PictView"
+  IDS_ERRORTITLE, "Eroare PictView"
+  IDS_BADTIMER, "Timpul de intarziere trebuie sa fie intre 1 si 360 secunde."
+  IDS_BADHOTKEY, "Atribuie unele taste disponibile."
+  IDS_CAPTURECANCELED, "Captura ecran a fost anulata."
+  IDS_CAPTURING, "Captura Ecran"
+  IDS_EMPTY, "Gol"
+  IDS_SELECTTARGETDIR, "Selecteaza directorul destinatie."
+  IDS_SPECIFYPATH, "O cale valida (absoluta sau relativa) trebuie specificata aici."
+  IDS_PICTVIEWPLUGINNAME, "Extensia PictView (vizualizor imagini si convertor)"
+
+
+  // !WARNING! 2 following variables must be synchronized with IDS_SAVEASFILTERMONO & IDS_SAVEASFILTERCOLOR:
+  // G.LastSaveAsFilterIndexMono  = 14; // index is 1-based (IDS_SAVEASFILTERMONO: 14=BMP)
+  // G.LastSaveAsFilterIndexColor = 13; // index is 1-based (IDS_SAVEASFILTERCOLOR: 13=BMP)
+  // !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING!
+
+  IDS_SAVEASFILTERMONO, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pbm,*.ppm)|*.pbm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|Wireless Bitmap (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEASFILTERCOLOR, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pnm,*.ppm)|*.pnm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEERROR, "Nu pot salva imaginea.\nEroare: %hs"
+  IDS_SAVE_AS_SUCCESS, "Imagine salvata cu succes."
+  IDS_SAVE_LOST_ALPHA, "Imaginea originala contine canalul alpha. Oricum a fost unit cu imaginea si cu fundalul actual.\nDe aceea canalul alpha nu va fi salvat. Salvez oricum?"
+  IDS_CANCELED_BY_USER, "Salvarea imaginii a fost anulata de utilizator. Fisierul nu a fost creat."
+  IDS_OPENFILTER, "Fisiere Grafice Comune (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|Toate Fisierele (*.*)|*.*|"
+  IDS_CUSTOM_COLOR, "Parti&cularizare culoare..."
+  IDS_AUTOMATIC_COLOR, "Culoare &automata"
+  IDS_SAL_IS_BUSY, "Sally este ocupat. Comanda necesara nu poate fi dusa la final, va rugam incercati mai tarziu."
+  IDS_RENAME_TO, "Redenumeste fisier ""%s"" in"
+  IDS_ERRORRENAMINGFILE, "Eroare Redenumire Fisier"
+  IDS_TOOLONGNAME, "Nu pot termina operatiunea, nume prea lung."
+  IDS_LOADEXIF, "Nu pot incarca libraria EXIF %s."
+  IDS_EXIF_TAG, "Eticheta"
+  IDS_EXIF_VALUE, "Valoare"
+  IDS_EXIF_LOCALIZATION_FNAME, "ro.po"
+
+  IDS_MENU_FILE, "&Fisier"
+  IDS_MENU_FILE_OPEN, "&Deschide...\tCtrl+O"
+  IDS_MENU_FILE_REFRESH, "Re&venire\tCtrl+R"
+  IDS_MENU_FILE_PREV, "Preceden&t\tBackspace"
+  IDS_MENU_FILE_NEXT, "&Urmatorul\tSpace"
+  IDS_MENU_FILE_SAVEAS, "Salvea&za ca...\tCtrl+S"
+  IDS_MENU_FILE_WALLPAPER, "Salveaza &ca Wallpaper"
+  IDS_MENU_WALLPARER_CENTER, "In &Centru"
+  IDS_MENU_WALLPARER_TILE, "&Tile"
+  IDS_MENU_WALLPARER_STRETCH, "&Intins"
+  IDS_MENU_WALLPARER_RESTORE, "&Refa precedent"
+  IDS_MENU_WALLPARER_NONE, "&Nimic"
+  IDS_MENU_FILE_CAPTURE, "Capt&ura ecran...\tQ"
+  IDS_MENU_FILE_SCAN, "Sc&anare imagine...\tW"
+  IDS_MENU_FILE_SCAN_SOURCE, "Se&lecteaza scanerul sursa..."
+  IDS_MENU_FILE_PROP, "Proper&ietati...\tI"
+  IDS_MENU_FILE_EXIF, "A&rata EXIF...\tE"
+  IDS_MENU_FILE_HISTOGRAM, "Arata &Histograma...\tCtrl+H"
+  IDS_MENU_FILE_PAGE, "Setare pa&gina...\tCtrl+Shift+P"
+  IDS_MENU_FILE_PRINT, "Im&primare...\tCtrl+P"
+  IDS_MENU_FILE_FILES, "Fisiere r&ecente"
+  IDS_MENU_FILE_DIRS, "Directoare rece&nte"
+  IDS_MENU_FILE_EXIT, "Ie&sire\tEsc"
+  IDS_MENU_FILE_OTHER, "Al&te fisiere"
+  IDS_MENU_FILE_FIRST, "Pri&mul\tShift+Backspace"
+  IDS_MENU_FILE_LAST, "Ult&imul\tShift+Space"
+  IDS_MENU_FILE_FOCUS, "&Focalizare\tF"
+  IDS_MENU_FILE_SELCRCFILE, "Selecteaza/Deselecteaza (&y) fisierele deschise in Panou sau Gaseste\tInsereaza"
+  IDS_MENU_FILE_RENAME, "Redenu&meste...\tF2"
+  IDS_MENU_FILE_DELETE, "Ster&ge\tDel"
+  IDS_MENU_FILE_PREVSEL, "Selectat &anterior\tCtrl+Backspace"
+  IDS_MENU_FILE_NEXTSEL, "Se&lectat Urmator\tCtrl+Space"
+  IDS_MENU_FILE_COPYTO, "C&opie In...\tX"
+
+  IDS_MENU_EDIT, "&Editeaza"
+  IDS_MENU_EDIT_COPY, "&Copie\tCtrl+C"
+  IDS_MENU_EDIT_PASTE, "&Paste\tCtrl+V"
+  IDS_MENU_EDIT_SELECTALL, "Selecteaza &Tot\tCtrl+A"
+  IDS_MENU_EDIT_DESELECT, "D&eselecteaza tot\tCtrl+D"
+  IDS_MENU_EDIT_CROP, "Cr&op\tC"
+  IDS_MENU_EDIT_180, "Rotire &180°\tT"
+  IDS_MENU_EDIT_RIGHT, "Rotire &Dreapta\tR"
+  IDS_MENU_EDIT_LEFT, "Rotire &Stanga\tL"
+  IDS_MENU_EDIT_FLIPH, "&Flip Orizontal\tH"
+  IDS_MENU_EDIT_FLIPV, "Flip &Vertical\tV"
+
+  IDS_MENU_VIEW, "&Vizualizare"
+  IDS_MENU_VIEW_ZOOMIN, "Scalare &Plus\t+"
+  IDS_MENU_VIEW_ZOOMOUT, "Scalare &Minus\t-"
+  IDS_MENU_VIEW_ZOOM, "&Scalare la...\tM"
+  IDS_MENU_VIEW_WHOLE, "Cat &Fereastra\tF5"
+  IDS_MENU_VIEW_WIDTH, "Cat &Latimea\tF6"
+  IDS_MENU_VIEW_ACTUAL, "Marime &Actuala (1:1)\tF7"
+  IDS_MENU_VIEW_WINDOW, "&Refa fereastra la intreg\tF8"
+  IDS_MENU_VIEW_TOOLBAR, "Bara de unel&te\tF9"
+  IDS_MENU_VIEW_STATUSBAR, "&Bara de stare"
+  IDS_MENU_VIEW_FULLSCREEN, "Pe Tot Ecra&nul\tF11"
+
+  IDS_MENU_MULTIPAGE, "&Imagini multipagini"
+  IDS_MENU_NEXTPAGE, "Pa&gina Urmatoare\tCtrl+Page Down"
+  IDS_MENU_PREVPAGE, "Pagina &Anterioara\tCtrl+Page Up"
+  IDS_MENU_FIRSTPAGE, "&Prima pagina\tCtrl+Home"
+  IDS_MENU_LASTPAGE, "U&ltima pagina\tCtrl+End"
+  IDS_MENU_PAGE, "&Mergi la pagina...\tG"
+  IDS_MENU_ANIMATION, "Redare/Pauză a&nimație"
+
+  IDS_MENU_TOOLS, "&Unelte"
+  IDS_MENU_TOOLS_HAND, "&Mana\tA"
+  IDS_MENU_TOOLS_ZOOM, "Sca&lare\tZ"
+  IDS_MENU_TOOLS_SELECT, "S&electeaza\tS"
+  IDS_MENU_TOOLS_PICK, "&Alege Culoare\tP"
+  IDS_MENU_TOOLS_OPTIONS, "&Configurare..."
+
+  IDS_MENU_HELP, "&Help"
+  IDS_MENU_HELP_CONTENTS, "&Continut\tF1"
+  IDS_MENU_HELP_INDEX, "&Index..."
+  IDS_MENU_HELP_SEARCH, "Ca&utare..."
+//  IDS_MENU_HELP_KEYBOARD, "&Keyboard Shortcuts"
+//  IDS_MENU_HELP_MOUSE, "&Mouse Shortcuts"
+  IDS_MENU_HELP_ABOUT, "&Despre PictView..."
+
+  IDS_TT_OPEN, "Deschide\tCtrl+O"
+  IDS_TT_SAVE, "Salveaza ca\tCtrl+S"
+  IDS_TT_PROPERTIES, "Proprietati Imagine\tI"
+  IDS_TT_PREV, "Deschide Fisierul Precedent\tBackspace"
+  IDS_TT_NEXT, "Deschide Fisierul Urmator\tSpace"
+  IDS_TT_PREVSELFILE, "Deschide Fisierul Precedent Selectat\tCtrl+Backspace"
+  IDS_TT_NEXTSELFILE, "Deschide Fisierul Urmator Selectat\tCtrl+Space"
+  IDS_TT_COPY, "Copie\tCtrl+C"
+  IDS_TT_PASTE, "Paste\tCtrl+V"
+  IDS_TT_TOOL_HAND, "Mana\tA"
+  IDS_TT_TOOL_ZOOM, "Scalare\tZ"
+  IDS_TT_TOOL_SELECT, "Selecteaza\tS"
+  IDS_TT_TOOL_PIPETTE, "Pipeta\tP"
+  IDS_TT_LEFT, "Rotire Stanga\tL"
+  IDS_TT_RIGHT, "Rotire Dreapta\tR"
+  IDS_TT_CROP, "Crop\tC"
+  IDS_TT_ZOOM_OUT, "Scalare -\t-"
+  IDS_TT_ZOOM_IN, "Scalare +\t+"
+  IDS_TT_ZOOM_TO, "Scalare\tM"
+  IDS_TT_ZOOM_WIDTH, "Scalare Latime\tF6"
+  IDS_TT_ZOOM_WHOLE, "Scalare Integral\tF5"
+  IDS_TT_ZOOM_ACTUAL, "Scalare Actuala\tF7"
+  IDS_TT_FULL_SCREEN, "Pe Tot Ecranul\tF11"
+  IDS_TT_SELSRCFILE, "Selecteaza/Deselecteaza Fisier Deschis in Panou sau Gaseste Fereastra\tInserare"
+  IDS_TT_PRINT, "Imprimare\tCtrl+P"
+
+  IDS_TWAIN_OPEN, "Nu pot deschide Manager Sursa TWAIN.\nDaca scanerul este compliant TWAIN,\nva rugam reinstalati soft-ul pentru scaner."
+  IDS_TWAIN_ERROR, "Eroare TWAIN"
+  IDS_TWCC_BUMMER, "Esec din cauze necunoscute."
+  IDS_TWCC_LOWMEMORY, "Memoria insuficienta sa execut operatiunea."
+  IDS_TWCC_NODS, "Nu am Sursa de Date."
+  IDS_TWCC_MAXCONNECTIONS, "DS este conectat la maximum de aplicatii posibile."
+  IDS_TWCC_OPERATIONERROR, "DS sau DSM au raportat erori, aplicatia nu ar trebui."
+  IDS_TWCC_BADCAP, "Capacitate necunoscuta."
+  IDS_TWCC_BADPROTOCOL, "Combinatiie nerecunoscuta MSG DG DAT."
+  IDS_TWCC_BADVALUE, "Parametri data in afara limitelor."
+  IDS_TWCC_SEQERROR, "DG DAT MSG in afara secventei asteptate."
+  IDS_TWCC_BADDEST, "Destinatie necunoscuta a Aplicatiei/Sursei in DSM_Entry."
+  IDS_TWCC_CAPUNSUPPORTED, "Capacitatea nu este suportata de sursa."
+  IDS_TWCC_CAPBADOPERATION, "Operatiune nesuportata de capacitate."
+  IDS_TWCC_CAPSEQERROR, "Capacitatea este dependenta de alta capacitate."
+  IDS_TWCC_DENIED, "Operatiunea Fisierui Sistem este blocata (fisier protejat)."
+  IDS_TWCC_FILEEXISTS, "Operatiune esuata deoarece fisierul exista deja."
+  IDS_TWCC_FILENOTFOUND, "Nu gasesc fisierul."
+  IDS_TWCC_NOTEMPTY, "Operatie esuata deoarece directorul nu e gol."
+  IDS_TWCC_PAPERJAM, "Alimentarea cu hartie este blocata."
+  IDS_TWCC_PAPERDOUBLEFEED, "Feeder-ul a detectat pagini multiple."
+  IDS_TWCC_FILEWRITEERROR, "Eroare la scriere fisier (disc plin?)."
+  IDS_TWCC_CHECKDEVICEONLINE, "Dispozitivul a trecut in mod offline inainte sau in timpul acestei operatiuni."
+
+  IDS_CAPTHINT_APPL, "Toata fereastra aplicatiei cu toate subferestrele ei si ferestrele rezultate."
+  IDS_CAPTHINT_WINDOW, "Fereastra (dialog, caseta mesaje...) care are focus de input."
+  IDS_CAPTHINT_CLIENT, "Ca fereastra prim plan, doar fereastra barei de titlu, rama si meniul nu sunt capturate."
+
+  IDS_DONT_SHOW_AGAIN, "&Nu mai afisa asta alta data"
+  IDS_DONT_SHOW_AGAIN_SLA, "&Nu mai afisa asta alta data si salveaza fara canalul alpha"
+  IDS_DONT_SHOW_AGAIN_UTH, "&Actualizeaza miniatura fara sa mai intrebi data viitoare"
+  IDS_REGENERATE_THUMBNAIL_TITLE, "PictView - Actualizez iniatura..."
+  IDS_REGENERATE_THUMB_WARNING, "Aceasta functie va actualiza miniatura in sectiunea Exif a fisierului(elor) imagine. Restul fisierului nu va fi modificat. Continuu?"
+  IDS_REGENERATE_THUMB_WRITEFILE, "Nu pot crea un fisier cu noua miniatura. Disc plin? Fisierul vechi '%s' ramane nemodificat."
+
+  IDS_N_OF_N_FILES_PROCESSED "{!}Doar %d din %d fisierele {a|1|au} fost procesate. Celelalte nu{ a|1|au} fost  modificate."
+  IDS_NO_FILES_FOUND, "Nici o imagine JPEG cu data EXIF nu a fost gasita. Nici un fisier nu a fost modificat."
+  IDS_NOT_JPEG_FILE, "Acest fisier nu este JPEG, nu este nici o miniatura de actualizat."
+  IDS_NOT_EXIF_CREATE_JFXX, "Acest fisier nu contine data EXIF, nu este nici o miniatura EXIF de actualizat. Vrei in schimb sa creezi miniatura JFIF JFXX?"
+  IDS_READ_ONLY_MODIFY, "Fisier este doar in mod citire. Modifici oricum?"
+  IDS_READ_ONLY_REWRITE, "Fisierul este %s doar in mod citire. Suprascriu oricum?"
+
+  IDS_CLRS_MONO, "2 culori"
+  IDS_CLRS_16, "16 culori"
+  IDS_CLRS_256, "256 culori"
+  IDS_CLRS_HC15, "15bit HiColor"
+  IDS_CLRS_HC16, "16bit HiColor"
+  IDS_CLRS_TC24, "24bit TrueColor"
+  IDS_CLRS_TC32, "32bit TrueColor"
+  IDS_CLRS_256GR, "256 nuante gri"
+  IDS_FLIP_NONE, "Nimic"
+  IDS_FLIP_VERT, "Vertical"
+  IDS_FLIP_HOR, "Orizontal"
+  IDS_ROT_NONE, "Nimic"
+  IDS_ROT_90, "90 grade CW"
+  IDS_ROT_180, "180 grade"
+  IDS_ROT_270, "270 grade CW"
+  IDS_SAVE_DEFAULT, "Implicit"
+
+  IDS_HIST_HISTOGRAM, "Histograma"
+  IDS_HIST_LUMINOSITY, "Luminozitate"
+  IDS_HIST_RED, "Rosu"
+  IDS_HIST_GREEN, "Verde"
+  IDS_HIST_BLUE, "Albastru"
+  IDS_HIST_RGBSUM, "RGB"
+  IDS_HIST_MENU_LUMINOSITY, "Luminozitate\tL"
+  IDS_HIST_MENU_RED, "Rosu\tR"
+  IDS_HIST_MENU_GREEN, "Verde\tG"
+  IDS_HIST_MENU_BLUE, "Albastru\tB"
+  IDS_HIST_MENU_RGBSUM, "RGB\tA"
+  IDS_HIST_TIP_LUMINOSITY, "Luminosity (L)"
+  IDS_HIST_TIP_RED, "Rosu (R)"
+  IDS_HIST_TIP_GREEN, "Verde (G)"
+  IDS_HIST_TIP_BLUE, "Albastru (B)"
+  IDS_HIST_TIP_RGBSUM, "RGB (A)"
+  IDS_HIST_TIP_OTHERCHANELS, "Arata Alte Canale (O)"
+  IDS_DLL_NOTFOUND, "Nu pot incarca libraria de procesare imagine PVW32Cnv.dll."
+  IDS_DLL_WRONG_VERSION, "A fost gasita o versiune gresita a PVW32Cnv.dll."
+  IDS_SELECT_REGION, "Mai intai selecteaza o regiune."
+  IDS_SAVE_ERR_EXISTS_OVERWRITE, "Fisierul ""%s"" exista deja.\nDoriti sa-l inlocuiti?"
+
+  IDS_SB_XY, "X:%d  Y:%d"
+  IDS_SB_WH, "L:%d  I:%d"
+  IDS_SB_RGB, "R:%d  V:%d  A:%d"
+  IDS_SB_CAGE, "Deseneaza selectie rectangulara. Shift si Space pentru optiuni aditionale."
+  IDS_SB_ZOOM, "Click pe imagine pentru scalare plus; click si trage pentru a marca scalarea. Space pentru a marca tragerea."
+  IDS_SB_HAND, "Click si trage pentru a deplasa imaginea in directia dorita."
+
+  IDS_SB_AUTOROTATING, "Rotire..."
+
+  IDS_UNIT_INCHES, "inches"
+  IDS_UNIT_CM, "cm"
+  IDS_UNIT_MM, "mm"
+  IDS_UNIT_POINTS, "points"
+  IDS_UNIT_PICAS, "picas"
+
+  IDS_PRINT_NODEFPRINTER, "Nu gasesc imprimanta implicita. Va rugam instalati o imprimanta implicita."
+  IDS_PRINT_NOPRINTERS, "Nu este imprimanta instalata."
+  IDS_PRINT_SETUPFAILED, "Dialogul de setare imprimare esuat."
+  IDS_PRINTING, "Imprimare..."
+  IDS_PRINTING_FAILED,  "Imprimarea a esuat.\n%s"
+  IDS_UNKNOWN_ERROR,    "A aparut o eroare necunoscuta. \n"
+  IDS_CHECK_EVENTLOG,   "Verifica Event Viewer sa vezi exact mesajul de eroare."
+  // The following 2 strings are concatenated together
+  IDS_EXCEPT_INFO1,     "O exceptie a aparut in PictView, va rugam informati autorii!\nDaca lucrai cu niste fisiere imagine cand a avut loc exceptia,\n"
+  IDS_EXCEPT_INFO2,     "va rugam incercati sa reproduceti bug-ul cu aceasta imagine si daca o exceptie\napare din nou, trimite-ne aceasta imagine (vom reface si fixa bug-ul).\nMultumiri pentru cooperare!"
+
+  IDS_NO_MORE_IMAGES,   "Nu sunt alte imagini disponibile"
+  IDS_UNSUPPORTED_IMAGE_TYPE, "Imagine in format nesuportat."
+  IDS_MUSTBEPOSITIVE,   "Introdu un numar mai mare decat zero."
+  IDS_SB_TIP_SELECT_SQUARE, "Indiciu: Foloseste Unelte Configurare pentru a selecta un poligon fix ne-patrat."
+  
+  IDS_WIA_ERROR_ACQUIREIMG, "Nu pot prelua imaginea de la device. Verifica daca device-ul e conectat in mod corect si reincearca. Eroare: (0x%08X) %s"
+  IDS_WIA_WAIT, "Asteapta..."
+  IDS_WIA_STATUS_TRANSFER_FROM_DEVICE, "Citesc datele din device (%d%% complet)"
+  IDS_WIA_STATUS_PROCESSING_DATA, "Procesez datele (%d%% complet)"
+  IDS_WIA_STATUS_TRANSFER_TO_CLIENT, "Transfer datele (%d%% complet)"
+  
+  IDS_SCAN_OPEN_EXTRA_IMGS, "Ati primit mai multe imagini de la scanner. Prima imagine a fost deschisa in aceasta fereastra. Vreti sa deschideti celelalte imagini in propria lor fereastra? Daca nu, imaginile vor fi ignorate.\n\nNumar de ferestre noi: %d"
+}
+
+STRINGTABLE
+{
+  IDS_RENAME_EMPTY, "Introduceți un nume de fișier sau o mască de redenumire."
+  IDS_RENAME_BAD_MASK, "Numele de fișier sau masca de redenumire nu poate conține separatori de cale sau aceste caractere: < > : "" / \\ |"
+  IDS_RENAME_MASK_EMPTY, "Masca de redenumire a produs un nume de fișier gol."
+  IDS_RENAME_BAD_NAME, "Numele de fișier rezultat nu poate conține separatori de cale sau aceste caractere: < > : "" / \\ | ? *"
+  IDS_COPYTO_SAME_FOLDER, "Fișierul se află deja în acest director. Alegeți un alt director de destinație."
+}
+
+STRINGTABLE
+{
+  IDS_PV_IMAGE_LOAD_WAS_CANCELED, "Încărcarea imaginii a fost anulată."
+  IDS_PV_UNABLE_TO_OPEN_IMAGE_FILE, "Nu se poate deschide fișierul imagine"
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE, "Nu se poate citi dimensiunea fișierului imagine"
+  IDS_PV_IMAGE_FILE_EXCEEDS_THE_CURRENT, "Fișierul imagine depășește limita de intrare actuală a PictView."
+  IDS_PV_UNABLE_TO_ALLOCATE_AN_IN, "Nu se poate aloca un flux de imagine în memorie."
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE_2, "Nu se poate citi fișierul imagine"
+  IDS_PV_UNABLE_TO_LOCK_IMAGE_STREAM, "Nu se poate bloca memoria fluxului de imagine"
+  IDS_PV_UNABLE_TO_CREATE_AN_IMAGE, "Nu se poate crea un flux de imagine pentru WIC."
+  IDS_PV_IMAGE_OPERATION_FAILED, "Operația asupra imaginii a eșuat."
+  IDS_PV_CLIPBOARD_IMAGE, "Imagine din Clipboard"
+  IDS_PV_UNABLE_TO_CREATE_A_COMPATIBLE, "Nu se poate crea un buffer compatibil pentru captura de ecran."
+  IDS_PV_UNABLE_TO_SELECT_THE_COMPATIBLE, "Nu se poate selecta bufferul compatibil pentru captura de ecran."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN, "Nu se poate captura ecranul"
+  IDS_PV_UNABLE_TO_READ_PIXELS_FROM, "Nu se pot citi pixelii din bufferul capturii de ecran."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING, "Nu se poate crea un context de desenare pentru captura de ecran."
+  IDS_PV_UNABLE_TO_CREATE_A_FALLBACK, "Nu se poate crea un context de desenare de rezervă pentru captura de ecran."
+  IDS_PV_UNABLE_TO_INITIALIZE_DXGI_SCREEN, "Nu se poate inițializa captura de ecran DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_2, "Nu se poate captura ecranul cu DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_3, "Nu se poate captura ecranul cu DXGI."
+  IDS_PV_SCREEN_CAPTURE_BOUNDS_ARE_INVALID, "Limitele capturii de ecran nu sunt valide."
+  IDS_PV_SCREEN_CAPTURE, "Captură de ecran"
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_UNAVAILABLE, "Datele imaginii din Clipboard nu sunt disponibile."
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_INCOMPLETE, "Datele imaginii din Clipboard sunt incomplete."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE, "Nu se pot bloca datele imaginii din Clipboard"
+  IDS_PV_CLIPBOARD_IMAGE_FORMAT_IS_UNSUPPORTED, "Formatul imaginii din Clipboard nu este acceptat."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_2, "Nu se poate crea un context de desenare pentru conversia imaginii din Clipboard."
+  IDS_PV_UNABLE_TO_CREATE_CLIPBOARD_IMAGE, "Nu se poate crea bufferul de conversie a imaginii din Clipboard."
+  IDS_PV_UNABLE_TO_CONVERT_CLIPBOARD_IMAGE, "Nu se pot converti datele imaginii din Clipboard."
+  IDS_PV_CLIPBOARD_BITMAP, "Bitmap din Clipboard"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_FALLBACK, "Nu se poate captura fereastra de rezervă."
+  IDS_PV_FALLBACK_WINDOW_DIMENSIONS_ARE_INVALID, "Dimensiunile ferestrei de rezervă nu sunt valide."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_3, "Nu se poate crea un context de desenare pentru captura ferestrei de rezervă."
+  IDS_PV_UNABLE_TO_PRINT_THE_FALLBACK, "Nu se poate desena fereastra de rezervă."
+  IDS_PV_IMAGE_SOURCE_DATA_IS_UNAVAILABLE, "Datele sursă ale imaginii nu sunt disponibile."
+  IDS_PV_NO_IMAGE_LOADED, "Nicio imagine încărcată"
+  IDS_PV_PICK_COLOR_MOVE_MOUSE_OVER, "Alege culoare: mutați mouse-ul peste imagine"
+  IDS_PV_UNABLE_TO_START_ANIMATED_GIF, "Nu se poate porni redarea GIF-ului animat."
+  IDS_PV_SOURCE_NAVIGATION_IS_NO_LONGER, "Navigarea în sursă nu mai este disponibilă."
+  IDS_PV_SOURCE_SELECTION_IS_NO_LONGER, "Selecția în sursă nu mai este disponibilă."
+  IDS_PV_OPENED_FILE_IS_SELECTED_IN, "Fișierul deschis este selectat în sursă."
+  IDS_PV_OPENED_FILE_IS_UNSELECTED_IN, "Fișierul deschis este deselectat în sursă."
+  IDS_PV_FILE_NAME_UNCHANGED, "Nume de fișier neschimbat."
+  IDS_PV_UNABLE_TO_RENAME_THE_FILE, "Nu se poate redenumi fișierul"
+  IDS_PV_RENAME_CANCELED, "Redenumire anulată."
+  IDS_PV_FILE_WAS_RENAMED_BUT_THE, "Fișierul a fost redenumit, dar noua cale nu este disponibilă."
+  IDS_PV_FILE_RENAMED, "Fișier redenumit."
+  IDS_PV_COPY_CANCELED, "Copiere anulată."
+  IDS_PV_UNABLE_TO_COPY_THE_FILE, "Nu se poate copia fișierul."
+  IDS_PV_FILE_COPIED, "Fișier copiat."
+  IDS_PV_COPY_WAS_NOT_COMPLETED, "Copierea nu a fost finalizată."
+  IDS_PV_UNABLE_TO_DELETE_THE_FILE, "Nu se poate șterge fișierul."
+  IDS_PV_FILE_MOVED_TO_THE_RECYCLE, "Fișier mutat în Recycle Bin."
+  IDS_PV_FILE_DELETED, "Fișier șters."
+  IDS_PV_DELETE_CANCELED, "Ștergere anulată."
+  IDS_PV_FILE_WAS_NOT_DELETED, "Fișierul nu a fost șters."
+  IDS_PV_SOURCE_FOCUS_IS_NO_LONGER, "Focalizarea în sursă nu mai este disponibilă."
+  IDS_PV_FOCUSING_OPENED_FILE_IN_THE, "Se focalizează fișierul deschis în sursă."
+  IDS_PV_PREVIOUS_WALLPAPER_RESTORED, "Wallpaper-ul anterior a fost restaurat."
+  IDS_PV_WALLPAPER_CLEARED, "Wallpaper eliminat."
+  IDS_PV_WALLPAPER_UPDATED, "Wallpaper actualizat."
+  IDS_PV_NO_IMAGE_IS_LOADED, "Nu este încărcată nicio imagine."
+  IDS_PV_UNABLE_TO_CREATE_A_WALLPAPER, "Nu se poate crea o cale de ieșire pentru wallpaper."
+  IDS_PV_UNABLE_TO_UPDATE_THE_DESKTOP, "Nu se poate actualiza wallpaper-ul desktopului."
+  IDS_PV_UNABLE_TO_OPEN_THE_DESKTOP, "Nu se poate deschide cheia de registru a wallpaper-ului desktopului."
+  IDS_PV_OPEN_IMAGE, "Deschide imagine"
+  IDS_PV_UNABLE_TO_OPEN_THE_HISTOGRAM, "Nu se poate deschide fereastra histogramei."
+  IDS_PV_UNABLE_TO_REGISTER_THE_SCREEN, "Nu se poate înregistra tasta rapidă pentru captura de ecran."
+  IDS_PV_UNABLE_TO_START_THE_SCREEN, "Nu se poate porni temporizatorul capturii de ecran."
+  IDS_PV_CAPTURING_PICTVIEW, "Captură în curs - PictView"
+  IDS_PV_SCREEN_CAPTURE_IS_WAITING_FOR, "Captura de ecran așteaptă tasta rapidă."
+  IDS_PV_SCREEN_CAPTURE_TIMER_STARTED, "Temporizatorul capturii de ecran a pornit."
+  IDS_PV_SCREEN_CAPTURED, "Ecran capturat."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_4, "Nu se poate captura ecranul."
+  IDS_PV_SCREEN_CAPTURED_FROM_THE_VIEWER, "Ecran capturat din fereastra vizualizatorului; captura desktopului nu era disponibilă."
+  IDS_PV_THE_CLIPBOARD_DOES_NOT_CONTAIN, "Clipboard-ul nu conține o imagine."
+  IDS_PV_UNABLE_TO_OPEN_THE_CLIPBOARD, "Nu se poate deschide Clipboard-ul."
+  IDS_PV_UNABLE_TO_PASTE_THE_CLIPBOARD, "Nu se poate lipi imaginea din Clipboard."
+  IDS_PV_PICTVIEW_IMAGE, "Imagine PictView"
+  IDS_PV_UNABLE_TO_PRINT_THE_IMAGE, "Nu se poate imprima imaginea."
+  IDS_PV_UNABLE_TO_READ_PRINTER_PAGE, "Nu se pot citi dimensiunile paginii imprimantei."
+  IDS_PV_UNABLE_TO_ALLOCATE_CLIPBOARD_IMAGE, "Nu se pot aloca datele imaginii pentru Clipboard."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE_2, "Nu se pot bloca datele imaginii din Clipboard."
+  IDS_PV_UNABLE_TO_COPY_IMAGE_DATA, "Nu se pot copia datele imaginii în Clipboard."
+  IDS_PV_UNABLE_TO_START_THE_IMAGE, "Nu se poate porni firul de încărcare a imaginii."
+  IDS_PV_FILE_DIALOG_FAILED, "Nu se poate deschide dialogul de fișiere.\nEroare: 0x%X"
+  IDS_PV_ALLOCATE_PIXELS_FAILED, "Nu se pot aloca pixelii pentru %s."
+  IDS_PV_CONVERSION_CONTEXT_FAILED, "Nu se poate crea un context de desenare pentru conversie (%s)."
+  IDS_PV_READ_PIXELS_FAILED, "Nu se pot citi pixelii din %s."
+  IDS_PV_SAVED, "Salvat: %s"
+  IDS_PV_LOADING, "Se încarcă..."
+  IDS_PV_LOADING_PERCENT, "Se încarcă... %u%%"
+  IDS_PV_IMAGE_FILES, "Fișiere imagine"
+  IDS_PV_ALL_FILES, "Toate fișierele"
+  IDS_PV_ERR_WIC_UNAVAILABLE, "Windows Imaging Component nu este disponibil."
+  IDS_PV_ERR_OPEN, "Nu se poate deschide imaginea."
+  IDS_PV_ERR_DECODE, "Imaginea este deteriorată sau nu poate fi decodificată."
+  IDS_PV_ERR_FRAME, "Pagina sau cadrul solicitat nu există."
+  IDS_PV_ERR_TOO_LARGE, "Imaginea este prea mare."
+  IDS_PV_ERR_CANCELED, "Operația a fost anulată."
+  IDS_PV_ERR_MEMORY, "Memorie insuficientă pentru procesarea imaginii."
+  IDS_PV_ERR_SAVE, "Nu se poate salva imaginea."
+  IDS_PV_SAVEAS_FILTER, "Portable Network Graphics (*.png)|*.png|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|CompuServe GIF (*.gif)|*.gif|"
+  IDS_EXIF_TAG_0001, "Index de interoperabilitate"
+  IDS_EXIF_TAG_0002, "Versiune de interoperabilitate"
+  IDS_EXIF_TAG_00FE, "Tip subfisier nou"
+  IDS_EXIF_TAG_0100, "Latime imagine"
+  IDS_EXIF_TAG_0101, "Inaltime imagine"
+  IDS_EXIF_TAG_0102, "Biti per esantion"
+  IDS_EXIF_TAG_0103, "Compresie"
+  IDS_EXIF_TAG_0106, "Interpretare fotometrica"
+  IDS_EXIF_TAG_010D, "Nume document"
+  IDS_EXIF_TAG_010E, "Descriere imagine"
+  IDS_EXIF_TAG_010F, "Producator camera"
+  IDS_EXIF_TAG_0110, "Model camera"
+  IDS_EXIF_TAG_0111, "Deplasamente benzi"
+  IDS_EXIF_TAG_0112, "Orientare"
+  IDS_EXIF_TAG_0115, "Esantioane per pixel"
+  IDS_EXIF_TAG_0116, "Randuri per banda"
+  IDS_EXIF_TAG_0117, "Numar de octeti per banda"
+  IDS_EXIF_TAG_011A, "Rezolutie orizontala"
+  IDS_EXIF_TAG_011B, "Rezolutie verticala"
+  IDS_EXIF_TAG_011C, "Configuratie planara"
+  IDS_EXIF_TAG_0128, "Unitate de rezolutie"
+  IDS_EXIF_TAG_012D, "Functie de transfer"
+  IDS_EXIF_TAG_0131, "Software"
+  IDS_EXIF_TAG_0132, "Data si ora"
+  IDS_EXIF_TAG_013B, "Artist"
+  IDS_EXIF_TAG_013C, "Computer gazda"
+  IDS_EXIF_TAG_013E, "Punct alb"
+  IDS_EXIF_TAG_013F, "Cromaticitati primare"
+  IDS_EXIF_TAG_0201, "Deplasament miniatura"
+  IDS_EXIF_TAG_0202, "Lungime miniatura"
+  IDS_EXIF_TAG_0211, "Coeficienti YCbCr"
+  IDS_EXIF_TAG_0212, "Subesantionare YCbCr"
+  IDS_EXIF_TAG_0213, "Pozitionare YCbCr"
+  IDS_EXIF_TAG_0214, "Referinta negru/alb"
+  IDS_EXIF_TAG_4746, "Evaluare"
+  IDS_EXIF_TAG_4749, "Evaluare procentuala"
+  IDS_EXIF_TAG_8298, "Drepturi de autor"
+  IDS_EXIF_TAG_829A, "Timp de expunere"
+  IDS_EXIF_TAG_829D, "Numar F"
+  IDS_EXIF_TAG_8769, "Pointer IFD Exif"
+  IDS_EXIF_TAG_8822, "Program de expunere"
+  IDS_EXIF_TAG_8824, "Sensibilitate spectrala"
+  IDS_EXIF_TAG_8825, "Pointer IFD GPS"
+  IDS_EXIF_TAG_8827, "Sensibilitate ISO"
+  IDS_EXIF_TAG_8828, "OECF"
+  IDS_EXIF_TAG_8830, "Tip sensibilitate"
+  IDS_EXIF_TAG_8831, "Sensibilitate de iesire standard"
+  IDS_EXIF_TAG_8832, "Indice de expunere recomandat"
+  IDS_EXIF_TAG_8833, "Valoare sensibilitate ISO"
+  IDS_EXIF_TAG_9000, "Versiune Exif"
+  IDS_EXIF_TAG_9003, "Data fotografierii"
+  IDS_EXIF_TAG_9004, "Data digitizarii"
+  IDS_EXIF_TAG_9010, "Fus orar"
+  IDS_EXIF_TAG_9011, "Fus orar (fotografiere)"
+  IDS_EXIF_TAG_9012, "Fus orar (digitizare)"
+  IDS_EXIF_TAG_9101, "Configuratie componente"
+  IDS_EXIF_TAG_9102, "Biti comprimati per pixel"
+  IDS_EXIF_TAG_9201, "Viteza obturatorului"
+  IDS_EXIF_TAG_9202, "Diafragma"
+  IDS_EXIF_TAG_9203, "Luminozitate"
+  IDS_EXIF_TAG_9204, "Compensare expunere"
+  IDS_EXIF_TAG_9205, "Diafragma maxima"
+  IDS_EXIF_TAG_9206, "Distanta fata de subiect"
+  IDS_EXIF_TAG_9207, "Mod de masurare"
+  IDS_EXIF_TAG_9208, "Sursa de lumina"
+  IDS_EXIF_TAG_9209, "Blitz"
+  IDS_EXIF_TAG_920A, "Distanta focala"
+  IDS_EXIF_TAG_9214, "Zona subiectului"
+  IDS_EXIF_TAG_927C, "Nota producatorului"
+  IDS_EXIF_TAG_9286, "Comentariu utilizator"
+  IDS_EXIF_TAG_9290, "Fractiuni de secunda"
+  IDS_EXIF_TAG_9291, "Fractiuni de secunda (fotografiere)"
+  IDS_EXIF_TAG_9292, "Fractiuni de secunda (digitizare)"
+  IDS_EXIF_TAG_9C9B, "Titlu"
+  IDS_EXIF_TAG_9C9C, "Comentarii"
+  IDS_EXIF_TAG_9C9D, "Autor"
+  IDS_EXIF_TAG_9C9E, "Cuvinte cheie"
+  IDS_EXIF_TAG_9C9F, "Subiect"
+  IDS_EXIF_TAG_A000, "Versiune FlashPix"
+  IDS_EXIF_TAG_A001, "Spatiu de culoare"
+  IDS_EXIF_TAG_A002, "Latime in pixeli"
+  IDS_EXIF_TAG_A003, "Inaltime in pixeli"
+  IDS_EXIF_TAG_A004, "Fisier audio asociat"
+  IDS_EXIF_TAG_A005, "Pointer IFD de interoperabilitate"
+  IDS_EXIF_TAG_A20B, "Energie blitz"
+  IDS_EXIF_TAG_A20C, "Raspuns in frecventa spatiala"
+  IDS_EXIF_TAG_A20E, "Rezolutie orizontala in planul focal"
+  IDS_EXIF_TAG_A20F, "Rezolutie verticala in planul focal"
+  IDS_EXIF_TAG_A210, "Unitate de rezolutie in planul focal"
+  IDS_EXIF_TAG_A214, "Pozitia subiectului"
+  IDS_EXIF_TAG_A215, "Indice de expunere"
+  IDS_EXIF_TAG_A217, "Metoda de captare"
+  IDS_EXIF_TAG_A300, "Sursa fisierului"
+  IDS_EXIF_TAG_A301, "Tip scena"
+  IDS_EXIF_TAG_A302, "Model CFA"
+  IDS_EXIF_TAG_A401, "Procesare imagine"
+  IDS_EXIF_TAG_A402, "Mod de expunere"
+  IDS_EXIF_TAG_A403, "Balans de alb"
+  IDS_EXIF_TAG_A404, "Raport zoom digital"
+  IDS_EXIF_TAG_A405, "Distanta focala echivalenta 35 mm"
+  IDS_EXIF_TAG_A406, "Tip captura scena"
+  IDS_EXIF_TAG_A407, "Control amplificare"
+  IDS_EXIF_TAG_A408, "Contrast"
+  IDS_EXIF_TAG_A409, "Saturatie"
+  IDS_EXIF_TAG_A40A, "Claritate"
+  IDS_EXIF_TAG_A40B, "Descriere setari dispozitiv"
+  IDS_EXIF_TAG_A40C, "Interval distanta fata de subiect"
+  IDS_EXIF_TAG_A420, "ID unic imagine"
+  IDS_EXIF_TAG_A430, "Proprietar camera"
+  IDS_EXIF_TAG_A431, "Numar de serie camera"
+  IDS_EXIF_TAG_A432, "Specificatii obiectiv"
+  IDS_EXIF_TAG_A433, "Producator obiectiv"
+  IDS_EXIF_TAG_A434, "Model obiectiv"
+  IDS_EXIF_TAG_A435, "Numar de serie obiectiv"
+  IDS_EXIF_TAG_A460, "Imagine compusa"
+  IDS_EXIF_TAG_A500, "Gamma"
+  IDS_EXIF_GPS_0000, "Versiune GPS"
+  IDS_EXIF_GPS_0001, "Referinta latitudine"
+  IDS_EXIF_GPS_0002, "Latitudine"
+  IDS_EXIF_GPS_0003, "Referinta longitudine"
+  IDS_EXIF_GPS_0004, "Longitudine"
+  IDS_EXIF_GPS_0005, "Referinta altitudine"
+  IDS_EXIF_GPS_0006, "Altitudine"
+  IDS_EXIF_GPS_0007, "Ora GPS (UTC)"
+  IDS_EXIF_GPS_0008, "Sateliti GPS"
+  IDS_EXIF_GPS_0009, "Stare receptor GPS"
+  IDS_EXIF_GPS_000A, "Mod de masurare GPS"
+  IDS_EXIF_GPS_000B, "Precizie GPS (DOP)"
+  IDS_EXIF_GPS_000C, "Unitate de viteza"
+  IDS_EXIF_GPS_000D, "Viteza"
+  IDS_EXIF_GPS_000E, "Referinta directie de deplasare"
+  IDS_EXIF_GPS_000F, "Directie de deplasare"
+  IDS_EXIF_GPS_0010, "Referinta directie imagine"
+  IDS_EXIF_GPS_0011, "Directie imagine"
+  IDS_EXIF_GPS_0012, "Datum geodezic"
+  IDS_EXIF_GPS_0013, "Referinta latitudine destinatie"
+  IDS_EXIF_GPS_0014, "Latitudine destinatie"
+  IDS_EXIF_GPS_0015, "Referinta longitudine destinatie"
+  IDS_EXIF_GPS_0016, "Longitudine destinatie"
+  IDS_EXIF_GPS_0017, "Referinta azimut destinatie"
+  IDS_EXIF_GPS_0018, "Azimut destinatie"
+  IDS_EXIF_GPS_0019, "Referinta distanta destinatie"
+  IDS_EXIF_GPS_001A, "Distanta destinatie"
+  IDS_EXIF_GPS_001B, "Metoda de procesare GPS"
+  IDS_EXIF_GPS_001C, "Informatii zona GPS"
+  IDS_EXIF_GPS_001D, "Data GPS"
+  IDS_EXIF_GPS_001E, "Corectie diferentiala GPS"
+  IDS_EXIF_GPS_001F, "Eroare de pozitionare orizontala GPS"
+  IDS_EXIF_VALUE_COMPRESSION_NONE, "Necomprimat"
+  IDS_EXIF_VALUE_COMPRESSION_JPEG, "JPEG"
+  IDS_EXIF_VALUE_PHOTOMETRIC_RGB, "RGB"
+  IDS_EXIF_VALUE_PHOTOMETRIC_YCBCR, "YCbCr"
+  IDS_EXIF_VALUE_ORIENTATION_1, "Normala"
+  IDS_EXIF_VALUE_ORIENTATION_2, "Oglindita orizontal"
+  IDS_EXIF_VALUE_ORIENTATION_3, "Rotita cu 180°"
+  IDS_EXIF_VALUE_ORIENTATION_4, "Oglindita vertical"
+  IDS_EXIF_VALUE_ORIENTATION_5, "Oglindita orizontal, rotita cu 270° in sens orar"
+  IDS_EXIF_VALUE_ORIENTATION_6, "Rotita cu 90° in sens orar"
+  IDS_EXIF_VALUE_ORIENTATION_7, "Oglindita orizontal, rotita cu 90° in sens orar"
+  IDS_EXIF_VALUE_ORIENTATION_8, "Rotita cu 270° in sens orar"
+  IDS_EXIF_VALUE_PLANAR_CHUNKY, "Intercalat"
+  IDS_EXIF_VALUE_PLANAR_PLANAR, "Planar"
+  IDS_EXIF_VALUE_UNIT_NONE, "Niciuna"
+  IDS_EXIF_VALUE_UNIT_INCH, "Inch"
+  IDS_EXIF_VALUE_UNIT_CM, "Centimetru"
+  IDS_EXIF_VALUE_YCBCR_CENTERED, "Centrat"
+  IDS_EXIF_VALUE_YCBCR_COSITED, "Co-situat"
+  IDS_EXIF_VALUE_PROGRAM_0, "Nedefinit"
+  IDS_EXIF_VALUE_PROGRAM_1, "Manual"
+  IDS_EXIF_VALUE_PROGRAM_2, "Program normal"
+  IDS_EXIF_VALUE_PROGRAM_3, "Prioritate diafragma"
+  IDS_EXIF_VALUE_PROGRAM_4, "Prioritate obturator"
+  IDS_EXIF_VALUE_PROGRAM_5, "Program creativ"
+  IDS_EXIF_VALUE_PROGRAM_6, "Program actiune"
+  IDS_EXIF_VALUE_PROGRAM_7, "Mod portret"
+  IDS_EXIF_VALUE_PROGRAM_8, "Mod peisaj"
+  IDS_EXIF_VALUE_METERING_0, "Necunoscut"
+  IDS_EXIF_VALUE_METERING_1, "Medie"
+  IDS_EXIF_VALUE_METERING_2, "Medie ponderata central"
+  IDS_EXIF_VALUE_METERING_3, "Spot"
+  IDS_EXIF_VALUE_METERING_4, "Multi-spot"
+  IDS_EXIF_VALUE_METERING_5, "Matriceala"
+  IDS_EXIF_VALUE_METERING_6, "Partiala"
+  IDS_EXIF_VALUE_METERING_255, "Altul"
+  IDS_EXIF_VALUE_LIGHT_0, "Necunoscuta"
+  IDS_EXIF_VALUE_LIGHT_1, "Lumina de zi"
+  IDS_EXIF_VALUE_LIGHT_2, "Fluorescenta"
+  IDS_EXIF_VALUE_LIGHT_3, "Tungsten (incandescenta)"
+  IDS_EXIF_VALUE_LIGHT_4, "Blitz"
+  IDS_EXIF_VALUE_LIGHT_9, "Vreme senina"
+  IDS_EXIF_VALUE_LIGHT_10, "Vreme innorata"
+  IDS_EXIF_VALUE_LIGHT_11, "Umbra"
+  IDS_EXIF_VALUE_LIGHT_12, "Fluorescenta lumina de zi"
+  IDS_EXIF_VALUE_LIGHT_13, "Fluorescenta alb de zi"
+  IDS_EXIF_VALUE_LIGHT_14, "Fluorescenta alb rece"
+  IDS_EXIF_VALUE_LIGHT_15, "Fluorescenta alba"
+  IDS_EXIF_VALUE_LIGHT_16, "Fluorescenta alb cald"
+  IDS_EXIF_VALUE_LIGHT_17, "Lumina standard A"
+  IDS_EXIF_VALUE_LIGHT_18, "Lumina standard B"
+  IDS_EXIF_VALUE_LIGHT_19, "Lumina standard C"
+  IDS_EXIF_VALUE_LIGHT_20, "D55"
+  IDS_EXIF_VALUE_LIGHT_21, "D65"
+  IDS_EXIF_VALUE_LIGHT_22, "D75"
+  IDS_EXIF_VALUE_LIGHT_23, "D50"
+  IDS_EXIF_VALUE_LIGHT_24, "Tungsten de studio ISO"
+  IDS_EXIF_VALUE_LIGHT_255, "Alta sursa de lumina"
+  IDS_EXIF_VALUE_COLORSPACE_SRGB, "sRGB"
+  IDS_EXIF_VALUE_COLORSPACE_UNCALIBRATED, "Necalibrat"
+  IDS_EXIF_VALUE_FPUNIT_NONE, "Niciuna"
+  IDS_EXIF_VALUE_FPUNIT_INCH, "Inch"
+  IDS_EXIF_VALUE_FPUNIT_CM, "Centimetru"
+  IDS_EXIF_VALUE_SENSING_1, "Nedefinit"
+  IDS_EXIF_VALUE_SENSING_2, "Senzor de suprafata color cu un cip"
+  IDS_EXIF_VALUE_SENSING_3, "Senzor de suprafata color cu doua cipuri"
+  IDS_EXIF_VALUE_SENSING_4, "Senzor de suprafata color cu trei cipuri"
+  IDS_EXIF_VALUE_SENSING_5, "Senzor de suprafata color secvential"
+  IDS_EXIF_VALUE_SENSING_7, "Senzor triliniar"
+  IDS_EXIF_VALUE_SENSING_8, "Senzor liniar color secvential"
+  IDS_EXIF_VALUE_FILESOURCE_DSC, "Camera foto digitala"
+  IDS_EXIF_VALUE_SCENETYPE_DIRECT, "Fotografiata direct"
+  IDS_EXIF_VALUE_RENDERED_0, "Procesare normala"
+  IDS_EXIF_VALUE_RENDERED_1, "Procesare personalizata"
+  IDS_EXIF_VALUE_EXPMODE_0, "Expunere automata"
+  IDS_EXIF_VALUE_EXPMODE_1, "Expunere manuala"
+  IDS_EXIF_VALUE_EXPMODE_2, "Bracketing automat"
+  IDS_EXIF_VALUE_WB_0, "Balans de alb automat"
+  IDS_EXIF_VALUE_WB_1, "Balans de alb manual"
+  IDS_EXIF_VALUE_SCENE_0, "Standard"
+  IDS_EXIF_VALUE_SCENE_1, "Peisaj"
+  IDS_EXIF_VALUE_SCENE_2, "Portret"
+  IDS_EXIF_VALUE_SCENE_3, "Scena de noapte"
+  IDS_EXIF_VALUE_GAIN_0, "Niciunul"
+  IDS_EXIF_VALUE_GAIN_1, "Amplificare redusa"
+  IDS_EXIF_VALUE_GAIN_2, "Amplificare mare"
+  IDS_EXIF_VALUE_GAIN_3, "Atenuare redusa"
+  IDS_EXIF_VALUE_GAIN_4, "Atenuare mare"
+  IDS_EXIF_VALUE_CONTRAST_0, "Normal"
+  IDS_EXIF_VALUE_CONTRAST_1, "Slab"
+  IDS_EXIF_VALUE_CONTRAST_2, "Puternic"
+  IDS_EXIF_VALUE_SATURATION_0, "Normala"
+  IDS_EXIF_VALUE_SATURATION_1, "Saturatie scazuta"
+  IDS_EXIF_VALUE_SATURATION_2, "Saturatie ridicata"
+  IDS_EXIF_VALUE_SHARPNESS_0, "Normala"
+  IDS_EXIF_VALUE_SHARPNESS_1, "Slaba"
+  IDS_EXIF_VALUE_SHARPNESS_2, "Puternica"
+  IDS_EXIF_VALUE_DISTANCE_0, "Necunoscuta"
+  IDS_EXIF_VALUE_DISTANCE_1, "Macro"
+  IDS_EXIF_VALUE_DISTANCE_2, "Vedere apropiata"
+  IDS_EXIF_VALUE_DISTANCE_3, "Vedere indepartata"
+  IDS_EXIF_VALUE_GPS_ABOVE_SEA, "Deasupra nivelului marii"
+  IDS_EXIF_VALUE_GPS_BELOW_SEA, "Sub nivelul marii"
+  IDS_EXIF_VALUE_GPS_NO_CORRECTION, "Fara corectie"
+  IDS_EXIF_VALUE_GPS_CORRECTION, "Corectie aplicata"
+  IDS_EXIF_VALUE_FLASH_FIRED, "Blitzul s-a declansat"
+  IDS_EXIF_VALUE_FLASH_NOT_FIRED, "Blitzul nu s-a declansat"
+  IDS_EXIF_VALUE_FLASH_COMPULSORY, "mod blitz fortat"
+  IDS_EXIF_VALUE_FLASH_SUPPRESSED, "suprimare fortata a blitzului"
+  IDS_EXIF_VALUE_FLASH_AUTO, "mod automat"
+  IDS_EXIF_VALUE_FLASH_RETURN_DETECTED, "lumina reflectata a blitzului detectata"
+  IDS_EXIF_VALUE_FLASH_RETURN_NOT_DETECTED, "lumina reflectata a blitzului nedetectata"
+  IDS_EXIF_VALUE_FLASH_RED_EYE, "reducere ochi rosii"
+  IDS_EXIF_VALUE_FLASH_NO_FUNCTION, "Fara functie blitz"
+}

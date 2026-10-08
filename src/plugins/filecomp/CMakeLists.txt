@@ -54,6 +54,7 @@ add_executable(fcremote
   "${SAL_PLUGINS}/filecomp/fcremote/fcremote.cpp"
   "${SAL_PLUGINS}/filecomp/fcremote/fcremote.rc"
 )
+sal_set_rc_platform_defines("${SAL_PLUGINS}/filecomp/fcremote/fcremote.rc")
 
 target_include_directories(fcremote PRIVATE
   "${SAL_PLUGINS}/filecomp/fcremote"

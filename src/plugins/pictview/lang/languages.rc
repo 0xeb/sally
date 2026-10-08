@@ -6,3 +6,13 @@
 // language, add its <tag>/lang.rc here.
 
 #include "lang.rc"
+#include "cs-CZ/lang.rc"
+#include "de-DE/lang.rc"
+#include "es-ES/lang.rc"
+#include "fr-FR/lang.rc"
+#include "hu-HU/lang.rc"
+#include "nl-NL/lang.rc"
+#include "ro-RO/lang.rc"
+#include "ru-RU/lang.rc"
+#include "sk-SK/lang.rc"
+#include "zh-CN/lang.rc"

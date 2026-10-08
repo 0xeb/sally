@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-#include "plugin_narrow_compat.h"
 
 // ****************************************************************************
 
@@ -47,7 +46,7 @@ DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE; // DLL can be loaded
 }
 
-BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const char* pluginName)
+BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const wchar_t* pluginName)
 {
     CALL_STACK_MESSAGE_NONE
 
@@ -62,12 +61,9 @@ BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const char* pluginN
     // this plugin targets the current Salamander version and newer - perform the check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // cannot call Error here because it uses SG->SalMessageBox (SG not initialized + incompatible interface)
-        // wide: REQUIRE_LAST_VERSION_OF_SALAMANDER is a shared narrow SDK macro
-        // and pluginName is a caller-supplied narrow string - no SalamanderGeneral yet, so widen
-        // via MessageBoxW+ToWideArg (plugin_narrow_compat.h, already included above).
-        MessageBoxW(salamander->GetParentWindow(),
-                    ToWideArg(REQUIRE_LAST_VERSION_OF_SALAMANDER).c_str(),
-                    ToWideArg(pluginName).c_str(), MB_OK | MB_ICONERROR);
+        // REQUIRE_LAST_VERSION_OF_SALAMANDER is a narrow literal; L"" makes the concatenation wide.
+        MessageBoxW(salamander->GetParentWindow(), L"" REQUIRE_LAST_VERSION_OF_SALAMANDER,
+                    pluginName, MB_OK | MB_ICONERROR);
         return FALSE;
     }
 

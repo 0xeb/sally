@@ -4,7 +4,7 @@
 
 #include "precomp.h"
 
-#include <list>
+#include "retained_text.h"
 #include "reg_sz_narrow_bridge.h"
 #include "ftp_persisted_text_codec.h"
 
@@ -271,18 +271,8 @@ std::wstring LangStr(int resID)
 
 // Temporary adapter for narrow formatting and protocol buffers that have not yet moved to the
 // explicit FTP codec. CLogs itself is UTF-16 and direct localized log messages use LangStr.
-//
-// The returned pointer must stay valid after the call, so each projection is retained - but the
-// retention is BOUNDED, because that is the whole contract this replaced. SalamanderGeneral->LoadStr
-// promised a 10000-character buffer "used cyclically" (spl_gen.h), so a pointer stayed good until
-// that much later text had been loaded and the storage cost was flat forever. A list that only ever
-// grows keeps the stability half of that promise and silently drops the bounded half: LoadStr is
-// reached once per queue row per repaint (LVN_GETDISPINFO -> GetListViewDataForW ->
-// GetProblemDescr, every arm of which is FTPFormatString(msg, LoadStr(...))), so scrolling a large
-// queue on a long transfer grew the plugin heap without limit for the life of the dialog thread.
-//
-// std::list is what makes the trim safe: popping the front never relocates an element that is still
-// retained, so every pointer still inside the budget stays valid.
+// The returned pointer must stay valid after the call; RetainBoundedText keeps it alive within
+// the bounded budget the old SDK buffer had (LoadStr is reached once per queue row per repaint).
 char* LoadStr(int resID)
 {
     static char failed[] = "ERROR LOADING STRING";
@@ -294,24 +284,7 @@ char* LoadStr(int resID)
     if (!SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID, wide) ||
         !FtpEncodeLocalText(wide.c_str(), encoded))
         return failed;
-
-    static thread_local std::list<std::string> values;
-    static thread_local size_t retainedBytes = 0;
-    retainedBytes += encoded.size() + 1;
-    values.emplace_back(std::move(encoded));
-
-    // The same budget the frozen buffer had, so a caller keeps the same guarantee it could already
-    // rely on. The floor keeps one expression that passes several LoadStr results as arguments safe
-    // even when the individual strings are enormous - the one case the fixed buffer could not
-    // survive and this can.
-    const size_t retentionBudget = 10000;
-    const size_t minRetained = 16;
-    while (retainedBytes > retentionBudget && values.size() > minRetained)
-    {
-        retainedBytes -= values.front().size() + 1;
-        values.pop_front();
-    }
-    return values.back().data();
+    return RetainBoundedText(std::move(encoded));
 }
 
 //

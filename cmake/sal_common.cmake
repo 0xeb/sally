@@ -40,6 +40,14 @@ elseif(SAL_PLATFORM STREQUAL "x64")
   list(APPEND SAL_RC_PLATFORM_DEFINES _WIN64)
 endif()
 
+# sal_set_rc_platform_defines(<rc_file>...)
+#   Gives resource scripts the defines a version resource needs to name its platform.
+function(sal_set_rc_platform_defines)
+  set_source_files_properties(${ARGN} PROPERTIES
+    COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;${SAL_RC_PLATFORM_DEFINES}"
+  )
+endfunction()
+
 # Output directory base
 if(NOT DEFINED SAL_OUTPUT_DIR)
   if(DEFINED ENV{OPENSAL_BUILD_DIR} AND NOT "$ENV{OPENSAL_BUILD_DIR}" STREQUAL "")

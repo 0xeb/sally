@@ -17,435 +17,6 @@
 
 STRINGTABLE
 {
-//  IDS_DLL+1
-//  IDS_DLL+2,   "ZSoft PC-PaintBrush PCX"  ;do not translate, it's a name
-  IDS_DLL+3,   "Imported bitmap"
-  IDS_DLL+4,   "Imported bitmap in CMYK mode"
-//  IDS_DLL+5,   "Zoner Bitmap"             ;do not translate, it's a name
-  IDS_DLL+6,   "Unknown type of compression!"
-  IDS_DLL+7,   "Out of memory!"
-//  IDS_DLL+8,   "TIFF"                     ;do not translate, it's a name
-  IDS_DLL+9,   "Too many bits per bitplane!"
-//  IDS_DLL+10:
-//  IDS_DLL+11
-//  IDS_DLL+12:
-//  IDS_DLL+13,   "Macintosh PICT"          ;do not translate, it's a name
-//  IDS_DLL+14,   "Interchange File Format" ;do not translate, it's a name
-  IDS_DLL+15,   "Contains # frames"       ;for 5,6,... frames ;see readme.txt
-//  IDS_DLL+16,   "Slow scan television"    ;do not translate, it's a name
-  IDS_DLL+17,   "Lossless JPEGs are not yet supported!"
-//  IDS_DLL+18,   "MS Windows 2.x"          ;do not translate, it's a name
-  IDS_DLL+19,   "RLE"
-//  IDS_DLL+20,   "Sun Microsystems"        ;do not translate, it's a name
-  IDS_DLL+21,   "Experimental format"
-//  IDS_DLL+22,   "SGI Image File Format"   ;do not translate, it's a name
-//  IDS_DLL+23,   "ColorRIX"                ;do not translate, it's a name
-//  IDS_DLL+24,   "Utah RunLength Encoded"  ;do not translate, it's a name
-//  IDS_DLL+25,   "Img software set"        ;do not translate, it's a name
-//  IDS_DLL+26,   "GEM IMG"                 ;do not translate, it's a name
-  IDS_DLL+27,   "MS Windows Icon"
-  IDS_DLL+28,   "MS Windows Icons"
-  IDS_DLL+29,   "File contains # icons"   ;for 5,6,7,.... icons ;see readme.txt
-  IDS_DLL+30,   "File contains # icons"   ;for 2,3,4 icons
-//  IDS_DLL+31,   "TrueVision Targa mono"   ;do not translate, it's a name
-//  IDS_DLL+32,   "TrueVision Targa8"       ;do not translate, it's a name
-//  IDS_DLL+33,   "WordPerfect Graphics"    ;do not translate, it's a name
-//  IDS_DLL+34,   "TrueVision Targa16"      ;do not translate, it's a name
-//  IDS_DLL+35,   "TrueVision Targa24"      ;do not translate, it's a name
-//  IDS_DLL+36,   "TrueVision Targa32"      ;do not translate, it's a name
-  IDS_DLL+37,   "OS/2 Icon"
-  IDS_DLL+38,   "Without an image"
-  IDS_DLL+39,   "Compressed"
-//  IDS_DLL+40,   "Pictor"                  ;do not translate, it's a name
-//  IDS_DLL+41,   "PC Paint"                ;do not translate, it's a name
-  IDS_DLL+42,   "File contains EGA palette"
-  IDS_DLL+43,   "Palette in separate file" ;will be followed by filename
-  IDS_DLL+44,   "Without a palette"
-//  IDS_DLL+45,   "SmoothMove Pan Viewer"   ;do not translate, it's a name
-//  IDS_DLL+46,   "Zoner Metafile"          ;do not translate, it's a name
-//  IDS_DLL+47,   "Amiga Deluxe Paint ILBM" ;do not translate, it's a name
-//  IDS_DLL+48,   "QuickLink II Fax"        ;do not translate, it's a name
-  IDS_DLL+49,   "PackBits"      ;LBM,TIFF 2x
-//  IDS_DLL+50,   "Windows BMP-JPEG"        ;do not translate, it's a name
-//  IDS_DLL+51,   "At Work Document Fax"    ;do not translate, it's a name
-  IDS_DLL+52,   "Custom format"	;this is (unlike msg 242) supported format
-//  IDS_DLL+53,   "Wireless Bitmap"         ;do not translate, it's a name
-//  IDS_DLL+54,   "Encapsulated Postscript" ;do not translate, it's a name
-//  IDS_DLL+55,   "EPOC Psion Multiple Bitmap" ;do not translate, it's a name
-  IDS_DLL+56,   "Digital Journal"
-  IDS_DLL+57,   "Uncompressed"
-  IDS_DLL+58,   "Huffman"
-  IDS_DLL+59,   "LZW"
-//  IDS_DLL+60
-//  IDS_DLL+61,   "CALS Raster Type I"      ;do not translate, it's a name
-//  IDS_DLL+62,   "Hemera Photo"            ;do not translate, it's a name
-  IDS_DLL+63,   "Texture"
-  IDS_DLL+64,   "OS/2 PM BitMap"
-  IDS_DLL+65,   "OS/2 BitMap"
-  IDS_DLL+66,   "MS Windows 3.x BitMap"
-  IDS_DLL+67,   "Lossless JPEG"
-  IDS_DLL+68,   "Windows Metafile"
-  IDS_DLL+69,   "DirectX Texture"
-//  IDS_DLL+70
-  IDS_DLL+71,   "Image in AmiPro document"
-//  IDS_DLL+72,   "Dr.Genius / Dr.Halo"     ;do not translate, it's a name
-  IDS_DLL+73,   "Cut from Dr.Genius/Dr.Halo"
-  IDS_DLL+74,   "CMYK color model is not yet supported!"
-  IDS_DLL+75,   "YIQ color model is not yet supported!"
-  IDS_DLL+76,   "Unknown color model!"
-  IDS_DLL+77,   "Arithmetic compression is not yet supported!"
-  IDS_DLL+78,   "Unexpected end of the file found!"
-  IDS_DLL+79,   "Unexpected marker found in the file!"
-  IDS_DLL+80,   "Unexpected marker found in data!"
-  IDS_DLL+81,   "Too many decompression Huffman tables!"
-  IDS_DLL+82,   "Too many color components in the image!"   ;2x
-  IDS_DLL+83,   "No interleaving of color components, not yet supported!"
-  IDS_DLL+84,   "Incorrect number of color component!"  ;number there means this:
-  IDS_DLL+85,   "Unusual size of DRI marker!"
-  IDS_DLL+86,   "Height of image must be known before decompression!"
-  IDS_DLL+87,   "Unknown marker found!"
-  IDS_DLL+88,   "Not yet supported type of color component subsampling!"
-  IDS_DLL+89,   "Too many quantization tables!"
-  IDS_DLL+90,   "Unknown"
-  IDS_DLL+91,   "The image dimension is invalid or not specified."
-  IDS_DLL+92,   "Reading"
-  IDS_DLL+93,   "Enhanced Metafile"
-  IDS_DLL+94,   "Unsupported file type!"   ;tiff,sgi,tga...  or:
-//  IDS_DLL+95:
-  IDS_DLL+96,   "Cannot read compressed TrueColor images!"
-  IDS_DLL+97,   "The file structure is not recognized!"
-//  IDS_DLL+98:
-  IDS_DLL+99,   "Cannot open the file!"
-  IDS_DLL+100,   "This AmiPro document contains no image!"
-//  IDS_DLL+101:
-  IDS_DLL+102,   "Monochromatic image"
-//  IDS_DLL+103
-//  IDS_DLL+104
-//  IDS_DLL+105
-//  IDS_DLL+106,   "Corel Metafile Exchange" ;do not translate, it's a name
-  IDS_DLL+107,   "Function supported for 256 color images only!"
-  IDS_DLL+108,   "Function supported for 256 color and TrueColor images only!"
-//  IDS_DLL+109
-//  IDS_DLL+110
-  IDS_DLL+111,   "No decompression Huffman table was defined!"
-  IDS_DLL+112,   "Unsupported control byte!"   ;rle,img
-//  IDS_DLL+113:
-//  IDS_DLL+114,   "Intergraph Raster"       ;do not translate, it's a name
-  IDS_DLL+115,   "Data writing error - disk full?"
-//  IDS_DLL+116,   "JPEG"                    ;do not translate, it's a name
-  IDS_DLL+117,   "Data reading error - the file is damaged!"
-//  IDS_DLL+118:
-  IDS_DLL+119,   "Color model YIQ"
-  IDS_DLL+120,   "Color model YCbCr"
-  IDS_DLL+121,   "Color model CMYK"
-  IDS_DLL+122,   "Unknown color model"
-  IDS_DLL+123,   "Lossy + Huffman coding"
-  IDS_DLL+124,   "Lossy + Arithmetic coding"
-  IDS_DLL+125,   "Progressive mode"
-  IDS_DLL+126,   "Not yet supported number of colors!"  ;ras,rle
-//  IDS_DLL+127,
-//  IDS_DLL+128:
-//  IDS_DLL+129:
-  IDS_DLL+130,   "Icons and cursors must be square with sizes of multiples of 16 pixels!"
-//  IDS_DLL+131:
-//  IDS_DLL+132:
-//  IDS_DLL+133:
-//  IDS_DLL+134:
-//  IDS_DLL+135:
-//  IDS_DLL+136:
-//  IDS_DLL+137:
-//  IDS_DLL+138:
-//  IDS_DLL+139:
-//  IDS_DLL+140:
-//  IDS_DLL+141:
-//  IDS_DLL+142:
-//  IDS_DLL+143:
-//  IDS_DLL+144:
-//  IDS_DLL+145:
-//  IDS_DLL+146:
-//  IDS_DLL+147:
-//  IDS_DLL+148:
-//  IDS_DLL+149:
-//  IDS_DLL+150:
-//  IDS_DLL+151:
-//  IDS_DLL+152
-//  IDS_DLL+153
-//  IDS_DLL+154
-//  IDS_DLL+155
-//  IDS_DLL+156
-//  IDS_DLL+157
-//  IDS_DLL+158
-//  IDS_DLL+159
-//  IDS_DLL+160
-//  IDS_DLL+161
-//  IDS_DLL+162
-//  IDS_DLL+163:
-//  IDS_DLL+164
-  IDS_DLL+165,   "Interlaced image"
-//  IDS_DLL+166:
-//  IDS_DLL+167:
-//  IDS_DLL+168:
-//  IDS_DLL+169:
-//  IDS_DLL+170:
-//  IDS_DLL+171
-//  IDS_DLL+172
-//  IDS_DLL+173
-//  IDS_DLL+174
-//  IDS_DLL+175
-//  IDS_DLL+176
-//  IDS_DLL+177:
-//  IDS_DLL+178:
-//  IDS_DLL+179:
-  IDS_DLL+180,   "No files found!"
-//  IDS_DLL+181:
-//  IDS_DLL+182:
-//  IDS_DLL+183:
-//  IDS_DLL+184:
-//  IDS_DLL+185:
-//  IDS_DLL+186:
-//  IDS_DLL+187:
-//  IDS_DLL+188:
-//  IDS_DLL+189:
-//  IDS_DLL+190:
-//  IDS_DLL+191:
-//  IDS_DLL+192:
-//  IDS_DLL+193:
-//  IDS_DLL+194:
-  IDS_DLL+195,   "Not yet supported type of compression!" ;RAS
-//  IDS_DLL+196
-//  IDS_DLL+197
-//  IDS_DLL+198
-//  IDS_DLL+199
-//  IDS_DLL+200
-//  IDS_DLL+201:
-//  IDS_DLL+202:
-//  IDS_DLL+203,   "CCITT Group 3"         ;do not translate, it's a name
-//  IDS_DLL+204,   "CCITT Group 4"         ;do not translate, it's a name
-  IDS_DLL+205,   "Unknown" ;PVCS_UNKNOWN - unknown compression scheme
-  IDS_DLL+206    "Color Filter Array"
-  IDS_DLL+207,   "Incorrect size of file header!"
-//  IDS_DLL+208:
-  IDS_DLL+209,   "Unexpected overflow of a Huffman table!"
-  IDS_DLL+210,   "Texas Instruments Calculator"
-//  IDS_DLL+211:
-//  IDS_DLL+212,   "Autodesk Animator Pro"   ;do not translate, it's a name
-//  IDS_DLL+213:
-//  IDS_DLL+214,   "Amiga Deluxe Paint HAM#" ;do not translate, it's a name
-//  IDS_DLL+215
-//  IDS_DLL+216
-//  IDS_DLL+217
-//  IDS_DLL+218
-  IDS_DLL+219,   "Thumbnail from PC PaintBrush"
-  IDS_DLL+220,   "Contains # frames"       ;for 2,3,4 frames
-//  IDS_DLL+221,
-//  IDS_DLL+222,
-  IDS_DLL+223,   "Unsupported number of color components!"
-  IDS_DLL+224,   "Different number of bits per sample in different samples is not supported!"  ;example:
-//  IDS_DLL+225
-//  IDS_DLL+226
-//  IDS_DLL+227
-//  IDS_DLL+228
-//  IDS_DLL+229
-//  IDS_DLL+230
-//  IDS_DLL+231
-  IDS_DLL+232,   "Unknown interleaving type!"
-//  IDS_DLL+233:
-//  IDS_DLL+234,   "Amiga Deluxe Paint PBM"      ;do not translate, it's a name
-//  IDS_DLL+235,   "Portable Network Graphics"   ;do not translate, it's a name
-  IDS_DLL+236,   "Deflating"
-//  IDS_DLL+237:
-//  IDS_DLL+238:
-//  IDS_DLL+239:
-//  IDS_DLL+240:
-  IDS_DLL+241,   "Copyright (c) 1996-2019, Dement - quantization"
-  IDS_DLL+242,   "Custom format"
-  IDS_DLL+243,   "Too big decompression buffer required, not supported!"
-  IDS_DLL+244,   "Incorrect size of uncompressed block!"
-  IDS_DLL+245,   "# colors used"
-  IDS_DLL+246,   "Bad CRC of the file header!"
-//  IDS_DLL+247,   "HSI JPEG"                     ;do not translate, it's a name
-  IDS_DLL+248,   "HSI JPEG files not yet supported!"
-//  IDS_DLL+249,   "Lumena BigPix"              ;do not translate, it's a name
-  IDS_DLL+250,   "Unknown type of filter!"
-//  IDS_DLL+251:
-  IDS_DLL+252,   "Adam7 interleaving"
-  IDS_DLL+253,   "2-D CCITT Group 3 compression is not yet supported!"
-  IDS_DLL+254,   "Uncompressed CCITT Group 3 documents not yet supported!"
-//  IDS_DLL+255,   "DEGAS Elite"                ;do not translate, it's a name
-//  IDS_DLL+256,   "MacPaint"                   ;do not translate, it's a name
-  IDS_DLL+257,   "Color model CIE L*a*b*"
-//  IDS_DLL+258,   "Exif JPEG"                  ;do not translate, it's a name
-  IDS_DLL+259,   "Contains alpha-channel"
-  IDS_DLL+260,   "Config file reading error!"
-  IDS_DLL+261,   "Config file is for an older version of PictView!"
-  IDS_DLL+262,   "MS Windows Cursor"
-  IDS_DLL+263,   "MS Windows Cursors"
-  IDS_DLL+264,   "File contains # cursors"   ;for 5,6,... cursors
-  IDS_DLL+265,   "File contains # cursors"   ;for 2,3,4 cursors
-  IDS_DLL+266,   "Image thumbnail"
-//  IDS_DLL+267,   "CorelDraw! #.0"            ;do not translate, it's a name
-//  IDS_DLL+268
-  IDS_DLL+269,   "Buffer is too small!"
-  IDS_DLL+270,   "No such page in the file!"
-  IDS_DLL+271,   "Incorrect parameter!"
-//  IDS_DLL+272:
-//  IDS_DLL+273:
-//  IDS_DLL+274:
-//  IDS_DLL+275:
-//  IDS_DLL+276:
-//  IDS_DLL+277:
-//  IDS_DLL+278:
-//  IDS_DLL+279,   "Corel PhotoPaint! 6.0" ;do not translate, it's a name
-  IDS_DLL+280,   "Error in scan definition!"
-  IDS_DLL+281,   "Unsupported number of components in a scan!"
-//  IDS_DLL+282,   "GIF87a"             ;do not translate, it's a name
-//  IDS_DLL+283,   "GIF89a"             ;do not translate, it's a name
-//  IDS_DLL+284,   "Microsoft Paint"    ;do not translate, it's a name
-//  IDS_DLL+285,   "Autodesk Animator"  ;do not translate, it's a name
-  IDS_DLL+286,   "Image is tiled"
-  IDS_DLL+287,   "Cannot create file"
-//  IDS_DLL+288,   "Pareniste" ;Used by Pareniste images in the Czech edition ;do not translate, it's a name
-//  IDS_DLL+289,   "Aldus Placeable Win MetaFile" ;do not translate, it's a name
-//  IDS_DLL+290:
-//  IDS_DLL+291,   "Dement's X" ;Used by Pareniste images in the Czech edition
-//  IDS_DLL+292,   "Vivid Raytracer"    ;do not translate, it's a name
-//  IDS_DLL+293,   "Portable BitMap"    ;do not translate, it's a name
-//  IDS_DLL+294,   "Portable GrayMap"   ;do not translate, it's a name
-//  IDS_DLL+295,   "Portable PixelMap"  ;do not translate, it's a name
-  IDS_DLL+296,   "Text format"
-  IDS_DLL+297,   "Text format not yet supported!"
-  IDS_DLL+298,   "Intel multipage fax format"
-  IDS_DLL+299,   "DPI%"
-  IDS_DLL+300,   "Contains # pages"   ;for 5,6,... pages
-  IDS_DLL+301,   "Contains # pages"   ;for 2,3,4 pages
-  IDS_DLL+302,   "Olifax image"
-  IDS_DLL+303,   "Animated GIF"
-//  IDS_DLL+304,   "TrueVision Targa15" ;do not translate, it's a name
-//  IDS_DLL+305,   "Corel R.A.V.E #.0"  ;do not translate, it's a name
-//  IDS_DLL+306,   "Multiple Network Graphics" ;do not translate, it's a name
-  IDS_DLL+307,   "Memory: "
-  IDS_DLL+308,   " File: "
-  IDS_DLL+309,   "Height%"
-  IDS_DLL+310,   "Invalid Huffman table definition!"
-//  IDS_DLL+311:
-//  IDS_DLL+312
-  IDS_DLL+313,   "The file does not contain a preview!"
-//  IDS_DLL+314,   "Autodesk Animator CEL" ;do not translate, it's a name
-  IDS_DLL+315,   "Contains 1 frame"
-//  IDS_DLL+316
-//  IDS_DLL+317:
-//  IDS_DLL+318:
-  IDS_DLL+319,   "Target format doesn't support requested color depth! Conversion abandoned!"
-//  IDS_DLL+320:
-//  IDS_DLL+321
-  IDS_DLL+322,   "JFIF #.#"
-  IDS_DLL+323,   "JFIF #.# with thumbnail" ;thumbnail is a small version of the image added as a preview
-  IDS_DLL+324,   "Captured screen"
-//  IDS_DLL+325:
-  IDS_DLL+326,   "Image does not contain bitmaps. Not supported."
-//  IDS_DLL+327,   "Microsoft AVI"   ;do not translate, it's a name
-//  IDS_DLL+328,   "Adobe Photoshop" ;do not translate, it's a name
-  IDS_DLL+329,   "Zoner Zebra for Windows"
-  IDS_DLL+330,   "Digital camera images in CCD raw format are not yet supported."
-  IDS_DLL+331,   "Windows Clipboard"
-  IDS_DLL+332,   "Audio files are not supported."
-//  IDS_DLL+333: ;must remain unused!
-//  IDS_DLL+334:
-//  IDS_DLL+335:
-//  IDS_DLL+336:
-//  IDS_DLL+337:
-//  IDS_DLL+338:
-//  IDS_DLL+339:
-  IDS_DLL+340,   "Pixels"
-//  IDS_DLL+341:
-//  IDS_DLL+342,   "Kodak PhotoCD"   ;do not translate, it's a name
-//  IDS_DLL+343:
-  IDS_DLL+344,   "Image too big!"
-  IDS_DLL+345,   "Image too wide!"
-  IDS_DLL+346,   "Unsupported combination of output format, compression, and bit-depth."
-  IDS_DLL+347,   "Specified transparent color could not be found."
-//  IDS_DLL+348:
-//  IDS_DLL+349:
-//  IDS_DLL+350:
-//  IDS_DLL+351:
-//  IDS_DLL+352:
-//  IDS_DLL+353:
-//  IDS_DLL+354:
-//  IDS_DLL+355:
-//  IDS_DLL+356:
-//  IDS_DLL+357:
-//  IDS_DLL+358:
-//  IDS_DLL+359:
-//  IDS_DLL+360:
-//  IDS_DLL+361:
-//  IDS_DLL+362:
-//  IDS_DLL+363:
-//  IDS_DLL+364:
-//  IDS_DLL+365:
-//  IDS_DLL+366:
-//  IDS_DLL+367:
-//  IDS_DLL+368:
-//  IDS_DLL+369:
-//  IDS_DLL+370:
-//  IDS_DLL+371:
-//  IDS_DLL+372:
-//  IDS_DLL+373:
-//  IDS_DLL+374:
-//  IDS_DLL+375:
-//  IDS_DLL+376:
-//  IDS_DLL+377:
-//  IDS_DLL+378:
-//  IDS_DLL+379:
-//  IDS_DLL+380:
-//  IDS_DLL+381:
-//  IDS_DLL+382:
-//  IDS_DLL+383:
-//  IDS_DLL+384:
-//  IDS_DLL+385:
-//  IDS_DLL+386:
-//  IDS_DLL+387:
-//  IDS_DLL+388:
-//  IDS_DLL+389:
-//  IDS_DLL+390:
-//  IDS_DLL+391:
-//  IDS_DLL+392:
-//  IDS_DLL+393:
-//  IDS_DLL+394:
-//  IDS_DLL+395:
-//  IDS_DLL+396:
-//  IDS_DLL+397:
-//  IDS_DLL+398:
-//  IDS_DLL+399:        
-//  IDS_DLL+400
-//  IDS_DLL+401
-//  IDS_DLL+402
-//  IDS_DLL+403
-//  IDS_DLL+404
-//  IDS_DLL+405
-//  IDS_DLL+406
-//  IDS_DLL+407
-//  IDS_DLL+408
-//  IDS_DLL+409
-//  IDS_DLL+410
-//  IDS_DLL+411
-//  IDS_DLL+412
-//  IDS_DLL+413
-//  IDS_DLL+414
-//  IDS_DLL+415
-//  IDS_DLL+416
-//  IDS_DLL+417
-  IDS_DLL+418,   "Contains EXIF info"
-//  IDS_DLL+419
-//  IDS_DLL+420
-//  IDS_DLL+421
-//  IDS_DLL+422
-//  IDS_DLL+423
-//  IDS_DLL+424
-//  IDS_DLL+425
-}
-
-STRINGTABLE
-{
   IDS_PLUGINNAME, "PictView"
   IDS_PLUGIN_DESCRIPTION, "Fast image viewer and converter."
   IDS_LOWMEMORY, "Low memory"
@@ -582,6 +153,7 @@ STRINGTABLE
   IDS_MENU_FIRSTPAGE, "&First Page\tCtrl+Home"
   IDS_MENU_LASTPAGE, "&Last Page\tCtrl+End"
   IDS_MENU_PAGE, "&Go to Page...\tG"
+  IDS_MENU_ANIMATION, "Play/Pause &Animation"
 
   IDS_MENU_TOOLS, "&Tools"
   IDS_MENU_TOOLS_HAND, "&Hand\tA"
@@ -743,4 +315,385 @@ STRINGTABLE
   IDS_WIA_STATUS_TRANSFER_TO_CLIENT, "Transferring data (%d%% complete)"
   
   IDS_SCAN_OPEN_EXTRA_IMGS, "You have received more images from scanner. The first image was opened in this window. Do you want to open other images each in its own window? If not, images will be ignored.\n\nNumber of new windows: %d"
+}
+
+STRINGTABLE
+{
+  IDS_RENAME_EMPTY, "Enter a file name or rename mask."
+  IDS_RENAME_BAD_MASK, "The file name or rename mask cannot contain path separators or these characters: < > : "" / \\ |"
+  IDS_RENAME_MASK_EMPTY, "The rename mask produced an empty file name."
+  IDS_RENAME_BAD_NAME, "The resulting file name cannot contain path separators or these characters: < > : "" / \\ | ? *"
+  IDS_COPYTO_SAME_FOLDER, "The file is already in this directory. Choose a different target directory."
+}
+
+STRINGTABLE
+{
+  IDS_PV_IMAGE_LOAD_WAS_CANCELED, "Image load was canceled."
+  IDS_PV_UNABLE_TO_OPEN_IMAGE_FILE, "Unable to open image file"
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE, "Unable to read image file size"
+  IDS_PV_IMAGE_FILE_EXCEEDS_THE_CURRENT, "Image file exceeds the current PictView input limit."
+  IDS_PV_UNABLE_TO_ALLOCATE_AN_IN, "Unable to allocate an in-memory image stream."
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE_2, "Unable to read image file"
+  IDS_PV_UNABLE_TO_LOCK_IMAGE_STREAM, "Unable to lock image stream memory"
+  IDS_PV_UNABLE_TO_CREATE_AN_IMAGE, "Unable to create an image stream for WIC."
+  IDS_PV_IMAGE_OPERATION_FAILED, "Image operation failed."
+  IDS_PV_CLIPBOARD_IMAGE, "Clipboard image"
+  IDS_PV_UNABLE_TO_CREATE_A_COMPATIBLE, "Unable to create a compatible screen capture buffer."
+  IDS_PV_UNABLE_TO_SELECT_THE_COMPATIBLE, "Unable to select the compatible screen capture buffer."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN, "Unable to capture the screen"
+  IDS_PV_UNABLE_TO_READ_PIXELS_FROM, "Unable to read pixels from the screen capture buffer."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING, "Unable to create a drawing context for screen capture."
+  IDS_PV_UNABLE_TO_CREATE_A_FALLBACK, "Unable to create a fallback drawing context for screen capture."
+  IDS_PV_UNABLE_TO_INITIALIZE_DXGI_SCREEN, "Unable to initialize DXGI screen capture"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_2, "Unable to capture the screen with DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_3, "Unable to capture the screen with DXGI."
+  IDS_PV_SCREEN_CAPTURE_BOUNDS_ARE_INVALID, "Screen capture bounds are invalid."
+  IDS_PV_SCREEN_CAPTURE, "Screen capture"
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_UNAVAILABLE, "Clipboard image data is unavailable."
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_INCOMPLETE, "Clipboard image data is incomplete."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE, "Unable to lock clipboard image data"
+  IDS_PV_CLIPBOARD_IMAGE_FORMAT_IS_UNSUPPORTED, "Clipboard image format is unsupported."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_2, "Unable to create a drawing context for clipboard image conversion."
+  IDS_PV_UNABLE_TO_CREATE_CLIPBOARD_IMAGE, "Unable to create clipboard image conversion buffer."
+  IDS_PV_UNABLE_TO_CONVERT_CLIPBOARD_IMAGE, "Unable to convert clipboard image data."
+  IDS_PV_CLIPBOARD_BITMAP, "Clipboard bitmap"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_FALLBACK, "Unable to capture the fallback window."
+  IDS_PV_FALLBACK_WINDOW_DIMENSIONS_ARE_INVALID, "Fallback window dimensions are invalid."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_3, "Unable to create a drawing context for fallback window capture."
+  IDS_PV_UNABLE_TO_PRINT_THE_FALLBACK, "Unable to print the fallback window."
+  IDS_PV_IMAGE_SOURCE_DATA_IS_UNAVAILABLE, "Image source data is unavailable."
+  IDS_PV_NO_IMAGE_LOADED, "No image loaded"
+  IDS_PV_PICK_COLOR_MOVE_MOUSE_OVER, "Pick Color: move mouse over image"
+  IDS_PV_UNABLE_TO_START_ANIMATED_GIF, "Unable to start animated GIF playback."
+  IDS_PV_SOURCE_NAVIGATION_IS_NO_LONGER, "Source navigation is no longer available."
+  IDS_PV_SOURCE_SELECTION_IS_NO_LONGER, "Source selection is no longer available."
+  IDS_PV_OPENED_FILE_IS_SELECTED_IN, "Opened file is selected in the source."
+  IDS_PV_OPENED_FILE_IS_UNSELECTED_IN, "Opened file is unselected in the source."
+  IDS_PV_FILE_NAME_UNCHANGED, "File name unchanged."
+  IDS_PV_UNABLE_TO_RENAME_THE_FILE, "Unable to rename the file"
+  IDS_PV_RENAME_CANCELED, "Rename canceled."
+  IDS_PV_FILE_WAS_RENAMED_BUT_THE, "File was renamed, but the new path is unavailable."
+  IDS_PV_FILE_RENAMED, "File renamed."
+  IDS_PV_COPY_CANCELED, "Copy canceled."
+  IDS_PV_UNABLE_TO_COPY_THE_FILE, "Unable to copy the file."
+  IDS_PV_FILE_COPIED, "File copied."
+  IDS_PV_COPY_WAS_NOT_COMPLETED, "Copy was not completed."
+  IDS_PV_UNABLE_TO_DELETE_THE_FILE, "Unable to delete the file."
+  IDS_PV_FILE_MOVED_TO_THE_RECYCLE, "File moved to the Recycle Bin."
+  IDS_PV_FILE_DELETED, "File deleted."
+  IDS_PV_DELETE_CANCELED, "Delete canceled."
+  IDS_PV_FILE_WAS_NOT_DELETED, "File was not deleted."
+  IDS_PV_SOURCE_FOCUS_IS_NO_LONGER, "Source focus is no longer available."
+  IDS_PV_FOCUSING_OPENED_FILE_IN_THE, "Focusing opened file in the source."
+  IDS_PV_PREVIOUS_WALLPAPER_RESTORED, "Previous wallpaper restored."
+  IDS_PV_WALLPAPER_CLEARED, "Wallpaper cleared."
+  IDS_PV_WALLPAPER_UPDATED, "Wallpaper updated."
+  IDS_PV_NO_IMAGE_IS_LOADED, "No image is loaded."
+  IDS_PV_UNABLE_TO_CREATE_A_WALLPAPER, "Unable to create a wallpaper output path."
+  IDS_PV_UNABLE_TO_UPDATE_THE_DESKTOP, "Unable to update the desktop wallpaper."
+  IDS_PV_UNABLE_TO_OPEN_THE_DESKTOP, "Unable to open the desktop wallpaper registry key."
+  IDS_PV_OPEN_IMAGE, "Open Image"
+  IDS_PV_UNABLE_TO_OPEN_THE_HISTOGRAM, "Unable to open the histogram window."
+  IDS_PV_UNABLE_TO_REGISTER_THE_SCREEN, "Unable to register the screen capture hot key."
+  IDS_PV_UNABLE_TO_START_THE_SCREEN, "Unable to start the screen capture timer."
+  IDS_PV_CAPTURING_PICTVIEW, "Capturing - PictView"
+  IDS_PV_SCREEN_CAPTURE_IS_WAITING_FOR, "Screen capture is waiting for the hot key."
+  IDS_PV_SCREEN_CAPTURE_TIMER_STARTED, "Screen capture timer started."
+  IDS_PV_SCREEN_CAPTURED, "Screen captured."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_4, "Unable to capture the screen."
+  IDS_PV_SCREEN_CAPTURED_FROM_THE_VIEWER, "Screen captured from the viewer window; desktop capture was unavailable."
+  IDS_PV_THE_CLIPBOARD_DOES_NOT_CONTAIN, "The clipboard does not contain an image."
+  IDS_PV_UNABLE_TO_OPEN_THE_CLIPBOARD, "Unable to open the clipboard."
+  IDS_PV_UNABLE_TO_PASTE_THE_CLIPBOARD, "Unable to paste the clipboard image."
+  IDS_PV_PICTVIEW_IMAGE, "PictView image"
+  IDS_PV_UNABLE_TO_PRINT_THE_IMAGE, "Unable to print the image."
+  IDS_PV_UNABLE_TO_READ_PRINTER_PAGE, "Unable to read printer page dimensions."
+  IDS_PV_UNABLE_TO_ALLOCATE_CLIPBOARD_IMAGE, "Unable to allocate clipboard image data."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE_2, "Unable to lock clipboard image data."
+  IDS_PV_UNABLE_TO_COPY_IMAGE_DATA, "Unable to copy image data to the clipboard."
+  IDS_PV_UNABLE_TO_START_THE_IMAGE, "Unable to start the image load worker."
+  IDS_PV_FILE_DIALOG_FAILED, "Unable to open the file dialog.\nError: 0x%X"
+  IDS_PV_ALLOCATE_PIXELS_FAILED, "Unable to allocate pixels for %s."
+  IDS_PV_CONVERSION_CONTEXT_FAILED, "Unable to create a drawing context for %s conversion."
+  IDS_PV_READ_PIXELS_FAILED, "Unable to read pixels from %s."
+  IDS_PV_SAVED, "Saved: %s"
+  IDS_PV_LOADING, "Loading..."
+  IDS_PV_LOADING_PERCENT, "Loading... %u%%"
+  IDS_PV_IMAGE_FILES, "Image files"
+  IDS_PV_ALL_FILES, "All files"
+  IDS_PV_ERR_WIC_UNAVAILABLE, "Windows Imaging Component is not available."
+  IDS_PV_ERR_OPEN, "Unable to open the image."
+  IDS_PV_ERR_DECODE, "The image is damaged or cannot be decoded."
+  IDS_PV_ERR_FRAME, "The requested page or frame does not exist."
+  IDS_PV_ERR_TOO_LARGE, "The image is too large."
+  IDS_PV_ERR_CANCELED, "The operation was canceled."
+  IDS_PV_ERR_MEMORY, "Not enough memory to process the image."
+  IDS_PV_ERR_SAVE, "Unable to save the image."
+  IDS_PV_SAVEAS_FILTER, "Portable Network Graphics (*.png)|*.png|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|CompuServe GIF (*.gif)|*.gif|"
+}
+
+STRINGTABLE
+{
+  IDS_EXIF_TAG_0001, "Interoperability Index"
+  IDS_EXIF_TAG_0002, "Interoperability Version"
+  IDS_EXIF_TAG_00FE, "New Subfile Type"
+  IDS_EXIF_TAG_0100, "Image Width"
+  IDS_EXIF_TAG_0101, "Image Height"
+  IDS_EXIF_TAG_0102, "Bits per Sample"
+  IDS_EXIF_TAG_0103, "Compression"
+  IDS_EXIF_TAG_0106, "Photometric Interpretation"
+  IDS_EXIF_TAG_010D, "Document Name"
+  IDS_EXIF_TAG_010E, "Image Description"
+  IDS_EXIF_TAG_010F, "Camera Manufacturer"
+  IDS_EXIF_TAG_0110, "Camera Model"
+  IDS_EXIF_TAG_0111, "Strip Offsets"
+  IDS_EXIF_TAG_0112, "Orientation"
+  IDS_EXIF_TAG_0115, "Samples per Pixel"
+  IDS_EXIF_TAG_0116, "Rows per Strip"
+  IDS_EXIF_TAG_0117, "Strip Byte Counts"
+  IDS_EXIF_TAG_011A, "Horizontal Resolution"
+  IDS_EXIF_TAG_011B, "Vertical Resolution"
+  IDS_EXIF_TAG_011C, "Planar Configuration"
+  IDS_EXIF_TAG_0128, "Resolution Unit"
+  IDS_EXIF_TAG_012D, "Transfer Function"
+  IDS_EXIF_TAG_0131, "Software"
+  IDS_EXIF_TAG_0132, "Date and Time"
+  IDS_EXIF_TAG_013B, "Artist"
+  IDS_EXIF_TAG_013C, "Host Computer"
+  IDS_EXIF_TAG_013E, "White Point"
+  IDS_EXIF_TAG_013F, "Primary Chromaticities"
+  IDS_EXIF_TAG_0201, "Thumbnail Offset"
+  IDS_EXIF_TAG_0202, "Thumbnail Length"
+  IDS_EXIF_TAG_0211, "YCbCr Coefficients"
+  IDS_EXIF_TAG_0212, "YCbCr Subsampling"
+  IDS_EXIF_TAG_0213, "YCbCr Positioning"
+  IDS_EXIF_TAG_0214, "Reference Black/White"
+  IDS_EXIF_TAG_4746, "Rating"
+  IDS_EXIF_TAG_4749, "Rating Percent"
+  IDS_EXIF_TAG_8298, "Copyright"
+  IDS_EXIF_TAG_829A, "Exposure Time"
+  IDS_EXIF_TAG_829D, "F-Number"
+  IDS_EXIF_TAG_8769, "Exif IFD Pointer"
+  IDS_EXIF_TAG_8822, "Exposure Program"
+  IDS_EXIF_TAG_8824, "Spectral Sensitivity"
+  IDS_EXIF_TAG_8825, "GPS IFD Pointer"
+  IDS_EXIF_TAG_8827, "ISO Speed"
+  IDS_EXIF_TAG_8828, "OECF"
+  IDS_EXIF_TAG_8830, "Sensitivity Type"
+  IDS_EXIF_TAG_8831, "Standard Output Sensitivity"
+  IDS_EXIF_TAG_8832, "Recommended Exposure Index"
+  IDS_EXIF_TAG_8833, "ISO Speed Value"
+  IDS_EXIF_TAG_9000, "Exif Version"
+  IDS_EXIF_TAG_9003, "Date Taken"
+  IDS_EXIF_TAG_9004, "Date Digitized"
+  IDS_EXIF_TAG_9010, "Time Zone"
+  IDS_EXIF_TAG_9011, "Time Zone (Taken)"
+  IDS_EXIF_TAG_9012, "Time Zone (Digitized)"
+  IDS_EXIF_TAG_9101, "Components Configuration"
+  IDS_EXIF_TAG_9102, "Compressed Bits per Pixel"
+  IDS_EXIF_TAG_9201, "Shutter Speed"
+  IDS_EXIF_TAG_9202, "Aperture"
+  IDS_EXIF_TAG_9203, "Brightness"
+  IDS_EXIF_TAG_9204, "Exposure Bias"
+  IDS_EXIF_TAG_9205, "Maximum Aperture"
+  IDS_EXIF_TAG_9206, "Subject Distance"
+  IDS_EXIF_TAG_9207, "Metering Mode"
+  IDS_EXIF_TAG_9208, "Light Source"
+  IDS_EXIF_TAG_9209, "Flash"
+  IDS_EXIF_TAG_920A, "Focal Length"
+  IDS_EXIF_TAG_9214, "Subject Area"
+  IDS_EXIF_TAG_927C, "Maker Note"
+  IDS_EXIF_TAG_9286, "User Comment"
+  IDS_EXIF_TAG_9290, "Subsecond Time"
+  IDS_EXIF_TAG_9291, "Subsecond Time (Taken)"
+  IDS_EXIF_TAG_9292, "Subsecond Time (Digitized)"
+  IDS_EXIF_TAG_9C9B, "Title"
+  IDS_EXIF_TAG_9C9C, "Comments"
+  IDS_EXIF_TAG_9C9D, "Author"
+  IDS_EXIF_TAG_9C9E, "Keywords"
+  IDS_EXIF_TAG_9C9F, "Subject"
+  IDS_EXIF_TAG_A000, "FlashPix Version"
+  IDS_EXIF_TAG_A001, "Color Space"
+  IDS_EXIF_TAG_A002, "Pixel Width"
+  IDS_EXIF_TAG_A003, "Pixel Height"
+  IDS_EXIF_TAG_A004, "Related Sound File"
+  IDS_EXIF_TAG_A005, "Interoperability IFD Pointer"
+  IDS_EXIF_TAG_A20B, "Flash Energy"
+  IDS_EXIF_TAG_A20C, "Spatial Frequency Response"
+  IDS_EXIF_TAG_A20E, "Focal Plane Horizontal Resolution"
+  IDS_EXIF_TAG_A20F, "Focal Plane Vertical Resolution"
+  IDS_EXIF_TAG_A210, "Focal Plane Resolution Unit"
+  IDS_EXIF_TAG_A214, "Subject Location"
+  IDS_EXIF_TAG_A215, "Exposure Index"
+  IDS_EXIF_TAG_A217, "Sensing Method"
+  IDS_EXIF_TAG_A300, "File Source"
+  IDS_EXIF_TAG_A301, "Scene Type"
+  IDS_EXIF_TAG_A302, "CFA Pattern"
+  IDS_EXIF_TAG_A401, "Custom Rendered"
+  IDS_EXIF_TAG_A402, "Exposure Mode"
+  IDS_EXIF_TAG_A403, "White Balance"
+  IDS_EXIF_TAG_A404, "Digital Zoom Ratio"
+  IDS_EXIF_TAG_A405, "Focal Length in 35 mm Film"
+  IDS_EXIF_TAG_A406, "Scene Capture Type"
+  IDS_EXIF_TAG_A407, "Gain Control"
+  IDS_EXIF_TAG_A408, "Contrast"
+  IDS_EXIF_TAG_A409, "Saturation"
+  IDS_EXIF_TAG_A40A, "Sharpness"
+  IDS_EXIF_TAG_A40B, "Device Setting Description"
+  IDS_EXIF_TAG_A40C, "Subject Distance Range"
+  IDS_EXIF_TAG_A420, "Image Unique ID"
+  IDS_EXIF_TAG_A430, "Camera Owner"
+  IDS_EXIF_TAG_A431, "Camera Serial Number"
+  IDS_EXIF_TAG_A432, "Lens Specification"
+  IDS_EXIF_TAG_A433, "Lens Manufacturer"
+  IDS_EXIF_TAG_A434, "Lens Model"
+  IDS_EXIF_TAG_A435, "Lens Serial Number"
+  IDS_EXIF_TAG_A460, "Composite Image"
+  IDS_EXIF_TAG_A500, "Gamma"
+  IDS_EXIF_GPS_0000, "GPS Version"
+  IDS_EXIF_GPS_0001, "Latitude Reference"
+  IDS_EXIF_GPS_0002, "Latitude"
+  IDS_EXIF_GPS_0003, "Longitude Reference"
+  IDS_EXIF_GPS_0004, "Longitude"
+  IDS_EXIF_GPS_0005, "Altitude Reference"
+  IDS_EXIF_GPS_0006, "Altitude"
+  IDS_EXIF_GPS_0007, "GPS Time (UTC)"
+  IDS_EXIF_GPS_0008, "GPS Satellites"
+  IDS_EXIF_GPS_0009, "GPS Receiver Status"
+  IDS_EXIF_GPS_000A, "GPS Measure Mode"
+  IDS_EXIF_GPS_000B, "GPS Precision (DOP)"
+  IDS_EXIF_GPS_000C, "Speed Unit"
+  IDS_EXIF_GPS_000D, "Speed"
+  IDS_EXIF_GPS_000E, "Direction of Movement Reference"
+  IDS_EXIF_GPS_000F, "Direction of Movement"
+  IDS_EXIF_GPS_0010, "Image Direction Reference"
+  IDS_EXIF_GPS_0011, "Image Direction"
+  IDS_EXIF_GPS_0012, "Geodetic Datum"
+  IDS_EXIF_GPS_0013, "Destination Latitude Reference"
+  IDS_EXIF_GPS_0014, "Destination Latitude"
+  IDS_EXIF_GPS_0015, "Destination Longitude Reference"
+  IDS_EXIF_GPS_0016, "Destination Longitude"
+  IDS_EXIF_GPS_0017, "Destination Bearing Reference"
+  IDS_EXIF_GPS_0018, "Destination Bearing"
+  IDS_EXIF_GPS_0019, "Destination Distance Reference"
+  IDS_EXIF_GPS_001A, "Destination Distance"
+  IDS_EXIF_GPS_001B, "GPS Processing Method"
+  IDS_EXIF_GPS_001C, "GPS Area Information"
+  IDS_EXIF_GPS_001D, "GPS Date"
+  IDS_EXIF_GPS_001E, "GPS Differential Correction"
+  IDS_EXIF_GPS_001F, "GPS Horizontal Positioning Error"
+  IDS_EXIF_VALUE_COMPRESSION_NONE, "Uncompressed"
+  IDS_EXIF_VALUE_COMPRESSION_JPEG, "JPEG"
+  IDS_EXIF_VALUE_PHOTOMETRIC_RGB, "RGB"
+  IDS_EXIF_VALUE_PHOTOMETRIC_YCBCR, "YCbCr"
+  IDS_EXIF_VALUE_ORIENTATION_1, "Normal"
+  IDS_EXIF_VALUE_ORIENTATION_2, "Mirrored horizontally"
+  IDS_EXIF_VALUE_ORIENTATION_3, "Rotated 180°"
+  IDS_EXIF_VALUE_ORIENTATION_4, "Mirrored vertically"
+  IDS_EXIF_VALUE_ORIENTATION_5, "Mirrored horizontally, rotated 270° clockwise"
+  IDS_EXIF_VALUE_ORIENTATION_6, "Rotated 90° clockwise"
+  IDS_EXIF_VALUE_ORIENTATION_7, "Mirrored horizontally, rotated 90° clockwise"
+  IDS_EXIF_VALUE_ORIENTATION_8, "Rotated 270° clockwise"
+  IDS_EXIF_VALUE_PLANAR_CHUNKY, "Chunky"
+  IDS_EXIF_VALUE_PLANAR_PLANAR, "Planar"
+  IDS_EXIF_VALUE_UNIT_NONE, "None"
+  IDS_EXIF_VALUE_UNIT_INCH, "Inch"
+  IDS_EXIF_VALUE_UNIT_CM, "Centimeter"
+  IDS_EXIF_VALUE_YCBCR_CENTERED, "Centered"
+  IDS_EXIF_VALUE_YCBCR_COSITED, "Co-sited"
+  IDS_EXIF_VALUE_PROGRAM_0, "Not defined"
+  IDS_EXIF_VALUE_PROGRAM_1, "Manual"
+  IDS_EXIF_VALUE_PROGRAM_2, "Normal program"
+  IDS_EXIF_VALUE_PROGRAM_3, "Aperture priority"
+  IDS_EXIF_VALUE_PROGRAM_4, "Shutter priority"
+  IDS_EXIF_VALUE_PROGRAM_5, "Creative program"
+  IDS_EXIF_VALUE_PROGRAM_6, "Action program"
+  IDS_EXIF_VALUE_PROGRAM_7, "Portrait mode"
+  IDS_EXIF_VALUE_PROGRAM_8, "Landscape mode"
+  IDS_EXIF_VALUE_METERING_0, "Unknown"
+  IDS_EXIF_VALUE_METERING_1, "Average"
+  IDS_EXIF_VALUE_METERING_2, "Center-weighted average"
+  IDS_EXIF_VALUE_METERING_3, "Spot"
+  IDS_EXIF_VALUE_METERING_4, "Multi-spot"
+  IDS_EXIF_VALUE_METERING_5, "Pattern"
+  IDS_EXIF_VALUE_METERING_6, "Partial"
+  IDS_EXIF_VALUE_METERING_255, "Other"
+  IDS_EXIF_VALUE_LIGHT_0, "Unknown"
+  IDS_EXIF_VALUE_LIGHT_1, "Daylight"
+  IDS_EXIF_VALUE_LIGHT_2, "Fluorescent"
+  IDS_EXIF_VALUE_LIGHT_3, "Tungsten (incandescent)"
+  IDS_EXIF_VALUE_LIGHT_4, "Flash"
+  IDS_EXIF_VALUE_LIGHT_9, "Fine weather"
+  IDS_EXIF_VALUE_LIGHT_10, "Cloudy weather"
+  IDS_EXIF_VALUE_LIGHT_11, "Shade"
+  IDS_EXIF_VALUE_LIGHT_12, "Daylight fluorescent"
+  IDS_EXIF_VALUE_LIGHT_13, "Day white fluorescent"
+  IDS_EXIF_VALUE_LIGHT_14, "Cool white fluorescent"
+  IDS_EXIF_VALUE_LIGHT_15, "White fluorescent"
+  IDS_EXIF_VALUE_LIGHT_16, "Warm white fluorescent"
+  IDS_EXIF_VALUE_LIGHT_17, "Standard light A"
+  IDS_EXIF_VALUE_LIGHT_18, "Standard light B"
+  IDS_EXIF_VALUE_LIGHT_19, "Standard light C"
+  IDS_EXIF_VALUE_LIGHT_20, "D55"
+  IDS_EXIF_VALUE_LIGHT_21, "D65"
+  IDS_EXIF_VALUE_LIGHT_22, "D75"
+  IDS_EXIF_VALUE_LIGHT_23, "D50"
+  IDS_EXIF_VALUE_LIGHT_24, "ISO studio tungsten"
+  IDS_EXIF_VALUE_LIGHT_255, "Other light source"
+  IDS_EXIF_VALUE_COLORSPACE_SRGB, "sRGB"
+  IDS_EXIF_VALUE_COLORSPACE_UNCALIBRATED, "Uncalibrated"
+  IDS_EXIF_VALUE_FPUNIT_NONE, "None"
+  IDS_EXIF_VALUE_FPUNIT_INCH, "Inch"
+  IDS_EXIF_VALUE_FPUNIT_CM, "Centimeter"
+  IDS_EXIF_VALUE_SENSING_1, "Not defined"
+  IDS_EXIF_VALUE_SENSING_2, "One-chip color area sensor"
+  IDS_EXIF_VALUE_SENSING_3, "Two-chip color area sensor"
+  IDS_EXIF_VALUE_SENSING_4, "Three-chip color area sensor"
+  IDS_EXIF_VALUE_SENSING_5, "Color sequential area sensor"
+  IDS_EXIF_VALUE_SENSING_7, "Trilinear sensor"
+  IDS_EXIF_VALUE_SENSING_8, "Color sequential linear sensor"
+  IDS_EXIF_VALUE_FILESOURCE_DSC, "Digital still camera"
+  IDS_EXIF_VALUE_SCENETYPE_DIRECT, "Directly photographed"
+  IDS_EXIF_VALUE_RENDERED_0, "Normal process"
+  IDS_EXIF_VALUE_RENDERED_1, "Custom process"
+  IDS_EXIF_VALUE_EXPMODE_0, "Auto exposure"
+  IDS_EXIF_VALUE_EXPMODE_1, "Manual exposure"
+  IDS_EXIF_VALUE_EXPMODE_2, "Auto bracket"
+  IDS_EXIF_VALUE_WB_0, "Auto white balance"
+  IDS_EXIF_VALUE_WB_1, "Manual white balance"
+  IDS_EXIF_VALUE_SCENE_0, "Standard"
+  IDS_EXIF_VALUE_SCENE_1, "Landscape"
+  IDS_EXIF_VALUE_SCENE_2, "Portrait"
+  IDS_EXIF_VALUE_SCENE_3, "Night scene"
+  IDS_EXIF_VALUE_GAIN_0, "None"
+  IDS_EXIF_VALUE_GAIN_1, "Low gain up"
+  IDS_EXIF_VALUE_GAIN_2, "High gain up"
+  IDS_EXIF_VALUE_GAIN_3, "Low gain down"
+  IDS_EXIF_VALUE_GAIN_4, "High gain down"
+  IDS_EXIF_VALUE_CONTRAST_0, "Normal"
+  IDS_EXIF_VALUE_CONTRAST_1, "Soft"
+  IDS_EXIF_VALUE_CONTRAST_2, "Hard"
+  IDS_EXIF_VALUE_SATURATION_0, "Normal"
+  IDS_EXIF_VALUE_SATURATION_1, "Low saturation"
+  IDS_EXIF_VALUE_SATURATION_2, "High saturation"
+  IDS_EXIF_VALUE_SHARPNESS_0, "Normal"
+  IDS_EXIF_VALUE_SHARPNESS_1, "Soft"
+  IDS_EXIF_VALUE_SHARPNESS_2, "Hard"
+  IDS_EXIF_VALUE_DISTANCE_0, "Unknown"
+  IDS_EXIF_VALUE_DISTANCE_1, "Macro"
+  IDS_EXIF_VALUE_DISTANCE_2, "Close view"
+  IDS_EXIF_VALUE_DISTANCE_3, "Distant view"
+  IDS_EXIF_VALUE_GPS_ABOVE_SEA, "Above sea level"
+  IDS_EXIF_VALUE_GPS_BELOW_SEA, "Below sea level"
+  IDS_EXIF_VALUE_GPS_NO_CORRECTION, "Without correction"
+  IDS_EXIF_VALUE_GPS_CORRECTION, "Correction applied"
+  IDS_EXIF_VALUE_FLASH_FIRED, "Flash fired"
+  IDS_EXIF_VALUE_FLASH_NOT_FIRED, "Flash did not fire"
+  IDS_EXIF_VALUE_FLASH_COMPULSORY, "compulsory flash mode"
+  IDS_EXIF_VALUE_FLASH_SUPPRESSED, "compulsory flash suppression"
+  IDS_EXIF_VALUE_FLASH_AUTO, "auto mode"
+  IDS_EXIF_VALUE_FLASH_RETURN_DETECTED, "strobe return light detected"
+  IDS_EXIF_VALUE_FLASH_RETURN_NOT_DETECTED, "strobe return light not detected"
+  IDS_EXIF_VALUE_FLASH_RED_EYE, "red-eye reduction"
+  IDS_EXIF_VALUE_FLASH_NO_FUNCTION, "No flash function"
 }

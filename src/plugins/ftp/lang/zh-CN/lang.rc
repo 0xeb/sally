@@ -2254,8 +2254,8 @@ STRINGTABLE
  IDS_PRXSCRERR_INVPORT, "你只能设置端口为数字或 $(ProxyPort) 或 $(Port) 变量。"
  IDS_PRXSCRERR_3XXONFIRSTLINE, "你可以为第一个命令使用 ""3xx:"" 条件，一些前面的命令 (通常为 ""USER"") 是必要的。"
  IDS_PRXSCRERR_NONECMDS, "代理脚本必须包含至少一个命令。"
- IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+ IDS_PRXSCRERR_CANNOTENCODE, "用户名、密码或帐户包含此连接的文本编码无法表示的字符。"
+ IDS_PRXHOST_CANNOTENCODE, "代理服务器地址无法用当前系统编码表示，或者过长。"
 
  IDS_EDITPROXYSRVTITLE, "编辑代理服务器"
  IDS_PORTISUSHORT, "端口号必须在 1 到 65535 范围内。"
@@ -2364,10 +2364,10 @@ STRINGTABLE
  IDS_CLEARPASSWORD_CONFIRMATION, "你确定要清除这个密码吗？"
  IDS_SHOWPASSWORD_CONFIRMATION, "你确定你想要显示这个密码吗？"
  IDS_PASSWORDIS, "密码是: %s\n\n你要复制密码到剪贴板吗？"
- IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
- IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
- IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+ IDS_SRVTYPENAME_CANNOTENCODE, "服务器类型名称包含当前配置编码无法表示的字符。"
+ IDS_PRXSCRIPT_CANNOTENCODE, "代理脚本包含当前配置编码无法表示的字符。"
+ IDS_FTPCOMMAND_CANNOTENCODE, "FTP 命令包含此连接的文本编码无法表示的字符。"
+ IDS_NEWNAME_CANNOTENCODE, "新名称包含此连接的文本编码无法表示的字符，因此无法用于在服务器上命名文件。\n\n该项目已保留其错误状态。"
+ IDS_DIRNAME_CANNOTENCODE, "目录名称包含此连接的文本编码无法表示的字符，因此无法在服务器上创建该目录。"
+ IDS_RENAMENAME_CANNOTENCODE, "新名称包含此连接的文本编码无法表示的字符，因此无法在服务器上重命名该项目。"
 }

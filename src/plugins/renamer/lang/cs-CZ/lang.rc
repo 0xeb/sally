@@ -477,6 +477,6 @@ STRINGTABLE
   IDS_EXP_BROWSE, "Procházet..."
   IDS_EXP_SALDIR, "Sally adresář"
   IDS_CFG_CONFLICT, "Konfigurace je již otevřena."
-  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
-  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+  IDS_EXP_ENVVARNOTFOUND, "Proměnná prostředí ""%s"" nebyla nalezena."
+  IDS_EXP_ENVVARTOOLARGE, "Hodnota proměnné prostředí ""%s"" je příliš dlouhá."
 }

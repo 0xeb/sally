@@ -11,6 +11,7 @@
 #include "Salamander.rh"
 #include "FileSystemInterface.h"
 #include "FileSystem.h"
+#include "SalamandText.h"
 
 #include <WinInterface.h>
 #include <SessionData.h>
@@ -289,12 +290,8 @@ void __fastcall CPluginInterfaceForFS::ConnectFileSystem(int Panel)
             SetForceNewSession(true);
             try
             {
-                // ChangePanelPathToPluginFS's fsName/fsUserPart are wide now; this
-                // TU is not part of the CMake build (Borland/VCL), so widen with plain Win32
-                // API rather than depend on plugin_narrow_compat.h's include path.
-                wchar_t fsNameW[MAX_PATH];
-                MultiByteToWideChar(CP_ACP, 0, FPlugin->GetFSName(FSessionToOpen->FSProtocol, false), -1, fsNameW, MAX_PATH);
-                SalamanderGeneral()->ChangePanelPathToPluginFS(Panel, fsNameW, L"", NULL);
+                const std::wstring fsNameW = SalWide(FPlugin->GetFSName(FSessionToOpen->FSProtocol, false));
+                SalamanderGeneral()->ChangePanelPathToPluginFS(Panel, fsNameW.c_str(), L"", NULL);
             }
             __finally
             {

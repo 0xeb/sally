@@ -20,6 +20,7 @@
 #include "zip2sfx.h"
 #include "inflate.h"
 #include "common/Win32TextCodec.h"
+#include "zip_text.h"
 
 #include "zip2sfx.rh"
 
@@ -74,8 +75,8 @@ BOOL Error(int error, ...)
     {
         char buf[1024]; //temp variable
         *buf = 0;
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf, 1024, NULL);
+        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
+                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf, 1024, NULL); // console text
         printf("%s", buf);
     }
 
@@ -251,7 +252,7 @@ BOOL GetZip2SfxDir(std::string& zip2sfxDir)
     if (slash == std::wstring::npos)
         return FALSE;
     directory.resize(slash + 1);
-    return WideToLegacyTextExact(directory.c_str(), zip2sfxDir);
+    return EncodeZipLegacyTextExact(directory, zip2sfxDir);
 }
 
 static BOOL GetEnvironmentVariableOwned(const wchar_t* name, std::wstring& value)
@@ -412,7 +413,7 @@ BOOL LoadDefaults()
     size = min(sfxHead.TextLen[ABOUTLICENCEDLEN], SE_MAX_ABOUT - 1);
     memcpy(About, ptr, size);
     About[size] = 0;
-    lstrcpy(DefAbout, About); // keep for later use
+    lstrcpyA(DefAbout, About); // keep for later use
     ptr += sfxHead.TextLen[ABOUTLICENCEDLEN];
 
     size = min(sfxHead.TextLen[BUTTONTEXTLEN], SE_MAX_EXTRBTN - 1);
@@ -423,19 +424,23 @@ BOOL LoadDefaults()
     size = min(sfxHead.TextLen[VENDORLEN], SE_MAX_VENDOR - 1);
     memcpy(Settings.Vendor, ptr, size);
     Settings.Vendor[size] = 0;
-    lstrcpy(DefVendor, Settings.Vendor); // keep for later use
+    lstrcpyA(DefVendor, Settings.Vendor); // keep for later use
     ptr += sfxHead.TextLen[VENDORLEN];
 
     size = min(sfxHead.TextLen[WWWLEN], SE_MAX_WWW - 1);
     memcpy(Settings.WWW, ptr, size);
     Settings.WWW[size] = 0;
-    lstrcpy(DefWWW, Settings.WWW); // keep for later use
+    lstrcpyA(DefWWW, Settings.WWW); // keep for later use
     ptr += sfxHead.TextLen[WWWLEN];
 
+    // Settings.IconFile is a byte field of the SFX settings; the name is stored exact or not at all.
     std::wstring moduleFileName;
-    if (!GetModuleFileNameOwned(moduleFileName) ||
-        !CopyWideToLegacyTextExact(moduleFileName.c_str(), Settings.IconFile,
-                                   _countof(Settings.IconFile)))
+    std::string iconFileBytes;
+    if (GetModuleFileNameOwned(moduleFileName) &&
+        EncodeZipLegacyTextExact(moduleFileName, iconFileBytes) &&
+        iconFileBytes.size() < _countof(Settings.IconFile))
+        memcpy(Settings.IconFile, iconFileBytes.c_str(), iconFileBytes.size() + 1);
+    else
         Settings.IconFile[0] = '\0';
     Settings.IconIndex = -IDI_SFXICON;
 
@@ -467,7 +472,7 @@ BOOL main2()
             // file omits it, so adopting the field unconditionally erased the SFX_DEFPACKAGE
             // default and aborted with STR_NODEFPACKAGE. pre-unicode seeded Settings.SfxFile from
             // the environment and let ImportSFXSettings overwrite it only when the key was there.
-            if (*Settings.SfxFile != 0 && !LegacyTextToWide(Settings.SfxFile, SfxPackageName))
+            if (*Settings.SfxFile != 0 && !DecodeZipLegacyText(Settings.SfxFile, SfxPackageName))
                 return Error(STR_BADSETFORMAT);
         }
     }
@@ -483,14 +488,16 @@ BOOL main2()
             return Error(STR_BADSETFORMAT);
 
         ImportSFXSettings(SettingsTextData, &Settings, zip2sfxDir.c_str());
-        if (lstrcmpi(Settings.Vendor, DefVendor) != 0 || lstrcmpi(Settings.WWW, DefWWW) != 0)
+        if (lstrcmpiA(Settings.Vendor, DefVendor) != 0 || lstrcmpiA(Settings.WWW, DefWWW) != 0)
         {
             char buffer[SE_MAX_VENDOR + SE_MAX_WWW + 10 + SE_MAX_ABOUT];
             sprintf(buffer, "%s\r\n%s\r\n\r\n%s", DefVendor, DefWWW, DefAbout);
-            lstrcpyn(About, buffer, SE_MAX_ABOUT);
+            lstrcpynA(About, buffer, SE_MAX_ABOUT);
         }
     }
-    const std::wstring iconFile = ZipTextToWide(Settings.IconFile);
+    std::wstring iconFile;
+    if (!DecodeZipLegacyText(Settings.IconFile, iconFile))
+        return Error(STR_ERROPENICO, Settings.IconFile);
     switch (LoadIcons(iconFile.c_str(), Settings.IconIndex, &Icons, &IconsCount))
     {
     case 1:

@@ -1,0 +1,1033 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Slovak (sk-SK) resources for pictview. Translation: Roman Paholík.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pictview/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pictview.rh2"
+
+LANGUAGE LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+DLG_WIAPROGRESS DIALOGEX 0, 0, 214, 63
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_CENTER
+CAPTION "Skenovanie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Zrušiť",IDCANCEL,157,43,50,14
+    LTEXT           "",IDC_WIAPROGR_MESSAGE,7,7,200,8
+    CONTROL         "",IDC_WIAPROGR_BAR,"msctls_progress32",WS_BORDER,7,22,200,14
+END
+
+DLG_ABOUT DIALOGEX 87, 50, 405, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "O plugine"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Zatvoriť",IDCANCEL,346,114,50,14
+    ICON            "",IDC_ABOUT_ICON,11,9,20,20
+    LTEXT           "Prehliadač PictView %s - Prehliadač obrázkov pre Sally",IDC_ABOUT_TITLE,46,9,352,8
+    LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,352,8,SS_NOPREFIX
+    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,123,8
+    LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,341,8
+    LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
+    LTEXT           "Email:",IDC_STATIC_6,46,81,30,8
+    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,113,81,85,8,WS_TABSTOP
+    LTEXT           "Domovská stránka:",IDC_STATIC_7,46,92,66,8
+    LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,113,92,122,8,WS_TABSTOP
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,403,1
+END
+
+DLG_CFGPAGE_APPEARANCE DIALOGEX 66, 53, 260, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Zobrazenie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Veľkosť okna",IDC_STATIC_1,6,5,248,53,WS_GROUP
+    CONTROL         "&Rovnaká ako Sally",IDC_CFGAPP_WINPOS_SAME,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,151,12
+    CONTROL         "Vä&čšia, ak je potrebné, ale nie menšia",IDC_CFGAPP_WINPOS_LARGER,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,148,12
+    CONTROL         "Pod&ľa potreby",IDC_CFGAPP_WINPOS_ANY,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,41,148,12
+    GROUPBOX        "Predvolený spôsob zväčšenia",IDC_STATIC_2,6,60,248,67,WS_GROUP
+    CONTROL         "&Umiestniť do okna (žiadne posuvníky)",IDC_CFGAPP_ZOOM_WHOLE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,72,151,12
+    CONTROL         "U&miestniť na šírku (bez vodorovného posuvníka)",IDC_CFGAPP_ZOOM_WIDTH,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,84,174,12
+    CONTROL         "&Pôvodná veľkosť",IDC_CFGAPP_ZOOM_ORIG,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,96,148,12
+    CONTROL         "&Celá obrazovka",IDC_CFGAPP_ZOOM_FSCREEN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,108,148,12
+    CONTROL         "Ukazovať celú cestu v záhlaví &okna",IDC_CFGAPP_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,167,12
+END
+
+DLG_CFGPAGE_COLORS DIALOGEX 66, 53, 260, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Farby"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Zobrazenie v okne",IDC_STATIC_1,6,5,248,50,WS_GROUP
+    LTEXT           "&Pozadie",IDC_STATIC_2,17,19,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_BORDER,128,16,27,14
+    LTEXT           "Priehľadná &farba",IDC_STATIC_3,17,36,91,8
+    PUSHBUTTON      "",IDC_CFGCLR_BKGND,128,33,27,14
+    GROUPBOX        "Zobrazenie cez celú obrazovku",IDC_STATIC_4,6,60,248,50,WS_GROUP
+    LTEXT           "P&ozadie",IDC_STATIC_5,17,75,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BORDER,128,72,27,14
+    LTEXT           "Priehľadná f&arba",IDC_STATIC_6,17,92,59,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BKGND,128,89,27,14
+END
+
+DLG_CFGPAGE_KEYBOARD DIALOGEX 66, 53, 260, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Klávesnica a myš"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Klávesy PageUp a PageDown, koliesko myši",IDC_STATIC_1,6,5,248,43,WS_GROUP
+    CONTROL         "Používať na &posun obrázkov",IDC_CFGKBD_PGDNUP_SCR,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,203,12
+    CONTROL         "Používať na prechod na predchádzajúci a nasledujúci &obrázok",IDC_CFGKBD_PGDNUP_PREV,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,220,12
+END
+
+DLG_CFGPAGE_TOOLS DIALOGEX 66, 53, 260, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Nástroje"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Výber",IDC_STATIC_1,6,5,248,94,WS_GROUP
+    LTEXT           "Oblasť vyberaná pri stlačení klávesu Shift:",IDC_STATIC_2,17,18,150,8
+    CONTROL         "Štvore&c",IDC_CFGTOOLS_SQUARE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,24,27,203,12
+    CONTROL         "Obdĺžnik &4:3",IDC_CFGTOOLS_4_3,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,40,218,12
+    CONTROL         "Obdĺžnik &3:2",IDC_CFGTOOLS_3_2,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,53,218,12
+    CONTROL         "Obdĺžnik &16:9",IDC_CFGTOOLS_16_9,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,66,218,12
+    CONTROL         "&Iná:",IDC_CFGTOOLS_OTHER,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,79,35,12
+    EDITTEXT        IDC_CFGTOOLS_RATIO_X,60,79,17,12,ES_NUMBER | WS_GROUP
+    LTEXT           ":",IDC_STATIC_3,79,81,4,8
+    EDITTEXT        IDC_CFGTOOLS_RATIO_Y,83,79,17,12,ES_NUMBER
+    CONTROL         "Ukazovať farby pipetou he&xadecimálne",IDC_CFGTOOLS_PIPHEX,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,106,167,12
+END
+
+DLG_CFGPAGE_ADVANCED DIALOGEX 66, 53, 260, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Rozšírené"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Miniatúry v súborových paneloch",IDC_STATIC_7,6,5,248,69,WS_GROUP
+    LTEXT           "Niektoré súbory s obrázkami môžu obsahovať neaktuálnu miniatúru, ktorá je zle otočená alebo nereflektuje posledné úpravy obrázka.",IDC_STATIC_8,14,18,231,16
+    CONTROL         "&Ignorovať miniatúry uložené priamo v súboroch (pomalé)",IDC_CFGADV_CREATE_THUMBNAILS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,35,205,12
+    LTEXT           "",IDC_STATIC_9,14,51,232,1,SS_ETCHEDHORZ | WS_GROUP
+    LTEXT           "&Nevytvárať miniatúry obrázkov väčších ako",IDC_STATIC_10,14,59,145,8
+    EDITTEXT        IDC_CFGADV_THUMB_MP,160,57,17,12,ES_NUMBER
+    LTEXT           "megapixelov.",IDC_STATIC_11,180,59,45,8
+    CONTROL         "Automaticky &otáčať obrázky EXIF JPEG (digitálne fotografie)",IDC_CFGADV_AUTOROTATE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,77,213,12
+    CONTROL         "In&formovať oknom o úspešnom uložení súboru",IDC_CFGADV_SAVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,89,169,12
+    CONTROL         "&Pamätať si cestu pre ukladanie",IDC_CFGADV_REMEMBER_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,101,233,12
+END
+
+DLG_IMGPROP DIALOGEX 106, 34, 177, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "Vlastnosti obrázka"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Zatvoriť",1,66,182,50,14,WS_GROUP
+    PUSHBUTTON      "Nápoveda",IDHELP,122,182,50,14
+    LTEXT           "&Stránka:",IDC_IMGPROP_PAGENUM_LBL,7,10,49,8
+    EDITTEXT        IDC_IMGPROP_PAGENUM,69,8,100,12,ES_READONLY
+    LTEXT           "Šír&ka:",IDC_STATIC_1,7,24,49,8
+    EDITTEXT        IDC_IMGPROP_WIDTH,69,22,100,12,ES_READONLY
+    LTEXT           "&Výška:",IDC_STATIC_2,7,38,49,8
+    EDITTEXT        IDC_IMGPROP_HEIGHT,69,36,100,12,ES_READONLY
+    LTEXT           "Počet &farieb:",IDC_STATIC_3,7,52,44,8
+    EDITTEXT        IDC_IMGPROP_COLORS,69,50,100,12,ES_READONLY
+    LTEXT           "Veľkosť (&pamäť):",IDC_STATIC_4,7,66,61,8
+    EDITTEXT        IDC_IMGPROP_SIZE,69,64,100,12,ES_READONLY
+    LTEXT           "Veľkosť (d&isk):",IDC_STATIC_5,7,80,52,8
+    EDITTEXT        IDC_IMGPROP_FSIZE,69,78,100,12,ES_READONLY
+    LTEXT           "&DPI:",IDC_STATIC_6,7,94,50,8
+    EDITTEXT        IDC_IMGPROP_DPI,69,92,100,12,ES_READONLY
+    LTEXT           "Fo&rmát:",IDC_STATIC_7,7,108,50,8
+    EDITTEXT        IDC_IMGPROP_FMT,69,106,100,12,ES_READONLY
+    LTEXT           "K&ompresia:",IDC_STATIC_8,7,122,50,8
+    EDITTEXT        IDC_IMGPROP_COMPR,69,120,100,12,ES_READONLY
+    LTEXT           "Kom&entár:",IDC_STATIC_9,7,136,50,8
+    EDITTEXT        IDC_IMGPROP_COMMENT,69,134,100,36,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY
+    LTEXT           "",IDC_STATIC_10,2,176,173,1,SS_ETCHEDHORZ | WS_GROUP
+END
+
+DLG_IMGEXIF DIALOGEX 57, 60, 386, 151
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "EXIF"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_IMGEXIF_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_BORDER | WS_GROUP | WS_TABSTOP,5,4,376,80
+    EDITTEXT        IDC_IMGEXIF_INFO,5,89,376,38,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_CLIPSIBLINGS | WS_VSCROLL | WS_GROUP
+    CONTROL         "&Najprv zvýraznené riadky",IDC_IMGEXIF_GROUP,"Button",BS_AUTOCHECKBOX | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,5,133,98,12
+    CONTROL         "&Zvýrazniť",IDC_IMGEXIF_HIGHLIGHT,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,105,132,50,14
+    PUSHBUTTON      "&Kopírovať",IDC_IMGEXIF_COPY,161,132,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "OK",IDOK,217,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Zrušiť",IDCANCEL,273,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Nápoveda",IDHELP,329,132,50,14
+END
+
+DLG_ZOOM DIALOGEX 85, 100, 121, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zväčšenie obrázku"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Pomer:",IDC_STATIC_1,8,13,49,8,NOT WS_GROUP
+    COMBOBOX        IDC_ZOOM_ZOOM,57,11,44,156,CBS_DROPDOWN | WS_TABSTOP
+    LTEXT           "%",IDC_STATIC_2,105,13,9,8
+    PUSHBUTTON      "OK",IDOK,7,37,50,14,BS_CENTER
+    PUSHBUTTON      "Zrušiť",IDCANCEL,63,37,50,14,BS_CENTER
+END
+
+DLG_PAGE DIALOGEX 85, 100, 123, 54
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Prejsť na stránku"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Stránka:",IDC_STATIC_1,8,9,30,8,NOT WS_GROUP
+    COMBOBOX        IDC_PAGE_PAGE,40,7,74,124,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "OK",IDOK,8,32,50,14,BS_CENTER
+    PUSHBUTTON      "Zrušiť",IDCANCEL,65,32,50,14,BS_CENTER
+END
+
+DLG_CAPTURE DIALOGEX 98, 61, 179, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Snímanie obrazovky"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Snímať",IDC_STATIC_1,6,6,167,81,WS_GROUP
+    CONTROL         "&Celú obrazovku",IDC_CAPTURE_FULL,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,19,110,12
+    CONTROL         "Aktívnu a&plikáciu",IDC_CAPTURE_APPL,"Button",BS_AUTORADIOBUTTON,16,31,110,12
+    CONTROL         "&Aktívne okno",IDC_CAPTURE_WINDOW,"Button",BS_AUTORADIOBUTTON,16,43,120,12
+    CONTROL         "&Klientsku oblasť aktívneho okna ",IDC_CAPTURE_CLIENT,
+                    "Button",BS_AUTORADIOBUTTON,16,55,135,12
+    CONTROL         "&Virtuálnu obrazovku (pri viac monitoroch)",IDC_CAPTURE_VIRTUAL,
+                    "Button",BS_AUTORADIOBUTTON,16,67,151,12
+    GROUPBOX        "Spúšť",IDC_STATIC_2,6,92,167,49,WS_GROUP
+    CONTROL         "&Horúci kláves",IDC_CAPTURE_HOTKEY,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,106,57,12
+    CONTROL         "Čas&ovač",IDC_CAPTURE_TIMER,"Button",BS_AUTORADIOBUTTON,16,121,40,12
+    CONTROL         "",IDC_CAPTURE_HOTKEY_VAL,"msctls_hotkey32",WS_GROUP | WS_TABSTOP,74,106,91,12
+    EDITTEXT        IDC_CAPTURE_TIMER_VAL,74,121,21,12
+    LTEXT           "sekúnd",IDC_STATIC_3,99,123,33,8
+    CONTROL         "Vrátane kurzoru &myši",IDC_CAPTURE_CURSOR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,147,85,12
+    LTEXT           "",IDC_STATIC_4,2,167,175,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "&Snímať",IDOK,8,172,50,14,BS_CENTER | WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,64,172,50,14,BS_CENTER
+    PUSHBUTTON      "Nápoveda",IDHELP,120,172,50,14,BS_CENTER
+END
+
+IDD_RENAMEDIALOG DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Premenovať súbor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_PATH,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,59,43,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,118,43,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 15, 34, 376, 89
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Prepísať súbor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Má sa prepísať súbor:",IDC_STATIC_1,6,14,76,8
+    LTEXT           "",IDS_SOURCENAME,84,14,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_SOURCEATTR,84,24,286,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "týmto súborom:",IDC_STATIC_2,6,37,76,8,NOT WS_GROUP
+    LTEXT           "",IDS_TARGETNAME,84,37,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_TARGETATTR,84,47,286,8,SS_NOPREFIX | NOT WS_GROUP
+    DEFPUSHBUTTON   "&Áno",IDYES,104,66,50,14,WS_GROUP
+    PUSHBUTTON      "&Nie",IDNO,163,66,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,222,66,50,14
+END
+
+IDD_COPYTO DIALOGEX 15, 34, 326, 121
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Kopírovať súbor"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&1",IDC_COPYTO_RB_1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,8,10,18,12
+    CONTROL         "&2",IDC_COPYTO_RB_2,"Button",BS_AUTORADIOBUTTON,8,27,18,12
+    CONTROL         "&3",IDC_COPYTO_RB_3,"Button",BS_AUTORADIOBUTTON,8,44,18,12
+    CONTROL         "&4",IDC_COPYTO_RB_4,"Button",BS_AUTORADIOBUTTON,8,61,18,12
+    CONTROL         "&5",IDC_COPYTO_RB_5,"Button",BS_AUTORADIOBUTTON,8,78,18,12
+    EDITTEXT        IDC_COPYTO_EL_1,29,10,221,12,WS_GROUP
+    PUSHBUTTON      "&Prechádzať...",IDC_COPYTO_BR_1,256,9,60,14
+    EDITTEXT        IDC_COPYTO_EL_2,29,27,221,12
+    PUSHBUTTON      "P&rechádzať...",IDC_COPYTO_BR_2,256,26,60,14
+    EDITTEXT        IDC_COPYTO_EL_3,29,44,221,12
+    PUSHBUTTON      "Pr&echádzať...",IDC_COPYTO_BR_3,256,43,60,14
+    EDITTEXT        IDC_COPYTO_EL_4,29,61,221,12
+    PUSHBUTTON      "Pre&chádzať...",IDC_COPYTO_BR_4,256,60,60,14
+    EDITTEXT        IDC_COPYTO_EL_5,29,78,221,12
+    PUSHBUTTON      "Prec&hádzať...",IDC_COPYTO_BR_5,256,77,60,14
+    DEFPUSHBUTTON   "OK",IDOK,142,100,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,199,100,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,256,100,60,14
+END
+
+IDD_SAVEEX DIALOGEX 0, 0, 400, 20
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CLIPSIBLINGS
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Kompresia:",IDC_SAVE_COMPRESSION_LABEL,5,2,40,8
+    COMBOBOX        IDC_SAVE_COMPRESSION,51,0,172,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Možnosti",IDC_SAVE_ADVANCED,229,0,50,14,WS_GROUP
+    LTEXT           "Počet &farieb:",IDC_STATIC_2,5,26,45,8
+    COMBOBOX        IDC_SAVE_BIT_DEPTH,51,24,79,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Otočenie:",IDC_STATIC_3,5,46,34,8
+    COMBOBOX        IDC_SAVE_ROTATION,51,44,79,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Zrkadlenie:",IDC_STATIC_4,5,66,43,8
+    COMBOBOX        IDC_SAVE_FLIP,51,64,79,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "&Inverzia farieb (negatív)",IDC_SAVE_INVERT,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_GROUP | WS_TABSTOP,5,82,117,12
+    LTEXT           "Kom&entár:",IDC_SAVE_COMMENT_STATIC,5,94,49,8
+    EDITTEXT        IDC_SAVE_COMMENT,5,104,124,41,ES_MULTILINE | WS_GROUP
+    GROUPBOX        "GIF",IDC_SAVE_GROUP_GIF,136,20,144,25,WS_GROUP
+    CONTROL         "&Prekladaný",IDC_SAVE_GIF_INTERLACED,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,141,30,50,12
+    CONTROL         "Vytvoriť &GIF89a",IDC_SAVE_GIF_89a,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,208,30,66,12
+    GROUPBOX        "JPEG, TIFF-JPEG",IDC_SAVE_GROUP_JPEG,136,50,144,45,WS_GROUP
+    LTEXT           "Kvalit&a:",IDC_SAVE_JPEG_STATIC1,141,61,40,8
+    EDITTEXT        IDC_SAVE_JPEG_QUALITY,190,59,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "%",IDC_SAVE_JPEG_STATIC2,213,61,40,8
+    LTEXT           "&Subsampling:",IDC_SAVE_JPEG_STATIC3,141,80,48,8
+    COMBOBOX        IDC_SAVE_JPEG_SUBSAMPLING,190,78,33,40,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    GROUPBOX        "TIFF",IDC_SAVE_GROUP_TIFF,136,100,144,45,WS_GROUP
+    CONTROL         "&Deliť do pásov (strips)",IDC_SAVE_TIFF_MAKE_STRIPS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,141,110,88,12
+    LTEXT           "&Veľkosť pásu:",IDC_SAVE_TIFF_STATIC1,151,126,49,8
+    EDITTEXT        IDC_SAVE_TIFF_STRIP_SIZE,201,124,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "KB",IDC_SAVE_TIFF_STATIC2,224,126,40,8
+END
+
+IDD_PRINT DIALOGEX 10, 24, 429, 227
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Tlač obrázka"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_PRINT_PREVIEW,"Static",SS_WHITEFRAME | SS_NOPREFIX | WS_GROUP,6,7,211,195
+    GROUPBOX        " Tlačiareň ",IDC_STATIC_4,225,4,196,27
+    LTEXT           "",IDC_PRINT_PRINTER,232,15,118,8
+    PUSHBUTTON      "&Nastavenie...",IDC_PRINT_SETUP,354,12,60,14,WS_GROUP
+    GROUPBOX        " Umiestnenie na papieri ",IDC_STATIC_1,225,35,196,62
+    RTEXT           "V&ľavo:",IDC_STATIC_2,234,49,24,8
+    EDITTEXT        IDC_PRINT_LEFT,262,47,45,12
+    COMBOBOX        IDC_PRINT_LEFT_UNITS,313,47,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "Z&hora:",IDC_STATIC_3,234,68,24,8
+    EDITTEXT        IDC_PRINT_TOP,262,66,45,12
+    COMBOBOX        IDC_PRINT_TOP_UNITS,313,66,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "&Centrovať",IDC_PRINT_CENTER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,262,82,60,12
+    GROUPBOX        " Prispôsobiť veľkosť ",IDC_STATIC_5,225,102,196,100
+    RTEXT           "&Pomer:",IDC_STATIC_6,233,118,25,8
+    EDITTEXT        IDC_PRINT_SCALE,262,116,35,12
+    LTEXT           "%",IDC_STATIC_7,300,118,10,8
+    CONTROL         "Prispôsobiť p&apieru",IDC_PRINT_FIT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,313,111,77,12
+    CONTROL         "&Zachovať pomer strán",IDC_PRINT_ASPECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,313,123,87,12
+    RTEXT           "Šír&ka:",IDC_STATIC_8,233,139,25,8
+    EDITTEXT        IDC_PRINT_WIDTH,262,137,45,12
+    COMBOBOX        IDC_PRINT_WIDTH_UNITS,313,137,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "&Výška:",IDC_STATIC_9,233,158,25,8
+    EDITTEXT        IDC_PRINT_HEIGHT,262,156,45,12
+    COMBOBOX        IDC_PRINT_HEIGHT_UNITS,313,156,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Ukazovať &ohraničenie",IDC_PRINT_BOX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,262,173,85,12
+    CONTROL         "&Tlačiť len označenú oblasť",IDC_PRINT_SELECTION,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,262,185,110,12
+    DEFPUSHBUTTON   "OK",IDOK,262,208,50,14,WS_GROUP
+    PUSHBUTTON      "Zrušiť",IDCANCEL,317,208,50,14
+    PUSHBUTTON      "Nápoveda",IDHELP,372,208,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Prehliadač PictView"
+  IDS_PLUGIN_DESCRIPTION, "Rýchly prehliadač a konvertor obrázkov."
+  IDS_LOWMEMORY, "Nedostatok pamäti"
+  IDS_SOME_WINS_OPENED, "Prehliadač PictView má otvorené najmenej jedno okno. Chcete ho zatvoriť?"
+  IDS_ERROR_OPENING, "Nie je možné otvoriť súbor %s:\n%s"
+  IDS_ERROR_OPENING_CONTINUE, "(%d) %hs Tento súbor nemôže byť spracovaný. Pokračovať?"
+  IDS_TITLE, "%s (%d x %d x %s - %i%%) - %s"
+  IDS_TITLE_MULTI, "%s (%d x %d x %s [%d. z %d] - %i%%) - %s"
+  IDS_NCOLORS, "{!}%d far{ba|1|by|4|ieb}"
+  IDS_NCOLORS_CMYK, "CMYK"
+  IDS_NCOLORS_LAB, "LAB"
+
+  IDS_ERROR_CALLING_PVW32_DLL, "Chyba pri volaní PVW32Cnv.DLL"
+  IDS_CLIPBOARD_TITLE, "<Schránka>"
+  IDS_CAPTURE_TITLE, "<Snímaná obrazovka>"
+  IDS_SCAN_TITLE, "<Sken>"
+  IDS_DELETED_TITLE, "<Zmazané>"
+  IDS_CLIPBOARD_FNAME, "Clipbrd"
+  IDS_CAPTURE_FNAME, "Capture"
+  IDS_SCAN_FNAME, "Scan"
+  IDS_RGB, "Červená: %i, Zelená: %i, Modrá: %i"
+  IDS_RGB_HEX, "Červená: %#02x, Zelená: %#02x, Modrá: %#02x"
+  IDS_RGBXY, "(%i, %i): Červená: %i, Zelená: %i, Modrá: %i"
+  IDS_RGBXY_HEX, "(%i, %i): Červená: %#02x, Zelená: %#02x, Modrá: %#02x"
+  IDS_INDEX, ", Index: %i"
+
+  IDS_VIEW_BMP_IN_CLIPBOARD, "Zo&braz bitmapu zo schránky"
+  IDS_PLUGINSMENU_SCREEN_CAPTURE, "Snímať &obrazovku..."
+  IDS_PLUGINSMENU_REGENERATE_THUMBNAIL, "&Aktualizovať miniatúru"
+  IDS_PLUGINSMENU_SCAN, "&Skenovať..."
+  IDS_PIXELS, "{!}%d bod{|1|y|4|ov}"
+  IDS_BYTES, "{!}%d bajt{|1|y|4|ov}"
+  IDS_OF, "%d z %d"
+  IDS_FRAMES, "S&nímok:"
+  IDS_IMGPROP_GRAY_NBIT, "GrayScale %dBit"
+  IDS_UNKNOWN, "Neznáme"
+  IDS_CFG_CONFLICT, "Okno s nastavením je už otvorené."
+  IDS_CONFIGURATION_TITLE, "Prehliadač PictView - Nastavenie"
+  IDS_ERRORTITLE, "Prehliadač PictView - Chyba"
+  IDS_BADTIMER, "Interval musí byť medzi 1 a 360 sekundami."
+  IDS_BADHOTKEY, "Priraďte vhodný horúci kláves."
+  IDS_CAPTURECANCELED, "Snímanie obrazovky bolo zrušené."
+  IDS_CAPTURING, "Snímanie obrazovky"
+  IDS_EMPTY, "Prázdne"
+  IDS_SELECTTARGETDIR, "Zvoľte cieľovú zložku."
+  IDS_SPECIFYPATH, "Musí tu byť uvedená plná alebo čiastočná cesta."
+  IDS_PICTVIEWPLUGINNAME, "Plugin Prehliadač PictView (prehliadač a konvertor obrázkov)"
+
+
+  // !WARNING! 2 following variables must be synchronized with IDS_SAVEASFILTERMONO & IDS_SAVEASFILTERCOLOR:
+  // G.LastSaveAsFilterIndexMono  = 14; // index is 1-based (IDS_SAVEASFILTERMONO: 14=BMP)
+  // G.LastSaveAsFilterIndexColor = 13; // index is 1-based (IDS_SAVEASFILTERCOLOR: 13=BMP)
+  // !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING!
+
+  IDS_SAVEASFILTERMONO, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pbm,*.ppm)|*.pbm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|Wireless Bitmap (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEASFILTERCOLOR, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pnm,*.ppm)|*.pnm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEERROR, "Nie je možné uložiť do súboru.\nPopis chyby: %hs"
+  IDS_SAVE_AS_SUCCESS, "Súbor bol úspešne uložený."
+  IDS_SAVE_LOST_ALPHA, "Pôvodný obrázok obsahoval alfa kanál. Bohužiaľ však bol zapracovaný do obrazových dát použitím aktuálneho pozadia.\nPreto nebude alfa kanál uložený. Pokračovať?"
+  IDS_CANCELED_BY_USER, "Ukladanie zrušené užívateľom. Súbor nebol vytvorený."
+  IDS_OPENFILTER, "Bežné formáty (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|Všetky súbory (*.*)|*.*|"
+  IDS_CUSTOM_COLOR, "&Vlastná farba..."
+  IDS_AUTOMATIC_COLOR, "&Automatická farba"
+  IDS_SAL_IS_BUSY, "Sally je zaneprázdnený. Príkaz nie je možné vykonať, prosím, opakujte ho neskôr."
+  IDS_RENAME_TO, "Premenovať súbor ""%s"" na"
+  IDS_ERRORRENAMINGFILE, "Súbor nie je možné premenovať"
+  IDS_TOOLONGNAME, "Operáciu nie je možné dokončiť kvôli príliš dlhému menu."
+  IDS_LOADEXIF, "Nie je možné nahrať EXIF knižnicu %s."
+  IDS_EXIF_TAG, "Tag"
+  IDS_EXIF_VALUE, "Hodnota"
+  IDS_EXIF_LOCALIZATION_FNAME, "sk.po"
+
+  IDS_MENU_FILE, "&Súbor"
+  IDS_MENU_FILE_OPEN, "&Otvoriť...\tCtrl+O"
+  IDS_MENU_FILE_REFRESH, "Z&nova načítať\tCtrl+R"
+  IDS_MENU_FILE_PREV, "&Predchádzajúci\tBackspace"
+  IDS_MENU_FILE_NEXT, "&Nasledujúci\tMedzerník"
+  IDS_MENU_FILE_SAVEAS, "Ulo&žiť ako...\tCtrl+S"
+  IDS_MENU_FILE_WALLPAPER, "U&ložiť ako tapetu"
+  IDS_MENU_WALLPARER_CENTER, "&Centrovať"
+  IDS_MENU_WALLPARER_TILE, "&Vedľa seba"
+  IDS_MENU_WALLPARER_STRETCH, "&Roztiahnuť"
+  IDS_MENU_WALLPARER_RESTORE, "&Obnoviť predchádzajúce"
+  IDS_MENU_WALLPARER_NONE, "Žia&dna"
+  IDS_MENU_FILE_CAPTURE, "Snímať o&brazovku...\tQ"
+  IDS_MENU_FILE_SCAN, "Skenova&ť...\tW"
+  IDS_MENU_FILE_SCAN_SOURCE, "&Zvoliť skener..."
+  IDS_MENU_FILE_PROP, "Vl&astnosti...\tI"
+  IDS_MENU_FILE_EXIF, "Ukáž E&XIF...\tE"
+  IDS_MENU_FILE_HISTOGRAM, "Ukáž histo&gram...\tCtrl+H"
+  IDS_MENU_FILE_PAGE, "Vzhľad &stránky...\tCtrl+Shift+P"
+  IDS_MENU_FILE_PRINT, "&Tlač...\tCtrl+P"
+  IDS_MENU_FILE_FILES, "Nedávne &súbory"
+  IDS_MENU_FILE_DIRS, "Nedá&vne adresáre"
+  IDS_MENU_FILE_EXIT, "&Koniec\tEsc"
+  IDS_MENU_FILE_OTHER, "&Ďalšie súbory"
+  IDS_MENU_FILE_FIRST, "P&rvý\tShift+Backspace"
+  IDS_MENU_FILE_LAST, "P&osledný\tShift+Medzerník"
+  IDS_MENU_FILE_FOCUS, "&Ukázať\tF"
+  IDS_MENU_FILE_SELCRCFILE, "Označ&iť/odznačiť súbor v paneli alebo okne Find\tInsert"
+  IDS_MENU_FILE_RENAME, "Pr&emenovať...\tF2"
+  IDS_MENU_FILE_DELETE, "Z&mazať\tDel"
+  IDS_MENU_FILE_PREVSEL, "Pre&došlý označený\tCtrl+Backspace"
+  IDS_MENU_FILE_NEXTSEL, "Na&sledujúci označený\tCtrl+Medzera"
+  IDS_MENU_FILE_COPYTO, "Kopí&rovať do...\tX"
+
+  IDS_MENU_EDIT, "Úpr&avy"
+  IDS_MENU_EDIT_COPY, "&Kopírovať\tCtrl+C"
+  IDS_MENU_EDIT_PASTE, "&Vložiť\tCtrl+V"
+  IDS_MENU_EDIT_SELECTALL, "V&ybrať všetko\tCtrl+A"
+  IDS_MENU_EDIT_DESELECT, "Zr&ušiť výber\tCtrl+D"
+  IDS_MENU_EDIT_CROP, "&Orezať\tC"
+  IDS_MENU_EDIT_180, "Otočiť o &180°\tT"
+  IDS_MENU_EDIT_RIGHT, "Otočiť dop&rava\tR"
+  IDS_MENU_EDIT_LEFT, "Otočiť do&ľava\tL"
+  IDS_MENU_EDIT_FLIPH, "&Preklopiť vodorovne\tH"
+  IDS_MENU_EDIT_FLIPV, "Preklopiť &zvislo\tV"
+
+  IDS_MENU_VIEW, "&Zobrazenie"
+  IDS_MENU_VIEW_ZOOMIN, "Z&väčšiť\t+"
+  IDS_MENU_VIEW_ZOOMOUT, "Z&menšiť\t-"
+  IDS_MENU_VIEW_ZOOM, "V&ybrať zväčšenie...\tM"
+  IDS_MENU_VIEW_WHOLE, "&Umiestniť do okna\tF5"
+  IDS_MENU_VIEW_WIDTH, "Umiestniť na &šírku\tF6"
+  IDS_MENU_VIEW_ACTUAL, "Pôvo&dná veľkosť (1:1)\tF7"
+  IDS_MENU_VIEW_WINDOW, "Prispôsob okno &obrázku\tF8"
+  IDS_MENU_VIEW_TOOLBAR, "&Panel nástrojov\tF9"
+  IDS_MENU_VIEW_STATUSBAR, "St&avový riadok"
+  IDS_MENU_VIEW_FULLSCREEN, "&Celá obrazovka\tF11"
+
+  IDS_MENU_MULTIPAGE, "&Stránky"
+  IDS_MENU_NEXTPAGE, "&Nasledovná\tCtrl+Page Down"
+  IDS_MENU_PREVPAGE, "&Predošlá\tCtrl+Page Up"
+  IDS_MENU_FIRSTPAGE, "P&rvá\tCtrl+Home"
+  IDS_MENU_LASTPAGE, "P&osledná\tCtrl+End"
+  IDS_MENU_PAGE, "Zobraziť &stránku...\tG"
+  IDS_MENU_ANIMATION, "Prehrať/pozastaviť &animáciu"
+
+  IDS_MENU_TOOLS, "&Nástroje"
+  IDS_MENU_TOOLS_HAND, "&Posun\tA"
+  IDS_MENU_TOOLS_ZOOM, "&Lupa\tZ"
+  IDS_MENU_TOOLS_SELECT, "&Výber\tS"
+  IDS_MENU_TOOLS_PICK, "Pip&eta\tP"
+  IDS_MENU_TOOLS_OPTIONS, "&Nastavenie..."
+
+  IDS_MENU_HELP, "Nápo&veda"
+  IDS_MENU_HELP_CONTENTS, "&Témy\tF1"
+  IDS_MENU_HELP_INDEX, "&Register..."
+  IDS_MENU_HELP_SEARCH, "&Hľadať..."
+//  IDS_MENU_HELP_KEYBOARD, "&Keyboard Shortcuts"
+//  IDS_MENU_HELP_MOUSE, "&Mouse Shortcuts"
+  IDS_MENU_HELP_ABOUT, "&O plugine Prehliadač PictView..."
+
+  IDS_TT_OPEN, "Otvoriť\tCtrl+O"
+  IDS_TT_SAVE, "Uložiť ako\tCtrl+S"
+  IDS_TT_PROPERTIES, "Vlastnosti\tI"
+  IDS_TT_PREV, "Otvoriť predošlý\tBackspace"
+  IDS_TT_NEXT, "Otvoriť nasledovný\tSpace"
+  IDS_TT_PREVSELFILE, "Otvoriť predošlý označený súbor\tCtrl+Backspace"
+  IDS_TT_NEXTSELFILE, "Otvoriť nasledovný označený súbor\tCtrl+Medzera"
+  IDS_TT_COPY, "Kopírovať\tCtrl+C"
+  IDS_TT_PASTE, "Vložiť\tCtrl+V"
+  IDS_TT_TOOL_HAND, "Posun\tA"
+  IDS_TT_TOOL_ZOOM, "Lupa\tZ"
+  IDS_TT_TOOL_SELECT, "Výber\tS"
+  IDS_TT_TOOL_PIPETTE, "Pipeta\tP"
+  IDS_TT_LEFT, "Otočiť doľava\tL"
+  IDS_TT_RIGHT, "Otočiť doprava\tR"
+  IDS_TT_CROP, "Orezať\tC"
+  IDS_TT_ZOOM_OUT, "Zmenšiť\t-"
+  IDS_TT_ZOOM_IN, "Zväčšiť\t+"
+  IDS_TT_ZOOM_TO, "Vybrať zväčšenie\tM"
+  IDS_TT_ZOOM_WIDTH, "Umiestniť na šírku\tF6"
+  IDS_TT_ZOOM_WHOLE, "Umiestniť do okna\tF5"
+  IDS_TT_ZOOM_ACTUAL, "Pôvodná veľkosť\tF7"
+  IDS_TT_FULL_SCREEN, "Celá obrazovka\tF11"
+  IDS_TT_SELSRCFILE, "Označiť/odznačiť zobrazený súbor v paneli alebo okne Find\tInsert"
+  IDS_TT_PRINT, "Tlač\tCtrl+P"
+
+  IDS_TWAIN_OPEN, "Nie je možné otvoriť TWAIN Source Manager.\nAk podporuje skener rozhranie TWAIN,\nprosím, reinštalujte jeho ovládače."
+  IDS_TWAIN_ERROR, "Chyba rozhrania TWAIN"
+  IDS_TWCC_BUMMER, "Chyba z neznámych príčin."
+  IDS_TWCC_LOWMEMORY, "Nedostatok pamäti na dokončenie operácie."
+  IDS_TWCC_NODS, "Žiadny zdroj dát."
+  IDS_TWCC_MAXCONNECTIONS, "Zdroj dát je vyčerpaný."
+  IDS_TWCC_OPERATIONERROR, "Zdroj dát signalizuje chybu."
+  IDS_TWCC_BADCAP, "Neznáma vlastnosť."
+  IDS_TWCC_BADPROTOCOL, "Neznámy protokol."
+  IDS_TWCC_BADVALUE, "Parameter má zlú hodnotu."
+  IDS_TWCC_SEQERROR, "Správy DG DAT mimo očakávaného poradia."
+  IDS_TWCC_BADDEST, "Neznáma cieľová aplikácia alebo zdroj v DSM_Entry."
+  IDS_TWCC_CAPUNSUPPORTED, "Vlastnosť nie je podporovaná zdrojom."
+  IDS_TWCC_CAPBADOPERATION, "Operácia nie je vlastnosťou podporovaná."
+  IDS_TWCC_CAPSEQERROR, "Vlastnosť závisí na inej vlastnosti."
+  IDS_TWCC_DENIED, "Práca so súborom bola odmietnutá (súbor je chránený)."
+  IDS_TWCC_FILEEXISTS, "Operácia skončila chybou, pretože súbor už existuje."
+  IDS_TWCC_FILENOTFOUND, "Súbor nebol nájdený."
+  IDS_TWCC_NOTEMPTY, "Operácia skončila chybou, pretože adresár nie je prázdny."
+  IDS_TWCC_PAPERJAM, "Papier je asi pokrčený."
+  IDS_TWCC_PAPERDOUBLEFEED, "Zrejme bolo natiahnutých niekoľko papierov."
+  IDS_TWCC_FILEWRITEERROR, "Chyba pri zápise do súboru (zrejme je zaplnený disk)."
+  IDS_TWCC_CHECKDEVICEONLINE, "Zariadenie bolo pred alebo počas operácie prepnuté do režimu offline."
+
+  IDS_CAPTHINT_APPL, "Celé okno aplikácie vrátane všetkých podokien a dcérskych okien."
+  IDS_CAPTHINT_WINDOW, "Okno (dialóg...), ktoré čaká na odozvu od užívateľa."
+  IDS_CAPTHINT_CLIENT, "Ako aktívne okno, ale záhlavie, rámček ani ponuky nie sú snímané."
+
+  IDS_DONT_SHOW_AGAIN, "&Nabudúce nezobrazovať"
+  IDS_DONT_SHOW_AGAIN_SLA, "&Nabudúce nezobrazovať a uložiť bez alfa kanála"
+  IDS_DONT_SHOW_AGAIN_UTH, "&Nabudúce aktualizovať miniatúry bez opýtania"
+  IDS_REGENERATE_THUMBNAIL_TITLE, "Prehliadač PictView - Aktualizujem miniatúry..."
+  IDS_REGENERATE_THUMB_WARNING, "Táto funkcia aktualizuje miniatúry v sekcii EXIF označených súborov. Ostatné časti súborov nebudú zmenené. Pokračovať?"
+  IDS_REGENERATE_THUMB_WRITEFILE, "Nie je možné vytvoriť súbor s novou miniatúrou. Možno je plný disk. Pôvodný súbor ""%s"" nebol zmenený."
+
+  IDS_N_OF_N_FILES_PROCESSED "{!}Iba %d z %d súborov bol{ spracovaný|1|i spracované|4|o spracovaných}. {Zvyšný súbor nebol zmenený|1|Zvyšné súbory neboli zmenené}."
+  IDS_NO_FILES_FOUND, "Neboli nájdené žiadne JPEG obrázky so sekciami EXIF. Žiadny súbor nebol zmenený."
+  IDS_NOT_JPEG_FILE, "Tento súbor nie je typu JPEG a neobsahuje žiadnu miniatúru, ktorá by mohla byť aktualizovaná."
+  IDS_NOT_EXIF_CREATE_JFXX, "Tento súbor neobsahuje sekciu EXIF ani EXIF miniatúru, ktorá by mohla byť aktualizovaná. Má sa namiesto toho vytvoriť miniatúra typu JFIF JFXX?"
+  IDS_READ_ONLY_MODIFY, "Tento súbor je len na čítanie. Má byť aj tak zmenený?"
+  IDS_READ_ONLY_REWRITE, "Súbor %s je len na čítanie. Má sa aj tak prepísať?"
+
+  IDS_CLRS_MONO, "2 farby"
+  IDS_CLRS_16, "16 farieb"
+  IDS_CLRS_256, "256 farieb"
+  IDS_CLRS_HC15, "15bit HiColor"
+  IDS_CLRS_HC16, "16bit HiColor"
+  IDS_CLRS_TC24, "24bit TrueColor"
+  IDS_CLRS_TC32, "32bit TrueColor"
+  IDS_CLRS_256GR, "256 odtieňov šedej"
+  IDS_FLIP_NONE, "Žiadne"
+  IDS_FLIP_VERT, "Zvislé"
+  IDS_FLIP_HOR, "Vodorovné"
+  IDS_ROT_NONE, "Žiadne"
+  IDS_ROT_90, "90 stupňov"
+  IDS_ROT_180, "180 stupňov"
+  IDS_ROT_270, "270 stupňov"
+  IDS_SAVE_DEFAULT, "Predvolené"
+
+  IDS_HIST_HISTOGRAM, "Histogram"
+  IDS_HIST_LUMINOSITY, "Jas"
+  IDS_HIST_RED, "Červená"
+  IDS_HIST_GREEN, "Zelená"
+  IDS_HIST_BLUE, "Modrá"
+  IDS_HIST_RGBSUM, "RGB"
+  IDS_HIST_MENU_LUMINOSITY, "Jas\tL"
+  IDS_HIST_MENU_RED, "Červená\tR"
+  IDS_HIST_MENU_GREEN, "Zelená\tG"
+  IDS_HIST_MENU_BLUE, "Modrá\tB"
+  IDS_HIST_MENU_RGBSUM, "RGB\tA"
+  IDS_HIST_TIP_LUMINOSITY, "Jas (L)"
+  IDS_HIST_TIP_RED, "Červená (R)"
+  IDS_HIST_TIP_GREEN, "Zelená (G)"
+  IDS_HIST_TIP_BLUE, "Modrá (B)"
+  IDS_HIST_TIP_RGBSUM, "RGB (A)"
+  IDS_HIST_TIP_OTHERCHANELS, "Ukázať ostatné kanály (O)"
+  IDS_DLL_NOTFOUND, "Nie je možné nájsť knižnicu PVW32Cnv.dll na spracovanie obrázkov."
+  IDS_DLL_WRONG_VERSION, "Bola nájdená zlá verzia knižnice PVW32Cnv.dll."
+  IDS_SELECT_REGION, "Nie je vybraná žiadna oblasť."
+  IDS_SAVE_ERR_EXISTS_OVERWRITE, "Súbor ""%s"" úž existuje.\nMá sa prepísať?"
+
+  IDS_SB_XY, "X:%d  Y:%d"
+  IDS_SB_WH, "Š:%d  V:%d"
+  IDS_SB_RGB, "R:%d  G:%d  B:%d"
+  IDS_SB_CAGE, "Myšou nakreslite výberovú klietku. Je možno využiť aj klávesy Shift a medzerník."
+  IDS_SB_ZOOM, "Kliknite na miesto, ktoré chcete zväčšiť, alebo označte celú oblasť, medzerníkom je možné ju posúvať."
+  IDS_SB_HAND, "Stlačením tlačidla myši a jej ťahaním posuňte obrázok."
+
+  IDS_SB_AUTOROTATING, "Otáčam..."
+
+  IDS_UNIT_INCHES, "palce"
+  IDS_UNIT_CM, "cm"
+  IDS_UNIT_MM, "mm"
+  IDS_UNIT_POINTS, "body"
+  IDS_UNIT_PICAS, "pica"
+
+  IDS_PRINT_NODEFPRINTER, "Žiadna tlačiareň nie je nastavená ako predvolená. Prosím, nastavte nejakú."
+  IDS_PRINT_NOPRINTERS, "Nie je nainštalovaná žiadna tlačiareň."
+  IDS_PRINT_SETUPFAILED, "Nastavenie tlače zlyhalo."
+  IDS_PRINTING, "Prebieha tlač..."
+  IDS_PRINTING_FAILED,  "Tlač sa nepodarila.\n%s"
+  IDS_UNKNOWN_ERROR,    "Došlo k neznámej chybe.\n"
+  IDS_CHECK_EVENTLOG,   "Viac informácií o chybe zistíte v Prehliadači udalostí."
+  // The following 2 strings are concatenated together
+  IDS_EXCEPT_INFO1,     "V plugine Prehliadač PictView došlo k chybe, prosíme o informovanie autorov!\nAk ste pracovali s nejakým obrázkom, keď k chybe došlo, skúste, prosím, znova túto chybu navodiť.\n"
+  IDS_EXCEPT_INFO2,     "Ak sa to podarí, pošlite nám, prosím, tento obrázok.\nPomôžete nám tým v oprave tejto chyby.\nĎakujeme za spoluprácu!"
+
+  IDS_NO_MORE_IMAGES,   "Viac obrázkov nie je k dispozícii"
+  IDS_UNSUPPORTED_IMAGE_TYPE, "Tento obrázok je v nepodporovanom alebo neznámom formáte."
+  IDS_MUSTBEPOSITIVE,   "Prosím, zadajte číslo väčšie ako nula."
+  IDS_SB_TIP_SELECT_SQUARE, "Tip: V Nastavení - Nástroje je voľba obdĺžnik s presne daným pomerom strán."
+  
+  IDS_WIA_ERROR_ACQUIREIMG, "Zo zariadenia nie je možné získať obrázok. Overte, či je zariadenie správne pripojené a skúste to znova. Chyba: (0x%08X) %s"
+  IDS_WIA_WAIT, "Čakajte..."
+  IDS_WIA_STATUS_TRANSFER_FROM_DEVICE, "Čítanie údajov zo zariadenia (%d%% hotovo)"
+  IDS_WIA_STATUS_PROCESSING_DATA, "Spracovanie údajov (%d%% hotovo)"
+  IDS_WIA_STATUS_TRANSFER_TO_CLIENT, "Prenos údajov (%d%% hotovo)"
+  
+  IDS_SCAN_OPEN_EXTRA_IMGS, "Zo skenera prišlo viac obrázkov. Prvý obrázok sa otvoril v tomto okne. Chcete pre každý ďalší obrázok otvoriť nové okno? Ak nie, obrázky budú ignorované.\n\nPočet nových okien: %d"
+}
+
+STRINGTABLE
+{
+  IDS_RENAME_EMPTY, "Zadajte názov súboru alebo masku na premenovanie."
+  IDS_RENAME_BAD_MASK, "Názov súboru ani maska na premenovanie nesmie obsahovať oddeľovače cesty ani tieto znaky: < > : "" / \\ |"
+  IDS_RENAME_MASK_EMPTY, "Maska na premenovanie vytvorila prázdny názov súboru."
+  IDS_RENAME_BAD_NAME, "Výsledný názov súboru nesmie obsahovať oddeľovače cesty ani tieto znaky: < > : "" / \\ | ? *"
+  IDS_COPYTO_SAME_FOLDER, "Súbor už je v tomto adresári. Zvoľte iný cieľový adresár."
+}
+
+STRINGTABLE
+{
+  IDS_PV_IMAGE_LOAD_WAS_CANCELED, "Načítanie obrázka bolo zrušené."
+  IDS_PV_UNABLE_TO_OPEN_IMAGE_FILE, "Nie je možné otvoriť súbor s obrázkom"
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE, "Nie je možné zistiť veľkosť súboru s obrázkom"
+  IDS_PV_IMAGE_FILE_EXCEEDS_THE_CURRENT, "Súbor s obrázkom prekračuje aktuálny limit vstupu prehliadača PictView."
+  IDS_PV_UNABLE_TO_ALLOCATE_AN_IN, "Nie je možné alokovať dátový prúd obrázka v pamäti."
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE_2, "Nie je možné načítať súbor s obrázkom"
+  IDS_PV_UNABLE_TO_LOCK_IMAGE_STREAM, "Nie je možné uzamknúť pamäť dátového prúdu obrázka"
+  IDS_PV_UNABLE_TO_CREATE_AN_IMAGE, "Nie je možné vytvoriť dátový prúd obrázka pre WIC."
+  IDS_PV_IMAGE_OPERATION_FAILED, "Operácia s obrázkom zlyhala."
+  IDS_PV_CLIPBOARD_IMAGE, "Obrázok zo schránky"
+  IDS_PV_UNABLE_TO_CREATE_A_COMPATIBLE, "Nie je možné vytvoriť kompatibilnú vyrovnávaciu pamäť na snímanie obrazovky."
+  IDS_PV_UNABLE_TO_SELECT_THE_COMPATIBLE, "Nie je možné vybrať kompatibilnú vyrovnávaciu pamäť na snímanie obrazovky."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN, "Nie je možné nasnímať obrazovku"
+  IDS_PV_UNABLE_TO_READ_PIXELS_FROM, "Nie je možné načítať body z vyrovnávacej pamäte na snímanie obrazovky."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING, "Nie je možné vytvoriť kontext kreslenia na snímanie obrazovky."
+  IDS_PV_UNABLE_TO_CREATE_A_FALLBACK, "Nie je možné vytvoriť záložný kontext kreslenia na snímanie obrazovky."
+  IDS_PV_UNABLE_TO_INITIALIZE_DXGI_SCREEN, "Nie je možné inicializovať snímanie obrazovky pomocou DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_2, "Nie je možné nasnímať obrazovku pomocou DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_3, "Nie je možné nasnímať obrazovku pomocou DXGI."
+  IDS_PV_SCREEN_CAPTURE_BOUNDS_ARE_INVALID, "Hranice snímanej oblasti obrazovky sú neplatné."
+  IDS_PV_SCREEN_CAPTURE, "Snímka obrazovky"
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_UNAVAILABLE, "Dáta obrázka v schránke nie sú k dispozícii."
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_INCOMPLETE, "Dáta obrázka v schránke sú neúplné."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE, "Nie je možné uzamknúť dáta obrázka v schránke"
+  IDS_PV_CLIPBOARD_IMAGE_FORMAT_IS_UNSUPPORTED, "Formát obrázka v schránke nie je podporovaný."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_2, "Nie je možné vytvoriť kontext kreslenia na prevod obrázka zo schránky."
+  IDS_PV_UNABLE_TO_CREATE_CLIPBOARD_IMAGE, "Nie je možné vytvoriť vyrovnávaciu pamäť na prevod obrázka zo schránky."
+  IDS_PV_UNABLE_TO_CONVERT_CLIPBOARD_IMAGE, "Nie je možné previesť dáta obrázka zo schránky."
+  IDS_PV_CLIPBOARD_BITMAP, "Bitmapa zo schránky"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_FALLBACK, "Nie je možné nasnímať záložné okno."
+  IDS_PV_FALLBACK_WINDOW_DIMENSIONS_ARE_INVALID, "Rozmery záložného okna sú neplatné."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_3, "Nie je možné vytvoriť kontext kreslenia na snímanie záložného okna."
+  IDS_PV_UNABLE_TO_PRINT_THE_FALLBACK, "Nie je možné vykresliť záložné okno."
+  IDS_PV_IMAGE_SOURCE_DATA_IS_UNAVAILABLE, "Zdrojové dáta obrázka nie sú k dispozícii."
+  IDS_PV_NO_IMAGE_LOADED, "Nie je načítaný žiadny obrázok"
+  IDS_PV_PICK_COLOR_MOVE_MOUSE_OVER, "Pipeta: presuňte myš nad obrázok"
+  IDS_PV_UNABLE_TO_START_ANIMATED_GIF, "Nie je možné spustiť prehrávanie animovaného GIF."
+  IDS_PV_SOURCE_NAVIGATION_IS_NO_LONGER, "Prechádzanie zdroja už nie je k dispozícii."
+  IDS_PV_SOURCE_SELECTION_IS_NO_LONGER, "Označovanie v zdroji už nie je k dispozícii."
+  IDS_PV_OPENED_FILE_IS_SELECTED_IN, "Otvorený súbor je v zdroji označený."
+  IDS_PV_OPENED_FILE_IS_UNSELECTED_IN, "Otvorený súbor je v zdroji odznačený."
+  IDS_PV_FILE_NAME_UNCHANGED, "Názov súboru nebol zmenený."
+  IDS_PV_UNABLE_TO_RENAME_THE_FILE, "Súbor nie je možné premenovať"
+  IDS_PV_RENAME_CANCELED, "Premenovanie bolo zrušené."
+  IDS_PV_FILE_WAS_RENAMED_BUT_THE, "Súbor bol premenovaný, ale nová cesta nie je k dispozícii."
+  IDS_PV_FILE_RENAMED, "Súbor bol premenovaný."
+  IDS_PV_COPY_CANCELED, "Kopírovanie bolo zrušené."
+  IDS_PV_UNABLE_TO_COPY_THE_FILE, "Súbor nie je možné skopírovať."
+  IDS_PV_FILE_COPIED, "Súbor bol skopírovaný."
+  IDS_PV_COPY_WAS_NOT_COMPLETED, "Kopírovanie nebolo dokončené."
+  IDS_PV_UNABLE_TO_DELETE_THE_FILE, "Súbor nie je možné zmazať."
+  IDS_PV_FILE_MOVED_TO_THE_RECYCLE, "Súbor bol presunutý do koša."
+  IDS_PV_FILE_DELETED, "Súbor bol zmazaný."
+  IDS_PV_DELETE_CANCELED, "Mazanie bolo zrušené."
+  IDS_PV_FILE_WAS_NOT_DELETED, "Súbor nebol zmazaný."
+  IDS_PV_SOURCE_FOCUS_IS_NO_LONGER, "Ukázanie v zdroji už nie je k dispozícii."
+  IDS_PV_FOCUSING_OPENED_FILE_IN_THE, "Otvorený súbor sa ukazuje v zdroji."
+  IDS_PV_PREVIOUS_WALLPAPER_RESTORED, "Predchádzajúca tapeta bola obnovená."
+  IDS_PV_WALLPAPER_CLEARED, "Tapeta bola odobraná."
+  IDS_PV_WALLPAPER_UPDATED, "Tapeta bola aktualizovaná."
+  IDS_PV_NO_IMAGE_IS_LOADED, "Nie je načítaný žiadny obrázok."
+  IDS_PV_UNABLE_TO_CREATE_A_WALLPAPER, "Nie je možné vytvoriť výstupnú cestu pre tapetu."
+  IDS_PV_UNABLE_TO_UPDATE_THE_DESKTOP, "Nie je možné aktualizovať tapetu pracovnej plochy."
+  IDS_PV_UNABLE_TO_OPEN_THE_DESKTOP, "Nie je možné otvoriť kľúč registra s tapetou pracovnej plochy."
+  IDS_PV_OPEN_IMAGE, "Otvoriť obrázok"
+  IDS_PV_UNABLE_TO_OPEN_THE_HISTOGRAM, "Nie je možné otvoriť okno histogramu."
+  IDS_PV_UNABLE_TO_REGISTER_THE_SCREEN, "Nie je možné zaregistrovať horúci kláves na snímanie obrazovky."
+  IDS_PV_UNABLE_TO_START_THE_SCREEN, "Nie je možné spustiť časovač na snímanie obrazovky."
+  IDS_PV_CAPTURING_PICTVIEW, "Snímanie - PictView"
+  IDS_PV_SCREEN_CAPTURE_IS_WAITING_FOR, "Snímanie obrazovky čaká na horúci kláves."
+  IDS_PV_SCREEN_CAPTURE_TIMER_STARTED, "Časovač na snímanie obrazovky bol spustený."
+  IDS_PV_SCREEN_CAPTURED, "Obrazovka bola nasnímaná."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_4, "Nie je možné nasnímať obrazovku."
+  IDS_PV_SCREEN_CAPTURED_FROM_THE_VIEWER, "Obrazovka bola nasnímaná z okna prehliadača; snímanie pracovnej plochy nebolo k dispozícii."
+  IDS_PV_THE_CLIPBOARD_DOES_NOT_CONTAIN, "Schránka neobsahuje obrázok."
+  IDS_PV_UNABLE_TO_OPEN_THE_CLIPBOARD, "Nie je možné otvoriť schránku."
+  IDS_PV_UNABLE_TO_PASTE_THE_CLIPBOARD, "Nie je možné vložiť obrázok zo schránky."
+  IDS_PV_PICTVIEW_IMAGE, "Obrázok PictView"
+  IDS_PV_UNABLE_TO_PRINT_THE_IMAGE, "Obrázok nie je možné vytlačiť."
+  IDS_PV_UNABLE_TO_READ_PRINTER_PAGE, "Nie je možné zistiť rozmery stránky tlačiarne."
+  IDS_PV_UNABLE_TO_ALLOCATE_CLIPBOARD_IMAGE, "Nie je možné alokovať dáta obrázka pre schránku."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE_2, "Nie je možné uzamknúť dáta obrázka v schránke."
+  IDS_PV_UNABLE_TO_COPY_IMAGE_DATA, "Nie je možné skopírovať dáta obrázka do schránky."
+  IDS_PV_UNABLE_TO_START_THE_IMAGE, "Nie je možné spustiť vlákno na načítanie obrázka."
+  IDS_PV_FILE_DIALOG_FAILED, "Nie je možné otvoriť dialóg na výber súboru.\nChyba: 0x%X"
+  IDS_PV_ALLOCATE_PIXELS_FAILED, "Nie je možné alokovať body pre %s."
+  IDS_PV_CONVERSION_CONTEXT_FAILED, "Nie je možné vytvoriť kontext kreslenia na prevod %s."
+  IDS_PV_READ_PIXELS_FAILED, "Nie je možné načítať body z %s."
+  IDS_PV_SAVED, "Uložené: %s"
+  IDS_PV_LOADING, "Načítava sa..."
+  IDS_PV_LOADING_PERCENT, "Načítava sa... %u%%"
+  IDS_PV_IMAGE_FILES, "Súbory obrázkov"
+  IDS_PV_ALL_FILES, "Všetky súbory"
+  IDS_PV_ERR_WIC_UNAVAILABLE, "Windows Imaging Component nie je k dispozícii."
+  IDS_PV_ERR_OPEN, "Obrázok nie je možné otvoriť."
+  IDS_PV_ERR_DECODE, "Obrázok je poškodený alebo ho nie je možné dekódovať."
+  IDS_PV_ERR_FRAME, "Požadovaná stránka alebo snímka neexistuje."
+  IDS_PV_ERR_TOO_LARGE, "Obrázok je príliš veľký."
+  IDS_PV_ERR_CANCELED, "Operácia bola zrušená."
+  IDS_PV_ERR_MEMORY, "Na spracovanie obrázka nie je dostatok pamäte."
+  IDS_PV_ERR_SAVE, "Obrázok nie je možné uložiť."
+  IDS_PV_SAVEAS_FILTER, "Portable Network Graphics (*.png)|*.png|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|CompuServe GIF (*.gif)|*.gif|"
+  IDS_EXIF_TAG_0001, "Index interoperability"
+  IDS_EXIF_TAG_0002, "Verzia interoperability"
+  IDS_EXIF_TAG_00FE, "Nový typ podsúboru"
+  IDS_EXIF_TAG_0100, "Šírka obrázka"
+  IDS_EXIF_TAG_0101, "Výška obrázka"
+  IDS_EXIF_TAG_0102, "Bity na vzorku"
+  IDS_EXIF_TAG_0103, "Kompresia"
+  IDS_EXIF_TAG_0106, "Fotometrická interpretácia"
+  IDS_EXIF_TAG_010D, "Názov dokumentu"
+  IDS_EXIF_TAG_010E, "Popis obrázka"
+  IDS_EXIF_TAG_010F, "Výrobca fotoaparátu"
+  IDS_EXIF_TAG_0110, "Model fotoaparátu"
+  IDS_EXIF_TAG_0111, "Posuny pásov"
+  IDS_EXIF_TAG_0112, "Orientácia"
+  IDS_EXIF_TAG_0115, "Vzorky na pixel"
+  IDS_EXIF_TAG_0116, "Riadky na pás"
+  IDS_EXIF_TAG_0117, "Počty bajtov pásov"
+  IDS_EXIF_TAG_011A, "Vodorovné rozlíšenie"
+  IDS_EXIF_TAG_011B, "Zvislé rozlíšenie"
+  IDS_EXIF_TAG_011C, "Planárna konfigurácia"
+  IDS_EXIF_TAG_0128, "Jednotka rozlíšenia"
+  IDS_EXIF_TAG_012D, "Prenosová funkcia"
+  IDS_EXIF_TAG_0131, "Softvér"
+  IDS_EXIF_TAG_0132, "Dátum a čas"
+  IDS_EXIF_TAG_013B, "Autor snímky"
+  IDS_EXIF_TAG_013C, "Hostiteľský počítač"
+  IDS_EXIF_TAG_013E, "Biely bod"
+  IDS_EXIF_TAG_013F, "Primárne chromatickosti"
+  IDS_EXIF_TAG_0201, "Posun miniatúry"
+  IDS_EXIF_TAG_0202, "Dĺžka miniatúry"
+  IDS_EXIF_TAG_0211, "Koeficienty YCbCr"
+  IDS_EXIF_TAG_0212, "Podvzorkovanie YCbCr"
+  IDS_EXIF_TAG_0213, "Umiestnenie YCbCr"
+  IDS_EXIF_TAG_0214, "Referenčná čierna/biela"
+  IDS_EXIF_TAG_4746, "Hodnotenie"
+  IDS_EXIF_TAG_4749, "Hodnotenie v percentách"
+  IDS_EXIF_TAG_8298, "Autorské práva"
+  IDS_EXIF_TAG_829A, "Čas expozície"
+  IDS_EXIF_TAG_829D, "Clonové číslo"
+  IDS_EXIF_TAG_8769, "Ukazovateľ na Exif IFD"
+  IDS_EXIF_TAG_8822, "Expozičný program"
+  IDS_EXIF_TAG_8824, "Spektrálna citlivosť"
+  IDS_EXIF_TAG_8825, "Ukazovateľ na GPS IFD"
+  IDS_EXIF_TAG_8827, "Citlivosť ISO"
+  IDS_EXIF_TAG_8828, "OECF"
+  IDS_EXIF_TAG_8830, "Typ citlivosti"
+  IDS_EXIF_TAG_8831, "Štandardná výstupná citlivosť"
+  IDS_EXIF_TAG_8832, "Odporúčaný expozičný index"
+  IDS_EXIF_TAG_8833, "Hodnota citlivosti ISO"
+  IDS_EXIF_TAG_9000, "Verzia Exif"
+  IDS_EXIF_TAG_9003, "Dátum snímania"
+  IDS_EXIF_TAG_9004, "Dátum digitalizácie"
+  IDS_EXIF_TAG_9010, "Časové pásmo"
+  IDS_EXIF_TAG_9011, "Časové pásmo (snímanie)"
+  IDS_EXIF_TAG_9012, "Časové pásmo (digitalizácia)"
+  IDS_EXIF_TAG_9101, "Konfigurácia zložiek"
+  IDS_EXIF_TAG_9102, "Komprimované bity na pixel"
+  IDS_EXIF_TAG_9201, "Rýchlosť uzávierky"
+  IDS_EXIF_TAG_9202, "Clona"
+  IDS_EXIF_TAG_9203, "Jas"
+  IDS_EXIF_TAG_9204, "Korekcia expozície"
+  IDS_EXIF_TAG_9205, "Maximálna clona"
+  IDS_EXIF_TAG_9206, "Vzdialenosť objektu"
+  IDS_EXIF_TAG_9207, "Režim merania"
+  IDS_EXIF_TAG_9208, "Svetelný zdroj"
+  IDS_EXIF_TAG_9209, "Blesk"
+  IDS_EXIF_TAG_920A, "Ohnisková vzdialenosť"
+  IDS_EXIF_TAG_9214, "Oblasť objektu"
+  IDS_EXIF_TAG_927C, "Poznámka výrobcu"
+  IDS_EXIF_TAG_9286, "Komentár používateľa"
+  IDS_EXIF_TAG_9290, "Zlomky sekundy"
+  IDS_EXIF_TAG_9291, "Zlomky sekundy (snímanie)"
+  IDS_EXIF_TAG_9292, "Zlomky sekundy (digitalizácia)"
+  IDS_EXIF_TAG_9C9B, "Názov"
+  IDS_EXIF_TAG_9C9C, "Komentáre"
+  IDS_EXIF_TAG_9C9D, "Autor"
+  IDS_EXIF_TAG_9C9E, "Kľúčové slová"
+  IDS_EXIF_TAG_9C9F, "Predmet"
+  IDS_EXIF_TAG_A000, "Verzia FlashPix"
+  IDS_EXIF_TAG_A001, "Farebný priestor"
+  IDS_EXIF_TAG_A002, "Šírka v pixeloch"
+  IDS_EXIF_TAG_A003, "Výška v pixeloch"
+  IDS_EXIF_TAG_A004, "Súvisiaci zvukový súbor"
+  IDS_EXIF_TAG_A005, "Ukazovateľ na IFD interoperability"
+  IDS_EXIF_TAG_A20B, "Energia blesku"
+  IDS_EXIF_TAG_A20C, "Priestorová frekvenčná odozva"
+  IDS_EXIF_TAG_A20E, "Vodorovné rozlíšenie ohniskovej roviny"
+  IDS_EXIF_TAG_A20F, "Zvislé rozlíšenie ohniskovej roviny"
+  IDS_EXIF_TAG_A210, "Jednotka rozlíšenia ohniskovej roviny"
+  IDS_EXIF_TAG_A214, "Poloha objektu"
+  IDS_EXIF_TAG_A215, "Expozičný index"
+  IDS_EXIF_TAG_A217, "Metóda snímania"
+  IDS_EXIF_TAG_A300, "Zdroj súboru"
+  IDS_EXIF_TAG_A301, "Typ scény"
+  IDS_EXIF_TAG_A302, "Vzor CFA"
+  IDS_EXIF_TAG_A401, "Vlastné spracovanie"
+  IDS_EXIF_TAG_A402, "Režim expozície"
+  IDS_EXIF_TAG_A403, "Vyváženie bielej"
+  IDS_EXIF_TAG_A404, "Pomer digitálneho priblíženia"
+  IDS_EXIF_TAG_A405, "Ohnisková vzdialenosť pre 35 mm film"
+  IDS_EXIF_TAG_A406, "Typ snímania scény"
+  IDS_EXIF_TAG_A407, "Riadenie zosilnenia"
+  IDS_EXIF_TAG_A408, "Kontrast"
+  IDS_EXIF_TAG_A409, "Sýtosť"
+  IDS_EXIF_TAG_A40A, "Ostrosť"
+  IDS_EXIF_TAG_A40B, "Popis nastavení zariadenia"
+  IDS_EXIF_TAG_A40C, "Rozsah vzdialenosti objektu"
+  IDS_EXIF_TAG_A420, "Jedinečné ID obrázka"
+  IDS_EXIF_TAG_A430, "Vlastník fotoaparátu"
+  IDS_EXIF_TAG_A431, "Sériové číslo fotoaparátu"
+  IDS_EXIF_TAG_A432, "Špecifikácia objektívu"
+  IDS_EXIF_TAG_A433, "Výrobca objektívu"
+  IDS_EXIF_TAG_A434, "Model objektívu"
+  IDS_EXIF_TAG_A435, "Sériové číslo objektívu"
+  IDS_EXIF_TAG_A460, "Zložený obrázok"
+  IDS_EXIF_TAG_A500, "Gama"
+  IDS_EXIF_GPS_0000, "Verzia GPS"
+  IDS_EXIF_GPS_0001, "Referencia zemepisnej šírky"
+  IDS_EXIF_GPS_0002, "Zemepisná šírka"
+  IDS_EXIF_GPS_0003, "Referencia zemepisnej dĺžky"
+  IDS_EXIF_GPS_0004, "Zemepisná dĺžka"
+  IDS_EXIF_GPS_0005, "Referencia nadmorskej výšky"
+  IDS_EXIF_GPS_0006, "Nadmorská výška"
+  IDS_EXIF_GPS_0007, "Čas GPS (UTC)"
+  IDS_EXIF_GPS_0008, "Satelity GPS"
+  IDS_EXIF_GPS_0009, "Stav prijímača GPS"
+  IDS_EXIF_GPS_000A, "Režim merania GPS"
+  IDS_EXIF_GPS_000B, "Presnosť GPS (DOP)"
+  IDS_EXIF_GPS_000C, "Jednotka rýchlosti"
+  IDS_EXIF_GPS_000D, "Rýchlosť"
+  IDS_EXIF_GPS_000E, "Referencia smeru pohybu"
+  IDS_EXIF_GPS_000F, "Smer pohybu"
+  IDS_EXIF_GPS_0010, "Referencia smeru snímky"
+  IDS_EXIF_GPS_0011, "Smer snímky"
+  IDS_EXIF_GPS_0012, "Geodetický dátum"
+  IDS_EXIF_GPS_0013, "Referencia zemepisnej šírky cieľa"
+  IDS_EXIF_GPS_0014, "Zemepisná šírka cieľa"
+  IDS_EXIF_GPS_0015, "Referencia zemepisnej dĺžky cieľa"
+  IDS_EXIF_GPS_0016, "Zemepisná dĺžka cieľa"
+  IDS_EXIF_GPS_0017, "Referencia azimutu cieľa"
+  IDS_EXIF_GPS_0018, "Azimut cieľa"
+  IDS_EXIF_GPS_0019, "Referencia vzdialenosti cieľa"
+  IDS_EXIF_GPS_001A, "Vzdialenosť cieľa"
+  IDS_EXIF_GPS_001B, "Metóda spracovania GPS"
+  IDS_EXIF_GPS_001C, "Informácie o oblasti GPS"
+  IDS_EXIF_GPS_001D, "Dátum GPS"
+  IDS_EXIF_GPS_001E, "Diferenciálna korekcia GPS"
+  IDS_EXIF_GPS_001F, "Chyba vodorovnej polohy GPS"
+  IDS_EXIF_VALUE_COMPRESSION_NONE, "Nekomprimované"
+  IDS_EXIF_VALUE_COMPRESSION_JPEG, "JPEG"
+  IDS_EXIF_VALUE_PHOTOMETRIC_RGB, "RGB"
+  IDS_EXIF_VALUE_PHOTOMETRIC_YCBCR, "YCbCr"
+  IDS_EXIF_VALUE_ORIENTATION_1, "Normálna"
+  IDS_EXIF_VALUE_ORIENTATION_2, "Zrkadlené vodorovne"
+  IDS_EXIF_VALUE_ORIENTATION_3, "Otočené o 180°"
+  IDS_EXIF_VALUE_ORIENTATION_4, "Zrkadlené zvisle"
+  IDS_EXIF_VALUE_ORIENTATION_5, "Zrkadlené vodorovne, otočené o 270° v smere hodinových ručičiek"
+  IDS_EXIF_VALUE_ORIENTATION_6, "Otočené o 90° v smere hodinových ručičiek"
+  IDS_EXIF_VALUE_ORIENTATION_7, "Zrkadlené vodorovne, otočené o 90° v smere hodinových ručičiek"
+  IDS_EXIF_VALUE_ORIENTATION_8, "Otočené o 270° v smere hodinových ručičiek"
+  IDS_EXIF_VALUE_PLANAR_CHUNKY, "Prekladaná"
+  IDS_EXIF_VALUE_PLANAR_PLANAR, "Planárna"
+  IDS_EXIF_VALUE_UNIT_NONE, "Žiadna"
+  IDS_EXIF_VALUE_UNIT_INCH, "Palec"
+  IDS_EXIF_VALUE_UNIT_CM, "Centimeter"
+  IDS_EXIF_VALUE_YCBCR_CENTERED, "Centrované"
+  IDS_EXIF_VALUE_YCBCR_COSITED, "Spoločne umiestnené"
+  IDS_EXIF_VALUE_PROGRAM_0, "Nedefinovaný"
+  IDS_EXIF_VALUE_PROGRAM_1, "Manuálny"
+  IDS_EXIF_VALUE_PROGRAM_2, "Normálny program"
+  IDS_EXIF_VALUE_PROGRAM_3, "Priorita clony"
+  IDS_EXIF_VALUE_PROGRAM_4, "Priorita uzávierky"
+  IDS_EXIF_VALUE_PROGRAM_5, "Kreatívny program"
+  IDS_EXIF_VALUE_PROGRAM_6, "Akčný program"
+  IDS_EXIF_VALUE_PROGRAM_7, "Režim portrét"
+  IDS_EXIF_VALUE_PROGRAM_8, "Režim krajina"
+  IDS_EXIF_VALUE_METERING_0, "Neznáme"
+  IDS_EXIF_VALUE_METERING_1, "Priemerové"
+  IDS_EXIF_VALUE_METERING_2, "Priemerové so zdôraznením stredu"
+  IDS_EXIF_VALUE_METERING_3, "Bodové"
+  IDS_EXIF_VALUE_METERING_4, "Viacbodové"
+  IDS_EXIF_VALUE_METERING_5, "Maticové"
+  IDS_EXIF_VALUE_METERING_6, "Selektívne"
+  IDS_EXIF_VALUE_METERING_255, "Iné"
+  IDS_EXIF_VALUE_LIGHT_0, "Neznámy"
+  IDS_EXIF_VALUE_LIGHT_1, "Denné svetlo"
+  IDS_EXIF_VALUE_LIGHT_2, "Žiarivka"
+  IDS_EXIF_VALUE_LIGHT_3, "Žiarovka (volfrámové svetlo)"
+  IDS_EXIF_VALUE_LIGHT_4, "Blesk"
+  IDS_EXIF_VALUE_LIGHT_9, "Pekné počasie"
+  IDS_EXIF_VALUE_LIGHT_10, "Zamračené počasie"
+  IDS_EXIF_VALUE_LIGHT_11, "Tieň"
+  IDS_EXIF_VALUE_LIGHT_12, "Žiarivka – denné svetlo"
+  IDS_EXIF_VALUE_LIGHT_13, "Žiarivka – denná biela"
+  IDS_EXIF_VALUE_LIGHT_14, "Žiarivka – studená biela"
+  IDS_EXIF_VALUE_LIGHT_15, "Žiarivka – biela"
+  IDS_EXIF_VALUE_LIGHT_16, "Žiarivka – teplá biela"
+  IDS_EXIF_VALUE_LIGHT_17, "Štandardné svetlo A"
+  IDS_EXIF_VALUE_LIGHT_18, "Štandardné svetlo B"
+  IDS_EXIF_VALUE_LIGHT_19, "Štandardné svetlo C"
+  IDS_EXIF_VALUE_LIGHT_20, "D55"
+  IDS_EXIF_VALUE_LIGHT_21, "D65"
+  IDS_EXIF_VALUE_LIGHT_22, "D75"
+  IDS_EXIF_VALUE_LIGHT_23, "D50"
+  IDS_EXIF_VALUE_LIGHT_24, "Štúdiová žiarovka ISO"
+  IDS_EXIF_VALUE_LIGHT_255, "Iný svetelný zdroj"
+  IDS_EXIF_VALUE_COLORSPACE_SRGB, "sRGB"
+  IDS_EXIF_VALUE_COLORSPACE_UNCALIBRATED, "Nekalibrovaný"
+  IDS_EXIF_VALUE_FPUNIT_NONE, "Žiadna"
+  IDS_EXIF_VALUE_FPUNIT_INCH, "Palec"
+  IDS_EXIF_VALUE_FPUNIT_CM, "Centimeter"
+  IDS_EXIF_VALUE_SENSING_1, "Nedefinovaná"
+  IDS_EXIF_VALUE_SENSING_2, "Jednočipový plošný farebný snímač"
+  IDS_EXIF_VALUE_SENSING_3, "Dvojčipový plošný farebný snímač"
+  IDS_EXIF_VALUE_SENSING_4, "Trojčipový plošný farebný snímač"
+  IDS_EXIF_VALUE_SENSING_5, "Plošný snímač so sekvenčným snímaním farieb"
+  IDS_EXIF_VALUE_SENSING_7, "Trilineárny snímač"
+  IDS_EXIF_VALUE_SENSING_8, "Lineárny snímač so sekvenčným snímaním farieb"
+  IDS_EXIF_VALUE_FILESOURCE_DSC, "Digitálny fotoaparát"
+  IDS_EXIF_VALUE_SCENETYPE_DIRECT, "Priamo fotografované"
+  IDS_EXIF_VALUE_RENDERED_0, "Normálne spracovanie"
+  IDS_EXIF_VALUE_RENDERED_1, "Vlastné spracovanie"
+  IDS_EXIF_VALUE_EXPMODE_0, "Automatická expozícia"
+  IDS_EXIF_VALUE_EXPMODE_1, "Manuálna expozícia"
+  IDS_EXIF_VALUE_EXPMODE_2, "Automatický bracketing"
+  IDS_EXIF_VALUE_WB_0, "Automatické vyváženie bielej"
+  IDS_EXIF_VALUE_WB_1, "Manuálne vyváženie bielej"
+  IDS_EXIF_VALUE_SCENE_0, "Štandardný"
+  IDS_EXIF_VALUE_SCENE_1, "Krajina"
+  IDS_EXIF_VALUE_SCENE_2, "Portrét"
+  IDS_EXIF_VALUE_SCENE_3, "Nočná scéna"
+  IDS_EXIF_VALUE_GAIN_0, "Žiadne"
+  IDS_EXIF_VALUE_GAIN_1, "Nízke zosilnenie"
+  IDS_EXIF_VALUE_GAIN_2, "Vysoké zosilnenie"
+  IDS_EXIF_VALUE_GAIN_3, "Nízke zoslabenie"
+  IDS_EXIF_VALUE_GAIN_4, "Vysoké zoslabenie"
+  IDS_EXIF_VALUE_CONTRAST_0, "Normálny"
+  IDS_EXIF_VALUE_CONTRAST_1, "Mäkký"
+  IDS_EXIF_VALUE_CONTRAST_2, "Tvrdý"
+  IDS_EXIF_VALUE_SATURATION_0, "Normálna"
+  IDS_EXIF_VALUE_SATURATION_1, "Nízka sýtosť"
+  IDS_EXIF_VALUE_SATURATION_2, "Vysoká sýtosť"
+  IDS_EXIF_VALUE_SHARPNESS_0, "Normálna"
+  IDS_EXIF_VALUE_SHARPNESS_1, "Mäkká"
+  IDS_EXIF_VALUE_SHARPNESS_2, "Tvrdá"
+  IDS_EXIF_VALUE_DISTANCE_0, "Neznáma"
+  IDS_EXIF_VALUE_DISTANCE_1, "Makro"
+  IDS_EXIF_VALUE_DISTANCE_2, "Blízky záber"
+  IDS_EXIF_VALUE_DISTANCE_3, "Vzdialený záber"
+  IDS_EXIF_VALUE_GPS_ABOVE_SEA, "Nad hladinou mora"
+  IDS_EXIF_VALUE_GPS_BELOW_SEA, "Pod hladinou mora"
+  IDS_EXIF_VALUE_GPS_NO_CORRECTION, "Bez korekcie"
+  IDS_EXIF_VALUE_GPS_CORRECTION, "S korekciou"
+  IDS_EXIF_VALUE_FLASH_FIRED, "Blesk sa spustil"
+  IDS_EXIF_VALUE_FLASH_NOT_FIRED, "Blesk sa nespustil"
+  IDS_EXIF_VALUE_FLASH_COMPULSORY, "vynútený blesk"
+  IDS_EXIF_VALUE_FLASH_SUPPRESSED, "vynútené potlačenie blesku"
+  IDS_EXIF_VALUE_FLASH_AUTO, "automatický režim"
+  IDS_EXIF_VALUE_FLASH_RETURN_DETECTED, "odrazené svetlo blesku zistené"
+  IDS_EXIF_VALUE_FLASH_RETURN_NOT_DETECTED, "odrazené svetlo blesku nezistené"
+  IDS_EXIF_VALUE_FLASH_RED_EYE, "redukcia červených očí"
+  IDS_EXIF_VALUE_FLASH_NO_FUNCTION, "Bez funkcie blesku"
+}

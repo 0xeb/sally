@@ -20,31 +20,31 @@
 
 #include "zip2sfx.rh"
 
-LPTSTR
-StrNChr(LPCTSTR lpStart, int nChar, char wMatch)
+// The SFX header and target-directory specification are code-page bytes.
+char* StrNChr(const char* lpStart, int nChar, char wMatch)
 {
     if (lpStart == NULL)
         return NULL;
-    int i = lstrlen(lpStart);
+    int i = lstrlenA(lpStart);
     if (i > nChar)
         i = nChar;
-    LPCTSTR lpEnd = lpStart + nChar;
+    const char* lpEnd = lpStart + i; // never past the terminator
     while (lpStart < lpEnd)
     {
         if (*lpStart == wMatch)
-            return (LPTSTR)lpStart;
+            return (char*)lpStart;
         lpStart++;
     }
     return NULL;
 }
 
-LPTSTR StrRChr(LPCTSTR lpStart, LPCTSTR lpEnd, char wMatch)
+char* StrRChr(const char* lpStart, const char* lpEnd, char wMatch)
 {
     lpEnd--;
     while (lpEnd >= lpStart)
     {
         if (*lpEnd == wMatch)
-            return (LPTSTR)lpEnd;
+            return (char*)lpEnd;
         lpEnd--;
     }
     return NULL;
@@ -71,7 +71,7 @@ BOOL WriteSFXHeader()
     CSelfExtrHeader header;
     int offs = sizeof(CSelfExtrHeader);
 
-    int l = lstrlen(Settings.Command);
+    int l = lstrlenA(Settings.Command);
     if (l)
     {
         header.CommandOffs = offs;
@@ -80,10 +80,10 @@ BOOL WriteSFXHeader()
     else
         header.CommandOffs = 0;
     header.TextOffs = offs;
-    l = lstrlen(Settings.Text);
+    l = lstrlenA(Settings.Text);
     offs += ++l;
     header.TitleOffs = offs;
-    l = lstrlen(Settings.Title);
+    l = lstrlenA(Settings.Title);
     offs += ++l;
     header.SubDirOffs = offs;
 
@@ -94,22 +94,22 @@ BOOL WriteSFXHeader()
     HKEY key;
     // no need to test the return value; it was verified earlier
     ParseTargetDir(Settings.TargetDir, &td, &sd, &sdl, &sdr, &key);
-    l = lstrlen(sd);
+    l = lstrlenA(sd);
     offs += ++l;
     header.AboutOffs = offs;
-    l = lstrlen(About);
+    l = lstrlenA(About);
     offs += ++l;
     header.ExtractBtnTextOffs = offs;
-    l = lstrlen(Settings.ExtractBtnText);
+    l = lstrlenA(Settings.ExtractBtnText);
     offs += ++l;
     header.VendorOffs = offs;
-    l = lstrlen(Settings.Vendor);
+    l = lstrlenA(Settings.Vendor);
     offs += ++l;
     header.WWWOffs = offs;
-    l = lstrlen(Settings.WWW);
+    l = lstrlenA(Settings.WWW);
     offs += ++l;
     header.ArchiveNameOffs = offs;
-    //l = lstrlen(archName);
+    //l = lstrlenA(archName);
     //ArchiveDataOffs += l; // we accounted for this earlier
     //offs += ++l;
     offs++;
@@ -122,23 +122,23 @@ BOOL WriteSFXHeader()
         if (!bs)
             offs += 1; // add a separator character between the subkey and value
     }
-    header.MBoxStyle = (lstrlen(Settings.MBoxTitle) ||
+    header.MBoxStyle = (lstrlenA(Settings.MBoxTitle) ||
                         !Settings.MBoxText.empty())
                            ? Settings.MBoxStyle
                            : -1;
     header.MBoxTitleOffs = offs;
-    l = lstrlen(Settings.MBoxTitle);
+    l = lstrlenA(Settings.MBoxTitle);
     offs += ++l;
     header.MBoxTextOffs = offs;
     if (!Settings.MBoxText.empty())
     {
-        l = lstrlen(Settings.MBoxText.c_str());
+        l = lstrlenA(Settings.MBoxText.c_str());
         offs += ++l;
     }
     else
         offs++;
     header.WaitForOffs = offs;
-    l = lstrlen(Settings.WaitFor);
+    l = lstrlenA(Settings.WaitFor);
     offs += Settings.Flags & SE_REMOVEAFTER ? ++l : 1;
 
     header.Signature = SELFEXTR_SIG;
@@ -152,23 +152,23 @@ BOOL WriteSFXHeader()
 
     if (!Write(ExeFile, &header, sizeof(CSelfExtrHeader)))
         return FALSE;
-    l = lstrlen(Settings.Command);
+    l = lstrlenA(Settings.Command);
     if (l &&
         !Write(ExeFile, Settings.Command, ++l))
         return FALSE;
-    if (!Write(ExeFile, Settings.Text, lstrlen(Settings.Text) + 1))
+    if (!Write(ExeFile, Settings.Text, lstrlenA(Settings.Text) + 1))
         return FALSE;
-    if (!Write(ExeFile, Settings.Title, lstrlen(Settings.Title) + 1))
+    if (!Write(ExeFile, Settings.Title, lstrlenA(Settings.Title) + 1))
         return FALSE;
-    if (!Write(ExeFile, (void*)sd, lstrlen(sd) + 1))
+    if (!Write(ExeFile, (void*)sd, lstrlenA(sd) + 1))
         return FALSE;
-    if (!Write(ExeFile, About, lstrlen(About) + 1))
+    if (!Write(ExeFile, About, lstrlenA(About) + 1))
         return FALSE;
-    if (!Write(ExeFile, Settings.ExtractBtnText, lstrlen(Settings.ExtractBtnText) + 1))
+    if (!Write(ExeFile, Settings.ExtractBtnText, lstrlenA(Settings.ExtractBtnText) + 1))
         return FALSE;
-    if (!Write(ExeFile, Settings.Vendor, lstrlen(Settings.Vendor) + 1))
+    if (!Write(ExeFile, Settings.Vendor, lstrlenA(Settings.Vendor) + 1))
         return FALSE;
-    if (!Write(ExeFile, Settings.WWW, lstrlen(Settings.WWW) + 1))
+    if (!Write(ExeFile, Settings.WWW, lstrlenA(Settings.WWW) + 1))
         return FALSE;
     if (!Write(ExeFile, "", 1))
         return FALSE;
@@ -211,13 +211,13 @@ BOOL WriteSFXHeader()
         if (!Write(ExeFile, "", 1))
             return FALSE;
     }
-    if (!Write(ExeFile, Settings.MBoxTitle, lstrlen(Settings.MBoxTitle) + 1))
+    if (!Write(ExeFile, Settings.MBoxTitle, lstrlenA(Settings.MBoxTitle) + 1))
         return FALSE;
     const char* str = Settings.MBoxText.c_str();
-    if (!Write(ExeFile, str, lstrlen(str) + 1))
+    if (!Write(ExeFile, str, lstrlenA(str) + 1))
         return FALSE;
     str = Settings.Flags & SE_REMOVEAFTER ? Settings.WaitFor : "";
-    if (!Write(ExeFile, str, lstrlen(str) + 1))
+    if (!Write(ExeFile, str, lstrlenA(str) + 1))
         return FALSE;
     return TRUE;
 }

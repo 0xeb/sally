@@ -10,7 +10,6 @@
 
 #include "common/unicode/WideTextRange.h"
 
-// when changing this header search for "BuiltForVersion" - tests for older plugin versions will no longer make sense and should be removed
 #define PLUGIN_REQVER 103 // ("5.0") load only plugins that return at least this required Salamander version
 
 //

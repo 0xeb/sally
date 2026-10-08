@@ -3,68 +3,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-#include "plugin_narrow_compat.h" // ToWideArg
-
-BOOL FileErrorL(int lastError, HWND parent, const char* fileName, int error,
-                BOOL retry, BOOL* skip, BOOL* skipAll, int title)
-{
-    CALL_STACK_MESSAGE1("FileError()");
-
-    std::wstring buffer = SPLLoadStrOwned(SG, HLanguage, error).c_str();
-    if (lastError != NO_ERROR)
-        buffer += SPLGetErrorTextOwned(SG, lastError);
-
-    if (title == -1)
-        title = IDS_SPLERROR;
-
-    if (skipAll && *skipAll)
-    {
-        if (skip)
-            *skip = TRUE;
-        return FALSE;
-    }
-
-    const std::wstring fileNameW = ToWideArg(fileName);
-    const std::wstring titleText = SPLLoadStrOwned(SG, HLanguage, title);
-
-    int ret;
-    if (retry)
-    {
-        if (skip)
-            ret = SG->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileNameW.c_str(), buffer.c_str(), titleText.c_str());
-        else
-            ret = SG->DialogError(parent, BUTTONS_RETRYCANCEL, fileNameW.c_str(), buffer.c_str(), titleText.c_str());
-    }
-    else
-    {
-        if (skip)
-            ret = SG->DialogError(parent, BUTTONS_SKIPCANCEL, fileNameW.c_str(), buffer.c_str(), titleText.c_str());
-        else
-            ret = SG->DialogError(parent, BUTTONS_OK, fileNameW.c_str(), buffer.c_str(), titleText.c_str());
-    }
-
-    switch (ret)
-    {
-    case DIALOG_RETRY:
-        return TRUE;
-
-    case DIALOG_SKIPALL:
-        if (skipAll)
-            *skipAll = TRUE;
-
-    case DIALOG_SKIP:
-        if (skip)
-            *skip = TRUE;
-        return FALSE;
-
-    //case DIALOG_OK:
-    //case DIALOG_CANCEL:
-    default:
-        if (skip)
-            *skip = FALSE;
-        return FALSE;
-    }
-}
 
 // ****************************************************************************
 //

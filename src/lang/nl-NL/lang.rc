@@ -1115,8 +1115,8 @@ BEGIN
     LTEXT           "Grootte:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "pixels",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " &Theme ",IDC_STATIC_7,1,192,295,30 // UNTRANSLATED
-    LTEXT           "Mode:",IDC_STATIC_8,8,206,21,8 // UNTRANSLATED
+    GROUPBOX        " &Thema ",IDC_STATIC_7,1,192,295,30
+    LTEXT           "Modus:",IDC_STATIC_8,8,206,45,8
     COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
 END
 
@@ -1272,7 +1272,7 @@ BEGIN
     CONTROL         "Inclusief &submappen",IDC_FIND_INCLUDE_SUBDIR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,55,87,12
     // This layout slot is intentionally reused by IDC_FIND_FILETYPE; archives remain hidden at runtime.
     CONTROL         "Inclusief archieven",IDC_FIND_INCLUDE_ARCHIVES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,55,87,12
-    LTEXT           "T&ype:",IDC_FIND_FILETYPE_TEXT,150,58,22,8 // UNTRANSLATED
+    LTEXT           "T&ype:",IDC_FIND_FILETYPE_TEXT,150,58,22,8
     COMBOBOX        IDC_FIND_FILETYPE,176,55,112,48,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     CONTROL         "Inc&lusief inhoud",IDC_FIND_GREP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,69,75,12
     CONTROL         "",IDC_FIND_LINE2,"Static",SS_ETCHEDHORZ | WS_GROUP,83,75,199,1
@@ -2053,13 +2053,13 @@ END
 
 IDD_DEFAULT_SHELL DIALOGEX 0, 0, 244, 72
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Default Shell" // UNTRANSLATED
+CAPTION "Standaardshell"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Open &Command Shell with:",IDC_STATIC_1,8,9,228,8 // UNTRANSLATED
+    LTEXT           "&Shellvenster openen met:",IDC_STATIC_1,8,9,228,8
     COMBOBOX        IDC_DEFAULT_SHELL_TARGET,8,20,228,108,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14 // UNTRANSLATED
-    PUSHBUTTON      "Cancel",IDCANCEL,186,50,50,14 // UNTRANSLATED
+    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,186,50,50,14
 END
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2531,7 +2531,7 @@ STRINGTABLE
  IDS_FIND_RESULTS_LOAD_EMPTY, "Er werden geen zoekresultaten geladen."
  IDS_FIND_RESULTS_LOAD_REPORT, "%u zoekresultaten geladen. %u ontbrekende of ongeldige paden overgeslagen."
  IDS_FIND_RESULTS_ANSI_ONLY, "De naam van dit item kan niet worden weergegeven in de codepagina van het systeem, en deze opdracht ondersteunt nog geen Unicode-namen.\nWissen en Resultaten Opslaan ondersteunen deze wel."
- IDS_FIND_HEX_INVALID, "The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes." // UNTRANSLATED
+ IDS_FIND_HEX_INVALID, "De tekst '%s' is geen geldig hexadecimaal patroon.\nGebruik paren van hexadecimale cijfers en plaats letterlijke tekst tussen dubbele aanhalingstekens."
 
  IDS_SEARCHFORCOLUMN1, "Masker"
  IDS_SEARCHFORCOLUMN2, "Pad"
@@ -4016,7 +4016,7 @@ IDS_OLDPLUGINVERSION2, "De plugin (%s) wordt niet door deze versie van Sally ond
  IDS_MASTERPASSWORD_REMOVED, "U hebt uw hoofdwachtwoord verwijderd. Uw opgeslagen wachtwoorden (bijvoorbeeld FTP en WinSCP) zullen niet worden beschermd."
  IDS_MASTERPASSWORD_SET, "Master wachtwoord succesvol gewijzigd. Uw opgeslagen wachtwoorden (bijvoorbeeld FTP en WinSCP) worden nu beveiligd door AES versleuteling."
  IDS_WRONG_MASTERPASSWORD, "U hebt niet het juiste hoofdwachtwoord ingegeven. Probeer het opnieuw."
- IDS_MASTERPASSWORD_TOO_LONG, "The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password." // UNTRANSLATED
+ IDS_MASTERPASSWORD_TOO_LONG, "Het UTF-8-gecodeerde hoofdwachtwoord overschrijdt de versleutelingslimiet.\nGebruik een korter wachtwoord."
 
  IDS_BROWSEDIRECTORY_TITLE, "Map Bladeren"
  IDS_BROWSEDIRECTORY_TEXT, "Kies de map die u wilt gebruiken."

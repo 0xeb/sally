@@ -549,8 +549,6 @@ CHeaderLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_TTGETTEXTW:
     {
-        // Answers the wide form, like every other core tooltip provider; the
-        // narrow WM_USER_TTGETTEXT fallback in CToolTip::GetText exists for v107 plugins.
         // The body has been commented out since long before this program - the header's
         // per-column tooltips are not wired up - so this only returns "no text".
         /*

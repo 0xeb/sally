@@ -5,7 +5,7 @@
 //---------------------------------------------------------------------------
 #define NO_WIN32_LEAN_AND_MEAN
 #include <vcl.h>
-#include "plugin_narrow_compat.h"
+#include "SalamandText.h"
 #pragma hdrstop
 
 #include <Consts.hpp>
@@ -58,7 +58,7 @@ bool WideToWinScpBytes(const wchar_t* Value, AnsiString& Result)
 bool WriteWinScpBytes(CSalamanderStringBuffer* Buffer, const AnsiString& Value)
 {
     return Buffer != NULL &&
-           sally::plugin_abi::WriteStringBuffer(*Buffer, ToWideArg(Value.c_str()));
+           sally::plugin_abi::WriteStringBuffer(*Buffer, SalWide(Value.c_str()));
 }
 }
 //---------------------------------------------------------------------------
@@ -825,7 +825,7 @@ void __fastcall CPluginFSInterface::PathChanged(const AnsiString Path,
             FPreloaded = true;
         }
         SalamanderGeneral()->PostChangeOnPathNotification(
-            ToWideArg(Path.c_str()).c_str(), IncludingSubDirs);
+            SalWide(Path.c_str()).c_str(), IncludingSubDirs);
     }
     else
     {
@@ -1361,7 +1361,7 @@ int __fastcall CPluginFSInterface::FileMenu(HWND Parent, int X, int Y)
                     MI.wID = fmMoveTo;
                     Enabled = FTerminal->IsCapable[fcRemoteMove];
                 }
-                const std::wstring CaptionW = ToWideArg(Caption.c_str());
+                const std::wstring CaptionW = SalWide(Caption.c_str());
                 MI.dwTypeData = const_cast<wchar_t*>(CaptionW.c_str());
                 MI.cch = static_cast<UINT>(CaptionW.size());
                 MI.fState = Enabled ? MFS_ENABLED : MFS_DISABLED;
@@ -1943,7 +1943,7 @@ void WINAPI CPluginFSInterface::Event(int Event, DWORD /*Param*/)
                     {
                         AnsiString ToolTip =
                             FMTLOAD(SAL_SECURE, (SessionInfo.SecurityProtocolName));
-                        SalamanderGeneral()->ShowSecurityIcon(Panel, true, true, ToWideArg(ToolTip.c_str()).c_str());
+                        SalamanderGeneral()->ShowSecurityIcon(Panel, true, true, SalWide(ToolTip.c_str()).c_str());
                     }
                 }
             }

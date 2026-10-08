@@ -1,0 +1,1033 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Chinese (Simplified) (zh-CN) resources for pictview. Translation: Michael Lu.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pictview/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pictview.rh2"
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+DLG_WIAPROGRESS DIALOGEX 0, 0, 214, 63
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_CENTER
+CAPTION "扫描图像"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "取消",IDCANCEL,157,43,50,14
+    LTEXT           "",IDC_WIAPROGR_MESSAGE,7,7,200,8
+    CONTROL         "",IDC_WIAPROGR_BAR,"msctls_progress32",WS_BORDER,7,22,200,14
+END
+
+DLG_ABOUT DIALOGEX 87, 50, 341, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "关于插件"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "关闭",IDCANCEL,282,114,50,14
+    ICON            "",IDC_ABOUT_ICON,11,9,20,20
+    LTEXT           "PictView %s - 用于 Sally 的图像查看器",IDC_ABOUT_TITLE,46,9,288,8
+    LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,288,8,SS_NOPREFIX
+    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,124,8
+    LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,277,8
+    LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
+    LTEXT           "Email:",IDC_STATIC_6,46,81,23,8
+    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,71,81,85,8,WS_TABSTOP
+    LTEXT           "主页:",IDC_STATIC_7,46,92,22,8
+    LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,71,92,122,8,WS_TABSTOP
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,339,1
+END
+
+DLG_CFGPAGE_APPEARANCE DIALOGEX 66, 53, 268, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "外观"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "窗口大小",IDC_STATIC_1,6,5,256,53,WS_GROUP
+    CONTROL         "和 Sally 的一样(&M)",IDC_CFGAPP_WINPOS_SAME,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,151,12
+    CONTROL         "如果需要就更大，但是不会更小(&L)",IDC_CFGAPP_WINPOS_LARGER,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,148,12
+    CONTROL         "跟随需要(&N)",IDC_CFGAPP_WINPOS_ANY,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,41,148,12
+    GROUPBOX        "默认缩放",IDC_STATIC_2,6,60,256,67,WS_GROUP
+    CONTROL         "适应完整(无滚动条)(&F)",IDC_CFGAPP_ZOOM_WHOLE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,72,151,12
+    CONTROL         "适应宽度(无水平滚动条)(&W)",IDC_CFGAPP_ZOOM_WIDTH,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,84,148,12
+    CONTROL         "原始大小(&O)",IDC_CFGAPP_ZOOM_ORIG,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,96,148,12
+    CONTROL         "全屏(&S)",IDC_CFGAPP_ZOOM_FSCREEN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,108,148,12
+    CONTROL         "在标题栏中显示图像文件路径(&P)",IDC_CFGAPP_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,167,12
+END
+
+DLG_CFGPAGE_COLORS DIALOGEX 66, 53, 268, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "颜色"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "窗口模式",IDC_STATIC_1,6,5,256,50,WS_GROUP
+    LTEXT           "背景(&B)",IDC_STATIC_2,17,19,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_BORDER,128,16,27,14
+    LTEXT           "透明(&T)",IDC_STATIC_3,17,36,91,8
+    PUSHBUTTON      "",IDC_CFGCLR_BKGND,128,33,27,14
+    GROUPBOX        "全屏模式",IDC_STATIC_4,6,60,256,50,WS_GROUP
+    LTEXT           "背景(&A)",IDC_STATIC_5,17,75,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BORDER,128,72,27,14
+    LTEXT           "透明(&R)",IDC_STATIC_6,17,92,44,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BKGND,128,89,27,14
+END
+
+DLG_CFGPAGE_KEYBOARD DIALOGEX 66, 53, 268, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "键盘 && 鼠标"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "PageUp && PageDown 键，鼠标滚轮",IDC_STATIC_1,6,5,256,43,WS_GROUP
+    CONTROL         "用于图像滚动(&S)",IDC_CFGKBD_PGDNUP_SCR,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,203,12
+    CONTROL         "用于访问上一个/下一个图像(&I)",IDC_CFGKBD_PGDNUP_PREV,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,218,12
+END
+
+DLG_CFGPAGE_TOOLS DIALOGEX 66, 53, 268, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "工具"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "选择工具",IDC_STATIC_1,6,5,256,94,WS_GROUP
+    LTEXT           "当按住 Shift 键时选择的区域:",IDC_STATIC_2,17,18,150,8
+    CONTROL         "正方形(&S)",IDC_CFGTOOLS_SQUARE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,24,27,203,12
+    CONTROL         "&4:3 长方形",IDC_CFGTOOLS_4_3,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,40,218,12
+    CONTROL         "&3:2 长方形",IDC_CFGTOOLS_3_2,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,53,218,12
+    CONTROL         "&16:9 长方形",IDC_CFGTOOLS_16_9,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,66,218,12
+    CONTROL         "其他(&O):",IDC_CFGTOOLS_OTHER,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,79,45,12
+    EDITTEXT        IDC_CFGTOOLS_RATIO_X,70,79,17,12,ES_NUMBER | WS_GROUP
+    LTEXT           ":",IDC_STATIC_3,89,81,4,8
+    EDITTEXT        IDC_CFGTOOLS_RATIO_Y,93,79,17,12,ES_NUMBER
+    CONTROL         "颜色吸管以十六进制挑选颜色(&X)",IDC_CFGTOOLS_PIPHEX,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,106,167,12
+END
+
+DLG_CFGPAGE_ADVANCED DIALOGEX 66, 53, 268, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "高级"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "文件面板中的缩略图",IDC_STATIC_7,6,5,256,69,WS_GROUP
+    LTEXT           "一些图像可能包含不正确的缩略图，这些缩略图没有正确旋转或没有反应最新的变更。",IDC_STATIC_8,14,18,240,16
+    CONTROL         "忽略存储在图像文件中的原始缩略图(更慢)(&I)",IDC_CFGADV_CREATE_THUMBNAILS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,35,200,12
+    LTEXT           "",IDC_STATIC_9,14,51,241,1,SS_ETCHEDHORZ | WS_GROUP
+    LTEXT           "不创建图像的缩略图如果大于(&T)",IDC_STATIC_10,14,59,124,8
+    EDITTEXT        IDC_CFGADV_THUMB_MP,139,57,17,12,ES_NUMBER
+    LTEXT           "万像素。",IDC_STATIC_11,159,59,44,8
+    CONTROL         "自动旋转 EXIF JPEG 图像(数码相机照片)(&R)",IDC_CFGADV_AUTOROTATE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,77,200,12
+    CONTROL         "文件保存成功时显示消息框(&S)",IDC_CFGADV_SAVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,89,167,12
+    CONTROL         "当保存截图，扫描，剪贴板粘贴时记住路径(&P)",IDC_CFGADV_REMEMBER_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,101,235,12
+END
+
+DLG_IMGPROP DIALOGEX 106, 34, 175, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "图像属性"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "关闭",1,64,182,50,14,WS_GROUP
+    PUSHBUTTON      "帮助",IDHELP,120,182,50,14
+    LTEXT           "页(&P):",IDC_IMGPROP_PAGENUM_LBL,7,10,24,8
+    EDITTEXT        IDC_IMGPROP_PAGENUM,67,8,100,12,ES_READONLY
+    LTEXT           "宽(&W):",IDC_STATIC_1,7,24,26,8
+    EDITTEXT        IDC_IMGPROP_WIDTH,67,22,100,12,ES_READONLY
+    LTEXT           "高(&H):",IDC_STATIC_2,7,38,24,8
+    EDITTEXT        IDC_IMGPROP_HEIGHT,67,36,100,12,ES_READONLY
+    LTEXT           "颜色(&C):",IDC_STATIC_3,7,52,33,8
+    EDITTEXT        IDC_IMGPROP_COLORS,67,50,100,12,ES_READONLY
+    LTEXT           "内存中大小(&S):",IDC_STATIC_4,7,66,58,8
+    EDITTEXT        IDC_IMGPROP_SIZE,67,64,100,12,ES_READONLY
+    LTEXT           "文件大小(&F):",IDC_STATIC_5,7,80,49,8
+    EDITTEXT        IDC_IMGPROP_FSIZE,67,78,100,12,ES_READONLY
+    LTEXT           "&DPI:",IDC_STATIC_6,7,94,17,8
+    EDITTEXT        IDC_IMGPROP_DPI,67,92,100,12,ES_READONLY
+    LTEXT           "格式(&R):",IDC_STATIC_7,7,108,33,8
+    EDITTEXT        IDC_IMGPROP_FMT,67,106,100,12,ES_READONLY
+    LTEXT           "压缩(&O):",IDC_STATIC_8,7,122,33,8
+    EDITTEXT        IDC_IMGPROP_COMPR,67,120,100,12,ES_READONLY
+    LTEXT           "注释(&M):",IDC_STATIC_9,7,136,34,8
+    EDITTEXT        IDC_IMGPROP_COMMENT,67,134,100,36,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY
+    LTEXT           "",IDC_STATIC_10,2,176,172,1,SS_ETCHEDHORZ | WS_GROUP
+END
+
+DLG_IMGEXIF DIALOGEX 57, 60, 391, 151
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "EXIF"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_IMGEXIF_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_BORDER | WS_GROUP | WS_TABSTOP,5,4,381,80
+    EDITTEXT        IDC_IMGEXIF_INFO,5,89,381,38,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_CLIPSIBLINGS | WS_VSCROLL | WS_GROUP
+    CONTROL         "分组高亮的项目(&G)",IDC_IMGEXIF_GROUP,"Button",BS_AUTOCHECKBOX | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,5,133,93,12
+    CONTROL         "高亮(&H)",IDC_IMGEXIF_HIGHLIGHT,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,110,132,50,14
+    PUSHBUTTON      "复制(&C)",IDC_IMGEXIF_COPY,166,132,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "确定",IDOK,222,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "取消",IDCANCEL,278,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "帮助",IDHELP,334,132,50,14
+END
+
+DLG_ZOOM DIALOGEX 85, 100, 121, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "缩放到"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "放大率(&M):",IDC_STATIC_1,8,13,49,8,NOT WS_GROUP
+    COMBOBOX        IDC_ZOOM_ZOOM,57,11,44,156,CBS_DROPDOWN | WS_TABSTOP
+    LTEXT           "%",IDC_STATIC_2,105,13,9,8
+    PUSHBUTTON      "确定",IDOK,7,37,50,14,BS_CENTER
+    PUSHBUTTON      "取消",IDCANCEL,63,37,50,14,BS_CENTER
+END
+
+DLG_PAGE DIALOGEX 85, 100, 121, 54
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "转到页"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "页(&P):",IDC_STATIC_1,8,9,24,8,NOT WS_GROUP
+    COMBOBOX        IDC_PAGE_PAGE,38,7,74,124,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "确定",IDOK,7,32,50,14,BS_CENTER
+    PUSHBUTTON      "取消",IDCANCEL,64,32,50,14,BS_CENTER
+END
+
+DLG_CAPTURE DIALOGEX 98, 61, 179, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "屏幕捕捉"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "捕捉",IDC_STATIC_1,6,6,167,81,WS_GROUP
+    CONTROL         "全屏(&F)",IDC_CAPTURE_FULL,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,19,41,12
+    CONTROL         "前台应用程序(&P)",IDC_CAPTURE_APPL,"Button",BS_AUTORADIOBUTTON,16,31,75,12
+    CONTROL         "前台窗口(&W)",IDC_CAPTURE_WINDOW,"Button",BS_AUTORADIOBUTTON,16,43,61,12
+    CONTROL         "前台窗口的客户区域(&A) ",IDC_CAPTURE_CLIENT,
+                    "Button",BS_AUTORADIOBUTTON,16,55,104,12
+    CONTROL         "虚拟屏幕(为多显示器)(&V)",IDC_CAPTURE_VIRTUAL,
+                    "Button",BS_AUTORADIOBUTTON,16,67,107,12
+    GROUPBOX        "捕捉触发器",IDC_STATIC_2,6,92,167,49,WS_GROUP
+    CONTROL         "热键(&H)",IDC_CAPTURE_HOTKEY,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,106,41,12
+    CONTROL         "计时器(&T)",IDC_CAPTURE_TIMER,"Button",BS_AUTORADIOBUTTON,16,121,50,12
+    CONTROL         "",IDC_CAPTURE_HOTKEY_VAL,"msctls_hotkey32",WS_GROUP | WS_TABSTOP,67,106,77,12
+    EDITTEXT        IDC_CAPTURE_TIMER_VAL,67,121,21,12
+    LTEXT           "秒",IDC_STATIC_3,92,123,11,8
+    CONTROL         "包括鼠标光标(&I)",IDC_CAPTURE_CURSOR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,147,73,12
+    LTEXT           "",IDC_STATIC_4,2,167,176,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "捕捉(&C)",IDOK,8,172,50,14,BS_CENTER | WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,64,172,50,14,BS_CENTER
+    PUSHBUTTON      "帮助",IDHELP,120,172,50,14,BS_CENTER
+END
+
+IDD_RENAMEDIALOG DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "重命名文件"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_PATH,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "确定",IDOK,59,43,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,118,43,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 15, 34, 340, 89
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "确认文件覆盖"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "覆盖文件:",IDC_STATIC_1,5,14,39,8
+    LTEXT           "",IDS_SOURCENAME,48,14,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_SOURCEATTR,48,24,286,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "用文件:",IDC_STATIC_2,5,37,39,8,NOT WS_GROUP
+    LTEXT           "",IDS_TARGETNAME,48,37,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_TARGETATTR,48,47,286,8,SS_NOPREFIX | NOT WS_GROUP
+    DEFPUSHBUTTON   "是(&Y)",IDYES,86,66,50,14,WS_GROUP
+    PUSHBUTTON      "否(&N)",IDNO,145,66,50,14
+    PUSHBUTTON      "取消",IDCANCEL,204,66,50,14
+END
+
+IDD_COPYTO DIALOGEX 15, 34, 316, 121
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "复制文件到"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&1",IDC_COPYTO_RB_1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,8,10,18,12
+    CONTROL         "&2",IDC_COPYTO_RB_2,"Button",BS_AUTORADIOBUTTON,8,27,18,12
+    CONTROL         "&3",IDC_COPYTO_RB_3,"Button",BS_AUTORADIOBUTTON,8,44,18,12
+    CONTROL         "&4",IDC_COPYTO_RB_4,"Button",BS_AUTORADIOBUTTON,8,61,18,12
+    CONTROL         "&5",IDC_COPYTO_RB_5,"Button",BS_AUTORADIOBUTTON,8,78,18,12
+    EDITTEXT        IDC_COPYTO_EL_1,29,10,221,12,WS_GROUP
+    PUSHBUTTON      "浏览(&B)...",IDC_COPYTO_BR_1,256,9,50,14
+    EDITTEXT        IDC_COPYTO_EL_2,29,27,221,12
+    PUSHBUTTON      "浏览(&R)...",IDC_COPYTO_BR_2,256,26,50,14
+    EDITTEXT        IDC_COPYTO_EL_3,29,44,221,12
+    PUSHBUTTON      "浏览(&O)...",IDC_COPYTO_BR_3,256,43,50,14
+    EDITTEXT        IDC_COPYTO_EL_4,29,61,221,12
+    PUSHBUTTON      "浏览(&W)...",IDC_COPYTO_BR_4,256,60,50,14
+    EDITTEXT        IDC_COPYTO_EL_5,29,78,221,12
+    PUSHBUTTON      "浏览(&S)...",IDC_COPYTO_BR_5,256,77,50,14
+    DEFPUSHBUTTON   "确定",IDOK,142,100,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,199,100,50,14
+    PUSHBUTTON      "帮助",IDHELP,256,100,50,14
+END
+
+IDD_SAVEEX DIALOGEX 0, 0, 400, 20
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CLIPSIBLINGS
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "压缩(&C):",IDC_SAVE_COMPRESSION_LABEL,5,2,33,8
+    COMBOBOX        IDC_SAVE_COMPRESSION,58,0,170,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "选项(&O)",IDC_SAVE_ADVANCED,234,0,50,14,WS_GROUP
+    LTEXT           "颜色深度(&D):",IDC_STATIC_2,5,26,49,8
+    COMBOBOX        IDC_SAVE_BIT_DEPTH,58,24,70,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "旋转(&R):",IDC_STATIC_3,5,46,49,8
+    COMBOBOX        IDC_SAVE_ROTATION,58,44,70,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "翻转/镜像(&F):",IDC_STATIC_4,5,66,52,8
+    COMBOBOX        IDC_SAVE_FLIP,58,64,70,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "颜色反相(负)(&N)",IDC_SAVE_INVERT,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_GROUP | WS_TABSTOP,5,82,115,12
+    LTEXT           "注释(&E):",IDC_SAVE_COMMENT_STATIC,5,94,49,8
+    EDITTEXT        IDC_SAVE_COMMENT,5,104,122,41,ES_MULTILINE | WS_GROUP
+    GROUPBOX        "GIF",IDC_SAVE_GROUP_GIF,134,20,144,25,WS_GROUP
+    CONTROL         "交错(&I)",IDC_SAVE_GIF_INTERLACED,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,139,30,50,12
+    CONTROL         "创建 &GIF89a",IDC_SAVE_GIF_89a,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,207,30,60,12
+    GROUPBOX        "JPEG, TIFF-JPEG",IDC_SAVE_GROUP_JPEG,134,50,144,45,WS_GROUP
+    LTEXT           "质量(&Q):",IDC_SAVE_JPEG_STATIC1,139,61,40,8
+    EDITTEXT        IDC_SAVE_JPEG_QUALITY,191,59,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "%",IDC_SAVE_JPEG_STATIC2,214,61,40,8
+    LTEXT           "二次抽样(&S):",IDC_SAVE_JPEG_STATIC3,139,80,50,8
+    COMBOBOX        IDC_SAVE_JPEG_SUBSAMPLING,191,78,33,40,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    GROUPBOX        "TIFF",IDC_SAVE_GROUP_TIFF,134,100,144,45,WS_GROUP
+    CONTROL         "制作条(&M)",IDC_SAVE_TIFF_MAKE_STRIPS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,139,110,50,12
+    LTEXT           "条大小(&Z):",IDC_SAVE_TIFF_STATIC1,149,126,41,8
+    EDITTEXT        IDC_SAVE_TIFF_STRIP_SIZE,191,124,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "KB",IDC_SAVE_TIFF_STATIC2,214,126,40,8
+END
+
+IDD_PRINT DIALOGEX 10, 24, 419, 227
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "打印"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_PRINT_PREVIEW,"Static",SS_WHITEFRAME | SS_NOPREFIX | WS_GROUP,6,7,211,195
+    GROUPBOX        " 打印机 ",IDC_STATIC_4,225,4,186,27
+    LTEXT           "",IDC_PRINT_PRINTER,232,15,118,8
+    PUSHBUTTON      "设置(&S)...",IDC_PRINT_SETUP,354,12,50,14,WS_GROUP
+    GROUPBOX        " 位置 ",IDC_STATIC_1,225,35,186,62
+    RTEXT           "左(&L):",IDC_STATIC_2,238,49,25,8
+    EDITTEXT        IDC_PRINT_LEFT,267,47,45,12
+    COMBOBOX        IDC_PRINT_LEFT_UNITS,318,47,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "顶(&T):",IDC_STATIC_3,238,68,25,8
+    EDITTEXT        IDC_PRINT_TOP,267,66,45,12
+    COMBOBOX        IDC_PRINT_TOP_UNITS,318,66,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "居中图像(&C)",IDC_PRINT_CENTER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,267,82,60,12
+    GROUPBOX        " 缩放打印大小 ",IDC_STATIC_5,225,102,186,100
+    RTEXT           "缩放(&E):",IDC_STATIC_6,231,118,32,8
+    EDITTEXT        IDC_PRINT_SCALE,267,116,35,12
+    LTEXT           "%",IDC_STATIC_7,305,118,10,8
+    CONTROL         "缩放以适应媒体(&F)",IDC_PRINT_FIT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,318,111,84,12
+    CONTROL         "保持宽高比(&K)",IDC_PRINT_ASPECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,318,123,70,12
+    RTEXT           "宽(&W):",IDC_STATIC_8,231,139,32,8
+    EDITTEXT        IDC_PRINT_WIDTH,267,137,45,12
+    COMBOBOX        IDC_PRINT_WIDTH_UNITS,318,137,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "高(&H):",IDC_STATIC_9,231,158,32,8
+    EDITTEXT        IDC_PRINT_HEIGHT,267,156,45,12
+    COMBOBOX        IDC_PRINT_HEIGHT_UNITS,318,156,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "显示边界框(&B)",IDC_PRINT_BOX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,267,173,80,12
+    CONTROL         "打印选中区域(&A)",IDC_PRINT_SELECTION,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,267,185,77,12
+    DEFPUSHBUTTON   "确定",IDOK,252,208,50,14,WS_GROUP
+    PUSHBUTTON      "取消",IDCANCEL,307,208,50,14
+    PUSHBUTTON      "帮助",IDHELP,362,208,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "PictView"
+  IDS_PLUGIN_DESCRIPTION, "快速文件查看器和转换器。"
+  IDS_LOWMEMORY, "低内存"
+  IDS_SOME_WINS_OPENED, "一些 PictView 窗口还打开着。你要关闭它们吗？"
+  IDS_ERROR_OPENING, "无法打开文件 %s:\n%s"
+  IDS_ERROR_OPENING_CONTINUE, "(%d) %hs 这个文件不能被处理。继续吗？"
+  IDS_TITLE, "%s (%d x %d x %s - %i%%) - %s"
+  IDS_TITLE_MULTI, "%s (%d x %d x %s [%d of %d] - %i%%) - %s"
+  IDS_NCOLORS, "{!}%d 颜色{}"
+  IDS_NCOLORS_CMYK, "CMYK"
+  IDS_NCOLORS_LAB, "LAB"
+
+  IDS_ERROR_CALLING_PVW32_DLL, "调用 PVW32Cnv.DLL 错误"
+  IDS_CLIPBOARD_TITLE, "<剪贴板>"
+  IDS_CAPTURE_TITLE, "<屏幕捕捉>"
+  IDS_SCAN_TITLE, "<扫描>"
+  IDS_DELETED_TITLE, "<已删除>"
+  IDS_CLIPBOARD_FNAME, "剪贴板"
+  IDS_CAPTURE_FNAME, "捕捉"
+  IDS_SCAN_FNAME, "扫描"
+  IDS_RGB, "红: %i, 绿: %i, 蓝: %i"
+  IDS_RGB_HEX, "红: %#02x, 绿: %#02x, 蓝: %#02x"
+  IDS_RGBXY, "(%i, %i): 红: %i, 绿: %i, 蓝: %i"
+  IDS_RGBXY_HEX, "(%i, %i): 红: %#02x, 绿: %#02x, 蓝: %#02x"
+  IDS_INDEX, ", 索引: %i"
+
+  IDS_VIEW_BMP_IN_CLIPBOARD, "从剪贴板查看位图(&C)"
+  IDS_PLUGINSMENU_SCREEN_CAPTURE, "屏幕捕捉(&S)..."
+  IDS_PLUGINSMENU_REGENERATE_THUMBNAIL, "更新缩略图(&U)"
+  IDS_PLUGINSMENU_SCAN, "扫描图像(&A)..."
+  IDS_PIXELS, "{!}%d 像素{}"
+  IDS_BYTES, "{!}%d 字节{}"
+  IDS_OF, "%d 分之 %d"
+  IDS_FRAMES, "边框(&R):"
+  IDS_IMGPROP_GRAY_NBIT, "灰度 %d位"
+  IDS_UNKNOWN, "未知"
+  IDS_CFG_CONFLICT, "配置已经打开。"
+  IDS_CONFIGURATION_TITLE, "PictView 配置"
+  IDS_ERRORTITLE, "PictView 错误"
+  IDS_BADTIMER, "时间延迟必须在 1 到 360 秒范围内。"
+  IDS_BADHOTKEY, "分配某个可用的热键。"
+  IDS_CAPTURECANCELED, "屏幕捕捉被取消。"
+  IDS_CAPTURING, "屏幕捕捉"
+  IDS_EMPTY, "空"
+  IDS_SELECTTARGETDIR, "选择目标目录。"
+  IDS_SPECIFYPATH, "此处必须指定有效的绝对或相对路径。"
+  IDS_PICTVIEWPLUGINNAME, "PictView 插件(图像查看器和转换器)"
+
+
+  // !WARNING! 2 following variables must be synchronized with IDS_SAVEASFILTERMONO & IDS_SAVEASFILTERCOLOR:
+  // G.LastSaveAsFilterIndexMono  = 14; // index is 1-based (IDS_SAVEASFILTERMONO: 14=BMP)
+  // G.LastSaveAsFilterIndexColor = 13; // index is 1-based (IDS_SAVEASFILTERCOLOR: 13=BMP)
+  // !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING!
+
+  IDS_SAVEASFILTERMONO, "Autodesk CEL (*.cel)|*.cel|Amiga 交换格式 (*.iff,*.lbm)|*.iff;*.lbm|电脑服务 GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|便携式位图 (*.pbm,*.ppm)|*.pbm;*.ppm|便携式网络图形 (*.png)|*.png|Silicon 图形 (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|视频租赁盒 SKA (*.ska)|*.ska|Windows 位图 (*.bmp)|*.bmp|无线位图 (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEASFILTERCOLOR, "Autodesk CEL (*.cel)|*.cel|Amiga 交换格式 (*.iff,*.lbm)|*.iff;*.lbm|电脑服务 GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|便携式位图 (*.pnm,*.ppm)|*.pnm;*.ppm|便携式网络图形 (*.png)|*.png|Silicon 图形 (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows 位图 (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEERROR, "无法保存图像。\n错误: %hs"
+  IDS_SAVE_AS_SUCCESS, "图像保存成功。"
+  IDS_SAVE_LOST_ALPHA, "原始图像包含 alpha 通道。但是，它已经和图像数据及当前背景合并。\n因此 alpha 通道将不会被保存。无论如何要保存吗？"
+  IDS_CANCELED_BY_USER, "图像保存被用户取消。没有创建输出文件。"
+  IDS_OPENFILTER, "常见的图形文件 (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|All Files (*.*)|*.*|"
+  IDS_CUSTOM_COLOR, "自定义颜色(&C)..."
+  IDS_AUTOMATIC_COLOR, "自动颜色(&A)"
+  IDS_SAL_IS_BUSY, "Sally 正忙。请求的命令无法被完成，请稍候再试。"
+  IDS_RENAME_TO, "重命名文件 ""%s"" 到"
+  IDS_ERRORRENAMINGFILE, "重命名文件错误"
+  IDS_TOOLONGNAME, "由于太长的名称不能完成操作。"
+  IDS_LOADEXIF, "无法加载 EXIF 库 %s."
+  IDS_EXIF_TAG, "标签"
+  IDS_EXIF_VALUE, "值"
+  IDS_EXIF_LOCALIZATION_FNAME, "en.po"
+
+  IDS_MENU_FILE, "文件(&F)"
+  IDS_MENU_FILE_OPEN, "打开(&O)...\tCtrl+O"
+  IDS_MENU_FILE_REFRESH, "恢复(&V)\tCtrl+R"
+  IDS_MENU_FILE_PREV, "前一个(&V)\tBackspace"
+  IDS_MENU_FILE_NEXT, "下一个(&N)\tSpace"
+  IDS_MENU_FILE_SAVEAS, "另存为(&S)...\tCtrl+S"
+  IDS_MENU_FILE_WALLPAPER, "设为壁纸(&W)"
+  IDS_MENU_WALLPARER_CENTER, "居中(&C)"
+  IDS_MENU_WALLPARER_TILE, "平铺(&T)"
+  IDS_MENU_WALLPARER_STRETCH, "拉伸(&S)"
+  IDS_MENU_WALLPARER_RESTORE, "还原前一个(&R)"
+  IDS_MENU_WALLPARER_NONE, "无(&N)"
+  IDS_MENU_FILE_CAPTURE, "屏幕捕捉(&C)...\tQ"
+  IDS_MENU_FILE_SCAN, "扫描图像(&A)...\tW"
+  IDS_MENU_FILE_SCAN_SOURCE, "选择扫描仪来源(&L)..."
+  IDS_MENU_FILE_PROP, "属性(&I)...\tI"
+  IDS_MENU_FILE_EXIF, "显示 EXIF(&H)...\tE"
+  IDS_MENU_FILE_HISTOGRAM, "显示柱状图(&G)...\tCtrl+H"
+  IDS_MENU_FILE_PAGE, "页面设置(&G)...\tCtrl+Shift+P"
+  IDS_MENU_FILE_PRINT, "打印(&P)...\tCtrl+P"
+  IDS_MENU_FILE_FILES, "最近的文件(&E)"
+  IDS_MENU_FILE_DIRS, "最近的目录(&N)"
+  IDS_MENU_FILE_EXIT, "退出(&X)\tEsc"
+  IDS_MENU_FILE_OTHER, "其他文件(&T)"
+  IDS_MENU_FILE_FIRST, "第一个(&F)\tShift+Backspace"
+  IDS_MENU_FILE_LAST, "最后一个(&L)\tShift+Space"
+  IDS_MENU_FILE_FOCUS, "焦点(&F)\tF"
+  IDS_MENU_FILE_SELCRCFILE, "选择/取消选择面板或""查找""中打开的文件(&U)\tInsert"
+  IDS_MENU_FILE_RENAME, "重命名(&R)...\tF2"
+  IDS_MENU_FILE_DELETE, "删除(&D)\tDel"
+  IDS_MENU_FILE_PREVSEL, "上一个选中的(&O)\tCtrl+Backspace"
+  IDS_MENU_FILE_NEXTSEL, "下一个选中的(&E)\tCtrl+Space"
+  IDS_MENU_FILE_COPYTO, "复制到(&Y)...\tX"
+
+  IDS_MENU_EDIT, "编辑(&E)"
+  IDS_MENU_EDIT_COPY, "复制(&C)\tCtrl+C"
+  IDS_MENU_EDIT_PASTE, "粘贴(&P)\tCtrl+V"
+  IDS_MENU_EDIT_SELECTALL, "选择全部(&A)\tCtrl+A"
+  IDS_MENU_EDIT_DESELECT, "取消选择全部(&D)\tCtrl+D"
+  IDS_MENU_EDIT_CROP, "裁剪(&O)\tC"
+  IDS_MENU_EDIT_180, "旋转 &180°\tT"
+  IDS_MENU_EDIT_RIGHT, "向右旋转(&R)\tR"
+  IDS_MENU_EDIT_LEFT, "向左旋转(&L)\tL"
+  IDS_MENU_EDIT_FLIPH, "水平翻转(&H)\tH"
+  IDS_MENU_EDIT_FLIPV, "垂直翻转(&V)\tV"
+
+  IDS_MENU_VIEW, "查看(&V)"
+  IDS_MENU_VIEW_ZOOMIN, "放大(&I)\t+"
+  IDS_MENU_VIEW_ZOOMOUT, "缩小(&O)\t-"
+  IDS_MENU_VIEW_ZOOM, "缩放到(&Z)...\tM"
+  IDS_MENU_VIEW_WHOLE, "适应窗口(&F)\tF5"
+  IDS_MENU_VIEW_WIDTH, "适应宽度(&W)\tF6"
+  IDS_MENU_VIEW_ACTUAL, "实际大小(1:1)(&A)\tF7"
+  IDS_MENU_VIEW_WINDOW, "调整窗口大小以适应(&R)\tF8"
+  IDS_MENU_VIEW_TOOLBAR, "工具栏(&T)\tF9"
+  IDS_MENU_VIEW_STATUSBAR, "状态栏(&B)"
+  IDS_MENU_VIEW_FULLSCREEN, "全屏(&S)\tF11"
+
+  IDS_MENU_MULTIPAGE, "多页图像(&M)"
+  IDS_MENU_NEXTPAGE, "下一页(&N)\tCtrl+Page Down"
+  IDS_MENU_PREVPAGE, "上一页(&P)\tCtrl+Page Up"
+  IDS_MENU_FIRSTPAGE, "第一页(&F)\tCtrl+Home"
+  IDS_MENU_LASTPAGE, "最后一页(&L)\tCtrl+End"
+  IDS_MENU_PAGE, "转到页(&G)...\tG"
+  IDS_MENU_ANIMATION, "播放/暂停动画(&A)"
+
+  IDS_MENU_TOOLS, "工具(&T)"
+  IDS_MENU_TOOLS_HAND, "手形(&H)\tA"
+  IDS_MENU_TOOLS_ZOOM, "缩放(&Z)\tZ"
+  IDS_MENU_TOOLS_SELECT, "选择(&S)\tS"
+  IDS_MENU_TOOLS_PICK, "拾取颜色(&P)\tP"
+  IDS_MENU_TOOLS_OPTIONS, "配置(&C)..."
+
+  IDS_MENU_HELP, "帮助(&H)"
+  IDS_MENU_HELP_CONTENTS, "内容(&C)\tF1"
+  IDS_MENU_HELP_INDEX, "索引(&I)..."
+  IDS_MENU_HELP_SEARCH, "搜索(&S)..."
+//  IDS_MENU_HELP_KEYBOARD, "&Keyboard Shortcuts"
+//  IDS_MENU_HELP_MOUSE, "&Mouse Shortcuts"
+  IDS_MENU_HELP_ABOUT, "关于 PictView(&A)..."
+
+  IDS_TT_OPEN, "打开\tCtrl+O"
+  IDS_TT_SAVE, "另存为\tCtrl+S"
+  IDS_TT_PROPERTIES, "图像属性\tI"
+  IDS_TT_PREV, "打开前一个文件\tBackspace"
+  IDS_TT_NEXT, "打开下一个文件\tSpace"
+  IDS_TT_PREVSELFILE, "打开上一个选中的文件\tCtrl+Backspace"
+  IDS_TT_NEXTSELFILE, "打开下一个选中的文件\tCtrl+Space"
+  IDS_TT_COPY, "复制\tCtrl+C"
+  IDS_TT_PASTE, "粘贴\tCtrl+V"
+  IDS_TT_TOOL_HAND, "手\tA"
+  IDS_TT_TOOL_ZOOM, "缩放\tZ"
+  IDS_TT_TOOL_SELECT, "选择\tS"
+  IDS_TT_TOOL_PIPETTE, "颜色吸管\tP"
+  IDS_TT_LEFT, "向左旋转\tL"
+  IDS_TT_RIGHT, "向右旋转\tR"
+  IDS_TT_CROP, "裁剪\tC"
+  IDS_TT_ZOOM_OUT, "缩小\t-"
+  IDS_TT_ZOOM_IN, "放大\t+"
+  IDS_TT_ZOOM_TO, "缩放\tM"
+  IDS_TT_ZOOM_WIDTH, "缩放宽度\tF6"
+  IDS_TT_ZOOM_WHOLE, "缩放整体\tF5"
+  IDS_TT_ZOOM_ACTUAL, "缩放实际\tF7"
+  IDS_TT_FULL_SCREEN, "全屏\tF11"
+  IDS_TT_SELSRCFILE, "选择/取消选择面板或查找窗口中打开的文件\tInsert"
+  IDS_TT_PRINT, "打印\tCtrl+P"
+
+  IDS_TWAIN_OPEN, "无法打开 TWAIN 源管理器。\n如果你的扫描仪兼容 TWAIN，\n请为此扫描仪重新安装软件。"
+  IDS_TWAIN_ERROR, "Twain 错误"
+  IDS_TWCC_BUMMER, "由于未知原因失败。"
+  IDS_TWCC_LOWMEMORY, "没有足够内存来执行操作。"
+  IDS_TWCC_NODS, "没有数据源。"
+  IDS_TWCC_MAXCONNECTIONS, "数据源已连接到最大可能的应用程序。"
+  IDS_TWCC_OPERATIONERROR, "DS 或 DSM 执行了错误，应用程序不应该。"
+  IDS_TWCC_BADCAP, "未知的功能。"
+  IDS_TWCC_BADPROTOCOL, "无法识别的 MSG DG DAT 组合。"
+  IDS_TWCC_BADVALUE, "数据参数超出范围。"
+  IDS_TWCC_SEQERROR, "DG DAT MSG 超出预期序列。"
+  IDS_TWCC_BADDEST, "DSM 条目中未知的目标应用程序/源。"
+  IDS_TWCC_CAPUNSUPPORTED, "功能不被源支持。"
+  IDS_TWCC_CAPBADOPERATION, "操作不被功能支持。"
+  IDS_TWCC_CAPSEQERROR, "功能依赖于其他功能。"
+  IDS_TWCC_DENIED, "文件系统操作被拒绝(文件被保护)。"
+  IDS_TWCC_FILEEXISTS, "操作失败，因为文件已经存在。"
+  IDS_TWCC_FILENOTFOUND, "未找到文件。"
+  IDS_TWCC_NOTEMPTY, "操作失败，因为目录不为空。"
+  IDS_TWCC_PAPERJAM, "进纸器被卡住。"
+  IDS_TWCC_PAPERDOUBLEFEED, "进纸器检测到多页。"
+  IDS_TWCC_FILEWRITEERROR, "写文件错误(磁盘已满？)。"
+  IDS_TWCC_CHECKDEVICEONLINE, "在此操作之前或过程中设备转为脱机。"
+
+  IDS_CAPTHINT_APPL, "整个应用程序窗口以及所有它的子窗口。"
+  IDS_CAPTHINT_WINDOW, "有输入焦点的窗口(对话框，消息框...)。"
+  IDS_CAPTHINT_CLIENT, "像前端窗口那样，但是不捕捉窗口标题栏，边框和菜单。"
+
+  IDS_DONT_SHOW_AGAIN, "不要再次显示(&D)"
+  IDS_DONT_SHOW_AGAIN_SLA, "不要再次显示此提醒并且不带 alpha 通道保存(&D)"
+  IDS_DONT_SHOW_AGAIN_UTH, "下次更新缩略图时不询问(&U)"
+  IDS_REGENERATE_THUMBNAIL_TITLE, "PictView - 正在更新缩略图..."
+  IDS_REGENERATE_THUMB_WARNING, "此功能将更新图像文件的 Exif 段中的缩略图。文件其他部分不会被改变。是否继续？"
+  IDS_REGENERATE_THUMB_WRITEFILE, "无法创建新的缩略图文件。是否磁盘已满？旧的文件 '%s' 保持不变。"
+
+  IDS_N_OF_N_FILES_PROCESSED "{!}只有 %d 分之 %d 个文件被{}处理。其他文件{}没有修改。"
+  IDS_NO_FILES_FOUND, "没有找到带有 EXIF 数据的 JPEG 图像。未修改任何文件。"
+  IDS_NOT_JPEG_FILE, "这不是 JPEG，没有缩略图要更新。"
+  IDS_NOT_EXIF_CREATE_JFXX, "这个文件不包含 EXIF 数据，没有 EXIF 缩略图要更新。你想要创建一个 JFIF JFXX 缩略图来代替吗？"
+  IDS_READ_ONLY_MODIFY, "这个文件是只读的。无论如何要修改吗？"
+  IDS_READ_ONLY_REWRITE, "文件 %s 是只读的。无论如何要覆盖吗？"
+
+  IDS_CLRS_MONO, "2 颜色"
+  IDS_CLRS_16, "16 色"
+  IDS_CLRS_256, "256 色"
+  IDS_CLRS_HC15, "15位高彩色"
+  IDS_CLRS_HC16, "16位高彩色"
+  IDS_CLRS_TC24, "24位真彩色"
+  IDS_CLRS_TC32, "32位真彩色"
+  IDS_CLRS_256GR, "256级灰度"
+  IDS_FLIP_NONE, "无"
+  IDS_FLIP_VERT, "垂直"
+  IDS_FLIP_HOR, "水平"
+  IDS_ROT_NONE, "无"
+  IDS_ROT_90, "90度顺时针"
+  IDS_ROT_180, "180度"
+  IDS_ROT_270, "270度顺时针"
+  IDS_SAVE_DEFAULT, "默认"
+
+  IDS_HIST_HISTOGRAM, "柱状图"
+  IDS_HIST_LUMINOSITY, "亮度"
+  IDS_HIST_RED, "红"
+  IDS_HIST_GREEN, "绿"
+  IDS_HIST_BLUE, "蓝"
+  IDS_HIST_RGBSUM, "RGB"
+  IDS_HIST_MENU_LUMINOSITY, "亮度\tL"
+  IDS_HIST_MENU_RED, "红\tR"
+  IDS_HIST_MENU_GREEN, "绿\tG"
+  IDS_HIST_MENU_BLUE, "蓝\tB"
+  IDS_HIST_MENU_RGBSUM, "RGB\tA"
+  IDS_HIST_TIP_LUMINOSITY, "亮度(L)"
+  IDS_HIST_TIP_RED, "红(R)"
+  IDS_HIST_TIP_GREEN, "绿(G)"
+  IDS_HIST_TIP_BLUE, "蓝(B)"
+  IDS_HIST_TIP_RGBSUM, "RGB (A)"
+  IDS_HIST_TIP_OTHERCHANELS, "显示其他通道(O)"
+  IDS_DLL_NOTFOUND, "无法加载图像处理库 PVW32Cnv.dll."
+  IDS_DLL_WRONG_VERSION, "发现错误的 PVW32Cnv.dll 版本。"
+  IDS_SELECT_REGION, "请先选择一个区域。"
+  IDS_SAVE_ERR_EXISTS_OVERWRITE, "文件 ""%s"" 已经存在。\n你要替换它吗？"
+
+  IDS_SB_XY, "X:%d  Y:%d"
+  IDS_SB_WH, "W:%d  H:%d"
+  IDS_SB_RGB, "R:%d  G:%d  B:%d"
+  IDS_SB_CAGE, "绘制矩形选择轮廓。 Shift 和 空格 键显示附加选项。"
+  IDS_SB_ZOOM, "点击图像以放大；点击并拖动来缩放选取框。空格用于选取框拖动。"
+  IDS_SB_HAND, "点击并拖动向需要的方向滚动图像。"
+
+  IDS_SB_AUTOROTATING, "旋转..."
+
+  IDS_UNIT_INCHES, "英寸"
+  IDS_UNIT_CM, "厘米"
+  IDS_UNIT_MM, "毫米"
+  IDS_UNIT_POINTS, "点"
+  IDS_UNIT_PICAS, "皮卡"
+
+  IDS_PRINT_NODEFPRINTER, "未找到系统默认打印机。请安装默认打印机。"
+  IDS_PRINT_NOPRINTERS, "没有安装打印机。"
+  IDS_PRINT_SETUPFAILED, "打印设置对话框失败。"
+  IDS_PRINTING, "正在打印..."
+  IDS_PRINTING_FAILED,  "打印失败。\n%s"
+  IDS_UNKNOWN_ERROR,    "发生了未知的错误。\n"
+  IDS_CHECK_EVENTLOG,   "请检查“事件查看器”来查看确切的错误消息。"
+  // The following 2 strings are concatenated together
+  IDS_EXCEPT_INFO1,     "PictView 出现异常，请通知作者！\n如果当异常发生时你正在处理某个图像文件，\n"
+  IDS_EXCEPT_INFO2,     "请尝试用这个图像重现此问题，如果异常再次发生，\n请发送这个图像给我们(我们将重现并修复这个问题)。\n感谢您的合作！"
+
+  IDS_NO_MORE_IMAGES,   "没有更多可用的图像"
+  IDS_UNSUPPORTED_IMAGE_TYPE, "这个图像使用了不被支持的格式。"
+  IDS_MUSTBEPOSITIVE,   "请输入一个大于零的数字。"
+  IDS_SB_TIP_SELECT_SQUARE, "提示: 使用工具配置来选择固定的非正方形矩形。"
+  
+  IDS_WIA_ERROR_ACQUIREIMG, "无法从设备获取图像。请验证设备已正确连接然后重试。错误: (0x%08X) %s"
+  IDS_WIA_WAIT, "等待..."
+  IDS_WIA_STATUS_TRANSFER_FROM_DEVICE, "正在从设备读取数据 (%d%% 完成)"
+  IDS_WIA_STATUS_PROCESSING_DATA, "正在处理数据 (%d%% 完成)"
+  IDS_WIA_STATUS_TRANSFER_TO_CLIENT, "正在传输数据 (%d%% 完成)"
+  
+  IDS_SCAN_OPEN_EXTRA_IMGS, "你从扫描仪获得了更多的图像。第一个图像在此窗口中打开。你想为其它图像各自打开单独的窗口吗？如果否，图像将被忽略。\n\n新窗口数量: %d"
+}
+
+STRINGTABLE
+{
+  IDS_RENAME_EMPTY, "请输入文件名或重命名掩码。"
+  IDS_RENAME_BAD_MASK, "文件名或重命名掩码不能包含路径分隔符或以下字符：< > : "" / \\ |"
+  IDS_RENAME_MASK_EMPTY, "重命名掩码生成了空文件名。"
+  IDS_RENAME_BAD_NAME, "生成的文件名不能包含路径分隔符或以下字符：< > : "" / \\ | ? *"
+  IDS_COPYTO_SAME_FOLDER, "文件已位于此目录中。请选择其他目标目录。"
+}
+
+STRINGTABLE
+{
+  IDS_PV_IMAGE_LOAD_WAS_CANCELED, "图像加载已取消。"
+  IDS_PV_UNABLE_TO_OPEN_IMAGE_FILE, "无法打开图像文件"
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE, "无法读取图像文件大小"
+  IDS_PV_IMAGE_FILE_EXCEEDS_THE_CURRENT, "图像文件超出了 PictView 当前的输入限制。"
+  IDS_PV_UNABLE_TO_ALLOCATE_AN_IN, "无法分配内存图像流。"
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE_2, "无法读取图像文件"
+  IDS_PV_UNABLE_TO_LOCK_IMAGE_STREAM, "无法锁定图像流内存"
+  IDS_PV_UNABLE_TO_CREATE_AN_IMAGE, "无法为 WIC 创建图像流。"
+  IDS_PV_IMAGE_OPERATION_FAILED, "图像操作失败。"
+  IDS_PV_CLIPBOARD_IMAGE, "剪贴板图像"
+  IDS_PV_UNABLE_TO_CREATE_A_COMPATIBLE, "无法创建兼容的屏幕捕捉缓冲区。"
+  IDS_PV_UNABLE_TO_SELECT_THE_COMPATIBLE, "无法选择兼容的屏幕捕捉缓冲区。"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN, "无法捕捉屏幕"
+  IDS_PV_UNABLE_TO_READ_PIXELS_FROM, "无法从屏幕捕捉缓冲区读取像素。"
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING, "无法为屏幕捕捉创建绘图上下文。"
+  IDS_PV_UNABLE_TO_CREATE_A_FALLBACK, "无法为屏幕捕捉创建备用绘图上下文。"
+  IDS_PV_UNABLE_TO_INITIALIZE_DXGI_SCREEN, "无法初始化 DXGI 屏幕捕捉"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_2, "无法使用 DXGI 捕捉屏幕"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_3, "无法使用 DXGI 捕捉屏幕。"
+  IDS_PV_SCREEN_CAPTURE_BOUNDS_ARE_INVALID, "屏幕捕捉范围无效。"
+  IDS_PV_SCREEN_CAPTURE, "屏幕捕捉"
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_UNAVAILABLE, "剪贴板图像数据不可用。"
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_INCOMPLETE, "剪贴板图像数据不完整。"
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE, "无法锁定剪贴板图像数据"
+  IDS_PV_CLIPBOARD_IMAGE_FORMAT_IS_UNSUPPORTED, "不支持该剪贴板图像格式。"
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_2, "无法为剪贴板图像转换创建绘图上下文。"
+  IDS_PV_UNABLE_TO_CREATE_CLIPBOARD_IMAGE, "无法创建剪贴板图像转换缓冲区。"
+  IDS_PV_UNABLE_TO_CONVERT_CLIPBOARD_IMAGE, "无法转换剪贴板图像数据。"
+  IDS_PV_CLIPBOARD_BITMAP, "剪贴板位图"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_FALLBACK, "无法捕捉备用窗口。"
+  IDS_PV_FALLBACK_WINDOW_DIMENSIONS_ARE_INVALID, "备用窗口尺寸无效。"
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_3, "无法为备用窗口捕捉创建绘图上下文。"
+  IDS_PV_UNABLE_TO_PRINT_THE_FALLBACK, "无法绘制备用窗口。"
+  IDS_PV_IMAGE_SOURCE_DATA_IS_UNAVAILABLE, "图像源数据不可用。"
+  IDS_PV_NO_IMAGE_LOADED, "未加载图像"
+  IDS_PV_PICK_COLOR_MOVE_MOUSE_OVER, "拾取颜色：将鼠标移到图像上"
+  IDS_PV_UNABLE_TO_START_ANIMATED_GIF, "无法开始播放 GIF 动画。"
+  IDS_PV_SOURCE_NAVIGATION_IS_NO_LONGER, "源窗口导航已不可用。"
+  IDS_PV_SOURCE_SELECTION_IS_NO_LONGER, "源窗口选择已不可用。"
+  IDS_PV_OPENED_FILE_IS_SELECTED_IN, "已在源窗口中选择打开的文件。"
+  IDS_PV_OPENED_FILE_IS_UNSELECTED_IN, "已在源窗口中取消选择打开的文件。"
+  IDS_PV_FILE_NAME_UNCHANGED, "文件名未更改。"
+  IDS_PV_UNABLE_TO_RENAME_THE_FILE, "无法重命名文件"
+  IDS_PV_RENAME_CANCELED, "重命名已取消。"
+  IDS_PV_FILE_WAS_RENAMED_BUT_THE, "文件已重命名，但新路径不可用。"
+  IDS_PV_FILE_RENAMED, "文件已重命名。"
+  IDS_PV_COPY_CANCELED, "复制已取消。"
+  IDS_PV_UNABLE_TO_COPY_THE_FILE, "无法复制文件。"
+  IDS_PV_FILE_COPIED, "文件已复制。"
+  IDS_PV_COPY_WAS_NOT_COMPLETED, "复制未完成。"
+  IDS_PV_UNABLE_TO_DELETE_THE_FILE, "无法删除文件。"
+  IDS_PV_FILE_MOVED_TO_THE_RECYCLE, "文件已移到回收站。"
+  IDS_PV_FILE_DELETED, "文件已删除。"
+  IDS_PV_DELETE_CANCELED, "删除已取消。"
+  IDS_PV_FILE_WAS_NOT_DELETED, "文件未删除。"
+  IDS_PV_SOURCE_FOCUS_IS_NO_LONGER, "源窗口焦点已不可用。"
+  IDS_PV_FOCUSING_OPENED_FILE_IN_THE, "正在源窗口中聚焦打开的文件。"
+  IDS_PV_PREVIOUS_WALLPAPER_RESTORED, "已还原前一个壁纸。"
+  IDS_PV_WALLPAPER_CLEARED, "壁纸已清除。"
+  IDS_PV_WALLPAPER_UPDATED, "壁纸已更新。"
+  IDS_PV_NO_IMAGE_IS_LOADED, "未加载图像。"
+  IDS_PV_UNABLE_TO_CREATE_A_WALLPAPER, "无法创建壁纸输出路径。"
+  IDS_PV_UNABLE_TO_UPDATE_THE_DESKTOP, "无法更新桌面壁纸。"
+  IDS_PV_UNABLE_TO_OPEN_THE_DESKTOP, "无法打开桌面壁纸注册表项。"
+  IDS_PV_OPEN_IMAGE, "打开图像"
+  IDS_PV_UNABLE_TO_OPEN_THE_HISTOGRAM, "无法打开柱状图窗口。"
+  IDS_PV_UNABLE_TO_REGISTER_THE_SCREEN, "无法注册屏幕捕捉热键。"
+  IDS_PV_UNABLE_TO_START_THE_SCREEN, "无法启动屏幕捕捉计时器。"
+  IDS_PV_CAPTURING_PICTVIEW, "正在捕捉 - PictView"
+  IDS_PV_SCREEN_CAPTURE_IS_WAITING_FOR, "屏幕捕捉正在等待热键。"
+  IDS_PV_SCREEN_CAPTURE_TIMER_STARTED, "屏幕捕捉计时器已启动。"
+  IDS_PV_SCREEN_CAPTURED, "已捕捉屏幕。"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_4, "无法捕捉屏幕。"
+  IDS_PV_SCREEN_CAPTURED_FROM_THE_VIEWER, "桌面捕捉不可用，已从查看器窗口捕捉屏幕。"
+  IDS_PV_THE_CLIPBOARD_DOES_NOT_CONTAIN, "剪贴板中不包含图像。"
+  IDS_PV_UNABLE_TO_OPEN_THE_CLIPBOARD, "无法打开剪贴板。"
+  IDS_PV_UNABLE_TO_PASTE_THE_CLIPBOARD, "无法粘贴剪贴板图像。"
+  IDS_PV_PICTVIEW_IMAGE, "PictView 图像"
+  IDS_PV_UNABLE_TO_PRINT_THE_IMAGE, "无法打印图像。"
+  IDS_PV_UNABLE_TO_READ_PRINTER_PAGE, "无法读取打印机页面尺寸。"
+  IDS_PV_UNABLE_TO_ALLOCATE_CLIPBOARD_IMAGE, "无法分配剪贴板图像数据。"
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE_2, "无法锁定剪贴板图像数据。"
+  IDS_PV_UNABLE_TO_COPY_IMAGE_DATA, "无法将图像数据复制到剪贴板。"
+  IDS_PV_UNABLE_TO_START_THE_IMAGE, "无法启动图像加载工作线程。"
+  IDS_PV_FILE_DIALOG_FAILED, "无法打开文件对话框。\n错误：0x%X"
+  IDS_PV_ALLOCATE_PIXELS_FAILED, "无法为 %s 分配像素。"
+  IDS_PV_CONVERSION_CONTEXT_FAILED, "无法为 %s 转换创建绘图上下文。"
+  IDS_PV_READ_PIXELS_FAILED, "无法从 %s 读取像素。"
+  IDS_PV_SAVED, "已保存：%s"
+  IDS_PV_LOADING, "正在加载..."
+  IDS_PV_LOADING_PERCENT, "正在加载... %u%%"
+  IDS_PV_IMAGE_FILES, "图像文件"
+  IDS_PV_ALL_FILES, "所有文件"
+  IDS_PV_ERR_WIC_UNAVAILABLE, "Windows Imaging Component 不可用。"
+  IDS_PV_ERR_OPEN, "无法打开图像。"
+  IDS_PV_ERR_DECODE, "图像已损坏或无法解码。"
+  IDS_PV_ERR_FRAME, "请求的页面或帧不存在。"
+  IDS_PV_ERR_TOO_LARGE, "图像过大。"
+  IDS_PV_ERR_CANCELED, "操作已取消。"
+  IDS_PV_ERR_MEMORY, "内存不足，无法处理图像。"
+  IDS_PV_ERR_SAVE, "无法保存图像。"
+  IDS_PV_SAVEAS_FILTER, "便携式网络图形 (*.png)|*.png|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|TIFF (*.tif)|*.tif;*.tiff|Windows 位图 (*.bmp)|*.bmp|CompuServe GIF (*.gif)|*.gif|"
+  IDS_EXIF_TAG_0001, "互操作性索引"
+  IDS_EXIF_TAG_0002, "互操作性版本"
+  IDS_EXIF_TAG_00FE, "新子文件类型"
+  IDS_EXIF_TAG_0100, "图像宽度"
+  IDS_EXIF_TAG_0101, "图像高度"
+  IDS_EXIF_TAG_0102, "每样本位数"
+  IDS_EXIF_TAG_0103, "压缩"
+  IDS_EXIF_TAG_0106, "光度解释"
+  IDS_EXIF_TAG_010D, "文档名称"
+  IDS_EXIF_TAG_010E, "图像描述"
+  IDS_EXIF_TAG_010F, "相机制造商"
+  IDS_EXIF_TAG_0110, "相机型号"
+  IDS_EXIF_TAG_0111, "条带偏移量"
+  IDS_EXIF_TAG_0112, "方向"
+  IDS_EXIF_TAG_0115, "每像素样本数"
+  IDS_EXIF_TAG_0116, "每条带行数"
+  IDS_EXIF_TAG_0117, "条带字节数"
+  IDS_EXIF_TAG_011A, "水平分辨率"
+  IDS_EXIF_TAG_011B, "垂直分辨率"
+  IDS_EXIF_TAG_011C, "平面配置"
+  IDS_EXIF_TAG_0128, "分辨率单位"
+  IDS_EXIF_TAG_012D, "传递函数"
+  IDS_EXIF_TAG_0131, "软件"
+  IDS_EXIF_TAG_0132, "日期和时间"
+  IDS_EXIF_TAG_013B, "创作者"
+  IDS_EXIF_TAG_013C, "主机"
+  IDS_EXIF_TAG_013E, "白点"
+  IDS_EXIF_TAG_013F, "原色色度"
+  IDS_EXIF_TAG_0201, "缩略图偏移量"
+  IDS_EXIF_TAG_0202, "缩略图长度"
+  IDS_EXIF_TAG_0211, "YCbCr 系数"
+  IDS_EXIF_TAG_0212, "YCbCr 二次采样"
+  IDS_EXIF_TAG_0213, "YCbCr 定位"
+  IDS_EXIF_TAG_0214, "黑白参考值"
+  IDS_EXIF_TAG_4746, "分级"
+  IDS_EXIF_TAG_4749, "分级百分比"
+  IDS_EXIF_TAG_8298, "版权"
+  IDS_EXIF_TAG_829A, "曝光时间"
+  IDS_EXIF_TAG_829D, "光圈值"
+  IDS_EXIF_TAG_8769, "Exif IFD 指针"
+  IDS_EXIF_TAG_8822, "曝光程序"
+  IDS_EXIF_TAG_8824, "光谱灵敏度"
+  IDS_EXIF_TAG_8825, "GPS IFD 指针"
+  IDS_EXIF_TAG_8827, "ISO 感光度"
+  IDS_EXIF_TAG_8828, "光电转换函数(OECF)"
+  IDS_EXIF_TAG_8830, "感光度类型"
+  IDS_EXIF_TAG_8831, "标准输出感光度"
+  IDS_EXIF_TAG_8832, "推荐曝光指数"
+  IDS_EXIF_TAG_8833, "ISO 感光度值"
+  IDS_EXIF_TAG_9000, "Exif 版本"
+  IDS_EXIF_TAG_9003, "拍摄日期"
+  IDS_EXIF_TAG_9004, "数字化日期"
+  IDS_EXIF_TAG_9010, "时区"
+  IDS_EXIF_TAG_9011, "时区(拍摄)"
+  IDS_EXIF_TAG_9012, "时区(数字化)"
+  IDS_EXIF_TAG_9101, "分量配置"
+  IDS_EXIF_TAG_9102, "每像素压缩位数"
+  IDS_EXIF_TAG_9201, "快门速度"
+  IDS_EXIF_TAG_9202, "光圈"
+  IDS_EXIF_TAG_9203, "亮度"
+  IDS_EXIF_TAG_9204, "曝光补偿"
+  IDS_EXIF_TAG_9205, "最大光圈"
+  IDS_EXIF_TAG_9206, "主体距离"
+  IDS_EXIF_TAG_9207, "测光模式"
+  IDS_EXIF_TAG_9208, "光源"
+  IDS_EXIF_TAG_9209, "闪光灯"
+  IDS_EXIF_TAG_920A, "焦距"
+  IDS_EXIF_TAG_9214, "主体区域"
+  IDS_EXIF_TAG_927C, "制造商注释"
+  IDS_EXIF_TAG_9286, "用户注释"
+  IDS_EXIF_TAG_9290, "亚秒时间"
+  IDS_EXIF_TAG_9291, "亚秒时间(拍摄)"
+  IDS_EXIF_TAG_9292, "亚秒时间(数字化)"
+  IDS_EXIF_TAG_9C9B, "标题"
+  IDS_EXIF_TAG_9C9C, "备注"
+  IDS_EXIF_TAG_9C9D, "作者"
+  IDS_EXIF_TAG_9C9E, "关键字"
+  IDS_EXIF_TAG_9C9F, "主题"
+  IDS_EXIF_TAG_A000, "FlashPix 版本"
+  IDS_EXIF_TAG_A001, "色彩空间"
+  IDS_EXIF_TAG_A002, "像素宽度"
+  IDS_EXIF_TAG_A003, "像素高度"
+  IDS_EXIF_TAG_A004, "相关音频文件"
+  IDS_EXIF_TAG_A005, "互操作性 IFD 指针"
+  IDS_EXIF_TAG_A20B, "闪光灯能量"
+  IDS_EXIF_TAG_A20C, "空间频率响应"
+  IDS_EXIF_TAG_A20E, "焦平面水平分辨率"
+  IDS_EXIF_TAG_A20F, "焦平面垂直分辨率"
+  IDS_EXIF_TAG_A210, "焦平面分辨率单位"
+  IDS_EXIF_TAG_A214, "主体位置"
+  IDS_EXIF_TAG_A215, "曝光指数"
+  IDS_EXIF_TAG_A217, "感光方式"
+  IDS_EXIF_TAG_A300, "文件来源"
+  IDS_EXIF_TAG_A301, "场景类型"
+  IDS_EXIF_TAG_A302, "CFA 模式"
+  IDS_EXIF_TAG_A401, "自定义渲染"
+  IDS_EXIF_TAG_A402, "曝光模式"
+  IDS_EXIF_TAG_A403, "白平衡"
+  IDS_EXIF_TAG_A404, "数码变焦比"
+  IDS_EXIF_TAG_A405, "35 mm 等效焦距"
+  IDS_EXIF_TAG_A406, "场景拍摄类型"
+  IDS_EXIF_TAG_A407, "增益控制"
+  IDS_EXIF_TAG_A408, "对比度"
+  IDS_EXIF_TAG_A409, "饱和度"
+  IDS_EXIF_TAG_A40A, "锐度"
+  IDS_EXIF_TAG_A40B, "设备设置描述"
+  IDS_EXIF_TAG_A40C, "主体距离范围"
+  IDS_EXIF_TAG_A420, "图像唯一 ID"
+  IDS_EXIF_TAG_A430, "相机所有者"
+  IDS_EXIF_TAG_A431, "相机序列号"
+  IDS_EXIF_TAG_A432, "镜头规格"
+  IDS_EXIF_TAG_A433, "镜头制造商"
+  IDS_EXIF_TAG_A434, "镜头型号"
+  IDS_EXIF_TAG_A435, "镜头序列号"
+  IDS_EXIF_TAG_A460, "合成图像"
+  IDS_EXIF_TAG_A500, "伽马"
+  IDS_EXIF_GPS_0000, "GPS 版本"
+  IDS_EXIF_GPS_0001, "纬度参考"
+  IDS_EXIF_GPS_0002, "纬度"
+  IDS_EXIF_GPS_0003, "经度参考"
+  IDS_EXIF_GPS_0004, "经度"
+  IDS_EXIF_GPS_0005, "海拔参考"
+  IDS_EXIF_GPS_0006, "海拔"
+  IDS_EXIF_GPS_0007, "GPS 时间(UTC)"
+  IDS_EXIF_GPS_0008, "GPS 卫星"
+  IDS_EXIF_GPS_0009, "GPS 接收器状态"
+  IDS_EXIF_GPS_000A, "GPS 测量模式"
+  IDS_EXIF_GPS_000B, "GPS 精度(DOP)"
+  IDS_EXIF_GPS_000C, "速度单位"
+  IDS_EXIF_GPS_000D, "速度"
+  IDS_EXIF_GPS_000E, "移动方向参考"
+  IDS_EXIF_GPS_000F, "移动方向"
+  IDS_EXIF_GPS_0010, "图像方向参考"
+  IDS_EXIF_GPS_0011, "图像方向"
+  IDS_EXIF_GPS_0012, "大地基准"
+  IDS_EXIF_GPS_0013, "目标纬度参考"
+  IDS_EXIF_GPS_0014, "目标纬度"
+  IDS_EXIF_GPS_0015, "目标经度参考"
+  IDS_EXIF_GPS_0016, "目标经度"
+  IDS_EXIF_GPS_0017, "目标方位参考"
+  IDS_EXIF_GPS_0018, "目标方位"
+  IDS_EXIF_GPS_0019, "目标距离参考"
+  IDS_EXIF_GPS_001A, "目标距离"
+  IDS_EXIF_GPS_001B, "GPS 处理方法"
+  IDS_EXIF_GPS_001C, "GPS 区域信息"
+  IDS_EXIF_GPS_001D, "GPS 日期"
+  IDS_EXIF_GPS_001E, "GPS 差分校正"
+  IDS_EXIF_GPS_001F, "GPS 水平定位误差"
+  IDS_EXIF_VALUE_COMPRESSION_NONE, "未压缩"
+  IDS_EXIF_VALUE_COMPRESSION_JPEG, "JPEG"
+  IDS_EXIF_VALUE_PHOTOMETRIC_RGB, "RGB"
+  IDS_EXIF_VALUE_PHOTOMETRIC_YCBCR, "YCbCr"
+  IDS_EXIF_VALUE_ORIENTATION_1, "正常"
+  IDS_EXIF_VALUE_ORIENTATION_2, "水平镜像"
+  IDS_EXIF_VALUE_ORIENTATION_3, "旋转 180°"
+  IDS_EXIF_VALUE_ORIENTATION_4, "垂直镜像"
+  IDS_EXIF_VALUE_ORIENTATION_5, "水平镜像，顺时针旋转 270°"
+  IDS_EXIF_VALUE_ORIENTATION_6, "顺时针旋转 90°"
+  IDS_EXIF_VALUE_ORIENTATION_7, "水平镜像，顺时针旋转 90°"
+  IDS_EXIF_VALUE_ORIENTATION_8, "顺时针旋转 270°"
+  IDS_EXIF_VALUE_PLANAR_CHUNKY, "交错格式"
+  IDS_EXIF_VALUE_PLANAR_PLANAR, "平面格式"
+  IDS_EXIF_VALUE_UNIT_NONE, "无"
+  IDS_EXIF_VALUE_UNIT_INCH, "英寸"
+  IDS_EXIF_VALUE_UNIT_CM, "厘米"
+  IDS_EXIF_VALUE_YCBCR_CENTERED, "居中"
+  IDS_EXIF_VALUE_YCBCR_COSITED, "共址"
+  IDS_EXIF_VALUE_PROGRAM_0, "未定义"
+  IDS_EXIF_VALUE_PROGRAM_1, "手动"
+  IDS_EXIF_VALUE_PROGRAM_2, "标准程序"
+  IDS_EXIF_VALUE_PROGRAM_3, "光圈优先"
+  IDS_EXIF_VALUE_PROGRAM_4, "快门优先"
+  IDS_EXIF_VALUE_PROGRAM_5, "创意程序"
+  IDS_EXIF_VALUE_PROGRAM_6, "运动程序"
+  IDS_EXIF_VALUE_PROGRAM_7, "人像模式"
+  IDS_EXIF_VALUE_PROGRAM_8, "风景模式"
+  IDS_EXIF_VALUE_METERING_0, "未知"
+  IDS_EXIF_VALUE_METERING_1, "平均"
+  IDS_EXIF_VALUE_METERING_2, "中央重点平均"
+  IDS_EXIF_VALUE_METERING_3, "点测光"
+  IDS_EXIF_VALUE_METERING_4, "多点测光"
+  IDS_EXIF_VALUE_METERING_5, "评价测光"
+  IDS_EXIF_VALUE_METERING_6, "局部测光"
+  IDS_EXIF_VALUE_METERING_255, "其他"
+  IDS_EXIF_VALUE_LIGHT_0, "未知"
+  IDS_EXIF_VALUE_LIGHT_1, "日光"
+  IDS_EXIF_VALUE_LIGHT_2, "荧光灯"
+  IDS_EXIF_VALUE_LIGHT_3, "钨丝灯(白炽灯)"
+  IDS_EXIF_VALUE_LIGHT_4, "闪光灯"
+  IDS_EXIF_VALUE_LIGHT_9, "晴天"
+  IDS_EXIF_VALUE_LIGHT_10, "阴天"
+  IDS_EXIF_VALUE_LIGHT_11, "阴影"
+  IDS_EXIF_VALUE_LIGHT_12, "日光色荧光灯"
+  IDS_EXIF_VALUE_LIGHT_13, "昼白色荧光灯"
+  IDS_EXIF_VALUE_LIGHT_14, "冷白色荧光灯"
+  IDS_EXIF_VALUE_LIGHT_15, "白色荧光灯"
+  IDS_EXIF_VALUE_LIGHT_16, "暖白色荧光灯"
+  IDS_EXIF_VALUE_LIGHT_17, "标准光源 A"
+  IDS_EXIF_VALUE_LIGHT_18, "标准光源 B"
+  IDS_EXIF_VALUE_LIGHT_19, "标准光源 C"
+  IDS_EXIF_VALUE_LIGHT_20, "D55"
+  IDS_EXIF_VALUE_LIGHT_21, "D65"
+  IDS_EXIF_VALUE_LIGHT_22, "D75"
+  IDS_EXIF_VALUE_LIGHT_23, "D50"
+  IDS_EXIF_VALUE_LIGHT_24, "ISO 摄影棚钨丝灯"
+  IDS_EXIF_VALUE_LIGHT_255, "其他光源"
+  IDS_EXIF_VALUE_COLORSPACE_SRGB, "sRGB"
+  IDS_EXIF_VALUE_COLORSPACE_UNCALIBRATED, "未校准"
+  IDS_EXIF_VALUE_FPUNIT_NONE, "无"
+  IDS_EXIF_VALUE_FPUNIT_INCH, "英寸"
+  IDS_EXIF_VALUE_FPUNIT_CM, "厘米"
+  IDS_EXIF_VALUE_SENSING_1, "未定义"
+  IDS_EXIF_VALUE_SENSING_2, "单芯片彩色区域传感器"
+  IDS_EXIF_VALUE_SENSING_3, "双芯片彩色区域传感器"
+  IDS_EXIF_VALUE_SENSING_4, "三芯片彩色区域传感器"
+  IDS_EXIF_VALUE_SENSING_5, "彩色顺序区域传感器"
+  IDS_EXIF_VALUE_SENSING_7, "三线传感器"
+  IDS_EXIF_VALUE_SENSING_8, "彩色顺序线性传感器"
+  IDS_EXIF_VALUE_FILESOURCE_DSC, "数码相机"
+  IDS_EXIF_VALUE_SCENETYPE_DIRECT, "直接拍摄"
+  IDS_EXIF_VALUE_RENDERED_0, "正常处理"
+  IDS_EXIF_VALUE_RENDERED_1, "自定义处理"
+  IDS_EXIF_VALUE_EXPMODE_0, "自动曝光"
+  IDS_EXIF_VALUE_EXPMODE_1, "手动曝光"
+  IDS_EXIF_VALUE_EXPMODE_2, "自动包围曝光"
+  IDS_EXIF_VALUE_WB_0, "自动白平衡"
+  IDS_EXIF_VALUE_WB_1, "手动白平衡"
+  IDS_EXIF_VALUE_SCENE_0, "标准"
+  IDS_EXIF_VALUE_SCENE_1, "风景"
+  IDS_EXIF_VALUE_SCENE_2, "人像"
+  IDS_EXIF_VALUE_SCENE_3, "夜景"
+  IDS_EXIF_VALUE_GAIN_0, "无"
+  IDS_EXIF_VALUE_GAIN_1, "低增益提高"
+  IDS_EXIF_VALUE_GAIN_2, "高增益提高"
+  IDS_EXIF_VALUE_GAIN_3, "低增益降低"
+  IDS_EXIF_VALUE_GAIN_4, "高增益降低"
+  IDS_EXIF_VALUE_CONTRAST_0, "正常"
+  IDS_EXIF_VALUE_CONTRAST_1, "柔和"
+  IDS_EXIF_VALUE_CONTRAST_2, "强烈"
+  IDS_EXIF_VALUE_SATURATION_0, "正常"
+  IDS_EXIF_VALUE_SATURATION_1, "低饱和度"
+  IDS_EXIF_VALUE_SATURATION_2, "高饱和度"
+  IDS_EXIF_VALUE_SHARPNESS_0, "正常"
+  IDS_EXIF_VALUE_SHARPNESS_1, "柔和"
+  IDS_EXIF_VALUE_SHARPNESS_2, "强烈"
+  IDS_EXIF_VALUE_DISTANCE_0, "未知"
+  IDS_EXIF_VALUE_DISTANCE_1, "微距"
+  IDS_EXIF_VALUE_DISTANCE_2, "近景"
+  IDS_EXIF_VALUE_DISTANCE_3, "远景"
+  IDS_EXIF_VALUE_GPS_ABOVE_SEA, "海平面以上"
+  IDS_EXIF_VALUE_GPS_BELOW_SEA, "海平面以下"
+  IDS_EXIF_VALUE_GPS_NO_CORRECTION, "未校正"
+  IDS_EXIF_VALUE_GPS_CORRECTION, "已校正"
+  IDS_EXIF_VALUE_FLASH_FIRED, "闪光灯已闪光"
+  IDS_EXIF_VALUE_FLASH_NOT_FIRED, "闪光灯未闪光"
+  IDS_EXIF_VALUE_FLASH_COMPULSORY, "强制闪光模式"
+  IDS_EXIF_VALUE_FLASH_SUPPRESSED, "强制不闪光"
+  IDS_EXIF_VALUE_FLASH_AUTO, "自动模式"
+  IDS_EXIF_VALUE_FLASH_RETURN_DETECTED, "检测到闪光返回光"
+  IDS_EXIF_VALUE_FLASH_RETURN_NOT_DETECTED, "未检测到闪光返回光"
+  IDS_EXIF_VALUE_FLASH_RED_EYE, "防红眼"
+  IDS_EXIF_VALUE_FLASH_NO_FUNCTION, "无闪光功能"
+}

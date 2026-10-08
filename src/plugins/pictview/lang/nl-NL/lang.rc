@@ -1,0 +1,1033 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Dutch (nl-NL) resources for pictview. Translation: Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pictview/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pictview.rh2"
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+DLG_WIAPROGRESS DIALOGEX 0, 0, 214, 63
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_CENTER
+CAPTION "Scan Image"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Annuleren",IDCANCEL,157,43,50,14
+    LTEXT           "",IDC_WIAPROGR_MESSAGE,7,7,200,8
+    CONTROL         "",IDC_WIAPROGR_BAR,"msctls_progress32",WS_BORDER,7,22,200,14
+END
+
+DLG_ABOUT DIALOGEX 87, 50, 362, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Over plugin"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Sluiten",IDCANCEL,303,114,50,14
+    ICON            "",IDC_ABOUT_ICON,11,9,20,20
+    LTEXT           "PictView %s - Afbeeldingsviewer voor Sally",IDC_ABOUT_TITLE,46,9,309,8
+    LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,309,8,SS_NOPREFIX
+    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,138,8
+    LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,298,8
+    LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
+    LTEXT           "Email:",IDC_STATIC_6,46,81,30,8
+    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,99,81,85,8,WS_TABSTOP
+    LTEXT           "Start pagina:",IDC_STATIC_7,46,92,50,8
+    LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,99,92,122,8,WS_TABSTOP
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,360,1
+END
+
+DLG_CFGPAGE_APPEARANCE DIALOGEX 66, 53, 288, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Weergave"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Venster grootte",IDC_STATIC_1,6,5,276,53,WS_GROUP
+    CONTROL         "Gelijk aan &Sally",IDC_CFGAPP_WINPOS_SAME,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,151,12
+    CONTROL         "&Groter indien nodig maar niet kleiner",IDC_CFGAPP_WINPOS_LARGER,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,148,12
+    CONTROL         "Indien &nodig",IDC_CFGAPP_WINPOS_ANY,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,41,148,12
+    GROUPBOX        "Standaard zoom",IDC_STATIC_2,6,60,276,67,WS_GROUP
+    CONTROL         "&Passend (geen schuifbalken)",IDC_CFGAPP_ZOOM_WHOLE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,72,151,12
+    CONTROL         "Aanpassen aan &breedte (geen horiz. schuifbalk)",IDC_CFGAPP_ZOOM_WIDTH,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,84,173,12
+    CONTROL         "&Werkelijke grootte",IDC_CFGAPP_ZOOM_ORIG,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,96,148,12
+    CONTROL         "Volledig &scherm",IDC_CFGAPP_ZOOM_FSCREEN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,108,148,12
+    CONTROL         "S&how image file path in titlebar",IDC_CFGAPP_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,167,12
+END
+
+DLG_CFGPAGE_COLORS DIALOGEX 66, 53, 288, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Kleuren"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Venstermodus",IDC_STATIC_1,6,5,276,50,WS_GROUP
+    LTEXT           "&Achtergrond",IDC_STATIC_2,17,19,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_BORDER,128,16,27,14
+    LTEXT           "&Doorzichtig",IDC_STATIC_3,17,36,91,8
+    PUSHBUTTON      "",IDC_CFGCLR_BKGND,128,33,27,14
+    GROUPBOX        "Volledig schermmodus",IDC_STATIC_4,6,60,276,50,WS_GROUP
+    LTEXT           "A&chtergrond",IDC_STATIC_5,17,75,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BORDER,128,72,27,14
+    LTEXT           "D&oorzichtig",IDC_STATIC_6,17,92,44,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BKGND,128,89,27,14
+END
+
+DLG_CFGPAGE_KEYBOARD DIALOGEX 66, 53, 288, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Toetsenbord && Muis"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "PageUp && PageDown toetsen, muiswiel",IDC_STATIC_1,6,5,276,43,WS_GROUP
+    CONTROL         "&Gebruiken voor afbeelding verschuiven",IDC_CFGKBD_PGDNUP_SCR,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,203,12
+    CONTROL         "Gebruiken voor &toegang tot vorige/volgende afbeelding",IDC_CFGKBD_PGDNUP_PREV,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,218,12
+END
+
+DLG_CFGPAGE_TOOLS DIALOGEX 66, 53, 288, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Gereedschappen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Selectie gereedschap",IDC_STATIC_1,6,5,276,94,WS_GROUP
+    LTEXT           "Gebied selectie bij vasthouden Shift toets:",IDC_STATIC_2,17,18,150,8
+    CONTROL         "&Vierkant",IDC_CFGTOOLS_SQUARE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,24,27,203,12
+    CONTROL         "&4:3 rechthoek",IDC_CFGTOOLS_4_3,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,40,218,12
+    CONTROL         "&3:2 rechthoek",IDC_CFGTOOLS_3_2,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,53,218,12
+    CONTROL         "&16:9 rechthoek",IDC_CFGTOOLS_16_9,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,66,218,12
+    CONTROL         "&Anders:",IDC_CFGTOOLS_OTHER,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,79,40,12
+    EDITTEXT        IDC_CFGTOOLS_RATIO_X,67,79,17,12,ES_NUMBER | WS_GROUP
+    LTEXT           ":",IDC_STATIC_3,86,81,4,8
+    EDITTEXT        IDC_CFGTOOLS_RATIO_Y,90,79,17,12,ES_NUMBER
+    CONTROL         "Pipet kiest  kleuren in &hexadecimalen",IDC_CFGTOOLS_PIPHEX,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,106,167,12
+END
+
+DLG_CFGPAGE_ADVANCED DIALOGEX 66, 53, 288, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Geavanceerd"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Miniatuurweergave in bestandspanelen",IDC_STATIC_7,6,5,276,69,WS_GROUP
+    LTEXT           "Sommige afbeeldingen kunnen een onjuiste miniatuurweergave hebben, die niet juist gedraaid is of niet de laatste wijzigingen weergeeft.",IDC_STATIC_8,14,18,260,16
+    CONTROL         "&Negeer oorspronkelijke miniaturen in afbeeldingen (langzamer)",IDC_CFGADV_CREATE_THUMBNAILS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,35,225,12
+    LTEXT           "",IDC_STATIC_9,14,51,260,1,SS_ETCHEDHORZ | WS_GROUP
+    LTEXT           "Maak geen minia&turen van afbeeldingen met meer dan",IDC_STATIC_10,14,59,188,8
+    EDITTEXT        IDC_CFGADV_THUMB_MP,203,57,17,12,ES_NUMBER
+    LTEXT           "megapixels.",IDC_STATIC_11,223,59,42,8
+    CONTROL         "Automatisch d&raaien EXIF JPEG afbeeldingen (van digitale camera)",IDC_CFGADV_AUTOROTATE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,77,238,12
+    CONTROL         "&Berichtenvenster weergeven bij succesvol opslaan bestand",IDC_CFGADV_SAVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,89,209,12
+    CONTROL         "&Pad onthouden bij opslaan schermafdrukken, scans en van klembord plakken",IDC_CFGADV_REMEMBER_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,101,272,12
+END
+
+DLG_IMGPROP DIALOGEX 106, 34, 173, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "Afbeeldingseigenschappen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Sluiten",1,62,182,50,14,WS_GROUP
+    PUSHBUTTON      "Help",IDHELP,118,182,50,14
+    LTEXT           "&Pagina:",IDC_IMGPROP_PAGENUM_LBL,7,10,49,8
+    EDITTEXT        IDC_IMGPROP_PAGENUM,75,8,90,12,ES_READONLY
+    LTEXT           "&Breedte:",IDC_STATIC_1,7,24,49,8
+    EDITTEXT        IDC_IMGPROP_WIDTH,75,22,90,12,ES_READONLY
+    LTEXT           "&Hoogte:",IDC_STATIC_2,7,38,49,8
+    EDITTEXT        IDC_IMGPROP_HEIGHT,75,36,90,12,ES_READONLY
+    LTEXT           "&Kleuren:",IDC_STATIC_3,7,52,42,8
+    EDITTEXT        IDC_IMGPROP_COLORS,75,50,90,12,ES_READONLY
+    LTEXT           "&Geheugengrootte:",IDC_STATIC_4,7,66,64,8
+    EDITTEXT        IDC_IMGPROP_SIZE,75,64,90,12,ES_READONLY
+    LTEXT           "B&estandsgrootte:",IDC_STATIC_5,7,80,59,8
+    EDITTEXT        IDC_IMGPROP_FSIZE,75,78,90,12,ES_READONLY
+    LTEXT           "&DPI:",IDC_STATIC_6,7,94,50,8
+    EDITTEXT        IDC_IMGPROP_DPI,75,92,90,12,ES_READONLY
+    LTEXT           "Fo&rmaat:",IDC_STATIC_7,7,108,50,8
+    EDITTEXT        IDC_IMGPROP_FMT,75,106,90,12,ES_READONLY
+    LTEXT           "C&ompressie:",IDC_STATIC_8,7,122,50,8
+    EDITTEXT        IDC_IMGPROP_COMPR,75,120,90,12,ES_READONLY
+    LTEXT           "Op&merkingen:",IDC_STATIC_9,7,136,50,8
+    EDITTEXT        IDC_IMGPROP_COMMENT,75,134,90,36,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY
+    LTEXT           "",IDC_STATIC_10,2,176,169,1,SS_ETCHEDHORZ | WS_GROUP
+END
+
+DLG_IMGEXIF DIALOGEX 57, 60, 391, 151
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "EXIF"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_IMGEXIF_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_BORDER | WS_GROUP | WS_TABSTOP,5,4,381,80
+    EDITTEXT        IDC_IMGEXIF_INFO,5,89,381,38,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_CLIPSIBLINGS | WS_VSCROLL | WS_GROUP
+    CONTROL         "&Gemark. items groeperen",IDC_IMGEXIF_GROUP,"Button",BS_AUTOCHECKBOX | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,5,133,98,12
+    CONTROL         "&Markeren",IDC_IMGEXIF_HIGHLIGHT,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,110,132,50,14
+    PUSHBUTTON      "&Kopiëren",IDC_IMGEXIF_COPY,166,132,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "OK",IDOK,222,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Annuleren",IDCANCEL,278,132,50,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Help",IDHELP,334,132,50,14
+END
+
+DLG_ZOOM DIALOGEX 85, 100, 121, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zoomen naar"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Vergroting:",IDC_STATIC_1,8,13,49,8,NOT WS_GROUP
+    COMBOBOX        IDC_ZOOM_ZOOM,57,11,44,156,CBS_DROPDOWN | WS_TABSTOP
+    LTEXT           "%",IDC_STATIC_2,105,13,9,8
+    PUSHBUTTON      "OK",IDOK,7,37,50,14,BS_CENTER
+    PUSHBUTTON      "Annuleren",IDCANCEL,63,37,50,14,BS_CENTER
+END
+
+DLG_PAGE DIALOGEX 85, 100, 121, 54
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ga naar pagina"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Pagina:",IDC_STATIC_1,8,9,28,8,NOT WS_GROUP
+    COMBOBOX        IDC_PAGE_PAGE,38,7,74,124,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "OK",IDOK,7,32,50,14,BS_CENTER
+    PUSHBUTTON      "Annuleren",IDCANCEL,64,32,50,14,BS_CENTER
+END
+
+DLG_CAPTURE DIALOGEX 98, 61, 184, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Schermafbeelding"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Vastleggen",IDC_STATIC_1,6,6,172,81,WS_GROUP
+    CONTROL         "V&olledig scherm",IDC_CAPTURE_FULL,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,19,110,12
+    CONTROL         "Voorgrond a&pplicatie",IDC_CAPTURE_APPL,"Button",BS_AUTORADIOBUTTON,16,31,110,12
+    CONTROL         "Voo&rgrondvenster",IDC_CAPTURE_WINDOW,"Button",BS_AUTORADIOBUTTON,16,43,120,12
+    CONTROL         "Client&gebied van voorgrondvenster ",IDC_CAPTURE_CLIENT,
+                    "Button",BS_AUTORADIOBUTTON,16,55,135,12
+    CONTROL         "&Virtueelscherm (voor meerdere schermen)",IDC_CAPTURE_VIRTUAL,
+                    "Button",BS_AUTORADIOBUTTON,16,67,154,12
+    GROUPBOX        "Trigger",IDC_STATIC_2,6,92,172,49,WS_GROUP
+    CONTROL         "&Sneltoets",IDC_CAPTURE_HOTKEY,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,106,44,12
+    CONTROL         "&Timer",IDC_CAPTURE_TIMER,"Button",BS_AUTORADIOBUTTON,16,121,44,12
+    CONTROL         "",IDC_CAPTURE_HOTKEY_VAL,"msctls_hotkey32",WS_GROUP | WS_TABSTOP,65,106,84,12
+    EDITTEXT        IDC_CAPTURE_TIMER_VAL,65,121,21,12
+    LTEXT           "seconden",IDC_STATIC_3,90,123,33,8
+    CONTROL         "&Inclusief muiscursor",IDC_CAPTURE_CURSOR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,147,85,12
+    LTEXT           "",IDC_STATIC_4,2,167,180,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "Vast&leggen",IDOK,11,172,50,14,BS_CENTER | WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,67,172,50,14,BS_CENTER
+    PUSHBUTTON      "Help",IDHELP,123,172,50,14,BS_CENTER
+END
+
+IDD_RENAMEDIALOG DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Bestand heroemen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_PATH,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,59,43,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,118,43,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 15, 34, 378, 89
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Bestand overschrijven bevestigen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Bestand overschrijven:",IDC_STATIC_1,4,14,78,8
+    LTEXT           "",IDS_SOURCENAME,86,14,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_SOURCEATTR,86,24,286,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Met bestand:",IDC_STATIC_2,4,37,78,8,NOT WS_GROUP
+    LTEXT           "",IDS_TARGETNAME,86,37,286,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_TARGETATTR,86,47,286,8,SS_NOPREFIX | NOT WS_GROUP
+    DEFPUSHBUTTON   "&Ja",IDYES,105,66,50,14,WS_GROUP
+    PUSHBUTTON      "&Nee",IDNO,164,66,50,14
+    PUSHBUTTON      "Annuleren",IDCANCEL,223,66,50,14
+END
+
+IDD_COPYTO DIALOGEX 15, 34, 316, 121
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Bestand kopiëren naar"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&1",IDC_COPYTO_RB_1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,8,10,18,12
+    CONTROL         "&2",IDC_COPYTO_RB_2,"Button",BS_AUTORADIOBUTTON,8,27,18,12
+    CONTROL         "&3",IDC_COPYTO_RB_3,"Button",BS_AUTORADIOBUTTON,8,44,18,12
+    CONTROL         "&4",IDC_COPYTO_RB_4,"Button",BS_AUTORADIOBUTTON,8,61,18,12
+    CONTROL         "&5",IDC_COPYTO_RB_5,"Button",BS_AUTORADIOBUTTON,8,78,18,12
+    EDITTEXT        IDC_COPYTO_EL_1,29,10,221,12,WS_GROUP
+    PUSHBUTTON      "&Bladeren...",IDC_COPYTO_BR_1,256,9,50,14
+    EDITTEXT        IDC_COPYTO_EL_2,29,27,221,12
+    PUSHBUTTON      "B&laderen...",IDC_COPYTO_BR_2,256,26,50,14
+    EDITTEXT        IDC_COPYTO_EL_3,29,44,221,12
+    PUSHBUTTON      "Bl&aderen...",IDC_COPYTO_BR_3,256,43,50,14
+    EDITTEXT        IDC_COPYTO_EL_4,29,61,221,12
+    PUSHBUTTON      "Bla&deren...",IDC_COPYTO_BR_4,256,60,50,14
+    EDITTEXT        IDC_COPYTO_EL_5,29,78,221,12
+    PUSHBUTTON      "Blade&ren...",IDC_COPYTO_BR_5,256,77,50,14
+    DEFPUSHBUTTON   "OK",IDOK,142,100,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,199,100,50,14
+    PUSHBUTTON      "Help",IDHELP,256,100,50,14
+END
+
+IDD_SAVEEX DIALOGEX 0, 0, 400, 20
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CLIPSIBLINGS
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Compressie:",IDC_SAVE_COMPRESSION_LABEL,5,2,49,8
+    COMBOBOX        IDC_SAVE_COMPRESSION,76,0,170,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Opties",IDC_SAVE_ADVANCED,252,0,50,14,WS_GROUP
+    LTEXT           "Kleu&rdiepte:",IDC_STATIC_2,5,26,49,8
+    COMBOBOX        IDC_SAVE_BIT_DEPTH,76,24,70,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Draaien:",IDC_STATIC_3,5,46,49,8
+    COMBOBOX        IDC_SAVE_ROTATION,76,44,70,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "O&mslaan/Spiegelen:",IDC_STATIC_4,5,66,70,8
+    COMBOBOX        IDC_SAVE_FLIP,76,64,70,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "Kleuren omkeren (&negatief maken)",IDC_SAVE_INVERT,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_GROUP | WS_TABSTOP,5,82,133,12
+    LTEXT           "Opm&erking:",IDC_SAVE_COMMENT_STATIC,5,94,49,8
+    EDITTEXT        IDC_SAVE_COMMENT,5,104,140,41,ES_MULTILINE | WS_GROUP
+    GROUPBOX        "GIF",IDC_SAVE_GROUP_GIF,152,20,144,25,WS_GROUP
+    CONTROL         "Geïnterl&inieerd",IDC_SAVE_GIF_INTERLACED,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,157,30,62,12
+    CONTROL         "Maak &GIF89a",IDC_SAVE_GIF_89a,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,225,30,60,12
+    GROUPBOX        "JPEG, TIFF-JPEG",IDC_SAVE_GROUP_JPEG,152,50,144,45,WS_GROUP
+    LTEXT           "&Kwaliteit:",IDC_SAVE_JPEG_STATIC1,157,61,40,8
+    EDITTEXT        IDC_SAVE_JPEG_QUALITY,207,59,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "%",IDC_SAVE_JPEG_STATIC2,230,61,40,8
+    LTEXT           "&Subsampling:",IDC_SAVE_JPEG_STATIC3,157,80,48,8
+    COMBOBOX        IDC_SAVE_JPEG_SUBSAMPLING,207,78,33,40,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    GROUPBOX        "TIFF",IDC_SAVE_GROUP_TIFF,152,100,144,45,WS_GROUP
+    CONTROL         "Stroken m&aken",IDC_SAVE_TIFF_MAKE_STRIPS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,157,110,63,12
+    LTEXT           "Strook groo&tte:",IDC_SAVE_TIFF_STATIC1,167,126,53,8
+    EDITTEXT        IDC_SAVE_TIFF_STRIP_SIZE,221,124,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "KB",IDC_SAVE_TIFF_STATIC2,244,126,40,8
+END
+
+IDD_PRINT DIALOGEX 10, 24, 428, 227
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Afdrukken"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_PRINT_PREVIEW,"Static",SS_WHITEFRAME | SS_NOPREFIX | WS_GROUP,6,7,211,195
+    GROUPBOX        " Printer ",IDC_STATIC_4,225,4,195,27
+    LTEXT           "",IDC_PRINT_PRINTER,232,15,131,8
+    PUSHBUTTON      "&Setup...",IDC_PRINT_SETUP,367,12,50,14,WS_GROUP
+    GROUPBOX        " Positie ",IDC_STATIC_1,225,35,195,62
+    RTEXT           "&Links:",IDC_STATIC_2,240,49,22,8
+    EDITTEXT        IDC_PRINT_LEFT,266,47,45,12
+    COMBOBOX        IDC_PRINT_LEFT_UNITS,317,47,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "&Top:",IDC_STATIC_3,244,68,18,8
+    EDITTEXT        IDC_PRINT_TOP,266,66,45,12
+    COMBOBOX        IDC_PRINT_TOP_UNITS,317,66,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "A&fbeelding centreren",IDC_PRINT_CENTER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,266,82,83,12
+    GROUPBOX        " Geschaalde afdruk grootte ",IDC_STATIC_5,225,102,195,100
+    RTEXT           "S&chaal:",IDC_STATIC_6,235,118,27,8
+    EDITTEXT        IDC_PRINT_SCALE,266,116,35,12
+    LTEXT           "%",IDC_STATIC_7,304,118,10,8
+    CONTROL         "Maak &passend aan media",IDC_PRINT_FIT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,317,111,98,12
+    CONTROL         "Behoud &verhouding",IDC_PRINT_ASPECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,317,123,78,12
+    RTEXT           "Br&eedte:",IDC_STATIC_8,231,139,31,8
+    EDITTEXT        IDC_PRINT_WIDTH,266,137,45,12
+    COMBOBOX        IDC_PRINT_WIDTH_UNITS,317,137,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "&Hoogte:",IDC_STATIC_9,233,158,29,8
+    EDITTEXT        IDC_PRINT_HEIGHT,266,156,45,12
+    COMBOBOX        IDC_PRINT_HEIGHT_UNITS,317,156,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "&Begrenzingsvak weergeven",IDC_PRINT_BOX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,266,173,104,12
+    CONTROL         "Geselecteerd gebied &afdrukken",IDC_PRINT_SELECTION,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,266,185,117,12
+    DEFPUSHBUTTON   "OK",IDOK,261,208,50,14,WS_GROUP
+    PUSHBUTTON      "Annuleren",IDCANCEL,316,208,50,14
+    PUSHBUTTON      "Help",IDHELP,371,208,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "PictView"
+  IDS_PLUGIN_DESCRIPTION, "Snelle afbeeldingsviewer en conversieprogramma."
+  IDS_LOWMEMORY, "Onvoldoende geheugen"
+  IDS_SOME_WINS_OPENED, "Er zijn PictView vensters geopend. Wilt u deze afsluiten?"
+  IDS_ERROR_OPENING, "Kan bestand %s niet openen\n%s"
+  IDS_ERROR_OPENING_CONTINUE, "(%d) %hs Dit bestand kan niet worden verwerkt. Doorgaan?"
+  IDS_TITLE, "%s (%d x %d x %s - %i%%) - %s"
+  IDS_TITLE_MULTI, "%s (%d x %d x %s [%d of %d] - %i%%) - %s"
+  IDS_NCOLORS, "{!}%d kleur{|1|en}"
+  IDS_NCOLORS_CMYK, "CMYK"
+  IDS_NCOLORS_LAB, "LAB"
+
+  IDS_ERROR_CALLING_PVW32_DLL, "Fout bij aanroep PVW32Cnv.DLL"
+  IDS_CLIPBOARD_TITLE, "<Klembord>"
+  IDS_CAPTURE_TITLE, "<Schermafbeelding>"
+  IDS_SCAN_TITLE, "<Scan>"
+  IDS_DELETED_TITLE, "<Verwijderen>"
+  IDS_CLIPBOARD_FNAME, "Klembrd"
+  IDS_CAPTURE_FNAME, "Vastleggen"
+  IDS_SCAN_FNAME, "Scan"
+  IDS_RGB, "Rood: %i, Groen: %i, Blauw: %i"
+  IDS_RGB_HEX, "Rood: %#02x, Groen: %#02x, Blauw: %#02x"
+  IDS_RGBXY, "(%i, %i): Rood: %i, Groen: %i, Blauw: %i"
+  IDS_RGBXY_HEX, "(%i, %i): Rood: %#02x, Groen: %#02x, Blauw: %#02x"
+  IDS_INDEX, ", Index: %i"
+
+  IDS_VIEW_BMP_IN_CLIPBOARD, "Bitmap van klembo&rd weergeven"
+  IDS_PLUGINSMENU_SCREEN_CAPTURE, "&Schermafbeelding..."
+  IDS_PLUGINSMENU_REGENERATE_THUMBNAIL, "&Miniatuurweergave bijwerken"
+  IDS_PLUGINSMENU_SCAN, "Sc&an afbeelding..."
+  IDS_PIXELS, "{!}%d pixel{|1|s}"
+  IDS_BYTES, "{!}%d byte{|1|s}"
+  IDS_OF, "%d of %d"
+  IDS_FRAMES, "F&rames:"
+  IDS_IMGPROP_GRAY_NBIT, "Grijswaarde %dBit"
+  IDS_UNKNOWN, "Onbekend"
+  IDS_CFG_CONFLICT, "De configuratie is reeds geopend."
+  IDS_CONFIGURATION_TITLE, "PictView Configuratie"
+  IDS_ERRORTITLE, "PictView fout"
+  IDS_BADTIMER, "Tijdsvertraging moet liggen tussen de 1 en 360 seconden."
+  IDS_BADHOTKEY, "Een beschikbare sneltoets toekennen."
+  IDS_CAPTURECANCELED, "Schermafbeelding is geannuleerd."
+  IDS_CAPTURING, "Schermafbeelding"
+  IDS_EMPTY, "Leeg"
+  IDS_SELECTTARGETDIR, "Selecteer de doelmap."
+  IDS_SPECIFYPATH, "Een geldig absoluut of relatief pad moeten hier worden opgegeven."
+  IDS_PICTVIEWPLUGINNAME, "PictView Plugin (afbeelingsviewer en conversieprogramma)"
+
+
+  // !WARNING! 2 following variables must be synchronized with IDS_SAVEASFILTERMONO & IDS_SAVEASFILTERCOLOR:
+  // G.LastSaveAsFilterIndexMono  = 14; // index is 1-based (IDS_SAVEASFILTERMONO: 14=BMP)
+  // G.LastSaveAsFilterIndexColor = 13; // index is 1-based (IDS_SAVEASFILTERCOLOR: 13=BMP)
+  // !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING!
+
+  IDS_SAVEASFILTERMONO, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pbm,*.ppm)|*.pbm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|Wireless Bitmap (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEASFILTERCOLOR, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pnm,*.ppm)|*.pnm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEERROR, "De afbeelding kan niet worden opgeslagen.\nFout: %hs"
+  IDS_SAVE_AS_SUCCESS, "Afbeelding opgeslagen."
+  IDS_SAVE_LOST_ALPHA, "De oorspronkelijke afbeelding bevat een alphakanaal. Echter, het is samengevoegd met de afbeeldingsgegevens en de huidige achtergrond.\n Hierdoor zal het alphakanaal niet worden bewaard. Toch opslaan?"
+  IDS_CANCELED_BY_USER, "Opslaan van de afbeelding is door de gebruiken geannuleerd. Geen uitvoerbestand gemaakt."
+  IDS_OPENFILTER, "Algemene grafische bestanden (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|Alle bestanden (*.*)|*.*|"
+  IDS_CUSTOM_COLOR, "&Aangepaste kleur..."
+  IDS_AUTOMATIC_COLOR, "A&utomatische kleur"
+  IDS_SAL_IS_BUSY, "Sally is bezig. De gewenste opdracht kan niet worden uitgevoerd, probeer het later opnieuw."
+  IDS_RENAME_TO, "Hernoem bestand ""%s"" naar"
+  IDS_ERRORRENAMINGFILE, "Fout hernoemen bestand"
+  IDS_TOOLONGNAME, "Kan bewerking niet voltooien omdat de naam te lang is."
+  IDS_LOADEXIF, "Laden van EXIF bibliotheek %s niet mogelijk."
+  IDS_EXIF_TAG, "Tag"
+  IDS_EXIF_VALUE, "Waarde"
+  IDS_EXIF_LOCALIZATION_FNAME, "nl.po"
+
+  IDS_MENU_FILE, "&Bestand"
+  IDS_MENU_FILE_OPEN, "&Openen...\tCtrl+O"
+  IDS_MENU_FILE_REFRESH, "He&rstellen\tCtrl+R"
+  IDS_MENU_FILE_PREV, "Vo&rige\tBackspace"
+  IDS_MENU_FILE_NEXT, "Volge&nde\tSpatie"
+  IDS_MENU_FILE_SAVEAS, "O&pslaan Als...\tCtrl+S"
+  IDS_MENU_FILE_WALLPAPER, "Stel in als a&chtergrond"
+  IDS_MENU_WALLPARER_CENTER, "&Centreren"
+  IDS_MENU_WALLPARER_TILE, "&Naast elkaar"
+  IDS_MENU_WALLPARER_STRETCH, "&Spreiden"
+  IDS_MENU_WALLPARER_RESTORE, "&Vorige herstellen"
+  IDS_MENU_WALLPARER_NONE, "&Geen"
+  IDS_MENU_FILE_CAPTURE, "Scher&mafbeelding...\tQ"
+  IDS_MENU_FILE_SCAN, "Sc&an afbeelding...\tW"
+  IDS_MENU_FILE_SCAN_SOURCE, "Se&lecteer scanner bron..."
+  IDS_MENU_FILE_PROP, "E&igenschappen...\tI"
+  IDS_MENU_FILE_EXIF, "EXIF &weergeven...\tE"
+  IDS_MENU_FILE_HISTOGRAM, "Histo&gram weergeven...\tCtrl+H"
+  IDS_MENU_FILE_PAGE, "Pa&gina instellingen...\tCtrl+Shift+P"
+  IDS_MENU_FILE_PRINT, "A&fdrukken...\tCtrl+P"
+  IDS_MENU_FILE_FILES, "R&ecente bestanden"
+  IDS_MENU_FILE_DIRS, "Rece&nte mappen"
+  IDS_MENU_FILE_EXIT, "Afsl&uiten\tEsc"
+  IDS_MENU_FILE_OTHER, "Overige bes&tanden"
+  IDS_MENU_FILE_FIRST, "Eer&ste\tShift+Backspace"
+  IDS_MENU_FILE_LAST, "&Laatste\tShift+Spatie"
+  IDS_MENU_FILE_FOCUS, "&Selectie\tF"
+  IDS_MENU_FILE_SELCRCFILE, "Selecteer/&deselecteer geopend bestand in paneel of zoek\tInsert"
+  IDS_MENU_FILE_RENAME, "&Hernoemen...\tF2"
+  IDS_MENU_FILE_DELETE, "&Verwijderen\tDel"
+  IDS_MENU_FILE_PREVSEL, "V&orige selectie\tCtrl+Backspace"
+  IDS_MENU_FILE_NEXTSEL, "Volg&ende Selectie\tCtrl+Spatie"
+  IDS_MENU_FILE_COPYTO, "&Kopiëren naar...\tX"
+
+  IDS_MENU_EDIT, "&Wijzingen"
+  IDS_MENU_EDIT_COPY, "&Kopiëren\tCtrl+C"
+  IDS_MENU_EDIT_PASTE, "&Plakken\tCtrl+V"
+  IDS_MENU_EDIT_SELECTALL, "&Alles selecteren\tCtrl+A"
+  IDS_MENU_EDIT_DESELECT, "All &deselecteren\tCtrl+D"
+  IDS_MENU_EDIT_CROP, "Bijs&nijden\tC"
+  IDS_MENU_EDIT_180, "Draaien &180°\tT"
+  IDS_MENU_EDIT_RIGHT, "Draai &Rechtsom\tR"
+  IDS_MENU_EDIT_LEFT, "Draai &Linksom\tL"
+  IDS_MENU_EDIT_FLIPH, "&Horizontaal spiegelen\tH"
+  IDS_MENU_EDIT_FLIPV, "&Verticaal spiegelen\tV"
+
+  IDS_MENU_VIEW, "Bee&ld"
+  IDS_MENU_VIEW_ZOOMIN, "&Inzoomen\t+"
+  IDS_MENU_VIEW_ZOOMOUT, "Uitz&oomen\t-"
+  IDS_MENU_VIEW_ZOOM, "&Zoomen naar...\tM"
+  IDS_MENU_VIEW_WHOLE, "&Passend in venster\tF5"
+  IDS_MENU_VIEW_WIDTH, "Aan breedte &aanpassen\tF6"
+  IDS_MENU_VIEW_ACTUAL, "&Werkelijke grootte (1:1)\tF7"
+  IDS_MENU_VIEW_WINDOW, "&Venster passend maken\tF8"
+  IDS_MENU_VIEW_TOOLBAR, "W&erkbalk\tF9"
+  IDS_MENU_VIEW_STATUSBAR, "Status&Balk"
+  IDS_MENU_VIEW_FULLSCREEN, "Vo&lledig scherm\tF11"
+
+  IDS_MENU_MULTIPAGE, "&Meerbladige afbeeldingen"
+  IDS_MENU_NEXTPAGE, "&Volgende pagina\tCtrl+Page Down"
+  IDS_MENU_PREVPAGE, "V&orige pagina\tCtrl+Page Up"
+  IDS_MENU_FIRSTPAGE, "&Eerste pagina\tCtrl+Home"
+  IDS_MENU_LASTPAGE, "&Laatste pagina\tCtrl+End"
+  IDS_MENU_PAGE, "&Ga naar pagina...\tG"
+  IDS_MENU_ANIMATION, "&Animatie afspelen/pauzeren"
+
+  IDS_MENU_TOOLS, "&Extra"
+  IDS_MENU_TOOLS_HAND, "&Hand\tA"
+  IDS_MENU_TOOLS_ZOOM, "&Zoomen\tZ"
+  IDS_MENU_TOOLS_SELECT, "&Selectie\tS"
+  IDS_MENU_TOOLS_PICK, "&Kleur kiezen\tP"
+  IDS_MENU_TOOLS_OPTIONS, "&Configuratie..."
+
+  IDS_MENU_HELP, "&Help"
+  IDS_MENU_HELP_CONTENTS, "&Inhoud\tF1"
+  IDS_MENU_HELP_INDEX, "I&ndex..."
+  IDS_MENU_HELP_SEARCH, "&Zoeken..."
+//  IDS_MENU_HELP_KEYBOARD, "&Keyboard Shortcuts"
+//  IDS_MENU_HELP_MOUSE, "&Mouse Shortcuts"
+  IDS_MENU_HELP_ABOUT, "&Over PictView..."
+
+  IDS_TT_OPEN, "Openen\tCtrl+O"
+  IDS_TT_SAVE, "Opslaan Als\tCtrl+S"
+  IDS_TT_PROPERTIES, "Afbeelding eigenschappen\tI"
+  IDS_TT_PREV, "Open vorige bestand\tBackspace"
+  IDS_TT_NEXT, "Open volgende bestand\tSpatie"
+  IDS_TT_PREVSELFILE, "Vorige geselecteerde bestand openen\tCtrl+Backspace"
+  IDS_TT_NEXTSELFILE, "Volgende geselecteerde bestand openen\tCtrl+Space"
+  IDS_TT_COPY, "Kopiëren\tCtrl+C"
+  IDS_TT_PASTE, "Plakken\tCtrl+V"
+  IDS_TT_TOOL_HAND, "Hand\tA"
+  IDS_TT_TOOL_ZOOM, "Zoomen\tZ"
+  IDS_TT_TOOL_SELECT, "Selecteren\tS"
+  IDS_TT_TOOL_PIPETTE, "Pipet\tP"
+  IDS_TT_LEFT, "Draai linksom\tL"
+  IDS_TT_RIGHT, "Draai rechtsom\tR"
+  IDS_TT_CROP, "Bijsnijden\tC"
+  IDS_TT_ZOOM_OUT, "Uitzoomen\t-"
+  IDS_TT_ZOOM_IN, "Inzoomen\t+"
+  IDS_TT_ZOOM_TO, "Zoomen\tM"
+  IDS_TT_ZOOM_WIDTH, "Aan breedte aanpassen\tF6"
+  IDS_TT_ZOOM_WHOLE, "Pas in venster\tF5"
+  IDS_TT_ZOOM_ACTUAL, "Werkelijke grootte\tF7"
+  IDS_TT_FULL_SCREEN, "Volledig scherm\tF11"
+  IDS_TT_SELSRCFILE, "Selecteer/De-selecteer geopend bestand in paneel of zoekvenster\tInsert"
+  IDS_TT_PRINT, "Afdrukken\tCtrl+P"
+
+  IDS_TWAIN_OPEN, "Kan TWAIN bronbeheer niet openen .\nAls uw scanner een TWAIN compatible scanner is,\ninstalleert u dan de software voor die scanner."
+  IDS_TWAIN_ERROR, "Twain-fout"
+  IDS_TWCC_BUMMER, "Fout door onbekende reden."
+  IDS_TWCC_LOWMEMORY, "Onvoldoende geheugen voor het uitvoeren van de bewerking."
+  IDS_TWCC_NODS, "Geen gegevensbron."
+  IDS_TWCC_MAXCONNECTIONS, "DS is verbonden met maximum aantal toepassingen."
+  IDS_TWCC_OPERATIONERROR, "DS of DSM heeft een fout gerapporteerd, toepassing moet niet."
+  IDS_TWCC_BADCAP, "Onbekende mogelijkheid."
+  IDS_TWCC_BADPROTOCOL, "Niet herkende MSG DG DAT combinatie."
+  IDS_TWCC_BADVALUE, "gegevensparameter buiten bereik."
+  IDS_TWCC_SEQERROR, "DG DAT MSG uit verwachte reeks."
+  IDS_TWCC_BADDEST, "Onbekende doel toepassing/Bron in DSM_vermelding."
+  IDS_TWCC_CAPUNSUPPORTED, "Mogelijkheden niet ondersteund door bron."
+  IDS_TWCC_CAPBADOPERATION, "Uitvoeren wordt niet ondersteund door de mogelijkheden."
+  IDS_TWCC_CAPSEQERROR, "Mogelijkheden zijn afhankelijk van andere mogelijkheden."
+  IDS_TWCC_DENIED, "Bestandssysteembewerking is geweigerd (bestand is beveiligd)."
+  IDS_TWCC_FILEEXISTS, "Bewerking is mislukt bestand bestaat al."
+  IDS_TWCC_FILENOTFOUND, "Bestand niet gevonden."
+  IDS_TWCC_NOTEMPTY, "Bewerking mislukt map is niet leeg."
+  IDS_TWCC_PAPERJAM, "De papierinvoer is vastgelopen."
+  IDS_TWCC_PAPERDOUBLEFEED, "De papierinvoer heeft meerdere pagina's gedetecteerd."
+  IDS_TWCC_FILEWRITEERROR, "Fout bij schrijven naar bestand (schijf vol?)."
+  IDS_TWCC_CHECKDEVICEONLINE, "Het apparaat is offline gegaan, tengevolge van of tijdens deze bewerking."
+
+  IDS_CAPTHINT_APPL, "Het volledige toepassingsvenster met alle subvensters."
+  IDS_CAPTHINT_WINDOW, "Het venster (dialoogvenster, berichtenvenster...) met invoerselectie."
+  IDS_CAPTHINT_CLIENT, "Zoals voorgrondvenster, maar titelbalk, kader en menu worden niet vastgelegd."
+
+  IDS_DONT_SHOW_AGAIN, "&Dit niet meer weergeven"
+  IDS_DONT_SHOW_AGAIN_SLA, "&Dit niet meer weergeven en opslaan zonder het alphakanaal"
+  IDS_DONT_SHOW_AGAIN_UTH, "&Miniatuurweergave bijwerken zonder een volgende keer te vragen"
+  IDS_REGENERATE_THUMBNAIL_TITLE, "PictView - Miniatuurweergave bijwerken..."
+  IDS_REGENERATE_THUMB_WARNING, "Deze funtie zal de miniatuurweergave bijwerken in de Exif sectie van de afbeelding(en). De rest van het bestand wordt niet gewijzigd. Doorgaan?"
+  IDS_REGENERATE_THUMB_WRITEFILE, "Het maken van een bestand met de nieuwe miniatuurweergave is niet mogelijk. Schijf vol? Het oude bestand '%s' blijft ongewijzgd."
+
+  IDS_N_OF_N_FILES_PROCESSED "{!}Alleen %d van %d bestanden {is|1|zijn} verwerkt. De andere {is|1|zijn} niet gewijzigd."
+  IDS_NO_FILES_FOUND, "Geen JPEG afbeeldingen met EXIF gegevens gevonden. Geen enkel bestand is gewijzigd."
+  IDS_NOT_JPEG_FILE, "Dit bestand is geen JPEG, er is geen miniatuurweergave om bij te werken."
+  IDS_NOT_EXIF_CREATE_JFXX, "Dit bestand bevat geen EXIF gegevens, er is geen EXIF miniatuurweergave om bij te werken. Wilt u een JFIF JFXX miniatuurweergave maken?"
+  IDS_READ_ONLY_MODIFY, "Het bestand is alleen-lezen, Toch wijzigen?"
+  IDS_READ_ONLY_REWRITE, "Bestand %s is alleen-lezen. Toch overschrijven?"
+
+  IDS_CLRS_MONO, "2 kleuren"
+  IDS_CLRS_16, "16 kleuren"
+  IDS_CLRS_256, "256 kleuren"
+  IDS_CLRS_HC15, "15bit HiColor"
+  IDS_CLRS_HC16, "16bit HiColor"
+  IDS_CLRS_TC24, "24bit TrueColor"
+  IDS_CLRS_TC32, "32bit TrueColor"
+  IDS_CLRS_256GR, "256 grijstinten"
+  IDS_FLIP_NONE, "Geen"
+  IDS_FLIP_VERT, "Verticaal"
+  IDS_FLIP_HOR, "Horizontaal"
+  IDS_ROT_NONE, "Geen"
+  IDS_ROT_90, "90 gr CW"
+  IDS_ROT_180, "180 gr"
+  IDS_ROT_270, "270 gr CW"
+  IDS_SAVE_DEFAULT, "Standaard"
+
+  IDS_HIST_HISTOGRAM, "Histogram"
+  IDS_HIST_LUMINOSITY, "Helderheid"
+  IDS_HIST_RED, "Rood"
+  IDS_HIST_GREEN, "Groen"
+  IDS_HIST_BLUE, "Blauw"
+  IDS_HIST_RGBSUM, "RGB"
+  IDS_HIST_MENU_LUMINOSITY, "Helderheid\tL"
+  IDS_HIST_MENU_RED, "Rood\tR"
+  IDS_HIST_MENU_GREEN, "Groen\tG"
+  IDS_HIST_MENU_BLUE, "Blauw\tB"
+  IDS_HIST_MENU_RGBSUM, "RGB\tA"
+  IDS_HIST_TIP_LUMINOSITY, "Helderheid (L)"
+  IDS_HIST_TIP_RED, "Rood (R)"
+  IDS_HIST_TIP_GREEN, "Groen (G)"
+  IDS_HIST_TIP_BLUE, "Blauw (B)"
+  IDS_HIST_TIP_RGBSUM, "RGB (A)"
+  IDS_HIST_TIP_OTHERCHANELS, "Andere kanalen weergeven (O)"
+  IDS_DLL_NOTFOUND, "Kan de afbeelding verwerkingsbibiliotheek PVW32Cnv.dll niet laden."
+  IDS_DLL_WRONG_VERSION, "De verkeerde versie van  PVW32Cnv.dll is gevonden."
+  IDS_SELECT_REGION, "Selecteer eerst een regio alstublieft."
+  IDS_SAVE_ERR_EXISTS_OVERWRITE, "Bestand ""%s"" bestaat reeds.\nWilt u deze vervangen?"
+
+  IDS_SB_XY, "X:%d  Y:%d"
+  IDS_SB_WH, "W:%d  H:%d"
+  IDS_SB_RGB, "R:%d  G:%d  B:%d"
+  IDS_SB_CAGE, "Teken rechthoekige selectie. Shift en Spatie voor extra opties."
+  IDS_SB_ZOOM, "Klik op afbeeldingen voor inzoomen; klik en sleep voor selectiekader zoom. Spatie om selectiekader te slepen."
+  IDS_SB_HAND, "Klik en sleep om de afbeelding in gewenste richting te schuiven."
+
+  IDS_SB_AUTOROTATING, "Draaien..."
+
+  IDS_UNIT_INCHES, "inches"
+  IDS_UNIT_CM, "cm"
+  IDS_UNIT_MM, "mm"
+  IDS_UNIT_POINTS, "points"
+  IDS_UNIT_PICAS, "picas"
+
+  IDS_PRINT_NODEFPRINTER, "Geen standaard systeemprinter gevonden. Installeer een standaard systeemprinter a.u.b."
+  IDS_PRINT_NOPRINTERS, "Geen printer geinstalleerd."
+  IDS_PRINT_SETUPFAILED, "Afdruk instellingen dialoogvenster mislukt."
+  IDS_PRINTING, "Afdrukken..."
+  IDS_PRINTING_FAILED,  "Afdrukken mislukt.\n%s"
+  IDS_UNKNOWN_ERROR,    "Er is een onbekende fout opgetreden.\n"
+  IDS_CHECK_EVENTLOG,   "Controleer de Event Viewer voor de exacte foutmelding."
+  // The following 2 strings are concatenated together
+  IDS_EXCEPT_INFO1,     "Er is een uitzondering opgetreden in PictView, neemt u alstublieft contact op met de auteurs!\nWanneer u aan het werk was met een afbeelding op het moment dat de uitzondering optrad,\n"
+  IDS_EXCEPT_INFO2,     "probeert u dan de fout te reproduceren met deze afbeelding en wanneer een uitzondering\nopnieuw optreedt,stuur de afbeelding dan naar ons (we zullen de bug reproduceren en oplossen).\nBedankt voor uw medewerking!"
+
+  IDS_NO_MORE_IMAGES,   "Geen afbeeldingen meer beschikbaar"
+  IDS_UNSUPPORTED_IMAGE_TYPE, "De afbeelding heeft een niet ondersteund bestandsformaat."
+  IDS_MUSTBEPOSITIVE,   "Geef een nummer op groter dan nul."
+  IDS_SB_TIP_SELECT_SQUARE, "Tip: Gebruik Extra Configuratie om vaste niet-vierkante rechthoeken."
+  
+  IDS_WIA_ERROR_ACQUIREIMG, "Kan image niet van apparaat terughalen. Kontroleer of het apparaat correct is aangesloten en probeer opnieuw. Fout: (0x%08X) %s"
+  IDS_WIA_WAIT, "Wacht..."
+  IDS_WIA_STATUS_TRANSFER_FROM_DEVICE, "Gegevens van apparaat lezen (%d%% compleet)"
+  IDS_WIA_STATUS_PROCESSING_DATA, "Gegevens verwerken (%d%% compleet)"
+  IDS_WIA_STATUS_TRANSFER_TO_CLIENT, "Gegevens oversturen (%d%% compleet)"
+  
+  IDS_SCAN_OPEN_EXTRA_IMGS, "Je hebt meer beelden van de scanner ontvangen. Het eerste beeld werd geopend in dit venster. Wilt u andere beelden openen elk in een eigen venster? Zo niet, dan worden de beelden worden genegeerd\n\nAantal nieuwe schermen: %d"
+}
+
+STRINGTABLE
+{
+  IDS_RENAME_EMPTY, "Voer een bestandsnaam of hernoemmasker in."
+  IDS_RENAME_BAD_MASK, "De bestandsnaam of het hernoemmasker mag geen padscheidingstekens of deze tekens bevatten: < > : "" / \\ |"
+  IDS_RENAME_MASK_EMPTY, "Het hernoemmasker leverde een lege bestandsnaam op."
+  IDS_RENAME_BAD_NAME, "De resulterende bestandsnaam mag geen padscheidingstekens of deze tekens bevatten: < > : "" / \\ | ? *"
+  IDS_COPYTO_SAME_FOLDER, "Het bestand staat al in deze map. Kies een andere doelmap."
+}
+
+STRINGTABLE
+{
+  IDS_PV_IMAGE_LOAD_WAS_CANCELED, "Laden van afbeelding geannuleerd."
+  IDS_PV_UNABLE_TO_OPEN_IMAGE_FILE, "Kan afbeeldingsbestand niet openen"
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE, "Kan grootte van afbeeldingsbestand niet lezen"
+  IDS_PV_IMAGE_FILE_EXCEEDS_THE_CURRENT, "Het afbeeldingsbestand overschrijdt de huidige invoerlimiet van PictView."
+  IDS_PV_UNABLE_TO_ALLOCATE_AN_IN, "Kan geen afbeeldingsstroom in het geheugen toewijzen."
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE_2, "Kan afbeeldingsbestand niet lezen"
+  IDS_PV_UNABLE_TO_LOCK_IMAGE_STREAM, "Kan geheugen van afbeeldingsstroom niet vergrendelen"
+  IDS_PV_UNABLE_TO_CREATE_AN_IMAGE, "Kan geen afbeeldingsstroom voor WIC maken."
+  IDS_PV_IMAGE_OPERATION_FAILED, "Afbeeldingsbewerking mislukt."
+  IDS_PV_CLIPBOARD_IMAGE, "Afbeelding van klembord"
+  IDS_PV_UNABLE_TO_CREATE_A_COMPATIBLE, "Kan geen compatibele buffer voor de schermafbeelding maken."
+  IDS_PV_UNABLE_TO_SELECT_THE_COMPATIBLE, "Kan de compatibele buffer voor de schermafbeelding niet selecteren."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN, "Kan geen schermafbeelding maken"
+  IDS_PV_UNABLE_TO_READ_PIXELS_FROM, "Kan geen pixels lezen uit de buffer van de schermafbeelding."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING, "Kan geen tekencontext voor de schermafbeelding maken."
+  IDS_PV_UNABLE_TO_CREATE_A_FALLBACK, "Kan geen vervangende tekencontext voor de schermafbeelding maken."
+  IDS_PV_UNABLE_TO_INITIALIZE_DXGI_SCREEN, "Kan DXGI-schermafbeelding niet initialiseren"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_2, "Kan geen schermafbeelding maken met DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_3, "Kan geen schermafbeelding maken met DXGI."
+  IDS_PV_SCREEN_CAPTURE_BOUNDS_ARE_INVALID, "De grenzen van de schermafbeelding zijn ongeldig."
+  IDS_PV_SCREEN_CAPTURE, "Schermafbeelding"
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_UNAVAILABLE, "Afbeeldingsgegevens op het klembord zijn niet beschikbaar."
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_INCOMPLETE, "Afbeeldingsgegevens op het klembord zijn onvolledig."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE, "Kan afbeeldingsgegevens op het klembord niet vergrendelen"
+  IDS_PV_CLIPBOARD_IMAGE_FORMAT_IS_UNSUPPORTED, "Het afbeeldingsformaat op het klembord wordt niet ondersteund."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_2, "Kan geen tekencontext maken voor het converteren van de klembordafbeelding."
+  IDS_PV_UNABLE_TO_CREATE_CLIPBOARD_IMAGE, "Kan geen conversiebuffer voor de klembordafbeelding maken."
+  IDS_PV_UNABLE_TO_CONVERT_CLIPBOARD_IMAGE, "Kan afbeeldingsgegevens op het klembord niet converteren."
+  IDS_PV_CLIPBOARD_BITMAP, "Bitmap van klembord"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_FALLBACK, "Kan geen afbeelding van het vervangende venster maken."
+  IDS_PV_FALLBACK_WINDOW_DIMENSIONS_ARE_INVALID, "De afmetingen van het vervangende venster zijn ongeldig."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_3, "Kan geen tekencontext maken voor de afbeelding van het vervangende venster."
+  IDS_PV_UNABLE_TO_PRINT_THE_FALLBACK, "Kan het vervangende venster niet tekenen."
+  IDS_PV_IMAGE_SOURCE_DATA_IS_UNAVAILABLE, "De brongegevens van de afbeelding zijn niet beschikbaar."
+  IDS_PV_NO_IMAGE_LOADED, "Geen afbeelding geladen"
+  IDS_PV_PICK_COLOR_MOVE_MOUSE_OVER, "Kleur kiezen: beweeg de muis over de afbeelding"
+  IDS_PV_UNABLE_TO_START_ANIMATED_GIF, "Kan het afspelen van de geanimeerde GIF niet starten."
+  IDS_PV_SOURCE_NAVIGATION_IS_NO_LONGER, "Navigatie in de bron is niet meer beschikbaar."
+  IDS_PV_SOURCE_SELECTION_IS_NO_LONGER, "Selectie in de bron is niet meer beschikbaar."
+  IDS_PV_OPENED_FILE_IS_SELECTED_IN, "Geopend bestand is geselecteerd in de bron."
+  IDS_PV_OPENED_FILE_IS_UNSELECTED_IN, "Geopend bestand is gedeselecteerd in de bron."
+  IDS_PV_FILE_NAME_UNCHANGED, "Bestandsnaam ongewijzigd."
+  IDS_PV_UNABLE_TO_RENAME_THE_FILE, "Kan het bestand niet hernoemen"
+  IDS_PV_RENAME_CANCELED, "Hernoemen geannuleerd."
+  IDS_PV_FILE_WAS_RENAMED_BUT_THE, "Bestand hernoemd, maar het nieuwe pad is niet beschikbaar."
+  IDS_PV_FILE_RENAMED, "Bestand hernoemd."
+  IDS_PV_COPY_CANCELED, "Kopiëren geannuleerd."
+  IDS_PV_UNABLE_TO_COPY_THE_FILE, "Kan het bestand niet kopiëren."
+  IDS_PV_FILE_COPIED, "Bestand gekopieerd."
+  IDS_PV_COPY_WAS_NOT_COMPLETED, "Kopiëren is niet voltooid."
+  IDS_PV_UNABLE_TO_DELETE_THE_FILE, "Kan het bestand niet verwijderen."
+  IDS_PV_FILE_MOVED_TO_THE_RECYCLE, "Bestand naar de Prullenbak verplaatst."
+  IDS_PV_FILE_DELETED, "Bestand verwijderd."
+  IDS_PV_DELETE_CANCELED, "Verwijderen geannuleerd."
+  IDS_PV_FILE_WAS_NOT_DELETED, "Bestand is niet verwijderd."
+  IDS_PV_SOURCE_FOCUS_IS_NO_LONGER, "Focus in de bron is niet meer beschikbaar."
+  IDS_PV_FOCUSING_OPENED_FILE_IN_THE, "Geopend bestand wordt gefocust in de bron."
+  IDS_PV_PREVIOUS_WALLPAPER_RESTORED, "Vorige bureaubladachtergrond hersteld."
+  IDS_PV_WALLPAPER_CLEARED, "Bureaubladachtergrond verwijderd."
+  IDS_PV_WALLPAPER_UPDATED, "Bureaubladachtergrond bijgewerkt."
+  IDS_PV_NO_IMAGE_IS_LOADED, "Er is geen afbeelding geladen."
+  IDS_PV_UNABLE_TO_CREATE_A_WALLPAPER, "Kan geen uitvoerpad voor de bureaubladachtergrond maken."
+  IDS_PV_UNABLE_TO_UPDATE_THE_DESKTOP, "Kan de bureaubladachtergrond niet bijwerken."
+  IDS_PV_UNABLE_TO_OPEN_THE_DESKTOP, "Kan de registersleutel van de bureaubladachtergrond niet openen."
+  IDS_PV_OPEN_IMAGE, "Afbeelding openen"
+  IDS_PV_UNABLE_TO_OPEN_THE_HISTOGRAM, "Kan het histogramvenster niet openen."
+  IDS_PV_UNABLE_TO_REGISTER_THE_SCREEN, "Kan de sneltoets voor de schermafbeelding niet registreren."
+  IDS_PV_UNABLE_TO_START_THE_SCREEN, "Kan de timer voor de schermafbeelding niet starten."
+  IDS_PV_CAPTURING_PICTVIEW, "Schermafbeelding maken - PictView"
+  IDS_PV_SCREEN_CAPTURE_IS_WAITING_FOR, "Schermafbeelding wacht op de sneltoets."
+  IDS_PV_SCREEN_CAPTURE_TIMER_STARTED, "Timer voor de schermafbeelding gestart."
+  IDS_PV_SCREEN_CAPTURED, "Schermafbeelding gemaakt."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_4, "Kan geen schermafbeelding maken."
+  IDS_PV_SCREEN_CAPTURED_FROM_THE_VIEWER, "Schermafbeelding gemaakt van het viewervenster; vastleggen van het bureaublad was niet beschikbaar."
+  IDS_PV_THE_CLIPBOARD_DOES_NOT_CONTAIN, "Het klembord bevat geen afbeelding."
+  IDS_PV_UNABLE_TO_OPEN_THE_CLIPBOARD, "Kan het klembord niet openen."
+  IDS_PV_UNABLE_TO_PASTE_THE_CLIPBOARD, "Kan de afbeelding van het klembord niet plakken."
+  IDS_PV_PICTVIEW_IMAGE, "PictView-afbeelding"
+  IDS_PV_UNABLE_TO_PRINT_THE_IMAGE, "Kan de afbeelding niet afdrukken."
+  IDS_PV_UNABLE_TO_READ_PRINTER_PAGE, "Kan de paginaafmetingen van de printer niet lezen."
+  IDS_PV_UNABLE_TO_ALLOCATE_CLIPBOARD_IMAGE, "Kan geen geheugen voor afbeeldingsgegevens op het klembord toewijzen."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE_2, "Kan afbeeldingsgegevens op het klembord niet vergrendelen."
+  IDS_PV_UNABLE_TO_COPY_IMAGE_DATA, "Kan afbeeldingsgegevens niet naar het klembord kopiëren."
+  IDS_PV_UNABLE_TO_START_THE_IMAGE, "Kan het achtergrondproces voor het laden van de afbeelding niet starten."
+  IDS_PV_FILE_DIALOG_FAILED, "Kan het bestandsdialoogvenster niet openen.\nFout: 0x%X"
+  IDS_PV_ALLOCATE_PIXELS_FAILED, "Kan geen geheugen voor de pixels van %s toewijzen."
+  IDS_PV_CONVERSION_CONTEXT_FAILED, "Kan geen tekencontext maken voor de conversie van %s."
+  IDS_PV_READ_PIXELS_FAILED, "Kan geen pixels lezen uit %s."
+  IDS_PV_SAVED, "Opgeslagen: %s"
+  IDS_PV_LOADING, "Laden..."
+  IDS_PV_LOADING_PERCENT, "Laden... %u%%"
+  IDS_PV_IMAGE_FILES, "Afbeeldingsbestanden"
+  IDS_PV_ALL_FILES, "Alle bestanden"
+  IDS_PV_ERR_WIC_UNAVAILABLE, "Windows Imaging Component is niet beschikbaar."
+  IDS_PV_ERR_OPEN, "Kan de afbeelding niet openen."
+  IDS_PV_ERR_DECODE, "De afbeelding is beschadigd of kan niet worden gedecodeerd."
+  IDS_PV_ERR_FRAME, "De gevraagde pagina of frame bestaat niet."
+  IDS_PV_ERR_TOO_LARGE, "De afbeelding is te groot."
+  IDS_PV_ERR_CANCELED, "De bewerking is geannuleerd."
+  IDS_PV_ERR_MEMORY, "Onvoldoende geheugen om de afbeelding te verwerken."
+  IDS_PV_ERR_SAVE, "Kan de afbeelding niet opslaan."
+  IDS_PV_SAVEAS_FILTER, "Portable Network Graphics (*.png)|*.png|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|TIFF (*.tif)|*.tif;*.tiff|Windows-bitmap (*.bmp)|*.bmp|CompuServe GIF (*.gif)|*.gif|"
+  IDS_EXIF_TAG_0001, "Interoperabiliteitsindex"
+  IDS_EXIF_TAG_0002, "Interoperabiliteitsversie"
+  IDS_EXIF_TAG_00FE, "Nieuw subbestandstype"
+  IDS_EXIF_TAG_0100, "Afbeeldingsbreedte"
+  IDS_EXIF_TAG_0101, "Afbeeldingshoogte"
+  IDS_EXIF_TAG_0102, "Bits per sample"
+  IDS_EXIF_TAG_0103, "Compressie"
+  IDS_EXIF_TAG_0106, "Fotometrische interpretatie"
+  IDS_EXIF_TAG_010D, "Documentnaam"
+  IDS_EXIF_TAG_010E, "Afbeeldingsbeschrijving"
+  IDS_EXIF_TAG_010F, "Cameramerk"
+  IDS_EXIF_TAG_0110, "Cameramodel"
+  IDS_EXIF_TAG_0111, "Strookoffsets"
+  IDS_EXIF_TAG_0112, "Stand"
+  IDS_EXIF_TAG_0115, "Samples per pixel"
+  IDS_EXIF_TAG_0116, "Rijen per strook"
+  IDS_EXIF_TAG_0117, "Aantal bytes per strook"
+  IDS_EXIF_TAG_011A, "Horizontale resolutie"
+  IDS_EXIF_TAG_011B, "Verticale resolutie"
+  IDS_EXIF_TAG_011C, "Vlakconfiguratie"
+  IDS_EXIF_TAG_0128, "Resolutie-eenheid"
+  IDS_EXIF_TAG_012D, "Overdrachtsfunctie"
+  IDS_EXIF_TAG_0131, "Software"
+  IDS_EXIF_TAG_0132, "Datum en tijd"
+  IDS_EXIF_TAG_013B, "Maker"
+  IDS_EXIF_TAG_013C, "Hostcomputer"
+  IDS_EXIF_TAG_013E, "Witpunt"
+  IDS_EXIF_TAG_013F, "Primaire kleurwaarden"
+  IDS_EXIF_TAG_0201, "Miniatuuroffset"
+  IDS_EXIF_TAG_0202, "Miniatuurlengte"
+  IDS_EXIF_TAG_0211, "YCbCr-coëfficiënten"
+  IDS_EXIF_TAG_0212, "YCbCr-subsampling"
+  IDS_EXIF_TAG_0213, "YCbCr-positionering"
+  IDS_EXIF_TAG_0214, "Referentie zwart/wit"
+  IDS_EXIF_TAG_4746, "Waardering"
+  IDS_EXIF_TAG_4749, "Waardering in procenten"
+  IDS_EXIF_TAG_8298, "Copyright"
+  IDS_EXIF_TAG_829A, "Belichtingstijd"
+  IDS_EXIF_TAG_829D, "F-getal"
+  IDS_EXIF_TAG_8769, "Exif IFD-pointer"
+  IDS_EXIF_TAG_8822, "Belichtingsprogramma"
+  IDS_EXIF_TAG_8824, "Spectrale gevoeligheid"
+  IDS_EXIF_TAG_8825, "GPS IFD-pointer"
+  IDS_EXIF_TAG_8827, "ISO-snelheid"
+  IDS_EXIF_TAG_8828, "OECF"
+  IDS_EXIF_TAG_8830, "Gevoeligheidstype"
+  IDS_EXIF_TAG_8831, "Standaard uitvoergevoeligheid"
+  IDS_EXIF_TAG_8832, "Aanbevolen belichtingsindex"
+  IDS_EXIF_TAG_8833, "ISO-snelheidswaarde"
+  IDS_EXIF_TAG_9000, "Exif-versie"
+  IDS_EXIF_TAG_9003, "Opnamedatum"
+  IDS_EXIF_TAG_9004, "Digitaliseringsdatum"
+  IDS_EXIF_TAG_9010, "Tijdzone"
+  IDS_EXIF_TAG_9011, "Tijdzone (opname)"
+  IDS_EXIF_TAG_9012, "Tijdzone (digitalisering)"
+  IDS_EXIF_TAG_9101, "Componentenconfiguratie"
+  IDS_EXIF_TAG_9102, "Gecomprimeerde bits per pixel"
+  IDS_EXIF_TAG_9201, "Sluitertijd"
+  IDS_EXIF_TAG_9202, "Diafragma"
+  IDS_EXIF_TAG_9203, "Helderheid"
+  IDS_EXIF_TAG_9204, "Belichtingscorrectie"
+  IDS_EXIF_TAG_9205, "Maximaal diafragma"
+  IDS_EXIF_TAG_9206, "Onderwerpafstand"
+  IDS_EXIF_TAG_9207, "Lichtmeetmethode"
+  IDS_EXIF_TAG_9208, "Lichtbron"
+  IDS_EXIF_TAG_9209, "Flitser"
+  IDS_EXIF_TAG_920A, "Brandpuntsafstand"
+  IDS_EXIF_TAG_9214, "Onderwerpgebied"
+  IDS_EXIF_TAG_927C, "Fabrikantnotitie"
+  IDS_EXIF_TAG_9286, "Opmerking van gebruiker"
+  IDS_EXIF_TAG_9290, "Fractie van seconde"
+  IDS_EXIF_TAG_9291, "Fractie van seconde (opname)"
+  IDS_EXIF_TAG_9292, "Fractie van seconde (digitalisering)"
+  IDS_EXIF_TAG_9C9B, "Titel"
+  IDS_EXIF_TAG_9C9C, "Opmerkingen"
+  IDS_EXIF_TAG_9C9D, "Auteur"
+  IDS_EXIF_TAG_9C9E, "Trefwoorden"
+  IDS_EXIF_TAG_9C9F, "Onderwerp"
+  IDS_EXIF_TAG_A000, "FlashPix-versie"
+  IDS_EXIF_TAG_A001, "Kleurruimte"
+  IDS_EXIF_TAG_A002, "Breedte in pixels"
+  IDS_EXIF_TAG_A003, "Hoogte in pixels"
+  IDS_EXIF_TAG_A004, "Gerelateerd geluidsbestand"
+  IDS_EXIF_TAG_A005, "Interoperabiliteits-IFD-pointer"
+  IDS_EXIF_TAG_A20B, "Flitsenergie"
+  IDS_EXIF_TAG_A20C, "Ruimtelijke frequentierespons"
+  IDS_EXIF_TAG_A20E, "Horizontale resolutie brandpuntsvlak"
+  IDS_EXIF_TAG_A20F, "Verticale resolutie brandpuntsvlak"
+  IDS_EXIF_TAG_A210, "Resolutie-eenheid brandpuntsvlak"
+  IDS_EXIF_TAG_A214, "Onderwerplocatie"
+  IDS_EXIF_TAG_A215, "Belichtingsindex"
+  IDS_EXIF_TAG_A217, "Detectiemethode"
+  IDS_EXIF_TAG_A300, "Bestandsbron"
+  IDS_EXIF_TAG_A301, "Scènetype"
+  IDS_EXIF_TAG_A302, "CFA-patroon"
+  IDS_EXIF_TAG_A401, "Aangepaste verwerking"
+  IDS_EXIF_TAG_A402, "Belichtingsmodus"
+  IDS_EXIF_TAG_A403, "Witbalans"
+  IDS_EXIF_TAG_A404, "Digitale zoomfactor"
+  IDS_EXIF_TAG_A405, "Brandpuntsafstand (35 mm-equivalent)"
+  IDS_EXIF_TAG_A406, "Type scèneopname"
+  IDS_EXIF_TAG_A407, "Versterkingsregeling"
+  IDS_EXIF_TAG_A408, "Contrast"
+  IDS_EXIF_TAG_A409, "Verzadiging"
+  IDS_EXIF_TAG_A40A, "Scherpte"
+  IDS_EXIF_TAG_A40B, "Beschrijving apparaatinstellingen"
+  IDS_EXIF_TAG_A40C, "Bereik onderwerpafstand"
+  IDS_EXIF_TAG_A420, "Unieke afbeeldings-ID"
+  IDS_EXIF_TAG_A430, "Eigenaar camera"
+  IDS_EXIF_TAG_A431, "Serienummer camera"
+  IDS_EXIF_TAG_A432, "Objectiefspecificatie"
+  IDS_EXIF_TAG_A433, "Objectieffabrikant"
+  IDS_EXIF_TAG_A434, "Objectiefmodel"
+  IDS_EXIF_TAG_A435, "Serienummer objectief"
+  IDS_EXIF_TAG_A460, "Samengestelde afbeelding"
+  IDS_EXIF_TAG_A500, "Gamma"
+  IDS_EXIF_GPS_0000, "GPS-versie"
+  IDS_EXIF_GPS_0001, "Breedtegraadreferentie"
+  IDS_EXIF_GPS_0002, "Breedtegraad"
+  IDS_EXIF_GPS_0003, "Lengtegraadreferentie"
+  IDS_EXIF_GPS_0004, "Lengtegraad"
+  IDS_EXIF_GPS_0005, "Hoogtereferentie"
+  IDS_EXIF_GPS_0006, "Hoogte"
+  IDS_EXIF_GPS_0007, "GPS-tijd (UTC)"
+  IDS_EXIF_GPS_0008, "GPS-satellieten"
+  IDS_EXIF_GPS_0009, "Status GPS-ontvanger"
+  IDS_EXIF_GPS_000A, "GPS-meetmodus"
+  IDS_EXIF_GPS_000B, "GPS-precisie (DOP)"
+  IDS_EXIF_GPS_000C, "Snelheidseenheid"
+  IDS_EXIF_GPS_000D, "Snelheid"
+  IDS_EXIF_GPS_000E, "Referentie bewegingsrichting"
+  IDS_EXIF_GPS_000F, "Bewegingsrichting"
+  IDS_EXIF_GPS_0010, "Referentie afbeeldingsrichting"
+  IDS_EXIF_GPS_0011, "Afbeeldingsrichting"
+  IDS_EXIF_GPS_0012, "Geodetisch datum"
+  IDS_EXIF_GPS_0013, "Referentie breedtegraad bestemming"
+  IDS_EXIF_GPS_0014, "Breedtegraad bestemming"
+  IDS_EXIF_GPS_0015, "Referentie lengtegraad bestemming"
+  IDS_EXIF_GPS_0016, "Lengtegraad bestemming"
+  IDS_EXIF_GPS_0017, "Referentie peiling bestemming"
+  IDS_EXIF_GPS_0018, "Peiling bestemming"
+  IDS_EXIF_GPS_0019, "Referentie afstand bestemming"
+  IDS_EXIF_GPS_001A, "Afstand bestemming"
+  IDS_EXIF_GPS_001B, "GPS-verwerkingsmethode"
+  IDS_EXIF_GPS_001C, "GPS-gebiedsinformatie"
+  IDS_EXIF_GPS_001D, "GPS-datum"
+  IDS_EXIF_GPS_001E, "GPS-differentiaalcorrectie"
+  IDS_EXIF_GPS_001F, "Horizontale GPS-positiefout"
+  IDS_EXIF_VALUE_COMPRESSION_NONE, "Niet gecomprimeerd"
+  IDS_EXIF_VALUE_COMPRESSION_JPEG, "JPEG"
+  IDS_EXIF_VALUE_PHOTOMETRIC_RGB, "RGB"
+  IDS_EXIF_VALUE_PHOTOMETRIC_YCBCR, "YCbCr"
+  IDS_EXIF_VALUE_ORIENTATION_1, "Normaal"
+  IDS_EXIF_VALUE_ORIENTATION_2, "Horizontaal gespiegeld"
+  IDS_EXIF_VALUE_ORIENTATION_3, "180° gedraaid"
+  IDS_EXIF_VALUE_ORIENTATION_4, "Verticaal gespiegeld"
+  IDS_EXIF_VALUE_ORIENTATION_5, "Horizontaal gespiegeld, 270° rechtsom gedraaid"
+  IDS_EXIF_VALUE_ORIENTATION_6, "90° rechtsom gedraaid"
+  IDS_EXIF_VALUE_ORIENTATION_7, "Horizontaal gespiegeld, 90° rechtsom gedraaid"
+  IDS_EXIF_VALUE_ORIENTATION_8, "270° rechtsom gedraaid"
+  IDS_EXIF_VALUE_PLANAR_CHUNKY, "Verweven"
+  IDS_EXIF_VALUE_PLANAR_PLANAR, "Planair"
+  IDS_EXIF_VALUE_UNIT_NONE, "Geen"
+  IDS_EXIF_VALUE_UNIT_INCH, "Inch"
+  IDS_EXIF_VALUE_UNIT_CM, "Centimeter"
+  IDS_EXIF_VALUE_YCBCR_CENTERED, "Gecentreerd"
+  IDS_EXIF_VALUE_YCBCR_COSITED, "Samenvallend"
+  IDS_EXIF_VALUE_PROGRAM_0, "Niet gedefinieerd"
+  IDS_EXIF_VALUE_PROGRAM_1, "Handmatig"
+  IDS_EXIF_VALUE_PROGRAM_2, "Normaal programma"
+  IDS_EXIF_VALUE_PROGRAM_3, "Diafragmavoorkeuze"
+  IDS_EXIF_VALUE_PROGRAM_4, "Sluitervoorkeuze"
+  IDS_EXIF_VALUE_PROGRAM_5, "Creatief programma"
+  IDS_EXIF_VALUE_PROGRAM_6, "Actieprogramma"
+  IDS_EXIF_VALUE_PROGRAM_7, "Portretmodus"
+  IDS_EXIF_VALUE_PROGRAM_8, "Landschapsmodus"
+  IDS_EXIF_VALUE_METERING_0, "Onbekend"
+  IDS_EXIF_VALUE_METERING_1, "Gemiddeld"
+  IDS_EXIF_VALUE_METERING_2, "Centrumgewogen gemiddeld"
+  IDS_EXIF_VALUE_METERING_3, "Spot"
+  IDS_EXIF_VALUE_METERING_4, "Multispot"
+  IDS_EXIF_VALUE_METERING_5, "Meervlaks"
+  IDS_EXIF_VALUE_METERING_6, "Gedeeltelijk"
+  IDS_EXIF_VALUE_METERING_255, "Overig"
+  IDS_EXIF_VALUE_LIGHT_0, "Onbekend"
+  IDS_EXIF_VALUE_LIGHT_1, "Daglicht"
+  IDS_EXIF_VALUE_LIGHT_2, "Tl-licht"
+  IDS_EXIF_VALUE_LIGHT_3, "Kunstlicht (gloeilamp)"
+  IDS_EXIF_VALUE_LIGHT_4, "Flitser"
+  IDS_EXIF_VALUE_LIGHT_9, "Mooi weer"
+  IDS_EXIF_VALUE_LIGHT_10, "Bewolkt"
+  IDS_EXIF_VALUE_LIGHT_11, "Schaduw"
+  IDS_EXIF_VALUE_LIGHT_12, "Daglicht-tl"
+  IDS_EXIF_VALUE_LIGHT_13, "Daglichtwit tl"
+  IDS_EXIF_VALUE_LIGHT_14, "Koelwit tl"
+  IDS_EXIF_VALUE_LIGHT_15, "Wit tl"
+  IDS_EXIF_VALUE_LIGHT_16, "Warmwit tl"
+  IDS_EXIF_VALUE_LIGHT_17, "Standaardlicht A"
+  IDS_EXIF_VALUE_LIGHT_18, "Standaardlicht B"
+  IDS_EXIF_VALUE_LIGHT_19, "Standaardlicht C"
+  IDS_EXIF_VALUE_LIGHT_20, "D55"
+  IDS_EXIF_VALUE_LIGHT_21, "D65"
+  IDS_EXIF_VALUE_LIGHT_22, "D75"
+  IDS_EXIF_VALUE_LIGHT_23, "D50"
+  IDS_EXIF_VALUE_LIGHT_24, "ISO-studiokunstlicht"
+  IDS_EXIF_VALUE_LIGHT_255, "Andere lichtbron"
+  IDS_EXIF_VALUE_COLORSPACE_SRGB, "sRGB"
+  IDS_EXIF_VALUE_COLORSPACE_UNCALIBRATED, "Niet gekalibreerd"
+  IDS_EXIF_VALUE_FPUNIT_NONE, "Geen"
+  IDS_EXIF_VALUE_FPUNIT_INCH, "Inch"
+  IDS_EXIF_VALUE_FPUNIT_CM, "Centimeter"
+  IDS_EXIF_VALUE_SENSING_1, "Niet gedefinieerd"
+  IDS_EXIF_VALUE_SENSING_2, "Eénchips-kleurvlaksensor"
+  IDS_EXIF_VALUE_SENSING_3, "Tweechips-kleurvlaksensor"
+  IDS_EXIF_VALUE_SENSING_4, "Driechips-kleurvlaksensor"
+  IDS_EXIF_VALUE_SENSING_5, "Sequentiële kleurvlaksensor"
+  IDS_EXIF_VALUE_SENSING_7, "Trilineaire sensor"
+  IDS_EXIF_VALUE_SENSING_8, "Sequentiële lineaire kleursensor"
+  IDS_EXIF_VALUE_FILESOURCE_DSC, "Digitale fotocamera"
+  IDS_EXIF_VALUE_SCENETYPE_DIRECT, "Direct gefotografeerd"
+  IDS_EXIF_VALUE_RENDERED_0, "Normale verwerking"
+  IDS_EXIF_VALUE_RENDERED_1, "Aangepaste verwerking"
+  IDS_EXIF_VALUE_EXPMODE_0, "Automatische belichting"
+  IDS_EXIF_VALUE_EXPMODE_1, "Handmatige belichting"
+  IDS_EXIF_VALUE_EXPMODE_2, "Automatische bracketing"
+  IDS_EXIF_VALUE_WB_0, "Automatische witbalans"
+  IDS_EXIF_VALUE_WB_1, "Handmatige witbalans"
+  IDS_EXIF_VALUE_SCENE_0, "Standaard"
+  IDS_EXIF_VALUE_SCENE_1, "Landschap"
+  IDS_EXIF_VALUE_SCENE_2, "Portret"
+  IDS_EXIF_VALUE_SCENE_3, "Nachtscène"
+  IDS_EXIF_VALUE_GAIN_0, "Geen"
+  IDS_EXIF_VALUE_GAIN_1, "Lage versterking omhoog"
+  IDS_EXIF_VALUE_GAIN_2, "Hoge versterking omhoog"
+  IDS_EXIF_VALUE_GAIN_3, "Lage versterking omlaag"
+  IDS_EXIF_VALUE_GAIN_4, "Hoge versterking omlaag"
+  IDS_EXIF_VALUE_CONTRAST_0, "Normaal"
+  IDS_EXIF_VALUE_CONTRAST_1, "Zacht"
+  IDS_EXIF_VALUE_CONTRAST_2, "Hard"
+  IDS_EXIF_VALUE_SATURATION_0, "Normaal"
+  IDS_EXIF_VALUE_SATURATION_1, "Lage verzadiging"
+  IDS_EXIF_VALUE_SATURATION_2, "Hoge verzadiging"
+  IDS_EXIF_VALUE_SHARPNESS_0, "Normaal"
+  IDS_EXIF_VALUE_SHARPNESS_1, "Zacht"
+  IDS_EXIF_VALUE_SHARPNESS_2, "Hard"
+  IDS_EXIF_VALUE_DISTANCE_0, "Onbekend"
+  IDS_EXIF_VALUE_DISTANCE_1, "Macro"
+  IDS_EXIF_VALUE_DISTANCE_2, "Dichtbij"
+  IDS_EXIF_VALUE_DISTANCE_3, "Veraf"
+  IDS_EXIF_VALUE_GPS_ABOVE_SEA, "Boven zeeniveau"
+  IDS_EXIF_VALUE_GPS_BELOW_SEA, "Onder zeeniveau"
+  IDS_EXIF_VALUE_GPS_NO_CORRECTION, "Zonder correctie"
+  IDS_EXIF_VALUE_GPS_CORRECTION, "Correctie toegepast"
+  IDS_EXIF_VALUE_FLASH_FIRED, "Flitser afgegaan"
+  IDS_EXIF_VALUE_FLASH_NOT_FIRED, "Flitser niet afgegaan"
+  IDS_EXIF_VALUE_FLASH_COMPULSORY, "verplichte flitsmodus"
+  IDS_EXIF_VALUE_FLASH_SUPPRESSED, "verplichte flitsonderdrukking"
+  IDS_EXIF_VALUE_FLASH_AUTO, "automatische modus"
+  IDS_EXIF_VALUE_FLASH_RETURN_DETECTED, "teruggekaatst flitslicht gedetecteerd"
+  IDS_EXIF_VALUE_FLASH_RETURN_NOT_DETECTED, "teruggekaatst flitslicht niet gedetecteerd"
+  IDS_EXIF_VALUE_FLASH_RED_EYE, "rodeogenreductie"
+  IDS_EXIF_VALUE_FLASH_NO_FUNCTION, "Geen flitsfunctie"
+}

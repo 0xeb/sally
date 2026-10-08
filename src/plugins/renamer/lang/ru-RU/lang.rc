@@ -477,6 +477,6 @@ STRINGTABLE
   IDS_EXP_BROWSE, "Обзор..."
   IDS_EXP_SALDIR, "Папка Sally"
   IDS_CFG_CONFLICT, "Настройки уже открыты."
-  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
-  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+  IDS_EXP_ENVVARNOTFOUND, "Переменная окружения ""%s"" не найдена."
+  IDS_EXP_ENVVARTOOLARGE, "Значение переменной окружения ""%s"" слишком велико."
 }

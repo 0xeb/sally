@@ -1,0 +1,1033 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Russian (ru-RU) resources for pictview. Translation: Ален Хайруллин, Vasiliy, Игорь Полякофф, Neutron16.
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pictview/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pictview.rh2"
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+DLG_WIAPROGRESS DIALOGEX 0, 0, 214, 63
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_CENTER
+CAPTION "Сканирование изображения"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Отмена",IDCANCEL,142,43,65,14
+    LTEXT           "",IDC_WIAPROGR_MESSAGE,7,7,200,8
+    CONTROL         "",IDC_WIAPROGR_BAR,"msctls_progress32",WS_BORDER,7,22,200,14
+END
+
+DLG_ABOUT DIALOGEX 87, 50, 367, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "О модуле"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Закрыть",IDCANCEL,308,114,50,14
+    ICON            "",IDC_ABOUT_ICON,11,9,20,20
+    LTEXT           "PictView %s - Просмотр изображений Sally",IDC_ABOUT_TITLE,46,9,314,8
+    LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,314,8,SS_NOPREFIX
+    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,181,8
+    LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,303,8
+    LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
+    LTEXT           "Эл. почта:",IDC_STATIC_6,46,81,39,8
+    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,86,81,85,8,WS_TABSTOP
+    LTEXT           "Сайт:",IDC_STATIC_7,46,92,22,8
+    LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,86,92,122,8,WS_TABSTOP
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,365,1
+END
+
+DLG_CFGPAGE_APPEARANCE DIALOGEX 66, 53, 329, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Интерфейс"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Размер окна",IDC_STATIC_1,6,5,317,53,WS_GROUP
+    CONTROL         "&Совпадает с главным окном Sally",IDC_CFGAPP_WINPOS_SAME,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,172,12
+    CONTROL         "&Не меньше главного окна или больше при необходимости",IDC_CFGAPP_WINPOS_LARGER,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,219,12
+    CONTROL         "&Автоматический",IDC_CFGAPP_WINPOS_ANY,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,41,148,12
+    GROUPBOX        "Масштаб по умолчанию",IDC_STATIC_2,6,60,317,67,WS_GROUP
+    CONTROL         "&Полностью (без прокрутки)",IDC_CFGAPP_ZOOM_WHOLE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,72,151,12
+    CONTROL         "По &ширине (без горизонтальной прокрутки)",IDC_CFGAPP_ZOOM_WIDTH,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,84,169,12
+    CONTROL         "&Реальный размер",IDC_CFGAPP_ZOOM_ORIG,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,96,148,12
+    CONTROL         "Во весь &экран",IDC_CFGAPP_ZOOM_FSCREEN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,108,148,12
+    CONTROL         "Отображать путь файла в &заголовке",IDC_CFGAPP_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,141,12
+END
+
+DLG_CFGPAGE_COLORS DIALOGEX 66, 53, 329, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Цвета"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Оконный режим",IDC_STATIC_1,6,5,317,50,WS_GROUP
+    LTEXT           "&Фон",IDC_STATIC_2,17,19,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_BORDER,128,16,27,14
+    LTEXT           "&Прозрачный",IDC_STATIC_3,17,36,91,8
+    PUSHBUTTON      "",IDC_CFGCLR_BKGND,128,33,27,14
+    GROUPBOX        "Полноэкранный режим",IDC_STATIC_4,6,60,317,50,WS_GROUP
+    LTEXT           "Ф&он",IDC_STATIC_5,17,75,103,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BORDER,128,72,27,14
+    LTEXT           "П&розрачный",IDC_STATIC_6,17,92,46,8
+    PUSHBUTTON      "",IDC_CFGCLR_FS_BKGND,128,89,27,14
+END
+
+DLG_CFGPAGE_KEYBOARD DIALOGEX 66, 53, 329, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Клавиатура и мышь"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Клавишы Page Up и Page Down, колесо мыши",IDC_STATIC_1,6,5,317,43,WS_GROUP
+    CONTROL         "Использовать для &прокрутки",IDC_CFGKBD_PGDNUP_SCR,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,203,12
+    CONTROL         "Испо&льзовать для открытия предыдущего/следующего изображения",IDC_CFGKBD_PGDNUP_PREV,
+                    "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,256,12
+END
+
+DLG_CFGPAGE_TOOLS DIALOGEX 66, 53, 329, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Инструменты"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Выделение области",IDC_STATIC_1,6,5,317,94,WS_GROUP
+    LTEXT           "При удерживании клавиши Shift выделять область:",IDC_STATIC_2,17,18,186,8
+    CONTROL         "&Квадрат",IDC_CFGTOOLS_SQUARE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,24,27,203,12
+    CONTROL         "Прямоугольник &4:3",IDC_CFGTOOLS_4_3,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,40,218,12
+    CONTROL         "Прямоугольник &3:2",IDC_CFGTOOLS_3_2,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,53,218,12
+    CONTROL         "Прямоугольник &16:9",IDC_CFGTOOLS_16_9,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,66,218,12
+    CONTROL         "&Другой:",IDC_CFGTOOLS_OTHER,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,24,79,40,12
+    EDITTEXT        IDC_CFGTOOLS_RATIO_X,65,79,17,12,ES_NUMBER | WS_GROUP
+    LTEXT           ":",IDC_STATIC_3,84,81,4,8
+    EDITTEXT        IDC_CFGTOOLS_RATIO_Y,88,79,17,12,ES_NUMBER
+    CONTROL         "Выбирать цвета в &шестнадцатеричных значениях",IDC_CFGTOOLS_PIPHEX,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,106,188,12
+END
+
+DLG_CFGPAGE_ADVANCED DIALOGEX 66, 53, 329, 150
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Дополнительно"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Эскизы на панелях",IDC_STATIC_7,6,5,317,69,WS_GROUP
+    LTEXT           "Изображения могут содержать некорректные эскизы, которые могут быть неправильно повернуты или не соответствовать последней редакции изображения.",IDC_STATIC_8,14,18,301,16
+    CONTROL         "&Не использовать встроенные эскизы файлов изображений (медленно)",IDC_CFGADV_CREATE_THUMBNAILS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,35,263,12
+    LTEXT           "",IDC_STATIC_9,14,51,301,1,SS_ETCHEDHORZ | WS_GROUP
+    LTEXT           "Не создавать &эскизы для изображений более",IDC_STATIC_10,14,59,163,8
+    EDITTEXT        IDC_CFGADV_THUMB_MP,178,57,17,12,ES_NUMBER
+    LTEXT           "мегапикселей.",IDC_STATIC_11,198,59,54,8
+    CONTROL         "&Автоматически поворачивать изображения EXIF JPEG (цифровые фотографии)",IDC_CFGADV_AUTOROTATE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,77,292,12
+    CONTROL         "&Сообщение об успешном сохранении файлов",IDC_CFGADV_SAVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,89,172,12
+    CONTROL         "Запоминать &путь сохранения снимков экрана, изображений со сканера, буфера",IDC_CFGADV_REMEMBER_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,101,296,12
+END
+
+DLG_IMGPROP DIALOGEX 106, 34, 238, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "Свойства изображения"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Закрыть",1,127,182,50,14,WS_GROUP
+    PUSHBUTTON      "Справка",IDHELP,183,182,50,14
+    LTEXT           "&Страница:",IDC_IMGPROP_PAGENUM_LBL,7,10,39,8
+    EDITTEXT        IDC_IMGPROP_PAGENUM,76,8,154,12,ES_READONLY
+    LTEXT           "&Ширина:",IDC_STATIC_1,7,24,34,8
+    EDITTEXT        IDC_IMGPROP_WIDTH,76,22,154,12,ES_READONLY
+    LTEXT           "&Высота:",IDC_STATIC_2,7,38,30,8
+    EDITTEXT        IDC_IMGPROP_HEIGHT,76,36,154,12,ES_READONLY
+    LTEXT           "&Глубина цвета:",IDC_STATIC_3,7,52,56,8
+    EDITTEXT        IDC_IMGPROP_COLORS,76,50,154,12,ES_READONLY
+    LTEXT           "&Размер в памяти:",IDC_STATIC_4,7,66,64,8
+    EDITTEXT        IDC_IMGPROP_SIZE,76,64,154,12,ES_READONLY
+    LTEXT           "Ра&змер файла:",IDC_STATIC_5,7,80,55,8
+    EDITTEXT        IDC_IMGPROP_FSIZE,76,78,154,12,ES_READONLY
+    LTEXT           "Разрешен&ие (DPI):",IDC_STATIC_6,7,94,68,8
+    EDITTEXT        IDC_IMGPROP_DPI,76,92,154,12,ES_READONLY
+    LTEXT           "&Формат:",IDC_STATIC_7,7,108,32,8
+    EDITTEXT        IDC_IMGPROP_FMT,76,106,154,12,ES_READONLY
+    LTEXT           "С&жатие:",IDC_STATIC_8,7,122,31,8
+    EDITTEXT        IDC_IMGPROP_COMPR,76,120,154,12,ES_READONLY
+    LTEXT           "&Комментарии:",IDC_STATIC_9,7,136,52,8
+    EDITTEXT        IDC_IMGPROP_COMMENT,76,134,154,36,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY
+    LTEXT           "",IDC_STATIC_10,2,176,234,1,SS_ETCHEDHORZ | WS_GROUP
+END
+
+DLG_IMGEXIF DIALOGEX 57, 60, 409, 151
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "EXIF"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_IMGEXIF_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_BORDER | WS_GROUP | WS_TABSTOP,5,4,399,80
+    EDITTEXT        IDC_IMGEXIF_INFO,5,89,399,38,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_CLIPSIBLINGS | WS_VSCROLL | WS_GROUP
+    CONTROL         "&Группировать отмеченные",IDC_IMGEXIF_GROUP,"Button",BS_AUTOCHECKBOX | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,5,133,107,12
+    CONTROL         "&Отметить",IDC_IMGEXIF_HIGHLIGHT,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_CLIPSIBLINGS | WS_GROUP | WS_TABSTOP,118,132,52,14
+    PUSHBUTTON      "&Копировать",IDC_IMGEXIF_COPY,176,132,52,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "ОК",IDOK,234,132,52,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Отмена",IDCANCEL,292,132,52,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "Справка",IDHELP,350,132,52,14
+END
+
+DLG_ZOOM DIALOGEX 85, 100, 121, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Масштаб"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Масштаб:",IDC_STATIC_1,8,13,49,8,NOT WS_GROUP
+    COMBOBOX        IDC_ZOOM_ZOOM,57,11,44,156,CBS_DROPDOWN | WS_TABSTOP
+    LTEXT           "%",IDC_STATIC_2,105,13,9,8
+    PUSHBUTTON      "ОК",IDOK,7,37,50,14,BS_CENTER
+    PUSHBUTTON      "Отмена",IDCANCEL,63,37,50,14,BS_CENTER
+END
+
+DLG_PAGE DIALOGEX 85, 100, 134, 54
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Открыть страницу"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Страница:",IDC_STATIC_1,8,9,38,8,NOT WS_GROUP
+    COMBOBOX        IDC_PAGE_PAGE,51,7,74,124,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "ОК",IDOK,13,32,50,14,BS_CENTER
+    PUSHBUTTON      "Отмена",IDCANCEL,70,32,50,14,BS_CENTER
+END
+
+DLG_CAPTURE DIALOGEX 98, 61, 194, 191
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Захват экрана"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Захватить",IDC_STATIC_1,6,6,182,81,WS_GROUP
+    CONTROL         "Весь &экран",IDC_CAPTURE_FULL,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,19,110,12
+    CONTROL         "Активное &приложение",IDC_CAPTURE_APPL,"Button",BS_AUTORADIOBUTTON,16,31,110,12
+    CONTROL         "Активное &окно",IDC_CAPTURE_WINDOW,"Button",BS_AUTORADIOBUTTON,16,43,120,12
+    CONTROL         "&Клиентская область активного окна ",IDC_CAPTURE_CLIENT,
+                    "Button",BS_AUTORADIOBUTTON,16,55,141,12
+    CONTROL         "В&иртуальный экран (несколько мониторов)",IDC_CAPTURE_VIRTUAL,
+                    "Button",BS_AUTORADIOBUTTON,16,67,165,12
+    GROUPBOX        "Запуск",IDC_STATIC_2,6,92,182,49,WS_GROUP
+    CONTROL         "&Сочетание клавиш",IDC_CAPTURE_HOTKEY,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,16,106,78,12
+    CONTROL         "&Таймер",IDC_CAPTURE_TIMER,"Button",BS_AUTORADIOBUTTON,16,121,38,12
+    CONTROL         "",IDC_CAPTURE_HOTKEY_VAL,"msctls_hotkey32",WS_GROUP | WS_TABSTOP,98,106,77,12
+    EDITTEXT        IDC_CAPTURE_TIMER_VAL,98,121,21,12
+    LTEXT           "секунд",IDC_STATIC_3,123,123,33,8
+    CONTROL         "Включая к&урсор мыши",IDC_CAPTURE_CURSOR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,147,90,12
+    LTEXT           "",IDC_STATIC_4,2,167,190,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "&Захват",IDOK,16,172,50,14,BS_CENTER | WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,72,172,50,14,BS_CENTER
+    PUSHBUTTON      "Справка",IDHELP,128,172,50,14,BS_CENTER
+END
+
+IDD_RENAMEDIALOG DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Переименовать файл"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_PATH,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "ОК",IDOK,59,43,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,118,43,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 15, 34, 361, 89
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Подтверждение замены файла"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Заменить файл:",IDC_STATIC_1,4,14,59,8
+    LTEXT           "",IDS_SOURCENAME,67,14,288,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_SOURCEATTR,67,24,288,8,SS_NOPREFIX | NOT WS_GROUP
+    RTEXT           "Файлом:",IDC_STATIC_2,4,37,59,8,NOT WS_GROUP
+    LTEXT           "",IDS_TARGETNAME,67,37,288,8,SS_NOPREFIX | NOT WS_GROUP
+    LTEXT           "",IDS_TARGETATTR,67,47,288,8,SS_NOPREFIX | NOT WS_GROUP
+    DEFPUSHBUTTON   "&Да",IDYES,96,66,50,14,WS_GROUP
+    PUSHBUTTON      "&Нет",IDNO,155,66,50,14
+    PUSHBUTTON      "Отмена",IDCANCEL,214,66,50,14
+END
+
+IDD_COPYTO DIALOGEX 15, 34, 316, 121
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Копировать файл в"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&1",IDC_COPYTO_RB_1,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,8,10,18,12
+    CONTROL         "&2",IDC_COPYTO_RB_2,"Button",BS_AUTORADIOBUTTON,8,27,18,12
+    CONTROL         "&3",IDC_COPYTO_RB_3,"Button",BS_AUTORADIOBUTTON,8,44,18,12
+    CONTROL         "&4",IDC_COPYTO_RB_4,"Button",BS_AUTORADIOBUTTON,8,61,18,12
+    CONTROL         "&5",IDC_COPYTO_RB_5,"Button",BS_AUTORADIOBUTTON,8,78,18,12
+    EDITTEXT        IDC_COPYTO_EL_1,29,10,221,12,WS_GROUP
+    PUSHBUTTON      "&Обзор...",IDC_COPYTO_BR_1,256,9,50,14
+    EDITTEXT        IDC_COPYTO_EL_2,29,27,221,12
+    PUSHBUTTON      "О&бзор...",IDC_COPYTO_BR_2,256,26,50,14
+    EDITTEXT        IDC_COPYTO_EL_3,29,44,221,12
+    PUSHBUTTON      "Об&зор...",IDC_COPYTO_BR_3,256,43,50,14
+    EDITTEXT        IDC_COPYTO_EL_4,29,61,221,12
+    PUSHBUTTON      "Обзо&р...",IDC_COPYTO_BR_4,256,60,50,14
+    EDITTEXT        IDC_COPYTO_EL_5,29,78,221,12
+    PUSHBUTTON      "Обзор&...",IDC_COPYTO_BR_5,256,77,50,14
+    DEFPUSHBUTTON   "ОК",IDOK,142,100,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,199,100,50,14
+    PUSHBUTTON      "Справка",IDHELP,256,100,50,14
+END
+
+IDD_SAVEEX DIALOGEX 0, 0, 420, 20
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CLIPSIBLINGS
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "С&жатие:",IDC_SAVE_COMPRESSION_LABEL,5,2,47,8
+    COMBOBOX        IDC_SAVE_COMPRESSION,54,0,190,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Свойства",IDC_SAVE_ADVANCED,250,0,53,14,WS_GROUP
+    LTEXT           "Глубина &цвета:",IDC_STATIC_2,5,26,55,8
+    COMBOBOX        IDC_SAVE_BIT_DEPTH,68,24,90,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Пово&рот:",IDC_STATIC_3,5,46,49,8
+    COMBOBOX        IDC_SAVE_ROTATION,68,44,90,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "О&тразить:",IDC_STATIC_4,5,66,62,8
+    COMBOBOX        IDC_SAVE_FLIP,68,64,90,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "&Инвертировать цвета (негатив)",IDC_SAVE_INVERT,"Button",BS_AUTOCHECKBOX | NOT WS_VISIBLE | WS_GROUP | WS_TABSTOP,5,82,143,12
+    LTEXT           "Комм&ентарий:",IDC_SAVE_COMMENT_STATIC,5,94,51,8
+    EDITTEXT        IDC_SAVE_COMMENT,5,104,152,41,ES_MULTILINE | WS_GROUP
+    GROUPBOX        "GIF",IDC_SAVE_GROUP_GIF,164,20,144,25,WS_GROUP
+    CONTROL         "&Чересстрочный",IDC_SAVE_GIF_INTERLACED,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,169,30,66,12
+    CONTROL         "GIF&89a",IDC_SAVE_GIF_89a,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,242,30,37,12
+    GROUPBOX        "JPEG, TIFF-JPEG",IDC_SAVE_GROUP_JPEG,164,50,144,45,WS_GROUP
+    LTEXT           "&Качество:",IDC_SAVE_JPEG_STATIC1,169,61,40,8
+    EDITTEXT        IDC_SAVE_JPEG_QUALITY,240,59,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "%",IDC_SAVE_JPEG_STATIC2,263,61,40,8
+    LTEXT           "Субдискретизаци&я:",IDC_SAVE_JPEG_STATIC3,169,80,70,8
+    COMBOBOX        IDC_SAVE_JPEG_SUBSAMPLING,240,78,33,40,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    GROUPBOX        "TIFF",IDC_SAVE_GROUP_TIFF,164,100,144,45,WS_GROUP
+    CONTROL         "&Полосы",IDC_SAVE_TIFF_MAKE_STRIPS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,169,110,50,12
+    LTEXT           "Р&азмер полосы:",IDC_SAVE_TIFF_STATIC1,179,126,58,8
+    EDITTEXT        IDC_SAVE_TIFF_STRIP_SIZE,240,124,21,12,ES_NUMBER | WS_GROUP
+    LTEXT           "КБ",IDC_SAVE_TIFF_STATIC2,263,126,40,8
+END
+
+IDD_PRINT DIALOGEX 10, 24, 440, 227
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Печать"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_PRINT_PREVIEW,"Static",SS_WHITEFRAME | SS_NOPREFIX | WS_GROUP,6,7,211,195
+    GROUPBOX        " Принтер ",IDC_STATIC_4,225,4,208,27
+    LTEXT           "",IDC_PRINT_PRINTER,232,15,132,8
+    PUSHBUTTON      "&Настройка...",IDC_PRINT_SETUP,370,12,57,14,WS_GROUP
+    GROUPBOX        " Положение ",IDC_STATIC_1,225,35,208,62
+    RTEXT           "&Левое поле:",IDC_STATIC_2,232,49,53,8
+    EDITTEXT        IDC_PRINT_LEFT,288,47,45,12
+    COMBOBOX        IDC_PRINT_LEFT_UNITS,339,47,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "&Верхнее поле:",IDC_STATIC_3,232,68,53,8
+    EDITTEXT        IDC_PRINT_TOP,288,66,45,12
+    COMBOBOX        IDC_PRINT_TOP_UNITS,339,66,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "&Центрировать",IDC_PRINT_CENTER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,288,82,63,12
+    GROUPBOX        " Размер ",IDC_STATIC_5,225,102,208,100
+    RTEXT           "&Масштаб:",IDC_STATIC_6,232,118,53,8
+    EDITTEXT        IDC_PRINT_SCALE,288,116,35,12
+    LTEXT           "%",IDC_STATIC_7,326,118,10,8
+    CONTROL         "По размеру л&иста",IDC_PRINT_FIT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,339,111,75,12
+    CONTROL         "&Сохранить пропорции",IDC_PRINT_ASPECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,339,123,90,12
+    RTEXT           "&Ширина:",IDC_STATIC_8,232,139,53,8
+    EDITTEXT        IDC_PRINT_WIDTH,288,137,45,12
+    COMBOBOX        IDC_PRINT_WIDTH_UNITS,339,137,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    RTEXT           "В&ысота:",IDC_STATIC_9,232,158,53,8
+    EDITTEXT        IDC_PRINT_HEIGHT,288,156,45,12
+    COMBOBOX        IDC_PRINT_HEIGHT_UNITS,339,156,66,75,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Г&раница",IDC_PRINT_BOX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,288,173,77,12
+    CONTROL         "Пе&чать выделенной области",IDC_PRINT_SELECTION,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,288,185,112,12
+    DEFPUSHBUTTON   "ОК",IDOK,274,208,50,14,WS_GROUP
+    PUSHBUTTON      "Отмена",IDCANCEL,329,208,50,14
+    PUSHBUTTON      "Справка",IDHELP,384,208,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "PictView"
+  IDS_PLUGIN_DESCRIPTION, "Быстрое средство просмотра и преобразования изображений."
+  IDS_LOWMEMORY, "Недостаточно памяти"
+  IDS_SOME_WINS_OPENED, "Открыты окна модуля PictView. Вы хотите закрыть их?"
+  IDS_ERROR_OPENING, "Не удается открыть файл %s:\n%s"
+  IDS_ERROR_OPENING_CONTINUE, "(%d) %hs Файл не может быть обработан. Продолжить?"
+  IDS_TITLE, "%s (%d x %d x %s - %i%%) - %s"
+  IDS_TITLE_MULTI, "%s (%d x %d x %s [%d из %d] - %i%%) - %s"
+  IDS_NCOLORS, "{!}%d цвет{|1|а|4|ов}"
+  IDS_NCOLORS_CMYK, "CMYK"
+  IDS_NCOLORS_LAB, "LAB"
+
+  IDS_ERROR_CALLING_PVW32_DLL, "Ошибка вызова библиотеки ""pvw32cnv.dll"""
+  IDS_CLIPBOARD_TITLE, "<Буфер>"
+  IDS_CAPTURE_TITLE, "<Снимок экрана>"
+  IDS_SCAN_TITLE, "<Скан>"
+  IDS_DELETED_TITLE, "<Удален>"
+  IDS_CLIPBOARD_FNAME, "Буфер"
+  IDS_CAPTURE_FNAME, "Экран"
+  IDS_SCAN_FNAME, "Скан"
+  IDS_RGB, "Красный: %i, Зеленый: %i, Синий: %i"
+  IDS_RGB_HEX, "Красный: %#02x, Зеленый: %#02x, Синий: %#02x"
+  IDS_RGBXY, "(%i, %i): Красный: %i, Зеленый: %i, Синий: %i"
+  IDS_RGBXY_HEX, "(%i, %i): Красный: %#02x, Зеленый: %#02x, Синий: %#02x"
+  IDS_INDEX, ", Индекс: %i"
+
+  IDS_VIEW_BMP_IN_CLIPBOARD, "Просмотр изображения из &буфера"
+  IDS_PLUGINSMENU_SCREEN_CAPTURE, "Захват &экрана..."
+  IDS_PLUGINSMENU_REGENERATE_THUMBNAIL, "&Обновить эскизы"
+  IDS_PLUGINSMENU_SCAN, "&Сканировать изображение..."
+  IDS_PIXELS, "{!}%d пиксел{ь|1|я|4|ей}"
+  IDS_BYTES, "{!}%d байт{|1|}"
+  IDS_OF, "%d из %d"
+  IDS_FRAMES, "&Кадров:"
+  IDS_IMGPROP_GRAY_NBIT, "Оттенки серого %d бит"
+  IDS_UNKNOWN, "Неизвестно"
+  IDS_CFG_CONFLICT, "Настройки уже открыты."
+  IDS_CONFIGURATION_TITLE, "Настройка"
+  IDS_ERRORTITLE, "Ошибка PictView"
+  IDS_BADTIMER, "Время задержки должно составлять от 1 до 360 секунд."
+  IDS_BADHOTKEY, "Введите сочетание клавиш."
+  IDS_CAPTURECANCELED, "Захват экрана отменен."
+  IDS_CAPTURING, "Захват экрана"
+  IDS_EMPTY, "Пусто"
+  IDS_SELECTTARGETDIR, "Выберите папку назначения."
+  IDS_SPECIFYPATH, "Требуется указать правильный абсолютный или относительный путь."
+  IDS_PICTVIEWPLUGINNAME, "Модуль PictView (средство просмотра и преобразования изображений)"
+
+
+  // !WARNING! 2 following variables must be synchronized with IDS_SAVEASFILTERMONO & IDS_SAVEASFILTERCOLOR:
+  // G.LastSaveAsFilterIndexMono  = 14; // index is 1-based (IDS_SAVEASFILTERMONO: 14=BMP)
+  // G.LastSaveAsFilterIndexColor = 13; // index is 1-based (IDS_SAVEASFILTERCOLOR: 13=BMP)
+  // !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING!
+
+  IDS_SAVEASFILTERMONO, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pbm,*.ppm)|*.pbm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Точечный рисунок (*.bmp)|*.bmp|Wireless Bitmap (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEASFILTERCOLOR, "Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pnm,*.ppm)|*.pnm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Точечный рисунок (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+  IDS_SAVEERROR, "Не удалось сохранить изображение.\nОшибка: %hs"
+  IDS_SAVE_AS_SUCCESS, "Изображение сохранено."
+  IDS_SAVE_LOST_ALPHA, "Исходное изображение содержит альфа-канал (прозрачность). Однако, он был объединен с данными изображения и текущим фоном.\nПоэтому альфа-канал не будет сохранен. Продолжить?"
+  IDS_CANCELED_BY_USER, "Сохранение изображения было отменено пользователем. Файл не был создан."
+  IDS_OPENFILTER, "Файлы изображений (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|All Files (*.*)|*.*|"
+  IDS_CUSTOM_COLOR, "&Выбрать цвет..."
+  IDS_AUTOMATIC_COLOR, "Цвет по &умолчанию"
+  IDS_SAL_IS_BUSY, "Sally занят, команда не может быть выполнена. Пожалуйста, попробуйте повторить позже."
+  IDS_RENAME_TO, "Переименовать файл ""%s"" в"
+  IDS_ERRORRENAMINGFILE, "Ошибка при переименовании файла"
+  IDS_TOOLONGNAME, "Невозможно выполнить операцию, имя файла слишком длинное."
+  IDS_LOADEXIF, "Не удается загрузить библиотеку EXIF %s."
+  IDS_EXIF_TAG, "Атрибут"
+  IDS_EXIF_VALUE, "Значение"
+  IDS_EXIF_LOCALIZATION_FNAME, "en.po"
+
+  IDS_MENU_FILE, "&Файл"
+  IDS_MENU_FILE_OPEN, "&Открыть...\tCtrl+O"
+  IDS_MENU_FILE_REFRESH, "Отме&нить изменения\tCtrl+R"
+  IDS_MENU_FILE_PREV, "&Предыдущий\tBackspace"
+  IDS_MENU_FILE_NEXT, "&Следующий\tПробел"
+  IDS_MENU_FILE_SAVEAS, "&Сохранить как...\tCtrl+S"
+  IDS_MENU_FILE_WALLPAPER, "Сделать &фоновым рисунком"
+  IDS_MENU_WALLPARER_CENTER, "По &центру"
+  IDS_MENU_WALLPARER_TILE, "&Замостить"
+  IDS_MENU_WALLPARER_STRETCH, "&Растянуть"
+  IDS_MENU_WALLPARER_RESTORE, "&Восстановить предыдущий"
+  IDS_MENU_WALLPARER_NONE, "&Нет рисунка"
+  IDS_MENU_FILE_CAPTURE, "Захват &экрана...\tQ"
+  IDS_MENU_FILE_SCAN, "Сканировать изобра&жение...\tW"
+  IDS_MENU_FILE_SCAN_SOURCE, "Выбор исто&чника сканирования..."
+  IDS_MENU_FILE_PROP, "Сво&йства...\tI"
+  IDS_MENU_FILE_EXIF, "Просмо&тр EXIF...\tE"
+  IDS_MENU_FILE_HISTOGRAM, "&Гистограмма...\tCtrl+H"
+  IDS_MENU_FILE_PAGE, "П&араметры страницы...\tCtrl+Shift+P"
+  IDS_MENU_FILE_PRINT, "&Печать...\tCtrl+P"
+  IDS_MENU_FILE_FILES, "Пос&ледние файлы"
+  IDS_MENU_FILE_DIRS, "Последние пап&ки"
+  IDS_MENU_FILE_EXIT, "В&ыход\tEsc"
+  IDS_MENU_FILE_OTHER, "&Другие файлы"
+  IDS_MENU_FILE_FIRST, "П&ервый\tShift+Backspace"
+  IDS_MENU_FILE_LAST, "П&оследний\tShift+Пробел"
+  IDS_MENU_FILE_FOCUS, "П&ерейти\tF"
+  IDS_MENU_FILE_SELCRCFILE, "Выделить/сн&ять файл на панели или в окне поиска\tInsert"
+  IDS_MENU_FILE_RENAME, "Пере&именовать...\tF2"
+  IDS_MENU_FILE_DELETE, "&Удалить\tDel"
+  IDS_MENU_FILE_PREVSEL, "П&редыдущий выделенный\tCtrl+Backspace"
+  IDS_MENU_FILE_NEXTSEL, "С&ледующий выделенный\tCtrl+Пробел"
+  IDS_MENU_FILE_COPYTO, "Копироват&ь в...\tX"
+
+  IDS_MENU_EDIT, "&Правка"
+  IDS_MENU_EDIT_COPY, "&Копировать\tCtrl+C"
+  IDS_MENU_EDIT_PASTE, "&Вставить\tCtrl+V"
+  IDS_MENU_EDIT_SELECTALL, "В&ыделить все\tCtrl+A"
+  IDS_MENU_EDIT_DESELECT, "Сн&ять выделение\tCtrl+D"
+  IDS_MENU_EDIT_CROP, "Обре&зать\tC"
+  IDS_MENU_EDIT_180, "Повернуть на &180°\tT"
+  IDS_MENU_EDIT_RIGHT, "Повернуть в&право\tR"
+  IDS_MENU_EDIT_LEFT, "Повернуть в&лево\tL"
+  IDS_MENU_EDIT_FLIPH, "Отразить &горизонтально\tH"
+  IDS_MENU_EDIT_FLIPV, "&Отразить вертикально\tV"
+
+  IDS_MENU_VIEW, "&Вид"
+  IDS_MENU_VIEW_ZOOMIN, "&Увеличить\t+"
+  IDS_MENU_VIEW_ZOOMOUT, "У&меньшить\t-"
+  IDS_MENU_VIEW_ZOOM, "Мас&штаб...\tM"
+  IDS_MENU_VIEW_WHOLE, "&Полностью\tF5"
+  IDS_MENU_VIEW_WIDTH, "П&о ширине\tF6"
+  IDS_MENU_VIEW_ACTUAL, "&Реальный размер (1:1)\tF7"
+  IDS_MENU_VIEW_WINDOW, "&Окно по размеру изображения\tF8"
+  IDS_MENU_VIEW_TOOLBAR, "Панель &инструментов\tF9"
+  IDS_MENU_VIEW_STATUSBAR, "С&трока состояния"
+  IDS_MENU_VIEW_FULLSCREEN, "Во весь &экран\tF11"
+
+  IDS_MENU_MULTIPAGE, "Многострани&чные изображения"
+  IDS_MENU_NEXTPAGE, "С&ледующая страница\tCtrl+Page Down"
+  IDS_MENU_PREVPAGE, "Пре&дыдущая страница\tCtrl+Page Up"
+  IDS_MENU_FIRSTPAGE, "&Первая страница\tCtrl+Home"
+  IDS_MENU_LASTPAGE, "П&оследняя страница\tCtrl+End"
+  IDS_MENU_PAGE, "Открыть &страницу...\tG"
+  IDS_MENU_ANIMATION, "Воспроизведение/пауза &анимации"
+
+  IDS_MENU_TOOLS, "&Инструменты"
+  IDS_MENU_TOOLS_HAND, "&Рука\tA"
+  IDS_MENU_TOOLS_ZOOM, "&Масштабирование\tZ"
+  IDS_MENU_TOOLS_SELECT, "&Выделение\tS"
+  IDS_MENU_TOOLS_PICK, "Выбор &цвета\tP"
+  IDS_MENU_TOOLS_OPTIONS, "&Настройка..."
+
+  IDS_MENU_HELP, "&Справка"
+  IDS_MENU_HELP_CONTENTS, "&Вызов справки\tF1"
+  IDS_MENU_HELP_INDEX, "&Указатель..."
+  IDS_MENU_HELP_SEARCH, "&Поиск..."
+//  IDS_MENU_HELP_KEYBOARD, "&Keyboard Shortcuts"
+//  IDS_MENU_HELP_MOUSE, "&Mouse Shortcuts"
+  IDS_MENU_HELP_ABOUT, "&О модуле..."
+
+  IDS_TT_OPEN, "Открыть\tCtrl+O"
+  IDS_TT_SAVE, "Сохранить как\tCtrl+S"
+  IDS_TT_PROPERTIES, "Свойства\tI"
+  IDS_TT_PREV, "Открыть предыдущий файл\tBackspace"
+  IDS_TT_NEXT, "Открыть следующий файл\tПробел"
+  IDS_TT_PREVSELFILE, "Открыть предыдущий выделенный файл\tCtrl+Backspace"
+  IDS_TT_NEXTSELFILE, "Открыть следующий выделенный файл\tCtrl+Пробел"
+  IDS_TT_COPY, "Копировать\tCtrl+C"
+  IDS_TT_PASTE, "Вставить\tCtrl+V"
+  IDS_TT_TOOL_HAND, "Рука\tA"
+  IDS_TT_TOOL_ZOOM, "Масштабирование\tZ"
+  IDS_TT_TOOL_SELECT, "Выделение\tS"
+  IDS_TT_TOOL_PIPETTE, "Выбор цвета\tP"
+  IDS_TT_LEFT, "Повернуть влево\tL"
+  IDS_TT_RIGHT, "Повернуть вправо\tR"
+  IDS_TT_CROP, "Обрезать\tC"
+  IDS_TT_ZOOM_OUT, "Уменьшить\t-"
+  IDS_TT_ZOOM_IN, "Увеличить\t+"
+  IDS_TT_ZOOM_TO, "Масштаб\tM"
+  IDS_TT_ZOOM_WIDTH, "По ширине\tF6"
+  IDS_TT_ZOOM_WHOLE, "Полностью\tF5"
+  IDS_TT_ZOOM_ACTUAL, "Реальный размер\tF7"
+  IDS_TT_FULL_SCREEN, "Во весь экран\tF11"
+  IDS_TT_SELSRCFILE, "Выделить/снять выделение с просматриваемого файла на панели или в окне поиска\tInsert"
+  IDS_TT_PRINT, "Печать\tCtrl+P"
+
+  IDS_TWAIN_OPEN, "Не удается открыть диспетчер источников TWAIN.\nЕсли ваш сканер совместим с TWAIN,\nпожалуйста, обновите программное обеспечение сканера."
+  IDS_TWAIN_ERROR, "Ошибка Twain"
+  IDS_TWCC_BUMMER, "Неизвестная ошибка."
+  IDS_TWCC_LOWMEMORY, "Недостаточно памяти для выполнения операции."
+  IDS_TWCC_NODS, "Отсутствует источник данных."
+  IDS_TWCC_MAXCONNECTIONS, "Достигнут лимит подключений приложений к источнику данных."
+  IDS_TWCC_OPERATIONERROR, "Источник данных или диспетчер сообщил об ошибке."
+  IDS_TWCC_BADCAP, "Неизвестная функция."
+  IDS_TWCC_BADPROTOCOL, "Неподдерживаемое сочетание MSG DG DAT."
+  IDS_TWCC_BADVALUE, "Параметр данных вне диапазона."
+  IDS_TWCC_SEQERROR, "DG DAT MSG вне ожидаемой последовательности."
+  IDS_TWCC_BADDEST, "Неизвестное конечное приложение/источник в DSM_Entry."
+  IDS_TWCC_CAPUNSUPPORTED, "Свойство не поддерживается источником."
+  IDS_TWCC_CAPBADOPERATION, "Операция не поддерживается свойством."
+  IDS_TWCC_CAPSEQERROR, "Свойство зависит от другого свойства."
+  IDS_TWCC_DENIED, "Файловая операция запрещена (файл защищен от записи)."
+  IDS_TWCC_FILEEXISTS, "Операция не выполнена, так как файл уже существует."
+  IDS_TWCC_FILENOTFOUND, "Файл не найден."
+  IDS_TWCC_NOTEMPTY, "Операция не выполнена, так как папка не пуста."
+  IDS_TWCC_PAPERJAM, "Застревание бумаги."
+  IDS_TWCC_PAPERDOUBLEFEED, "Несколько листов в устройстве подачи бумаги."
+  IDS_TWCC_FILEWRITEERROR, "Ошибка записи файла (возможно, недостаточно свободного пространства на диске)."
+  IDS_TWCC_CHECKDEVICEONLINE, "Устройство стало недоступно до или во время выполнения операции."
+
+  IDS_CAPTHINT_APPL, "Окно приложения полностью, включая все его элементы и дочение окна."
+  IDS_CAPTHINT_WINDOW, "Активное окно (диалог, сообщение...)."
+  IDS_CAPTHINT_CLIENT, "Активное окно, исключая заголовок окна, строку меню и границу окна."
+
+  IDS_DONT_SHOW_AGAIN, "&Больше не показывать это сообщение"
+  IDS_DONT_SHOW_AGAIN_SLA, "&Больше не показывать это сообщение"
+  IDS_DONT_SHOW_AGAIN_UTH, "&Больше не показывать это сообщение"
+  IDS_REGENERATE_THUMBNAIL_TITLE, "PictView - Обновление эскизов..."
+  IDS_REGENERATE_THUMB_WARNING, "Эскизы в данных EXIF будут обновлены. Остальные данные файлов не будут изменены. Продолжить?"
+  IDS_REGENERATE_THUMB_WRITEFILE, "Не удается создать файл с новым эскизом. Возможно, недостаточно свободного пространства на диске. Исходный файл ""%s"" не был изменен."
+
+  IDS_N_OF_N_FILES_PROCESSED "{!}Обработан{|1|ы} %d из %d файлов. Оста{вшийся файл не был изменен|1|льные файлы не были изменены}."
+  IDS_NO_FILES_FOUND, "Изображения JPEG, содержащие данные EXIF, не найдены. Файлы не были изменены."
+  IDS_NOT_JPEG_FILE, "Файл не является изображением JPEG, эскиз отсутствует."
+  IDS_NOT_EXIF_CREATE_JFXX, "Файл не содержит данных EXIF, соответствующий эскиз отсутствует. Создать вместо этого эскиз JFIF JFXX?"
+  IDS_READ_ONLY_MODIFY, "Файл только для чтения. Выполнить изменение файла?"
+  IDS_READ_ONLY_REWRITE, "Файл %s только для чтения. Заменить файл?"
+
+  IDS_CLRS_MONO, "2 цвета"
+  IDS_CLRS_16, "16 цветов"
+  IDS_CLRS_256, "256 цветов"
+  IDS_CLRS_HC15, "HiColor 15 бит"
+  IDS_CLRS_HC16, "HiColor 16 бит"
+  IDS_CLRS_TC24, "TrueColor 24 бита"
+  IDS_CLRS_TC32, "TrueColor 32 бита"
+  IDS_CLRS_256GR, "256 оттенков серого"
+  IDS_FLIP_NONE, "Нет"
+  IDS_FLIP_VERT, "Вертикально"
+  IDS_FLIP_HOR, "Горизонтально"
+  IDS_ROT_NONE, "Нет"
+  IDS_ROT_90, "90° вправо"
+  IDS_ROT_180, "180°"
+  IDS_ROT_270, "90° влево"
+  IDS_SAVE_DEFAULT, "По умолчанию"
+
+  IDS_HIST_HISTOGRAM, "Гистограмма"
+  IDS_HIST_LUMINOSITY, "Яркость"
+  IDS_HIST_RED, "Красный"
+  IDS_HIST_GREEN, "Зеленый"
+  IDS_HIST_BLUE, "Синий"
+  IDS_HIST_RGBSUM, "RGB"
+  IDS_HIST_MENU_LUMINOSITY, "Яркость\tL"
+  IDS_HIST_MENU_RED, "Красный\tR"
+  IDS_HIST_MENU_GREEN, "Зеленый\tG"
+  IDS_HIST_MENU_BLUE, "Синий\tB"
+  IDS_HIST_MENU_RGBSUM, "RGB\tA"
+  IDS_HIST_TIP_LUMINOSITY, "Яркость (L)"
+  IDS_HIST_TIP_RED, "Красный (R)"
+  IDS_HIST_TIP_GREEN, "Зеленый (G)"
+  IDS_HIST_TIP_BLUE, "Синий (B)"
+  IDS_HIST_TIP_RGBSUM, "RGB (A)"
+  IDS_HIST_TIP_OTHERCHANELS, "Другие каналы (O)"
+  IDS_DLL_NOTFOUND, "Не удается загрузить библиотеку обработки изображений ""pvw32cnv.dll""."
+  IDS_DLL_WRONG_VERSION, "Несоответствующая версия библиотеки ""pvw32cnv.dll""."
+  IDS_SELECT_REGION, "Пожалуйста, выберите область."
+  IDS_SAVE_ERR_EXISTS_OVERWRITE, "Файл ""%s"" уже существует.\nЗаменить файл?"
+
+  IDS_SB_XY, "X:%d  Y:%d"
+  IDS_SB_WH, "Ш:%d  В:%d"
+  IDS_SB_RGB, "R:%d  G:%d  B:%d"
+  IDS_SB_CAGE, "Выделите прямоугольную область. Клавишы Shift и Пробел используются для дополнительных возможностей."
+  IDS_SB_ZOOM, "Щелкните изображение для увеличения; щелкните и перетащите для выделения увеличиваемой области. Удерживайте Пробел для перемещения выделенной области увеличения."
+  IDS_SB_HAND, "Щелкните и перетащите изображение для прокрутки его в желаемом направлении."
+
+  IDS_SB_AUTOROTATING, "Поворот..."
+
+  IDS_UNIT_INCHES, "дюймов"
+  IDS_UNIT_CM, "см"
+  IDS_UNIT_MM, "мм"
+  IDS_UNIT_POINTS, "пунктов"
+  IDS_UNIT_PICAS, "пк"
+
+  IDS_PRINT_NODEFPRINTER, "Не найден принтер по умолчанию. Пожалуйста, установите принтер по умолчанию."
+  IDS_PRINT_NOPRINTERS, "Принтеры не установлены."
+  IDS_PRINT_SETUPFAILED, "Не удается выполнить настройку печати."
+  IDS_PRINTING, "Печать..."
+  IDS_PRINTING_FAILED,  "Не удается выполнить печать.\n%s"
+  IDS_UNKNOWN_ERROR,    "Произошла неизвестная ошибка.\n"
+  IDS_CHECK_EVENTLOG,   "Пожалуйста, просмотрите системный журнал событий, там содержится подробная информация об ошибке."
+  // The following 2 strings are concatenated together
+  IDS_EXCEPT_INFO1,     "Произошла ошибка в модуле PictView. Пожалуйста, сообщите разработчикам об этом!\nЕсли при возникновении ошибки вы работали с изображением, пожалуйста, попытайтесь\n"
+  IDS_EXCEPT_INFO2,     "воспроизвести ошибку еще раз. Если ошибка возникнет снова, отправьте это\nизображение разработчикам для проверки и устранения ошибки.\nБлагодарим за сотрудничество!"
+
+  IDS_NO_MORE_IMAGES,   "Изображений больше нет"
+  IDS_UNSUPPORTED_IMAGE_TYPE, "Неподдерживаемый формат изображений."
+  IDS_MUSTBEPOSITIVE,   "Пожалуйста, введите положительное число."
+  IDS_SB_TIP_SELECT_SQUARE, "Совет: выбор неквадратных прямоугольных областей с фиксированными пропорциями сторон может быть установлен в настройках."
+  
+  IDS_WIA_ERROR_ACQUIREIMG, "Не удалось получить изображение с устройства. Проверьте правильность подключения устройства и попробуйте снова. Ошибка: (0x%08X) %s"
+  IDS_WIA_WAIT, "Подождите..."
+  IDS_WIA_STATUS_TRANSFER_FROM_DEVICE, "Чтение данных с устройства (%d%% выполнено)"
+  IDS_WIA_STATUS_PROCESSING_DATA, "Обработка данных (%d%% выполнено)"
+  IDS_WIA_STATUS_TRANSFER_TO_CLIENT, "Передача данных (%d%% выполнено)"
+  
+  IDS_SCAN_OPEN_EXTRA_IMGS, "От сканера получено несколько изображений. Первое изображение открыто в этом окне. Открыть остальные изображения в отдельных окнах? Если нет, изображения будут потеряны.\n\nКоличество новых окон: %d"
+}
+
+STRINGTABLE
+{
+  IDS_RENAME_EMPTY, "Введите имя файла или маску переименования."
+  IDS_RENAME_BAD_MASK, "Имя файла или маска переименования не может содержать разделители пути или следующие символы: < > : "" / \\ |"
+  IDS_RENAME_MASK_EMPTY, "В результате применения маски переименования получено пустое имя файла."
+  IDS_RENAME_BAD_NAME, "Итоговое имя файла не может содержать разделители пути или следующие символы: < > : "" / \\ | ? *"
+  IDS_COPYTO_SAME_FOLDER, "Файл уже находится в этой папке. Выберите другую папку назначения."
+}
+
+STRINGTABLE
+{
+  IDS_PV_IMAGE_LOAD_WAS_CANCELED, "Загрузка изображения отменена."
+  IDS_PV_UNABLE_TO_OPEN_IMAGE_FILE, "Не удается открыть файл изображения"
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE, "Не удается определить размер файла изображения"
+  IDS_PV_IMAGE_FILE_EXCEEDS_THE_CURRENT, "Размер файла изображения превышает текущее ограничение PictView."
+  IDS_PV_UNABLE_TO_ALLOCATE_AN_IN, "Не удается выделить память для потока изображения."
+  IDS_PV_UNABLE_TO_READ_IMAGE_FILE_2, "Не удается прочитать файл изображения"
+  IDS_PV_UNABLE_TO_LOCK_IMAGE_STREAM, "Не удается заблокировать память потока изображения"
+  IDS_PV_UNABLE_TO_CREATE_AN_IMAGE, "Не удается создать поток изображения для WIC."
+  IDS_PV_IMAGE_OPERATION_FAILED, "Не удалось выполнить операцию с изображением."
+  IDS_PV_CLIPBOARD_IMAGE, "Изображение из буфера"
+  IDS_PV_UNABLE_TO_CREATE_A_COMPATIBLE, "Не удается создать совместимый буфер для захвата экрана."
+  IDS_PV_UNABLE_TO_SELECT_THE_COMPATIBLE, "Не удается выбрать совместимый буфер для захвата экрана."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN, "Не удается выполнить захват экрана"
+  IDS_PV_UNABLE_TO_READ_PIXELS_FROM, "Не удается прочитать пиксели из буфера захвата экрана."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING, "Не удается создать контекст рисования для захвата экрана."
+  IDS_PV_UNABLE_TO_CREATE_A_FALLBACK, "Не удается создать резервный контекст рисования для захвата экрана."
+  IDS_PV_UNABLE_TO_INITIALIZE_DXGI_SCREEN, "Не удается инициализировать захват экрана DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_2, "Не удается выполнить захват экрана с помощью DXGI"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_3, "Не удается выполнить захват экрана с помощью DXGI."
+  IDS_PV_SCREEN_CAPTURE_BOUNDS_ARE_INVALID, "Недопустимые границы области захвата экрана."
+  IDS_PV_SCREEN_CAPTURE, "Снимок экрана"
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_UNAVAILABLE, "Данные изображения в буфере обмена недоступны."
+  IDS_PV_CLIPBOARD_IMAGE_DATA_IS_INCOMPLETE, "Данные изображения в буфере обмена неполные."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE, "Не удается заблокировать данные изображения в буфере обмена"
+  IDS_PV_CLIPBOARD_IMAGE_FORMAT_IS_UNSUPPORTED, "Формат изображения в буфере обмена не поддерживается."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_2, "Не удается создать контекст рисования для преобразования изображения из буфера обмена."
+  IDS_PV_UNABLE_TO_CREATE_CLIPBOARD_IMAGE, "Не удается создать буфер для преобразования изображения из буфера обмена."
+  IDS_PV_UNABLE_TO_CONVERT_CLIPBOARD_IMAGE, "Не удается преобразовать данные изображения из буфера обмена."
+  IDS_PV_CLIPBOARD_BITMAP, "Точечный рисунок из буфера"
+  IDS_PV_UNABLE_TO_CAPTURE_THE_FALLBACK, "Не удается выполнить захват резервного окна."
+  IDS_PV_FALLBACK_WINDOW_DIMENSIONS_ARE_INVALID, "Недопустимые размеры резервного окна."
+  IDS_PV_UNABLE_TO_CREATE_A_DRAWING_3, "Не удается создать контекст рисования для захвата резервного окна."
+  IDS_PV_UNABLE_TO_PRINT_THE_FALLBACK, "Не удается отрисовать резервное окно."
+  IDS_PV_IMAGE_SOURCE_DATA_IS_UNAVAILABLE, "Исходные данные изображения недоступны."
+  IDS_PV_NO_IMAGE_LOADED, "Изображение не загружено"
+  IDS_PV_PICK_COLOR_MOVE_MOUSE_OVER, "Выбор цвета: наведите указатель мыши на изображение"
+  IDS_PV_UNABLE_TO_START_ANIMATED_GIF, "Не удается запустить воспроизведение анимированного GIF."
+  IDS_PV_SOURCE_NAVIGATION_IS_NO_LONGER, "Переход по источнику больше недоступен."
+  IDS_PV_SOURCE_SELECTION_IS_NO_LONGER, "Выделение в источнике больше недоступно."
+  IDS_PV_OPENED_FILE_IS_SELECTED_IN, "Открытый файл выделен в источнике."
+  IDS_PV_OPENED_FILE_IS_UNSELECTED_IN, "С открытого файла снято выделение в источнике."
+  IDS_PV_FILE_NAME_UNCHANGED, "Имя файла не изменено."
+  IDS_PV_UNABLE_TO_RENAME_THE_FILE, "Не удается переименовать файл"
+  IDS_PV_RENAME_CANCELED, "Переименование отменено."
+  IDS_PV_FILE_WAS_RENAMED_BUT_THE, "Файл переименован, но новый путь недоступен."
+  IDS_PV_FILE_RENAMED, "Файл переименован."
+  IDS_PV_COPY_CANCELED, "Копирование отменено."
+  IDS_PV_UNABLE_TO_COPY_THE_FILE, "Не удается скопировать файл."
+  IDS_PV_FILE_COPIED, "Файл скопирован."
+  IDS_PV_COPY_WAS_NOT_COMPLETED, "Копирование не завершено."
+  IDS_PV_UNABLE_TO_DELETE_THE_FILE, "Не удается удалить файл."
+  IDS_PV_FILE_MOVED_TO_THE_RECYCLE, "Файл перемещен в Корзину."
+  IDS_PV_FILE_DELETED, "Файл удален."
+  IDS_PV_DELETE_CANCELED, "Удаление отменено."
+  IDS_PV_FILE_WAS_NOT_DELETED, "Файл не удален."
+  IDS_PV_SOURCE_FOCUS_IS_NO_LONGER, "Переход к файлу в источнике больше недоступен."
+  IDS_PV_FOCUSING_OPENED_FILE_IN_THE, "Переход к открытому файлу в источнике."
+  IDS_PV_PREVIOUS_WALLPAPER_RESTORED, "Предыдущий фоновый рисунок восстановлен."
+  IDS_PV_WALLPAPER_CLEARED, "Фоновый рисунок удален."
+  IDS_PV_WALLPAPER_UPDATED, "Фоновый рисунок обновлен."
+  IDS_PV_NO_IMAGE_IS_LOADED, "Изображение не загружено."
+  IDS_PV_UNABLE_TO_CREATE_A_WALLPAPER, "Не удается создать путь для файла фонового рисунка."
+  IDS_PV_UNABLE_TO_UPDATE_THE_DESKTOP, "Не удается обновить фоновый рисунок рабочего стола."
+  IDS_PV_UNABLE_TO_OPEN_THE_DESKTOP, "Не удается открыть раздел реестра фонового рисунка рабочего стола."
+  IDS_PV_OPEN_IMAGE, "Открыть изображение"
+  IDS_PV_UNABLE_TO_OPEN_THE_HISTOGRAM, "Не удается открыть окно гистограммы."
+  IDS_PV_UNABLE_TO_REGISTER_THE_SCREEN, "Не удается зарегистрировать сочетание клавиш для захвата экрана."
+  IDS_PV_UNABLE_TO_START_THE_SCREEN, "Не удается запустить таймер захвата экрана."
+  IDS_PV_CAPTURING_PICTVIEW, "Захват - PictView"
+  IDS_PV_SCREEN_CAPTURE_IS_WAITING_FOR, "Захват экрана ожидает нажатия сочетания клавиш."
+  IDS_PV_SCREEN_CAPTURE_TIMER_STARTED, "Таймер захвата экрана запущен."
+  IDS_PV_SCREEN_CAPTURED, "Снимок экрана выполнен."
+  IDS_PV_UNABLE_TO_CAPTURE_THE_SCREEN_4, "Не удается выполнить захват экрана."
+  IDS_PV_SCREEN_CAPTURED_FROM_THE_VIEWER, "Снимок сделан из окна просмотра: захват рабочего стола недоступен."
+  IDS_PV_THE_CLIPBOARD_DOES_NOT_CONTAIN, "Буфер обмена не содержит изображения."
+  IDS_PV_UNABLE_TO_OPEN_THE_CLIPBOARD, "Не удается открыть буфер обмена."
+  IDS_PV_UNABLE_TO_PASTE_THE_CLIPBOARD, "Не удается вставить изображение из буфера обмена."
+  IDS_PV_PICTVIEW_IMAGE, "Изображение PictView"
+  IDS_PV_UNABLE_TO_PRINT_THE_IMAGE, "Не удается напечатать изображение."
+  IDS_PV_UNABLE_TO_READ_PRINTER_PAGE, "Не удается получить размеры страницы принтера."
+  IDS_PV_UNABLE_TO_ALLOCATE_CLIPBOARD_IMAGE, "Не удается выделить память для данных изображения в буфере обмена."
+  IDS_PV_UNABLE_TO_LOCK_CLIPBOARD_IMAGE_2, "Не удается заблокировать данные изображения в буфере обмена."
+  IDS_PV_UNABLE_TO_COPY_IMAGE_DATA, "Не удается скопировать данные изображения в буфер обмена."
+  IDS_PV_UNABLE_TO_START_THE_IMAGE, "Не удается запустить поток загрузки изображения."
+  IDS_PV_FILE_DIALOG_FAILED, "Не удается открыть диалог выбора файла.\nОшибка: 0x%X"
+  IDS_PV_ALLOCATE_PIXELS_FAILED, "Не удается выделить память для пикселей (%s)."
+  IDS_PV_CONVERSION_CONTEXT_FAILED, "Не удается создать контекст рисования для преобразования (%s)."
+  IDS_PV_READ_PIXELS_FAILED, "Не удается прочитать пиксели (%s)."
+  IDS_PV_SAVED, "Сохранено: %s"
+  IDS_PV_LOADING, "Загрузка..."
+  IDS_PV_LOADING_PERCENT, "Загрузка... %u%%"
+  IDS_PV_IMAGE_FILES, "Файлы изображений"
+  IDS_PV_ALL_FILES, "Все файлы"
+  IDS_PV_ERR_WIC_UNAVAILABLE, "Компонент Windows Imaging Component недоступен."
+  IDS_PV_ERR_OPEN, "Не удается открыть изображение."
+  IDS_PV_ERR_DECODE, "Изображение повреждено или не может быть декодировано."
+  IDS_PV_ERR_FRAME, "Запрошенная страница или кадр не существует."
+  IDS_PV_ERR_TOO_LARGE, "Изображение слишком большое."
+  IDS_PV_ERR_CANCELED, "Операция отменена."
+  IDS_PV_ERR_MEMORY, "Недостаточно памяти для обработки изображения."
+  IDS_PV_ERR_SAVE, "Не удается сохранить изображение."
+  IDS_PV_SAVEAS_FILTER, "Portable Network Graphics (*.png)|*.png|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|TIFF (*.tif)|*.tif;*.tiff|Точечный рисунок Windows (*.bmp)|*.bmp|CompuServe GIF (*.gif)|*.gif|"
+  IDS_EXIF_TAG_0001, "Индекс совместимости"
+  IDS_EXIF_TAG_0002, "Версия совместимости"
+  IDS_EXIF_TAG_00FE, "Тип подфайла"
+  IDS_EXIF_TAG_0100, "Ширина изображения"
+  IDS_EXIF_TAG_0101, "Высота изображения"
+  IDS_EXIF_TAG_0102, "Бит на компонент"
+  IDS_EXIF_TAG_0103, "Сжатие"
+  IDS_EXIF_TAG_0106, "Фотометрическая интерпретация"
+  IDS_EXIF_TAG_010D, "Имя документа"
+  IDS_EXIF_TAG_010E, "Описание изображения"
+  IDS_EXIF_TAG_010F, "Производитель камеры"
+  IDS_EXIF_TAG_0110, "Модель камеры"
+  IDS_EXIF_TAG_0111, "Смещения полос"
+  IDS_EXIF_TAG_0112, "Ориентация"
+  IDS_EXIF_TAG_0115, "Компонентов на пиксель"
+  IDS_EXIF_TAG_0116, "Строк в полосе"
+  IDS_EXIF_TAG_0117, "Размеры полос в байтах"
+  IDS_EXIF_TAG_011A, "Разрешение по горизонтали"
+  IDS_EXIF_TAG_011B, "Разрешение по вертикали"
+  IDS_EXIF_TAG_011C, "Планарная конфигурация"
+  IDS_EXIF_TAG_0128, "Единица разрешения"
+  IDS_EXIF_TAG_012D, "Передаточная функция"
+  IDS_EXIF_TAG_0131, "Программное обеспечение"
+  IDS_EXIF_TAG_0132, "Дата и время"
+  IDS_EXIF_TAG_013B, "Автор снимка"
+  IDS_EXIF_TAG_013C, "Компьютер"
+  IDS_EXIF_TAG_013E, "Белая точка"
+  IDS_EXIF_TAG_013F, "Цветность основных цветов"
+  IDS_EXIF_TAG_0201, "Смещение эскиза"
+  IDS_EXIF_TAG_0202, "Размер эскиза"
+  IDS_EXIF_TAG_0211, "Коэффициенты YCbCr"
+  IDS_EXIF_TAG_0212, "Субдискретизация YCbCr"
+  IDS_EXIF_TAG_0213, "Позиционирование YCbCr"
+  IDS_EXIF_TAG_0214, "Опорные значения черного и белого"
+  IDS_EXIF_TAG_4746, "Оценка"
+  IDS_EXIF_TAG_4749, "Оценка в процентах"
+  IDS_EXIF_TAG_8298, "Авторские права"
+  IDS_EXIF_TAG_829A, "Выдержка"
+  IDS_EXIF_TAG_829D, "Диафрагменное число"
+  IDS_EXIF_TAG_8769, "Указатель Exif IFD"
+  IDS_EXIF_TAG_8822, "Программа экспозиции"
+  IDS_EXIF_TAG_8824, "Спектральная чувствительность"
+  IDS_EXIF_TAG_8825, "Указатель GPS IFD"
+  IDS_EXIF_TAG_8827, "Светочувствительность ISO"
+  IDS_EXIF_TAG_8828, "OECF"
+  IDS_EXIF_TAG_8830, "Тип чувствительности"
+  IDS_EXIF_TAG_8831, "Стандартная выходная чувствительность"
+  IDS_EXIF_TAG_8832, "Рекомендуемый индекс экспозиции"
+  IDS_EXIF_TAG_8833, "Значение ISO"
+  IDS_EXIF_TAG_9000, "Версия Exif"
+  IDS_EXIF_TAG_9003, "Дата съемки"
+  IDS_EXIF_TAG_9004, "Дата оцифровки"
+  IDS_EXIF_TAG_9010, "Часовой пояс"
+  IDS_EXIF_TAG_9011, "Часовой пояс (съемка)"
+  IDS_EXIF_TAG_9012, "Часовой пояс (оцифровка)"
+  IDS_EXIF_TAG_9101, "Конфигурация компонентов"
+  IDS_EXIF_TAG_9102, "Бит на пиксель после сжатия"
+  IDS_EXIF_TAG_9201, "Выдержка затвора"
+  IDS_EXIF_TAG_9202, "Диафрагма"
+  IDS_EXIF_TAG_9203, "Яркость"
+  IDS_EXIF_TAG_9204, "Компенсация экспозиции"
+  IDS_EXIF_TAG_9205, "Максимальная диафрагма"
+  IDS_EXIF_TAG_9206, "Расстояние до объекта"
+  IDS_EXIF_TAG_9207, "Режим замера экспозиции"
+  IDS_EXIF_TAG_9208, "Источник света"
+  IDS_EXIF_TAG_9209, "Вспышка"
+  IDS_EXIF_TAG_920A, "Фокусное расстояние"
+  IDS_EXIF_TAG_9214, "Область объекта"
+  IDS_EXIF_TAG_927C, "Примечание производителя"
+  IDS_EXIF_TAG_9286, "Комментарий пользователя"
+  IDS_EXIF_TAG_9290, "Доли секунды"
+  IDS_EXIF_TAG_9291, "Доли секунды (съемка)"
+  IDS_EXIF_TAG_9292, "Доли секунды (оцифровка)"
+  IDS_EXIF_TAG_9C9B, "Название"
+  IDS_EXIF_TAG_9C9C, "Комментарии"
+  IDS_EXIF_TAG_9C9D, "Автор"
+  IDS_EXIF_TAG_9C9E, "Ключевые слова"
+  IDS_EXIF_TAG_9C9F, "Тема"
+  IDS_EXIF_TAG_A000, "Версия FlashPix"
+  IDS_EXIF_TAG_A001, "Цветовое пространство"
+  IDS_EXIF_TAG_A002, "Ширина в пикселях"
+  IDS_EXIF_TAG_A003, "Высота в пикселях"
+  IDS_EXIF_TAG_A004, "Связанный звуковой файл"
+  IDS_EXIF_TAG_A005, "Указатель IFD совместимости"
+  IDS_EXIF_TAG_A20B, "Энергия вспышки"
+  IDS_EXIF_TAG_A20C, "Пространственная частотная характеристика"
+  IDS_EXIF_TAG_A20E, "Разрешение фокальной плоскости по горизонтали"
+  IDS_EXIF_TAG_A20F, "Разрешение фокальной плоскости по вертикали"
+  IDS_EXIF_TAG_A210, "Единица разрешения фокальной плоскости"
+  IDS_EXIF_TAG_A214, "Положение объекта"
+  IDS_EXIF_TAG_A215, "Индекс экспозиции"
+  IDS_EXIF_TAG_A217, "Тип сенсора"
+  IDS_EXIF_TAG_A300, "Источник файла"
+  IDS_EXIF_TAG_A301, "Тип сцены"
+  IDS_EXIF_TAG_A302, "Шаблон CFA"
+  IDS_EXIF_TAG_A401, "Обработка изображения"
+  IDS_EXIF_TAG_A402, "Режим экспозиции"
+  IDS_EXIF_TAG_A403, "Баланс белого"
+  IDS_EXIF_TAG_A404, "Коэффициент цифрового увеличения"
+  IDS_EXIF_TAG_A405, "Фокусное расстояние в 35-мм эквиваленте"
+  IDS_EXIF_TAG_A406, "Тип сюжета"
+  IDS_EXIF_TAG_A407, "Регулировка усиления"
+  IDS_EXIF_TAG_A408, "Контрастность"
+  IDS_EXIF_TAG_A409, "Насыщенность"
+  IDS_EXIF_TAG_A40A, "Резкость"
+  IDS_EXIF_TAG_A40B, "Описание настроек устройства"
+  IDS_EXIF_TAG_A40C, "Диапазон расстояния до объекта"
+  IDS_EXIF_TAG_A420, "Уникальный идентификатор изображения"
+  IDS_EXIF_TAG_A430, "Владелец камеры"
+  IDS_EXIF_TAG_A431, "Серийный номер камеры"
+  IDS_EXIF_TAG_A432, "Характеристики объектива"
+  IDS_EXIF_TAG_A433, "Производитель объектива"
+  IDS_EXIF_TAG_A434, "Модель объектива"
+  IDS_EXIF_TAG_A435, "Серийный номер объектива"
+  IDS_EXIF_TAG_A460, "Составное изображение"
+  IDS_EXIF_TAG_A500, "Гамма"
+  IDS_EXIF_GPS_0000, "Версия GPS"
+  IDS_EXIF_GPS_0001, "Полушарие широты"
+  IDS_EXIF_GPS_0002, "Широта"
+  IDS_EXIF_GPS_0003, "Полушарие долготы"
+  IDS_EXIF_GPS_0004, "Долгота"
+  IDS_EXIF_GPS_0005, "Опорный уровень высоты"
+  IDS_EXIF_GPS_0006, "Высота"
+  IDS_EXIF_GPS_0007, "Время GPS (UTC)"
+  IDS_EXIF_GPS_0008, "Спутники GPS"
+  IDS_EXIF_GPS_0009, "Состояние приемника GPS"
+  IDS_EXIF_GPS_000A, "Режим измерения GPS"
+  IDS_EXIF_GPS_000B, "Точность GPS (DOP)"
+  IDS_EXIF_GPS_000C, "Единица скорости"
+  IDS_EXIF_GPS_000D, "Скорость"
+  IDS_EXIF_GPS_000E, "Опорное направление движения"
+  IDS_EXIF_GPS_000F, "Направление движения"
+  IDS_EXIF_GPS_0010, "Опорное направление съемки"
+  IDS_EXIF_GPS_0011, "Направление съемки"
+  IDS_EXIF_GPS_0012, "Геодезическая система координат"
+  IDS_EXIF_GPS_0013, "Полушарие широты точки назначения"
+  IDS_EXIF_GPS_0014, "Широта точки назначения"
+  IDS_EXIF_GPS_0015, "Полушарие долготы точки назначения"
+  IDS_EXIF_GPS_0016, "Долгота точки назначения"
+  IDS_EXIF_GPS_0017, "Опорный азимут точки назначения"
+  IDS_EXIF_GPS_0018, "Азимут точки назначения"
+  IDS_EXIF_GPS_0019, "Единица расстояния до точки назначения"
+  IDS_EXIF_GPS_001A, "Расстояние до точки назначения"
+  IDS_EXIF_GPS_001B, "Метод обработки GPS"
+  IDS_EXIF_GPS_001C, "Информация о районе GPS"
+  IDS_EXIF_GPS_001D, "Дата GPS"
+  IDS_EXIF_GPS_001E, "Дифференциальная коррекция GPS"
+  IDS_EXIF_GPS_001F, "Погрешность горизонтального позиционирования GPS"
+  IDS_EXIF_VALUE_COMPRESSION_NONE, "Без сжатия"
+  IDS_EXIF_VALUE_COMPRESSION_JPEG, "JPEG"
+  IDS_EXIF_VALUE_PHOTOMETRIC_RGB, "RGB"
+  IDS_EXIF_VALUE_PHOTOMETRIC_YCBCR, "YCbCr"
+  IDS_EXIF_VALUE_ORIENTATION_1, "Обычная"
+  IDS_EXIF_VALUE_ORIENTATION_2, "Отражено по горизонтали"
+  IDS_EXIF_VALUE_ORIENTATION_3, "Повернуто на 180°"
+  IDS_EXIF_VALUE_ORIENTATION_4, "Отражено по вертикали"
+  IDS_EXIF_VALUE_ORIENTATION_5, "Отражено по горизонтали, повернуто на 270° по часовой стрелке"
+  IDS_EXIF_VALUE_ORIENTATION_6, "Повернуто на 90° по часовой стрелке"
+  IDS_EXIF_VALUE_ORIENTATION_7, "Отражено по горизонтали, повернуто на 90° по часовой стрелке"
+  IDS_EXIF_VALUE_ORIENTATION_8, "Повернуто на 270° по часовой стрелке"
+  IDS_EXIF_VALUE_PLANAR_CHUNKY, "Чередующаяся"
+  IDS_EXIF_VALUE_PLANAR_PLANAR, "Планарная"
+  IDS_EXIF_VALUE_UNIT_NONE, "Нет"
+  IDS_EXIF_VALUE_UNIT_INCH, "Дюйм"
+  IDS_EXIF_VALUE_UNIT_CM, "Сантиметр"
+  IDS_EXIF_VALUE_YCBCR_CENTERED, "По центру"
+  IDS_EXIF_VALUE_YCBCR_COSITED, "Совмещенное"
+  IDS_EXIF_VALUE_PROGRAM_0, "Не определено"
+  IDS_EXIF_VALUE_PROGRAM_1, "Ручная"
+  IDS_EXIF_VALUE_PROGRAM_2, "Обычная программа"
+  IDS_EXIF_VALUE_PROGRAM_3, "Приоритет диафрагмы"
+  IDS_EXIF_VALUE_PROGRAM_4, "Приоритет выдержки"
+  IDS_EXIF_VALUE_PROGRAM_5, "Творческая программа"
+  IDS_EXIF_VALUE_PROGRAM_6, "Спортивная программа"
+  IDS_EXIF_VALUE_PROGRAM_7, "Портретный режим"
+  IDS_EXIF_VALUE_PROGRAM_8, "Пейзажный режим"
+  IDS_EXIF_VALUE_METERING_0, "Неизвестно"
+  IDS_EXIF_VALUE_METERING_1, "Средний"
+  IDS_EXIF_VALUE_METERING_2, "Центровзвешенный"
+  IDS_EXIF_VALUE_METERING_3, "Точечный"
+  IDS_EXIF_VALUE_METERING_4, "Многоточечный"
+  IDS_EXIF_VALUE_METERING_5, "Матричный"
+  IDS_EXIF_VALUE_METERING_6, "Частичный"
+  IDS_EXIF_VALUE_METERING_255, "Другой"
+  IDS_EXIF_VALUE_LIGHT_0, "Неизвестно"
+  IDS_EXIF_VALUE_LIGHT_1, "Дневной свет"
+  IDS_EXIF_VALUE_LIGHT_2, "Флуоресцентная лампа"
+  IDS_EXIF_VALUE_LIGHT_3, "Лампа накаливания"
+  IDS_EXIF_VALUE_LIGHT_4, "Вспышка"
+  IDS_EXIF_VALUE_LIGHT_9, "Ясная погода"
+  IDS_EXIF_VALUE_LIGHT_10, "Облачная погода"
+  IDS_EXIF_VALUE_LIGHT_11, "Тень"
+  IDS_EXIF_VALUE_LIGHT_12, "Флуоресцентная лампа дневного света"
+  IDS_EXIF_VALUE_LIGHT_13, "Флуоресцентная лампа дневного белого света"
+  IDS_EXIF_VALUE_LIGHT_14, "Флуоресцентная лампа холодного белого света"
+  IDS_EXIF_VALUE_LIGHT_15, "Флуоресцентная лампа белого света"
+  IDS_EXIF_VALUE_LIGHT_16, "Флуоресцентная лампа теплого белого света"
+  IDS_EXIF_VALUE_LIGHT_17, "Стандартный источник A"
+  IDS_EXIF_VALUE_LIGHT_18, "Стандартный источник B"
+  IDS_EXIF_VALUE_LIGHT_19, "Стандартный источник C"
+  IDS_EXIF_VALUE_LIGHT_20, "D55"
+  IDS_EXIF_VALUE_LIGHT_21, "D65"
+  IDS_EXIF_VALUE_LIGHT_22, "D75"
+  IDS_EXIF_VALUE_LIGHT_23, "D50"
+  IDS_EXIF_VALUE_LIGHT_24, "Студийная лампа накаливания ISO"
+  IDS_EXIF_VALUE_LIGHT_255, "Другой источник света"
+  IDS_EXIF_VALUE_COLORSPACE_SRGB, "sRGB"
+  IDS_EXIF_VALUE_COLORSPACE_UNCALIBRATED, "Не откалибровано"
+  IDS_EXIF_VALUE_FPUNIT_NONE, "Нет"
+  IDS_EXIF_VALUE_FPUNIT_INCH, "Дюйм"
+  IDS_EXIF_VALUE_FPUNIT_CM, "Сантиметр"
+  IDS_EXIF_VALUE_SENSING_1, "Не определено"
+  IDS_EXIF_VALUE_SENSING_2, "Однокристальный цветной матричный сенсор"
+  IDS_EXIF_VALUE_SENSING_3, "Двухкристальный цветной матричный сенсор"
+  IDS_EXIF_VALUE_SENSING_4, "Трехкристальный цветной матричный сенсор"
+  IDS_EXIF_VALUE_SENSING_5, "Цветной последовательный матричный сенсор"
+  IDS_EXIF_VALUE_SENSING_7, "Трилинейный сенсор"
+  IDS_EXIF_VALUE_SENSING_8, "Цветной последовательный линейный сенсор"
+  IDS_EXIF_VALUE_FILESOURCE_DSC, "Цифровой фотоаппарат"
+  IDS_EXIF_VALUE_SCENETYPE_DIRECT, "Непосредственная съемка"
+  IDS_EXIF_VALUE_RENDERED_0, "Обычная обработка"
+  IDS_EXIF_VALUE_RENDERED_1, "Нестандартная обработка"
+  IDS_EXIF_VALUE_EXPMODE_0, "Автоэкспозиция"
+  IDS_EXIF_VALUE_EXPMODE_1, "Ручная экспозиция"
+  IDS_EXIF_VALUE_EXPMODE_2, "Автобрекетинг"
+  IDS_EXIF_VALUE_WB_0, "Автоматический баланс белого"
+  IDS_EXIF_VALUE_WB_1, "Ручной баланс белого"
+  IDS_EXIF_VALUE_SCENE_0, "Стандартный"
+  IDS_EXIF_VALUE_SCENE_1, "Пейзаж"
+  IDS_EXIF_VALUE_SCENE_2, "Портрет"
+  IDS_EXIF_VALUE_SCENE_3, "Ночной сюжет"
+  IDS_EXIF_VALUE_GAIN_0, "Нет"
+  IDS_EXIF_VALUE_GAIN_1, "Слабое повышение усиления"
+  IDS_EXIF_VALUE_GAIN_2, "Сильное повышение усиления"
+  IDS_EXIF_VALUE_GAIN_3, "Слабое понижение усиления"
+  IDS_EXIF_VALUE_GAIN_4, "Сильное понижение усиления"
+  IDS_EXIF_VALUE_CONTRAST_0, "Обычная"
+  IDS_EXIF_VALUE_CONTRAST_1, "Низкая"
+  IDS_EXIF_VALUE_CONTRAST_2, "Высокая"
+  IDS_EXIF_VALUE_SATURATION_0, "Обычная"
+  IDS_EXIF_VALUE_SATURATION_1, "Низкая насыщенность"
+  IDS_EXIF_VALUE_SATURATION_2, "Высокая насыщенность"
+  IDS_EXIF_VALUE_SHARPNESS_0, "Обычная"
+  IDS_EXIF_VALUE_SHARPNESS_1, "Мягкая"
+  IDS_EXIF_VALUE_SHARPNESS_2, "Жесткая"
+  IDS_EXIF_VALUE_DISTANCE_0, "Неизвестно"
+  IDS_EXIF_VALUE_DISTANCE_1, "Макро"
+  IDS_EXIF_VALUE_DISTANCE_2, "Близкий план"
+  IDS_EXIF_VALUE_DISTANCE_3, "Дальний план"
+  IDS_EXIF_VALUE_GPS_ABOVE_SEA, "Над уровнем моря"
+  IDS_EXIF_VALUE_GPS_BELOW_SEA, "Ниже уровня моря"
+  IDS_EXIF_VALUE_GPS_NO_CORRECTION, "Без коррекции"
+  IDS_EXIF_VALUE_GPS_CORRECTION, "С коррекцией"
+  IDS_EXIF_VALUE_FLASH_FIRED, "Вспышка сработала"
+  IDS_EXIF_VALUE_FLASH_NOT_FIRED, "Вспышка не сработала"
+  IDS_EXIF_VALUE_FLASH_COMPULSORY, "принудительный режим вспышки"
+  IDS_EXIF_VALUE_FLASH_SUPPRESSED, "принудительное отключение вспышки"
+  IDS_EXIF_VALUE_FLASH_AUTO, "автоматический режим"
+  IDS_EXIF_VALUE_FLASH_RETURN_DETECTED, "отраженный свет обнаружен"
+  IDS_EXIF_VALUE_FLASH_RETURN_NOT_DETECTED, "отраженный свет не обнаружен"
+  IDS_EXIF_VALUE_FLASH_RED_EYE, "подавление эффекта красных глаз"
+  IDS_EXIF_VALUE_FLASH_NO_FUNCTION, "Функция вспышки отсутствует"
+}

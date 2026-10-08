@@ -477,6 +477,6 @@ STRINGTABLE
   IDS_EXP_BROWSE, "Rasfoieste..."
   IDS_EXP_SALDIR, "Directorul Sally"
   IDS_CFG_CONFLICT, "Configuratia este deja deschisa."
-  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found." // UNTRANSLATED
-  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large." // UNTRANSLATED
+  IDS_EXP_ENVVARNOTFOUND, "Variabila de mediu ""%s"" nu a fost găsită."
+  IDS_EXP_ENVVARTOOLARGE, "Valoarea variabilei de mediu ""%s"" este prea mare."
 }

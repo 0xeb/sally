@@ -29,8 +29,7 @@
 #include "plugin_text_encoding.h"
 
 // Narrow -> wide for a REG_SZ write. Lossless: the narrow bytes came from
-// CP_ACP in the first place (same contract as ToWideArg in
-// plugin_narrow_compat.h), so converting back to UTF-16 recovers exactly
+// CP_ACP in the first place, so converting back to UTF-16 recovers exactly
 // what they meant.
 inline BOOL EncodeRegSzFromNarrowOwned(const char* narrowValue,
                                        std::wstring& wideValue) noexcept

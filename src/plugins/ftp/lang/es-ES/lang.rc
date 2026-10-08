@@ -2254,8 +2254,8 @@ STRINGTABLE
  IDS_PRXSCRERR_INVPORT, "Puede disponer el puerto sólo como número o como variable $(ProxyPuerto) or $(Puerto)."
  IDS_PRXSCRERR_3XXONFIRSTLINE, "No puede usar la condición ""3xx:"" para el primer comando; se necesita un comando precedente (típicamente ""USER"")."
  IDS_PRXSCRERR_NONECMDS, "El script del proxy debe contener al menos un comando."
- IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long." // UNTRANSLATED
+ IDS_PRXSCRERR_CANNOTENCODE, "Un nombre de usuario, contraseña o cuenta contiene caracteres que no se pueden representar con la codificación de texto de esta conexión."
+ IDS_PRXHOST_CANNOTENCODE, "La dirección del servidor proxy no se puede representar con la codificación actual del sistema o es demasiado larga."
 
  IDS_EDITPROXYSRVTITLE, "Editar servidor proxy"
  IDS_PORTISUSHORT, "Número de puerto comprendido entre 1 y 65535."
@@ -2364,10 +2364,10 @@ STRINGTABLE
  IDS_CLEARPASSWORD_CONFIRMATION, "¿Está seguro de que desea borrar esta contraseña?"
  IDS_SHOWPASSWORD_CONFIRMATION, "¿Está seguro de que desea ver esta contraseña?"
  IDS_PASSWORDIS, "La contraseña es: %s\n\n¿Quiere copiarla contraseña al portapapeles?"
- IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding." // UNTRANSLATED
- IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding." // UNTRANSLATED
- IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state." // UNTRANSLATED
- IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server." // UNTRANSLATED
- IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server." // UNTRANSLATED
+ IDS_SRVTYPENAME_CANNOTENCODE, "El nombre del tipo de servidor contiene caracteres que no se pueden representar con la codificación actual de la configuración."
+ IDS_PRXSCRIPT_CANNOTENCODE, "El script del proxy contiene caracteres que no se pueden representar con la codificación actual de la configuración."
+ IDS_FTPCOMMAND_CANNOTENCODE, "El comando FTP contiene caracteres que no se pueden representar con la codificación de texto de esta conexión."
+ IDS_NEWNAME_CANNOTENCODE, "El nuevo nombre contiene caracteres que no se pueden representar con la codificación de texto de esta conexión, por lo que no se puede usar para nombrar un fichero en el servidor.\n\nEl elemento se ha dejado en estado de error."
+ IDS_DIRNAME_CANNOTENCODE, "El nombre del directorio contiene caracteres que no se pueden representar con la codificación de texto de esta conexión, por lo que no se puede crear el directorio en el servidor."
+ IDS_RENAMENAME_CANNOTENCODE, "El nuevo nombre contiene caracteres que no se pueden representar con la codificación de texto de esta conexión, por lo que no se puede cambiar el nombre del elemento en el servidor."
 }

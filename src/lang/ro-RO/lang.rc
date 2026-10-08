@@ -1115,8 +1115,8 @@ BEGIN
     LTEXT           "Marime:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "pixels",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " &Theme ",IDC_STATIC_7,1,192,295,30 // UNTRANSLATED
-    LTEXT           "Mode:",IDC_STATIC_8,8,206,21,8 // UNTRANSLATED
+    GROUPBOX        " Temă &vizuală ",IDC_STATIC_7,1,192,295,30
+    LTEXT           "Mod:",IDC_STATIC_8,8,206,45,8
     COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
 END
 
@@ -1272,7 +1272,7 @@ BEGIN
     CONTROL         "Cauta &subdirectoarele",IDC_FIND_INCLUDE_SUBDIR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,55,87,12
     // This layout slot is intentionally reused by IDC_FIND_FILETYPE; archives remain hidden at runtime.
     CONTROL         "Cauta arhivele",IDC_FIND_INCLUDE_ARCHIVES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,55,87,12
-    LTEXT           "T&ype:",IDC_FIND_FILETYPE_TEXT,150,58,22,8 // UNTRANSLATED
+    LTEXT           "Tip&ul:",IDC_FIND_FILETYPE_TEXT,150,58,22,8
     COMBOBOX        IDC_FIND_FILETYPE,176,55,112,48,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     CONTROL         "Cau&ta continutul fisierului",IDC_FIND_GREP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,69,75,12
     CONTROL         "",IDC_FIND_LINE2,"Static",SS_ETCHEDHORZ | WS_GROUP,83,75,199,1
@@ -2053,13 +2053,13 @@ END
 
 IDD_DEFAULT_SHELL DIALOGEX 0, 0, 244, 72
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Default Shell" // UNTRANSLATED
+CAPTION "Shell default"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Open &Command Shell with:",IDC_STATIC_1,8,9,228,8 // UNTRANSLATED
+    LTEXT           "Deschide shell-ul de &comenzi cu:",IDC_STATIC_1,8,9,228,8
     COMBOBOX        IDC_DEFAULT_SHELL_TARGET,8,20,228,108,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14 // UNTRANSLATED
-    PUSHBUTTON      "Cancel",IDCANCEL,186,50,50,14 // UNTRANSLATED
+    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14
+    PUSHBUTTON      "Anulează",IDCANCEL,186,50,50,14
 END
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2531,7 +2531,7 @@ STRINGTABLE
  IDS_FIND_RESULTS_LOAD_EMPTY, "Nu a fost incarcat nici un rezultat al cautarii."
  IDS_FIND_RESULTS_LOAD_REPORT, "Am incarcat %u rezultate ale cautarii. Am ignorat %u cai lipsa sau invalide."
  IDS_FIND_RESULTS_ANSI_ONLY, "Numele acestui element nu poate fi reprezentat in codul de pagina al sistemului, iar aceasta comanda nu suporta inca nume Unicode.\nComenzile Sterge si Salveaza Rezultatele le suporta."
- IDS_FIND_HEX_INVALID, "The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes." // UNTRANSLATED
+ IDS_FIND_HEX_INVALID, "Textul '%s' nu este un model hexazecimal valid.\nFolosiți perechi de cifre hexazecimale și încadrați textul literal între ghilimele duble."
 
  IDS_SEARCHFORCOLUMN1, "Masca"
  IDS_SEARCHFORCOLUMN2, "Cale"
@@ -4016,7 +4016,7 @@ IDS_OLDPLUGINVERSION2, "Plugin (%s) nu e suportat de aceasta versiune de Sally. 
  IDS_MASTERPASSWORD_REMOVED, "Ati sters Parola Master. Parolele dvs stocate nu vor mai fi protejate (de ex FTP si WINSCP)."
  IDS_MASTERPASSWORD_SET, "Parola Master a fost schimbata cu succes. Parolele dvs stocate sunt securizate acum de cifrarea AES (de exemplu FTP si WinSCP)."
  IDS_WRONG_MASTERPASSWORD, "Nu ati introdus corect Parola Master curenta. Va rugam incercati din nou."
- IDS_MASTERPASSWORD_TOO_LONG, "The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password." // UNTRANSLATED
+ IDS_MASTERPASSWORD_TOO_LONG, "Parola Master codificată în UTF-8 depășește limita de criptare.\nVă rugăm să folosiți o parolă mai scurtă."
 
  IDS_BROWSEDIRECTORY_TITLE, "Rasfoieste Directorul"
  IDS_BROWSEDIRECTORY_TEXT, "Alege directorul pe care doresti sa-l folosesti."

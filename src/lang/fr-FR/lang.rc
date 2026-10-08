@@ -1115,8 +1115,8 @@ BEGIN
     LTEXT           "Taille:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "éléments d'images (pixels)",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " &Theme ",IDC_STATIC_7,1,192,295,30 // UNTRANSLATED
-    LTEXT           "Mode:",IDC_STATIC_8,8,206,21,8 // UNTRANSLATED
+    GROUPBOX        " &Thème ",IDC_STATIC_7,1,192,295,30
+    LTEXT           "Mode:",IDC_STATIC_8,8,206,45,8
     COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
 END
 
@@ -1272,7 +1272,7 @@ BEGIN
     CONTROL         "Examiner les sous-ré&pertoires",IDC_FIND_INCLUDE_SUBDIR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,55,87,12
     // This layout slot is intentionally reused by IDC_FIND_FILETYPE; archives remain hidden at runtime.
     CONTROL         "Examiner les archives",IDC_FIND_INCLUDE_ARCHIVES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,55,87,12
-    LTEXT           "T&ype:",IDC_FIND_FILETYPE_TEXT,150,58,22,8 // UNTRANSLATED
+    LTEXT           "&Type:",IDC_FIND_FILETYPE_TEXT,150,58,22,8
     COMBOBOX        IDC_FIND_FILETYPE,176,55,112,48,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     CONTROL         "Recherc&he de contenu d'un fichier",IDC_FIND_GREP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,69,75,12
     CONTROL         "",IDC_FIND_LINE2,"Static",SS_ETCHEDHORZ | WS_GROUP,83,75,199,1
@@ -2053,13 +2053,13 @@ END
 
 IDD_DEFAULT_SHELL DIALOGEX 0, 0, 244, 72
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Default Shell" // UNTRANSLATED
+CAPTION "Interpréteur de commandes par défaut"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Open &Command Shell with:",IDC_STATIC_1,8,9,228,8 // UNTRANSLATED
+    LTEXT           "Ouvrir l'&interpréteur de commandes avec:",IDC_STATIC_1,8,9,228,8
     COMBOBOX        IDC_DEFAULT_SHELL_TARGET,8,20,228,108,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14 // UNTRANSLATED
-    PUSHBUTTON      "Cancel",IDCANCEL,186,50,50,14 // UNTRANSLATED
+    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14
+    PUSHBUTTON      "Annuler",IDCANCEL,186,50,50,14
 END
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2531,7 +2531,7 @@ STRINGTABLE
  IDS_FIND_RESULTS_LOAD_EMPTY, "Aucun résultat de recherche n'a été chargé."
  IDS_FIND_RESULTS_LOAD_REPORT, "%u résultat(s) de recherche chargé(s). %u chemin(s) d'accès manquant(s) ou invalide(s) ignoré(s)."
  IDS_FIND_RESULTS_ANSI_ONLY, "Le nom de cet élément ne peut pas être représenté dans la page de code du système, et cette commande ne prend pas encore en charge les noms Unicode.\nLes commandes Supprimer et Enregistrer les résultats les prennent en charge."
- IDS_FIND_HEX_INVALID, "The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes." // UNTRANSLATED
+ IDS_FIND_HEX_INVALID, "Le texte '%s' n'est pas un motif hexadécimal valide.\nUtilisez des paires de chiffres hexadécimaux et placez le texte littéral entre guillemets doubles."
 
  IDS_SEARCHFORCOLUMN1, "Masque"
  IDS_SEARCHFORCOLUMN2, "Chemin d'accès"
@@ -4016,7 +4016,7 @@ IDS_OLDPLUGINVERSION2, "Le module (%s) n'est pas pris en charge par cette versio
  IDS_MASTERPASSWORD_REMOVED, "Votre mot de passe principal a été supprimé. Les autres mots de passe enregistrés (par exemple lFTP ou WinSCP) sont maintenant  vulnérables."
  IDS_MASTERPASSWORD_SET, "Votre mot de passe principal a été modifié. Les autres mots de passe enregistrés (par exemple lFTP ou WinSCP) sont maintenant  moins protégés par un chiffrement AES."
  IDS_WRONG_MASTERPASSWORD, "Il ne s'agit pas du bon mot de passe principal. Essayer à nouveau."
- IDS_MASTERPASSWORD_TOO_LONG, "The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password." // UNTRANSLATED
+ IDS_MASTERPASSWORD_TOO_LONG, "Le mot de passe principal encodé en UTF-8 dépasse la limite du chiffrement.\nVeuillez utiliser un mot de passe plus court."
 
  IDS_BROWSEDIRECTORY_TITLE, "Parcourir le répertoire"
  IDS_BROWSEDIRECTORY_TEXT, "Choisir le répertoire à utiliser."

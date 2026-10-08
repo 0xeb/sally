@@ -1115,8 +1115,8 @@ BEGIN
     LTEXT           "Veľkosť:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "bodov",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " &Theme ",IDC_STATIC_7,1,192,295,30 // UNTRANSLATED
-    LTEXT           "Mode:",IDC_STATIC_8,8,206,21,8 // UNTRANSLATED
+    GROUPBOX        " Mo&tív ",IDC_STATIC_7,1,192,295,30
+    LTEXT           "Režim:",IDC_STATIC_8,8,206,45,8
     COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
 END
 
@@ -1272,7 +1272,7 @@ BEGIN
     CONTROL         "Vrátane &podadresárov",IDC_FIND_INCLUDE_SUBDIR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,55,87,12
     // This layout slot is intentionally reused by IDC_FIND_FILETYPE; archives remain hidden at runtime.
     CONTROL         "Hľadať v archívoch",IDC_FIND_INCLUDE_ARCHIVES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,55,87,12
-    LTEXT           "T&ype:",IDC_FIND_FILETYPE_TEXT,150,58,22,8 // UNTRANSLATED
+    LTEXT           "&Typ:",IDC_FIND_FILETYPE_TEXT,150,58,22,8
     COMBOBOX        IDC_FIND_FILETYPE,176,55,112,48,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     CONTROL         "H&ľadať v súbore",IDC_FIND_GREP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,69,75,12
     CONTROL         "",IDC_FIND_LINE2,"Static",SS_ETCHEDHORZ | WS_GROUP,83,75,199,1
@@ -2053,13 +2053,13 @@ END
 
 IDD_DEFAULT_SHELL DIALOGEX 0, 0, 244, 72
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Default Shell" // UNTRANSLATED
+CAPTION "Predvolený príkazový riadok"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Open &Command Shell with:",IDC_STATIC_1,8,9,228,8 // UNTRANSLATED
+    LTEXT           "&Príkazový riadok otvárať pomocou:",IDC_STATIC_1,8,9,228,8
     COMBOBOX        IDC_DEFAULT_SHELL_TARGET,8,20,228,108,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14 // UNTRANSLATED
-    PUSHBUTTON      "Cancel",IDCANCEL,186,50,50,14 // UNTRANSLATED
+    DEFPUSHBUTTON   "OK",IDOK,128,50,50,14
+    PUSHBUTTON      "Zrušiť",IDCANCEL,186,50,50,14
 END
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2531,7 +2531,7 @@ STRINGTABLE
  IDS_FIND_RESULTS_LOAD_EMPTY, "Neboli načítané žiadne výsledky hľadania."
  IDS_FIND_RESULTS_LOAD_REPORT, "Načítaných %u výsledkov hľadania. Preskočených %u chýbajúcich alebo neplatných ciest."
  IDS_FIND_RESULTS_ANSI_ONLY, "Názov tejto položky nie je možné vyjadriť v systémovej znakovej stránke a tento príkaz zatiaľ nepodporuje názvy v Unicode.\nPríkazy Odstrániť a Uložiť výsledky ich podporujú."
- IDS_FIND_HEX_INVALID, "The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes." // UNTRANSLATED
+ IDS_FIND_HEX_INVALID, "Text '%s' nie je platná šestnástková vzorka.\nPoužite dvojice šestnástkových číslic a doslovný text uzavrite do dvojitých úvodzoviek."
 
  IDS_SEARCHFORCOLUMN1, "Maska"
  IDS_SEARCHFORCOLUMN2, "Cesta"
@@ -4016,7 +4016,7 @@ IDS_OLDPLUGINVERSION2, "Tento plugin (%s) nie je podporovaný v tejto verzii Sal
  IDS_MASTERPASSWORD_REMOVED, "Hlavné heslo bolo odobrané. Vaše uložené heslá (napríklad FTP a WinSCP) nebudú zabezpečené."
  IDS_MASTERPASSWORD_SET, "Hlavné heslo bolo úspešne zmenené. Vaše uložené heslá (napríklad FTP a WinSCP) sú teraz zabezpečené AES šifrou."
  IDS_WRONG_MASTERPASSWORD, "Zadané hlavné heslo nie je správne. Opakujte akciu."
- IDS_MASTERPASSWORD_TOO_LONG, "The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password." // UNTRANSLATED
+ IDS_MASTERPASSWORD_TOO_LONG, "Hlavné heslo v kódovaní UTF-8 prekračuje limit šifrovania.\nPoužite prosím kratšie heslo."
 
  IDS_BROWSEDIRECTORY_TITLE, "Prechádzať adresár"
  IDS_BROWSEDIRECTORY_TEXT, "Vyberte adresár, ktorý chcete použiť."
