@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include <tlhelp32.h>
+#include "common/AccessViolationText.h"
 #include "common/DiagnosticTextEncoding.h"
 #include "common/IEnvironment.h"
 #include "common/IRegistry.h"
@@ -772,7 +773,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 if (Exception->ExceptionRecord->NumberParameters >= 2)
                 {
                     sprintf(avbuf + strlen(avbuf), ": %s on 0x%p",
-                            (Exception->ExceptionRecord->ExceptionInformation[0] == 0) ? "read" : "write",
+                            Sally::Diagnostics::AccessViolationOperation(Exception->ExceptionRecord->ExceptionInformation[0]),
                             (void*)Exception->ExceptionRecord->ExceptionInformation[1]);
                 }
                 message = avbuf;

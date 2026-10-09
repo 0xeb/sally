@@ -711,16 +711,6 @@ public:
         return FileResult::Ok();
     }
 
-    FileResult ScheduleDeleteOnReboot(const wchar_t* path) override
-    {
-        // Do NOT wrap with LongPath / \\?\ here: this value is handed to the Session Manager
-        // (HKLM ...\PendingFileRenameOperations) and MoveFileEx performs its own DOS->NT
-        // conversion; a \\?\ prefix can leave a non-canonical pending entry. Requires admin.
-        if (!::MoveFileExW(path, NULL, MOVEFILE_DELAY_UNTIL_REBOOT))
-            return FileResult::Error(::GetLastError());
-        return FileResult::Ok();
-    }
-
     FileResult GetDiskFree(const wchar_t* path, uint64_t* freeForCaller, uint64_t* totalBytes) override
     {
         LongPath lp(path);

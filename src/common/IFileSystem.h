@@ -211,12 +211,6 @@ public:
     virtual FileResult MoveFileWithFlags(const wchar_t* source, const wchar_t* target, MoveFlags flags)
     { (void)source; (void)target; (void)flags; return FileResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
 
-    // Schedule 'path' for deletion on the next reboot — for files a running process still holds
-    // (e.g. a shell-extension DLL loaded by Explorer, see issue #82). Requires administrator rights;
-    // returns the Win32 error (typically ERROR_ACCESS_DENIED) when unprivileged so callers degrade.
-    virtual FileResult ScheduleDeleteOnReboot(const wchar_t* path)
-    { (void)path; return FileResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
-
     // '*freeForCaller' / '*totalBytes' (either may be NULL) in bytes.
     virtual FileResult GetDiskFree(const wchar_t* path, uint64_t* freeForCaller, uint64_t* totalBytes)
     { (void)path; (void)freeForCaller; (void)totalBytes; return FileResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }

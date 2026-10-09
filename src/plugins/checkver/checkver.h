@@ -142,6 +142,17 @@ void ModulesCreateLog(BOOL* moduleWasFound, BOOL rereadModules);
 // returns TRUE only if some modules are loaded (from the server or from a file)
 BOOL ModulesHasCorrectData();
 
+// TRUE when the latest release can be installed by the updater (see self_update.h)
+BOOL ReleaseCanBeInstalled();
+namespace checkver
+{
+struct ReleaseCheckResult;
+}
+const checkver::ReleaseCheckResult* GetReleaseCheckResult();
+
+// set once the updater was started: closing the Check Version window then closes Sally
+extern BOOL CloseSallyForUpdate;
+
 // cleanup of Modules
 void ModulesCleanup();
 

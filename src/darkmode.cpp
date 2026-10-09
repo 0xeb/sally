@@ -13,11 +13,17 @@
 
 #include <vector>
 
+// Imported, not looked up at run time: a pointer taken from a dwmapi.dll that Sally did not
+// load itself dangles once another module (an injected shell mod) unloads it, and the next
+// dialog then crashes in its title-bar setup. The import keeps dwmapi.dll loaded for good.
+// <dwmapi.h> is not included because its DWMWINDOWATTRIBUTE enumerators collide with the
+// attribute constants below, some of which older SDKs do not define.
+#pragma comment(lib, "dwmapi.lib")
+extern "C" __declspec(dllimport) HRESULT WINAPI DwmSetWindowAttribute(HWND hwnd, DWORD dwAttribute,
+                                                                      LPCVOID pvAttribute, DWORD cbAttribute);
+
 namespace
 {
-typedef HRESULT(WINAPI * PFNDWMSETWINDOWATTRIBUTE)(HWND hwnd, DWORD dwAttribute, LPCVOID pvAttribute, DWORD cbAttribute);
-
-PFNDWMSETWINDOWATTRIBUTE DwmSetWindowAttributePtr = NULL;
 BOOL Initialized = FALSE;
 int ThemeMode = THEME_MODE_LIGHT;
 BOOL InitSupportLogged = FALSE;
@@ -125,21 +131,12 @@ void EnsureInitialized()
 
     Initialized = TRUE;
 
-    HMODULE hDwm = GetModuleHandleW(L"dwmapi.dll");
-    if (hDwm == NULL)
-        hDwm = LoadLibraryW(L"dwmapi.dll");
-
-    if (hDwm != NULL)
-        DwmSetWindowAttributePtr = (PFNDWMSETWINDOWATTRIBUTE)GetProcAddress(hDwm, "DwmSetWindowAttribute");
-
     if (!InitSupportLogged)
     {
         InitSupportLogged = TRUE;
-        TRACE_I("DarkMode init: Windows10AndLater=" << Windows10AndLater
-                                                    << ", DwmSetWindowAttribute=" << (void*)DwmSetWindowAttributePtr);
+        TRACE_I("DarkMode init: Windows10AndLater=" << Windows10AndLater);
         wchar_t msg[200];
-        swprintf_s(msg, _countof(msg), L"DarkMode init: Windows10AndLater=%d DwmSetWindowAttribute=%p\n",
-                   (int)Windows10AndLater, (void*)DwmSetWindowAttributePtr);
+        swprintf_s(msg, _countof(msg), L"DarkMode init: Windows10AndLater=%d\n", (int)Windows10AndLater);
         DebugOutW(msg);
     }
 }
@@ -1426,7 +1423,7 @@ void DarkMode_Initialize()
 BOOL DarkMode_IsSupported()
 {
     EnsureInitialized();
-    return DwmSetWindowAttributePtr != NULL;
+    return Windows10AndLater;
 }
 
 HBRUSH DarkMode_GetMainFrameBrush()
@@ -1656,12 +1653,12 @@ void DarkMode_ApplyTitleBar(HWND hwnd)
         return;
 
     BOOL useDark = DarkMode_ShouldUseDark();
-    HRESULT hrNew = DwmSetWindowAttributePtr(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_NEW, &useDark, sizeof(useDark));
+    HRESULT hrNew = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_NEW, &useDark, sizeof(useDark));
     HRESULT hrOld = S_OK;
     HRESULT finalHr = hrNew;
     if (FAILED(finalHr))
     {
-        hrOld = DwmSetWindowAttributePtr(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &useDark, sizeof(useDark));
+        hrOld = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &useDark, sizeof(useDark));
         finalHr = hrOld;
     }
 
@@ -1694,19 +1691,19 @@ void DarkMode_ApplyTitleBar(HWND hwnd)
     HRESULT hrBorder = S_OK;
     if (BorderColorAttrSupported)
     {
-        hrBorder = DwmSetWindowAttributePtr(hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
+        hrBorder = DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
         if (FAILED(hrBorder))
             BorderColorAttrSupported = FALSE;
     }
     if (CaptionColorAttrSupported)
     {
-        hrCaption = DwmSetWindowAttributePtr(hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
+        hrCaption = DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
         if (FAILED(hrCaption))
             CaptionColorAttrSupported = FALSE;
     }
     if (TextColorAttrSupported)
     {
-        hrText = DwmSetWindowAttributePtr(hwnd, DWMWA_TEXT_COLOR, &textColor, sizeof(textColor));
+        hrText = DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &textColor, sizeof(textColor));
         if (FAILED(hrText))
             TextColorAttrSupported = FALSE;
     }

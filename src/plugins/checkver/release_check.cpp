@@ -35,6 +35,20 @@ namespace checkver
 
         result.UpdateAvailable =
             CompareVersionTags(result.InstalledVersion, result.LatestVersion) < 0;
+
+        const GitHubReleaseAsset* package = FindPlatformAsset(release, platform);
+        const GitHubReleaseAsset* checksums = FindChecksumsAsset(release);
+        if (package != nullptr)
+        {
+            result.PrimaryAssetSize = package->Size;
+            result.PrimaryAssetDigest = package->Digest;
+        }
+        if (checksums != nullptr)
+            result.ChecksumsUrl = checksums->DownloadUrl;
+        auto isHttps = [](const std::string& url) { return url.compare(0, 8, "https://") == 0; };
+        result.CanInstall = result.UpdateAvailable && !release.Prerelease && package != nullptr &&
+                            checksums != nullptr && isHttps(package->DownloadUrl) &&
+                            isHttps(checksums->DownloadUrl);
         result.HasCorrectData = true;
         return true;
     }

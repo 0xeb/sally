@@ -15,9 +15,14 @@
 
 #include "registry_names.h"
 
+// Imported, not looked up at run time: a pointer taken from a dwmapi.dll the plugin did not
+// load itself dangles once another module unloads it. See the same note in Sally's darkmode.cpp.
+#pragma comment(lib, "dwmapi.lib")
+extern "C" __declspec(dllimport) HRESULT WINAPI DwmSetWindowAttribute(HWND hwnd, DWORD dwAttribute,
+                                                                      LPCVOID pvAttribute, DWORD cbAttribute);
+
 namespace
 {
-typedef HRESULT(WINAPI* PFNDWMSETWINDOWATTRIBUTE)(HWND hwnd, DWORD dwAttribute, LPCVOID pvAttribute, DWORD cbAttribute);
 typedef HRESULT(WINAPI* PFNSETWINDOWTHEME)(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList);
 
 const int PLUGIN_THEME_MODE_LIGHT = 0;
@@ -52,7 +57,6 @@ const WCHAR* UXTHEME_DARKMODE_EXPLORER = L"DarkMode_Explorer";
 const UINT_PTR PLUGIN_EDIT_FRAME_SUBCLASS_ID = 16;
 
 BOOL Initialized = FALSE;
-PFNDWMSETWINDOWATTRIBUTE DwmSetWindowAttributePtr = NULL;
 PFNSETWINDOWTHEME SetWindowThemePtr = NULL;
 BOOL CaptionColorAttrSupported = TRUE;
 BOOL TextColorAttrSupported = TRUE;
@@ -199,12 +203,6 @@ void EnsureInitialized()
         return;
 
     Initialized = TRUE;
-
-    HMODULE hDwm = GetModuleHandleW(L"dwmapi.dll");
-    if (hDwm == NULL)
-        hDwm = LoadLibraryW(L"dwmapi.dll");
-    if (hDwm != NULL)
-        DwmSetWindowAttributePtr = (PFNDWMSETWINDOWATTRIBUTE)GetProcAddress(hDwm, "DwmSetWindowAttribute");
 
     HMODULE hUxTheme = GetModuleHandleW(L"uxtheme.dll");
     if (hUxTheme == NULL)
@@ -650,13 +648,13 @@ void PluginDarkMode_ApplyTitleBar(HWND hwnd)
 {
     EnsureInitialized();
 
-    if (DwmSetWindowAttributePtr == NULL || !IsTopLevelWindow(hwnd))
+    if (!IsTopLevelWindow(hwnd))
         return;
 
     BOOL useDark = PluginDarkMode_ShouldUseDark();
-    HRESULT hrNew = DwmSetWindowAttributePtr(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_NEW, &useDark, sizeof(useDark));
+    HRESULT hrNew = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_NEW, &useDark, sizeof(useDark));
     if (FAILED(hrNew))
-        DwmSetWindowAttributePtr(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &useDark, sizeof(useDark));
+        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &useDark, sizeof(useDark));
 
     COLORREF captionColor = DWMWA_COLOR_DEFAULT;
     COLORREF textColor = DWMWA_COLOR_DEFAULT;
@@ -668,13 +666,13 @@ void PluginDarkMode_ApplyTitleBar(HWND hwnd)
 
     if (CaptionColorAttrSupported)
     {
-        HRESULT hrCaption = DwmSetWindowAttributePtr(hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
+        HRESULT hrCaption = DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &captionColor, sizeof(captionColor));
         if (FAILED(hrCaption))
             CaptionColorAttrSupported = FALSE;
     }
     if (TextColorAttrSupported)
     {
-        HRESULT hrText = DwmSetWindowAttributePtr(hwnd, DWMWA_TEXT_COLOR, &textColor, sizeof(textColor));
+        HRESULT hrText = DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &textColor, sizeof(textColor));
         if (FAILED(hrText))
             TextColorAttrSupported = FALSE;
     }

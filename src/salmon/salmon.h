@@ -35,7 +35,7 @@ BOOL ReadBugReportText(const CBugReport& report, std::string& text);
 
 BOOL RestartSalamander(HWND hParent);
 
-BOOL CleanBugReportsDirectory(BOOL keep7ZipArchives);
+BOOL CleanBugReportsDirectory(BOOL keepArchives);
 
 // returns TRUE if a bug report exists
 // sets the LatestBugReport global to the most recent name

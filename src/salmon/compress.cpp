@@ -4,65 +4,78 @@
 
 #include "precomp.h"
 
+#include "zip/ZipWriter.h"
+
 //------------------------------------------------------------------------------------------------
 //
 // CompresBugReports()
 //
+// Packs each report's files (<Name>.TXT, .DMP, .INF) into <Name>.zip, a format a GitHub
+// issue accepts as an attachment.
+
+namespace
+{
+
+std::wstring JoinPath(const std::wstring& directory, const std::wstring& name)
+{
+    std::wstring path = directory;
+    if (!path.empty() && path.back() != L'\\')
+        path += L'\\';
+    path += name;
+    return path;
+}
+
+bool IsReportArchive(const wchar_t* fileName)
+{
+    const wchar_t* ext = wcsrchr(fileName, L'.');
+    return ext != NULL && (_wcsicmp(ext, L".zip") == 0 || _wcsicmp(ext, L".7z") == 0);
+}
+
+BOOL PackReport(const CBugReport& report, std::wstring& errorMessage)
+{
+    std::vector<std::wstring> files;
+    WIN32_FIND_DATAW find;
+    HANDLE hFind = FindFirstFileW(JoinPath(BugReportPath, report.Name + L".*").c_str(), &find);
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            if ((find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0 && !IsReportArchive(find.cFileName))
+                files.push_back(find.cFileName);
+        } while (FindNextFileW(hFind, &find));
+        FindClose(hFind);
+    }
+
+    Sally::Zip::ZipWriter writer;
+    BOOL ok = writer.Create(JoinPath(BugReportPath, report.Name + L".zip"));
+    for (const std::wstring& file : files)
+    {
+        if (!ok)
+            break;
+        ok = writer.AddFile(JoinPath(BugReportPath, file), file);
+    }
+    if (ok)
+        ok = writer.Finish();
+    if (!ok)
+        errorMessage = writer.ErrorText();
+    return ok;
+}
+
+} // namespace
 
 BOOL CompresBugReports(CCompressParams* compressParams)
 {
-    BOOL ret = FALSE;
+    BOOL ret = TRUE;
     compressParams->ErrorMessage.clear();
-    const wchar_t* WRAPPER_DLL = L"..\\plugins\\7zip\\7zwrapper.dll";
-    HINSTANCE h7zwrapper = LoadLibraryW(WRAPPER_DLL);
-    if (h7zwrapper != NULL)
+    for (const CBugReport& report : BugReports)
     {
-        typedef BOOL(WINAPI * CompressFilesW_t)(const wchar_t* archiveName7z, const wchar_t* sourceDir,
-                                                const wchar_t* filter, wchar_t** errorMessage);
-        CompressFilesW_t CompressFilesW;
-        CompressFilesW = (CompressFilesW_t)GetProcAddress(h7zwrapper, "CompressFilesW");
-        if (CompressFilesW != NULL)
+        std::wstring error;
+        if (!PackReport(report, error))
         {
-            ret = TRUE;
-            for (const CBugReport& report : BugReports)
-            {
-                // Fully qualified on purpose. The 7-Zip wrapper globs this mask
-                // with a bare FindFirstFileW(filter, ...), which resolves against
-                // the PROCESS CURRENT DIRECTORY - its 'sourceDir' argument is only
-                // used afterwards to rebuild full paths from cFileName, and does
-                // not scope the search. pre-unicode made that work by calling
-                // SetCurrentDirectory(BugReportPath) first; the wide port dropped
-                // that call but kept the bare mask, so the glob matched nothing
-                // wherever salmon happened to be running and every bug-report
-                // archive came out empty, silently. Qualifying the mask fixes it
-                // without reintroducing a process-global directory change.
-                std::wstring mask = BugReportPath;
-                if (!mask.empty() && mask.back() != L'\\')
-                    mask += L'\\';
-                mask += report.Name + L".*";
-                std::wstring archive = BugReportPath;
-                if (!archive.empty() && archive.back() != L'\\')
-                    archive += L'\\';
-                archive += report.Name + L".7Z";
-                DeleteFileW(archive.c_str()); // so the subsequent compression does not fail
-
-                wchar_t* error = NULL;
-                BOOL res = CompressFilesW(archive.c_str(), BugReportPath.c_str(), mask.c_str(), &error);
-                if (!res)
-                    compressParams->ErrorMessage = error != NULL ? error : L"The 7-Zip wrapper could not create the archive.";
-                CoTaskMemFree(error);
-                ret &= res;
-            }
+            if (compressParams->ErrorMessage.empty())
+                compressParams->ErrorMessage = error;
+            ret = FALSE;
         }
-        else
-        {
-            compressParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage).c_str(), WRAPPER_DLL);
-        }
-        FreeLibrary(h7zwrapper);
-    }
-    else
-    {
-        compressParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage).c_str(), WRAPPER_DLL);
     }
     return ret;
 }

@@ -1,0 +1,258 @@
+﻿// SPDX-FileCopyrightText: 2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// The updater's messages in Sally's built-in languages (UTF-8; included after
+// #pragma code_page(65001)). Keep every language's ids identical to English.
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Sally Update"
+ IDS_UPDATER_USAGE, "To update Sally from a downloaded release, open its .zip file with this program, or drop the .zip file onto it:\n\nsalupdate.exe Sally-v<version>-<processor>.zip [--yes]\n\n--yes answers every question with Yes and runs without messages, except errors. The release's SHA256SUMS file, when it lies next to the .zip file, is used to check it."
+ IDS_UPDATER_NOT_IN_SALLY, "This updater is not in a Sally folder:\n%s\n\nRun the salupdate.exe in Sally's utils folder, or name the Sally folder with --install <folder>."
+ IDS_UPDATER_BAD_PACKAGE, "%s cannot be installed:\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s does not match its SHA-256 checksum in %s.\n\nThe file is damaged or not the published one. It was not installed."
+ IDS_UPDATER_UNVERIFIED, "No SHA-256 checksum for %s was found next to it (the release's Sally-v...-SHA256SUMS.txt), so it cannot be checked against the published release.\n\nInstall it anyway?"
+ IDS_UPDATER_CONFIRM_NEWER, "Install Sally %s from %s?\n\nThe installed version is %s."
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s is already installed. Install it again from %s?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s holds Sally %s, which is older than the installed %s.\n\nInstall the older version?"
+ IDS_UPDATER_WILL_CLOSE, "Sally is running (windows: %d). It will close, and start again after the update."
+ IDS_UPDATER_OTHERS_RUNNING, "Close these programs started from the Sally folder, then try again:\n%s"
+ IDS_UPDATER_DONE, "Sally was updated from %s to %s."
+ IDS_UPDATER_FAILED, "The update to %s failed and nothing was changed:\n%s"
+ IDS_UPDATER_INCOMPLETE, "The update to %s failed and some files could not be restored:\n%s\n\nPlease unpack the release into the Sally folder again."
+ IDS_UPDATER_ABORTED, "The update to %s did not take place because Sally did not close."
+ IDS_UPDATER_RECOVERED, "An update that was interrupted was found and undone; Sally is as it was before."
+ IDS_UPDATER_RECOVER_FAILED, "An interrupted update could not be undone:\n%s\n\nPlease unpack the release into the Sally folder again."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s is a Sally for another processor than the installed one. It was not installed."
+}
+
+LANGUAGE LANG_CZECH, SUBLANG_DEFAULT
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Aktualizace Sally"
+ IDS_UPDATER_USAGE, "Chcete-li aktualizovat Sally ze staženého vydání, otevřete jeho soubor .zip tímto programem nebo jej na program přetáhněte:\n\nsalupdate.exe Sally-v<verze>-<procesor>.zip [--yes]\n\n--yes odpoví na všechny otázky Ano a kromě chyb nic nehlásí. Soubor SHA256SUMS vydání, pokud leží vedle souboru .zip, slouží k jeho kontrole."
+ IDS_UPDATER_NOT_IN_SALLY, "Tento aktualizační program není ve složce Sally:\n%s\n\nSpusťte salupdate.exe ze složky utils programu Sally, nebo složku Sally zadejte pomocí --install <složka>."
+ IDS_UPDATER_BAD_PACKAGE, "%s nelze nainstalovat:\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s neodpovídá svému kontrolnímu součtu SHA-256 v %s.\n\nSoubor je poškozený nebo to není zveřejněný soubor. Nebyl nainstalován."
+ IDS_UPDATER_UNVERIFIED, "Vedle souboru %s nebyl nalezen jeho kontrolní součet SHA-256 (Sally-v...-SHA256SUMS.txt z vydání), takže jej nelze ověřit proti zveřejněnému vydání.\n\nPřesto nainstalovat?"
+ IDS_UPDATER_CONFIRM_NEWER, "Nainstalovat Sally %s ze souboru %s?\n\nNainstalovaná verze je %s."
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s je již nainstalována. Nainstalovat ji znovu ze souboru %s?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s obsahuje Sally %s, která je starší než nainstalovaná %s.\n\nNainstalovat starší verzi?"
+ IDS_UPDATER_WILL_CLOSE, "Sally běží (oken: %d). Zavře se a po aktualizaci se znovu spustí."
+ IDS_UPDATER_OTHERS_RUNNING, "Zavřete tyto programy spuštěné ze složky Sally a zkuste to znovu:\n%s"
+ IDS_UPDATER_DONE, "Sally byla aktualizována z verze %s na %s."
+ IDS_UPDATER_FAILED, "Aktualizace na %s selhala a nic nebylo změněno:\n%s"
+ IDS_UPDATER_INCOMPLETE, "Aktualizace na %s selhala a některé soubory se nepodařilo obnovit:\n%s\n\nRozbalte prosím vydání do složky Sally znovu."
+ IDS_UPDATER_ABORTED, "Aktualizace na %s neproběhla, protože se Sally nezavřela."
+ IDS_UPDATER_RECOVERED, "Byla nalezena přerušená aktualizace a vrácena zpět; Sally je jako dříve."
+ IDS_UPDATER_RECOVER_FAILED, "Přerušenou aktualizaci se nepodařilo vrátit zpět:\n%s\n\nRozbalte prosím vydání do složky Sally znovu."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s je Sally pro jiný procesor než ta nainstalovaná. Nebyla nainstalována."
+}
+
+LANGUAGE LANG_SLOVAK, SUBLANG_DEFAULT
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Aktualizácia Sally"
+ IDS_UPDATER_USAGE, "Ak chcete aktualizovať Sally zo stiahnutého vydania, otvorte jeho súbor .zip týmto programom alebo ho na program pretiahnite:\n\nsalupdate.exe Sally-v<verzia>-<procesor>.zip [--yes]\n\n--yes odpovie na všetky otázky Áno a okrem chýb nič nehlási. Súbor SHA256SUMS vydania, ak leží vedľa súboru .zip, slúži na jeho kontrolu."
+ IDS_UPDATER_NOT_IN_SALLY, "Tento aktualizačný program nie je v priečinku Sally:\n%s\n\nSpustite salupdate.exe z priečinka utils programu Sally, alebo priečinok Sally zadajte pomocou --install <priečinok>."
+ IDS_UPDATER_BAD_PACKAGE, "%s nemožno nainštalovať:\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s nezodpovedá svojmu kontrolnému súčtu SHA-256 v %s.\n\nSúbor je poškodený alebo to nie je zverejnený súbor. Nebol nainštalovaný."
+ IDS_UPDATER_UNVERIFIED, "Vedľa súboru %s sa nenašiel jeho kontrolný súčet SHA-256 (Sally-v...-SHA256SUMS.txt z vydania), takže ho nemožno overiť voči zverejnenému vydaniu.\n\nNapriek tomu nainštalovať?"
+ IDS_UPDATER_CONFIRM_NEWER, "Nainštalovať Sally %s zo súboru %s?\n\nNainštalovaná verzia je %s."
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s je už nainštalovaná. Nainštalovať ju znova zo súboru %s?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s obsahuje Sally %s, ktorá je staršia ako nainštalovaná %s.\n\nNainštalovať staršiu verziu?"
+ IDS_UPDATER_WILL_CLOSE, "Sally beží (okien: %d). Zatvorí sa a po aktualizácii sa znova spustí."
+ IDS_UPDATER_OTHERS_RUNNING, "Zatvorte tieto programy spustené z priečinka Sally a skúste to znova:\n%s"
+ IDS_UPDATER_DONE, "Sally bola aktualizovaná z verzie %s na %s."
+ IDS_UPDATER_FAILED, "Aktualizácia na %s zlyhala a nič sa nezmenilo:\n%s"
+ IDS_UPDATER_INCOMPLETE, "Aktualizácia na %s zlyhala a niektoré súbory sa nepodarilo obnoviť:\n%s\n\nRozbaľte prosím vydanie do priečinka Sally znova."
+ IDS_UPDATER_ABORTED, "Aktualizácia na %s neprebehla, pretože sa Sally nezatvorila."
+ IDS_UPDATER_RECOVERED, "Našla sa prerušená aktualizácia a bola vrátená späť; Sally je ako predtým."
+ IDS_UPDATER_RECOVER_FAILED, "Prerušenú aktualizáciu sa nepodarilo vrátiť späť:\n%s\n\nRozbaľte prosím vydanie do priečinka Sally znova."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s je Sally pre iný procesor ako tá nainštalovaná. Nebola nainštalovaná."
+}
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Sally-Aktualisierung"
+ IDS_UPDATER_USAGE, "Um Sally aus einer heruntergeladenen Version zu aktualisieren, öffnen Sie deren .zip-Datei mit diesem Programm oder ziehen Sie sie darauf:\n\nsalupdate.exe Sally-v<Version>-<Prozessor>.zip [--yes]\n\n--yes beantwortet jede Frage mit Ja und meldet außer Fehlern nichts. Die SHA256SUMS-Datei der Version wird zur Prüfung verwendet, wenn sie neben der .zip-Datei liegt."
+ IDS_UPDATER_NOT_IN_SALLY, "Dieses Aktualisierungsprogramm liegt nicht in einem Sally-Ordner:\n%s\n\nStarten Sie die salupdate.exe im utils-Ordner von Sally, oder geben Sie den Sally-Ordner mit --install <Ordner> an."
+ IDS_UPDATER_BAD_PACKAGE, "%s kann nicht installiert werden:\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s stimmt nicht mit seiner SHA-256-Prüfsumme in %s überein.\n\nDie Datei ist beschädigt oder nicht die veröffentlichte. Sie wurde nicht installiert."
+ IDS_UPDATER_UNVERIFIED, "Neben %s wurde keine SHA-256-Prüfsumme gefunden (die Sally-v...-SHA256SUMS.txt der Version), daher kann die Datei nicht mit der veröffentlichten Version verglichen werden.\n\nTrotzdem installieren?"
+ IDS_UPDATER_CONFIRM_NEWER, "Sally %s aus %s installieren?\n\nDie installierte Version ist %s."
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s ist bereits installiert. Erneut aus %s installieren?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s enthält Sally %s, die älter ist als die installierte %s.\n\nDie ältere Version installieren?"
+ IDS_UPDATER_WILL_CLOSE, "Sally läuft (Fenster: %d). Sally wird geschlossen und nach der Aktualisierung neu gestartet."
+ IDS_UPDATER_OTHERS_RUNNING, "Schließen Sie diese Programme aus dem Sally-Ordner und versuchen Sie es erneut:\n%s"
+ IDS_UPDATER_DONE, "Sally wurde von %s auf %s aktualisiert."
+ IDS_UPDATER_FAILED, "Die Aktualisierung auf %s ist fehlgeschlagen; es wurde nichts geändert:\n%s"
+ IDS_UPDATER_INCOMPLETE, "Die Aktualisierung auf %s ist fehlgeschlagen und einige Dateien konnten nicht wiederhergestellt werden:\n%s\n\nBitte entpacken Sie die Version erneut in den Sally-Ordner."
+ IDS_UPDATER_ABORTED, "Die Aktualisierung auf %s fand nicht statt, weil Sally nicht geschlossen wurde."
+ IDS_UPDATER_RECOVERED, "Eine unterbrochene Aktualisierung wurde gefunden und rückgängig gemacht; Sally ist wie zuvor."
+ IDS_UPDATER_RECOVER_FAILED, "Eine unterbrochene Aktualisierung konnte nicht rückgängig gemacht werden:\n%s\n\nBitte entpacken Sie die Version erneut in den Sally-Ordner."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s ist eine Sally für einen anderen Prozessor als die installierte. Sie wurde nicht installiert."
+}
+
+LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Mise à jour de Sally"
+ IDS_UPDATER_USAGE, "Pour mettre Sally à jour à partir d'une version téléchargée, ouvrez son fichier .zip avec ce programme ou déposez-le dessus :\n\nsalupdate.exe Sally-v<version>-<processeur>.zip [--yes]\n\n--yes répond Oui à toutes les questions et n'affiche que les erreurs. Le fichier SHA256SUMS de la version, s'il se trouve à côté du fichier .zip, sert à le vérifier."
+ IDS_UPDATER_NOT_IN_SALLY, "Ce programme de mise à jour n'est pas dans un dossier Sally :\n%s\n\nLancez le salupdate.exe du dossier utils de Sally, ou indiquez le dossier de Sally avec --install <dossier>."
+ IDS_UPDATER_BAD_PACKAGE, "%s ne peut pas être installé :\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s ne correspond pas à sa somme SHA-256 dans %s.\n\nLe fichier est endommagé ou n'est pas celui publié. Il n'a pas été installé."
+ IDS_UPDATER_UNVERIFIED, "Aucune somme SHA-256 pour %s n'a été trouvée à côté de lui (le Sally-v...-SHA256SUMS.txt de la version) : il ne peut pas être comparé à la version publiée.\n\nL'installer quand même ?"
+ IDS_UPDATER_CONFIRM_NEWER, "Installer Sally %s à partir de %s ?\n\nLa version installée est %s."
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s est déjà installé. Le réinstaller à partir de %s ?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s contient Sally %s, plus ancien que le %s installé.\n\nInstaller la version plus ancienne ?"
+ IDS_UPDATER_WILL_CLOSE, "Sally est en cours d'exécution (fenêtres : %d). Il va se fermer, puis redémarrer après la mise à jour."
+ IDS_UPDATER_OTHERS_RUNNING, "Fermez ces programmes lancés depuis le dossier de Sally, puis réessayez :\n%s"
+ IDS_UPDATER_DONE, "Sally a été mis à jour de %s vers %s."
+ IDS_UPDATER_FAILED, "La mise à jour vers %s a échoué et rien n'a été modifié :\n%s"
+ IDS_UPDATER_INCOMPLETE, "La mise à jour vers %s a échoué et certains fichiers n'ont pas pu être restaurés :\n%s\n\nDécompressez à nouveau la version dans le dossier de Sally."
+ IDS_UPDATER_ABORTED, "La mise à jour vers %s n'a pas eu lieu car Sally ne s'est pas fermé."
+ IDS_UPDATER_RECOVERED, "Une mise à jour interrompue a été trouvée et annulée ; Sally est comme avant."
+ IDS_UPDATER_RECOVER_FAILED, "Une mise à jour interrompue n'a pas pu être annulée :\n%s\n\nDécompressez à nouveau la version dans le dossier de Sally."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s est un Sally pour un autre processeur que celui installé. Il n'a pas été installé."
+}
+
+LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Actualización de Sally"
+ IDS_UPDATER_USAGE, "Para actualizar Sally desde una versión descargada, abra su archivo .zip con este programa o arrástrelo sobre él:\n\nsalupdate.exe Sally-v<versión>-<procesador>.zip [--yes]\n\n--yes responde Sí a todas las preguntas y solo muestra los errores. El archivo SHA256SUMS de la versión, si está junto al archivo .zip, se usa para comprobarlo."
+ IDS_UPDATER_NOT_IN_SALLY, "Este actualizador no está en una carpeta de Sally:\n%s\n\nEjecute el salupdate.exe de la carpeta utils de Sally o indique la carpeta de Sally con --install <carpeta>."
+ IDS_UPDATER_BAD_PACKAGE, "No se puede instalar %s:\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s no coincide con su suma SHA-256 en %s.\n\nEl archivo está dañado o no es el publicado. No se instaló."
+ IDS_UPDATER_UNVERIFIED, "No se encontró ninguna suma SHA-256 para %s junto a él (el Sally-v...-SHA256SUMS.txt de la versión), así que no se puede comprobar con la versión publicada.\n\n¿Instalarlo de todos modos?"
+ IDS_UPDATER_CONFIRM_NEWER, "¿Instalar Sally %s desde %s?\n\nLa versión instalada es %s."
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s ya está instalada. ¿Instalarla de nuevo desde %s?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s contiene Sally %s, que es más antigua que la %s instalada.\n\n¿Instalar la versión más antigua?"
+ IDS_UPDATER_WILL_CLOSE, "Sally se está ejecutando (ventanas: %d). Se cerrará y se volverá a iniciar tras la actualización."
+ IDS_UPDATER_OTHERS_RUNNING, "Cierre estos programas iniciados desde la carpeta de Sally e inténtelo de nuevo:\n%s"
+ IDS_UPDATER_DONE, "Sally se actualizó de %s a %s."
+ IDS_UPDATER_FAILED, "La actualización a %s falló y no se cambió nada:\n%s"
+ IDS_UPDATER_INCOMPLETE, "La actualización a %s falló y algunos archivos no se pudieron restaurar:\n%s\n\nDescomprima de nuevo la versión en la carpeta de Sally."
+ IDS_UPDATER_ABORTED, "La actualización a %s no se realizó porque Sally no se cerró."
+ IDS_UPDATER_RECOVERED, "Se encontró una actualización interrumpida y se deshizo; Sally está como antes."
+ IDS_UPDATER_RECOVER_FAILED, "No se pudo deshacer una actualización interrumpida:\n%s\n\nDescomprima de nuevo la versión en la carpeta de Sally."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s es una Sally para otro procesador distinto del de la instalada. No se instaló."
+}
+
+LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Sally bijwerken"
+ IDS_UPDATER_USAGE, "Om Sally bij te werken vanuit een gedownloade release, opent u het .zip-bestand met dit programma of sleept u het erop:\n\nsalupdate.exe Sally-v<versie>-<processor>.zip [--yes]\n\n--yes beantwoordt elke vraag met Ja en meldt alleen fouten. Het SHA256SUMS-bestand van de release wordt gebruikt voor de controle als het naast het .zip-bestand staat."
+ IDS_UPDATER_NOT_IN_SALLY, "Dit updateprogramma staat niet in een Sally-map:\n%s\n\nStart de salupdate.exe in de utils-map van Sally, of geef de Sally-map op met --install <map>."
+ IDS_UPDATER_BAD_PACKAGE, "%s kan niet worden geïnstalleerd:\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s komt niet overeen met de SHA-256-controlesom in %s.\n\nHet bestand is beschadigd of niet het gepubliceerde bestand. Het is niet geïnstalleerd."
+ IDS_UPDATER_UNVERIFIED, "Naast %s is geen SHA-256-controlesom gevonden (de Sally-v...-SHA256SUMS.txt van de release), dus het kan niet met de gepubliceerde release worden vergeleken.\n\nToch installeren?"
+ IDS_UPDATER_CONFIRM_NEWER, "Sally %s installeren vanuit %s?\n\nDe geïnstalleerde versie is %s."
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s is al geïnstalleerd. Opnieuw installeren vanuit %s?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s bevat Sally %s, ouder dan de geïnstalleerde %s.\n\nDe oudere versie installeren?"
+ IDS_UPDATER_WILL_CLOSE, "Sally draait (vensters: %d). Sally wordt gesloten en na de update opnieuw gestart."
+ IDS_UPDATER_OTHERS_RUNNING, "Sluit deze programma's die vanuit de Sally-map zijn gestart en probeer het opnieuw:\n%s"
+ IDS_UPDATER_DONE, "Sally is bijgewerkt van %s naar %s."
+ IDS_UPDATER_FAILED, "De update naar %s is mislukt en er is niets gewijzigd:\n%s"
+ IDS_UPDATER_INCOMPLETE, "De update naar %s is mislukt en sommige bestanden konden niet worden hersteld:\n%s\n\nPak de release opnieuw uit in de Sally-map."
+ IDS_UPDATER_ABORTED, "De update naar %s is niet uitgevoerd omdat Sally niet werd gesloten."
+ IDS_UPDATER_RECOVERED, "Een onderbroken update is gevonden en ongedaan gemaakt; Sally is weer zoals voorheen."
+ IDS_UPDATER_RECOVER_FAILED, "Een onderbroken update kon niet ongedaan worden gemaakt:\n%s\n\nPak de release opnieuw uit in de Sally-map."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s is een Sally voor een andere processor dan de geïnstalleerde. Het is niet geïnstalleerd."
+}
+
+LANGUAGE LANG_HUNGARIAN, SUBLANG_DEFAULT
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Sally frissítése"
+ IDS_UPDATER_USAGE, "A Sally letöltött kiadásból való frissítéséhez nyissa meg a .zip fájlt ezzel a programmal, vagy húzza rá:\n\nsalupdate.exe Sally-v<verzió>-<processzor>.zip [--yes]\n\nA --yes minden kérdésre Igennel felel, és csak a hibákat jelzi. A kiadás SHA256SUMS fájlja, ha a .zip fájl mellett van, az ellenőrzésre szolgál."
+ IDS_UPDATER_NOT_IN_SALLY, "Ez a frissítőprogram nem egy Sally mappában van:\n%s\n\nIndítsa a Sally utils mappájában lévő salupdate.exe-t, vagy adja meg a Sally mappát a --install <mappa> kapcsolóval."
+ IDS_UPDATER_BAD_PACKAGE, "%s nem telepíthető:\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s nem egyezik a(z) %s fájlban lévő SHA-256 ellenőrzőösszegével.\n\nA fájl sérült, vagy nem a közzétett fájl. Nem lett telepítve."
+ IDS_UPDATER_UNVERIFIED, "%s mellett nem található SHA-256 ellenőrzőösszeg (a kiadás Sally-v...-SHA256SUMS.txt fájlja), így nem ellenőrizhető a közzétett kiadással.\n\nMégis telepíti?"
+ IDS_UPDATER_CONFIRM_NEWER, "Telepíti a Sally %s verzióját innen: %s?\n\nA telepített verzió: %s."
+ IDS_UPDATER_CONFIRM_SAME, "A Sally %s már telepítve van. Újratelepíti innen: %s?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s a Sally %s verzióját tartalmazza, amely régebbi a telepített %s verziónál.\n\nTelepíti a régebbi verziót?"
+ IDS_UPDATER_WILL_CLOSE, "A Sally fut (ablakok: %d). Bezárul, és a frissítés után újraindul."
+ IDS_UPDATER_OTHERS_RUNNING, "Zárja be ezeket a Sally mappájából indított programokat, majd próbálja újra:\n%s"
+ IDS_UPDATER_DONE, "A Sally frissült: %s -> %s."
+ IDS_UPDATER_FAILED, "A(z) %s verzióra frissítés nem sikerült, semmi sem változott:\n%s"
+ IDS_UPDATER_INCOMPLETE, "A(z) %s verzióra frissítés nem sikerült, és néhány fájl nem állítható vissza:\n%s\n\nCsomagolja ki újra a kiadást a Sally mappájába."
+ IDS_UPDATER_ABORTED, "A(z) %s verzióra frissítés nem történt meg, mert a Sally nem zárult be."
+ IDS_UPDATER_RECOVERED, "Egy megszakadt frissítést találtunk és visszavontunk; a Sally olyan, mint előtte."
+ IDS_UPDATER_RECOVER_FAILED, "Egy megszakadt frissítés nem vonható vissza:\n%s\n\nCsomagolja ki újra a kiadást a Sally mappájába."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s egy másik processzorra készült Sally, mint a telepített. Nem lett telepítve."
+}
+
+LANGUAGE LANG_ROMANIAN, SUBLANG_DEFAULT
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Actualizare Sally"
+ IDS_UPDATER_USAGE, "Pentru a actualiza Sally dintr-o versiune descărcată, deschideți fișierul .zip cu acest program sau trageți-l peste el:\n\nsalupdate.exe Sally-v<versiune>-<procesor>.zip [--yes]\n\n--yes răspunde Da la orice întrebare și afișează doar erorile. Fișierul SHA256SUMS al versiunii, dacă se află lângă fișierul .zip, este folosit pentru verificare."
+ IDS_UPDATER_NOT_IN_SALLY, "Acest program de actualizare nu se află într-un dosar Sally:\n%s\n\nPorniți salupdate.exe din dosarul utils al Sally sau indicați dosarul Sally cu --install <dosar>."
+ IDS_UPDATER_BAD_PACKAGE, "%s nu poate fi instalat:\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s nu corespunde sumei sale SHA-256 din %s.\n\nFișierul este deteriorat sau nu este cel publicat. Nu a fost instalat."
+ IDS_UPDATER_UNVERIFIED, "Lângă %s nu s-a găsit nicio sumă SHA-256 (fișierul Sally-v...-SHA256SUMS.txt al versiunii), deci nu poate fi verificat față de versiunea publicată.\n\nÎl instalați totuși?"
+ IDS_UPDATER_CONFIRM_NEWER, "Instalați Sally %s din %s?\n\nVersiunea instalată este %s."
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s este deja instalat. Îl reinstalați din %s?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s conține Sally %s, mai vechi decât %s instalat.\n\nInstalați versiunea mai veche?"
+ IDS_UPDATER_WILL_CLOSE, "Sally rulează (ferestre: %d). Se va închide și va porni din nou după actualizare."
+ IDS_UPDATER_OTHERS_RUNNING, "Închideți aceste programe pornite din dosarul Sally, apoi încercați din nou:\n%s"
+ IDS_UPDATER_DONE, "Sally a fost actualizat de la %s la %s."
+ IDS_UPDATER_FAILED, "Actualizarea la %s a eșuat și nu s-a modificat nimic:\n%s"
+ IDS_UPDATER_INCOMPLETE, "Actualizarea la %s a eșuat și unele fișiere nu au putut fi restaurate:\n%s\n\nDezarhivați din nou versiunea în dosarul Sally."
+ IDS_UPDATER_ABORTED, "Actualizarea la %s nu a avut loc deoarece Sally nu s-a închis."
+ IDS_UPDATER_RECOVERED, "A fost găsită și anulată o actualizare întreruptă; Sally este ca înainte."
+ IDS_UPDATER_RECOVER_FAILED, "O actualizare întreruptă nu a putut fi anulată:\n%s\n\nDezarhivați din nou versiunea în dosarul Sally."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s este un Sally pentru alt procesor decât cel instalat. Nu a fost instalat."
+}
+
+LANGUAGE LANG_RUSSIAN, SUBLANG_DEFAULT
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Обновление Sally"
+ IDS_UPDATER_USAGE, "Чтобы обновить Sally из загруженного выпуска, откройте его файл .zip этой программой или перетащите файл на неё:\n\nsalupdate.exe Sally-v<версия>-<процессор>.zip [--yes]\n\n--yes отвечает «Да» на все вопросы и сообщает только об ошибках. Файл SHA256SUMS выпуска, если он лежит рядом с файлом .zip, используется для проверки."
+ IDS_UPDATER_NOT_IN_SALLY, "Эта программа обновления находится не в папке Sally:\n%s\n\nЗапустите salupdate.exe из папки utils программы Sally или укажите папку Sally параметром --install <папка>."
+ IDS_UPDATER_BAD_PACKAGE, "Не удаётся установить %s:\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s не совпадает со своей контрольной суммой SHA-256 в %s.\n\nФайл повреждён или это не опубликованный файл. Он не установлен."
+ IDS_UPDATER_UNVERIFIED, "Рядом с %s не найдена контрольная сумма SHA-256 (файл Sally-v...-SHA256SUMS.txt выпуска), поэтому его нельзя сверить с опубликованным выпуском.\n\nВсё равно установить?"
+ IDS_UPDATER_CONFIRM_NEWER, "Установить Sally %s из %s?\n\nУстановленная версия: %s."
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s уже установлена. Установить её заново из %s?"
+ IDS_UPDATER_CONFIRM_OLDER, "%s содержит Sally %s, более старую, чем установленная %s.\n\nУстановить более старую версию?"
+ IDS_UPDATER_WILL_CLOSE, "Sally запущена (окон: %d). Она закроется и запустится снова после обновления."
+ IDS_UPDATER_OTHERS_RUNNING, "Закройте эти программы, запущенные из папки Sally, и повторите попытку:\n%s"
+ IDS_UPDATER_DONE, "Sally обновлена с версии %s до %s."
+ IDS_UPDATER_FAILED, "Обновление до %s не удалось, ничего не изменено:\n%s"
+ IDS_UPDATER_INCOMPLETE, "Обновление до %s не удалось, и некоторые файлы не удалось восстановить:\n%s\n\nРаспакуйте выпуск в папку Sally заново."
+ IDS_UPDATER_ABORTED, "Обновление до %s не выполнено, так как Sally не закрылась."
+ IDS_UPDATER_RECOVERED, "Найдено прерванное обновление; оно отменено, Sally в прежнем состоянии."
+ IDS_UPDATER_RECOVER_FAILED, "Не удалось отменить прерванное обновление:\n%s\n\nРаспакуйте выпуск в папку Sally заново."
+ IDS_UPDATER_WRONG_PROCESSOR, "%s — это Sally для другого процессора, чем установленная. Она не установлена."
+}
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+STRINGTABLE
+{
+ IDS_UPDATER_TITLE, "Sally 更新"
+ IDS_UPDATER_USAGE, "要从下载的发布版本更新 Sally，请用本程序打开其 .zip 文件，或将 .zip 文件拖放到本程序上：\n\nsalupdate.exe Sally-v<版本>-<处理器>.zip [--yes]\n\n--yes 对所有问题回答“是”，除错误外不显示消息。如果发布版本的 SHA256SUMS 文件位于 .zip 文件旁边，将用它进行校验。"
+ IDS_UPDATER_NOT_IN_SALLY, "此更新程序不在 Sally 文件夹中：\n%s\n\n请运行 Sally 的 utils 文件夹中的 salupdate.exe，或用 --install <文件夹> 指定 Sally 文件夹。"
+ IDS_UPDATER_BAD_PACKAGE, "无法安装 %s：\n%s"
+ IDS_UPDATER_CHECKSUM_MISMATCH, "%s 与 %s 中的 SHA-256 校验和不匹配。\n\n该文件已损坏或不是发布的文件，未安装。"
+ IDS_UPDATER_UNVERIFIED, "在 %s 旁边没有找到它的 SHA-256 校验和（发布版本的 Sally-v...-SHA256SUMS.txt），因此无法与发布的版本核对。\n\n仍然安装吗？"
+ IDS_UPDATER_CONFIRM_NEWER, "安装 Sally %s（来自 %s）吗？\n\n已安装的版本是 %s。"
+ IDS_UPDATER_CONFIRM_SAME, "Sally %s 已经安装。要从 %s 重新安装吗？"
+ IDS_UPDATER_CONFIRM_OLDER, "%s 包含 Sally %s，比已安装的 %s 旧。\n\n安装旧版本吗？"
+ IDS_UPDATER_WILL_CLOSE, "Sally 正在运行（窗口：%d 个）。它将关闭，并在更新后重新启动。"
+ IDS_UPDATER_OTHERS_RUNNING, "请关闭以下从 Sally 文件夹启动的程序，然后重试：\n%s"
+ IDS_UPDATER_DONE, "Sally 已从 %s 更新到 %s。"
+ IDS_UPDATER_FAILED, "更新到 %s 失败，未做任何更改：\n%s"
+ IDS_UPDATER_INCOMPLETE, "更新到 %s 失败，部分文件无法恢复：\n%s\n\n请将发布版本重新解压到 Sally 文件夹。"
+ IDS_UPDATER_ABORTED, "未能更新到 %s，因为 Sally 没有关闭。"
+ IDS_UPDATER_RECOVERED, "发现一次被中断的更新并已撤销；Sally 已恢复原样。"
+ IDS_UPDATER_RECOVER_FAILED, "无法撤销被中断的更新：\n%s\n\n请将发布版本重新解压到 Sally 文件夹。"
+ IDS_UPDATER_WRONG_PROCESSOR, "%s 是用于另一种处理器的 Sally，与已安装的不同。未安装。"
+}

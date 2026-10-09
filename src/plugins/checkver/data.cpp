@@ -8,6 +8,7 @@
 #include "checkver.rh2"
 #include "checkver_text.h"
 #include "release_check.h"
+#include "self_update.h"
 #include "lang\lang.rh"
 
 #include <string>
@@ -118,6 +119,8 @@ void FillReleaseLog()
         AddPrimaryLinkLine();
         AddReleasePageLine();
         AddLogLine(L"", FALSE);
+        if (ReleaseState.CanInstall)
+            AddLogLine(LangStr(IDS_LOGWNDHELP_INSTALL).c_str(), FALSE);
         AddLogLine(LangStr(IDS_LOGWNDHELP1).c_str(), FALSE);
         AddLogLine(LangStr(IDS_LOGWNDHELP2).c_str(), FALSE);
     }
@@ -154,6 +157,9 @@ const wchar_t* CONFIG_TIMESTAMP_KEY = L"TimeStamp.hidden";
 const wchar_t* CONFIG_LASTCHECK = L"LastOpen";
 const wchar_t* CONFIG_NEXTOPEN = L"NextOpen";
 const wchar_t* CONFIG_NUMOFERRORS = L"NumOfErrors";
+// An HTTPS address answering like GitHub's "latest release" API (a mirror); not in the UI.
+const wchar_t* CONFIG_RELEASEFEEDURL = L"ReleaseFeedUrl";
+std::wstring ConfiguredReleaseFeedUrl;
 
 int ConfigVersion = 0;
 #define CURRENT_CONFIG_VERSION 5
@@ -242,6 +248,21 @@ void LoadConfig(HKEY regKey, CSalamanderRegistryAbstract* registry)
     InternetProtocol = inetpHTTP;
     Data = DataDefaults[InternetConnection];
     ApplyFixedReleaseSettings(Data);
+
+    ConfiguredReleaseFeedUrl.clear();
+    wchar_t feedUrl[2048];
+    if (regKey != NULL && registry->GetValue(regKey, CONFIG_RELEASEFEEDURL, REG_SZ, feedUrl, sizeof(feedUrl)))
+    {
+        feedUrl[_countof(feedUrl) - 1] = 0;
+        ConfiguredReleaseFeedUrl = feedUrl;
+    }
+    SetReleaseFeedUrl(ConfiguredReleaseFeedUrl);
+
+    // Sally was just restarted by the updater: show how the update went instead of checking.
+    const BOOL reportUpdate = LoadedOnSalamanderStart && HasPendingUpdateResult();
+    if (reportUpdate)
+        SalGeneral->PostMenuExtCommand(CM_UPDATE_REPORT, TRUE);
+
     if (regKey != NULL && ConfigVersion >= LOAD_ONLY_CONFIG_VERSION)
     {
         registry->GetValue(regKey, CONFIG_AUTOCHECKMODE, REG_DWORD, &Data.AutoCheckMode, sizeof(DWORD));
@@ -262,7 +283,7 @@ void LoadConfig(HKEY regKey, CSalamanderRegistryAbstract* registry)
             registry->CloseKey(actKey);
         }
 
-        if (LoadedOnSalamanderStart && timeStampLoaded)
+        if (LoadedOnSalamanderStart && timeStampLoaded && !reportUpdate)
         {
             if (IsTimeExpired(&NextOpenOrCheckTime))
                 SalGeneral->PostMenuExtCommand(CM_AUTOCHECK_VERSION, TRUE);
@@ -272,6 +293,8 @@ void LoadConfig(HKEY regKey, CSalamanderRegistryAbstract* registry)
     }
     else
     {
+        if (reportUpdate)
+            return;
         if (LoadedOnSalInstall)
         {
             SalGeneral->PostMenuExtCommand(CM_FIRSTCHECK_VERSION, TRUE);
@@ -315,8 +338,12 @@ void SaveConfig(HKEY regKey, CSalamanderRegistryAbstract* registry)
     registry->SetValue(regKey, CONFIG_CHECKRELEASE, REG_DWORD, &Data.CheckReleaseVersion, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_CONNECTION, REG_DWORD, &InternetConnection, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_PROTOCOL, REG_DWORD, &InternetProtocol, sizeof(DWORD));
+    if (!ConfiguredReleaseFeedUrl.empty())
+        registry->SetValue(regKey, CONFIG_RELEASEFEEDURL, REG_SZ, ConfiguredReleaseFeedUrl.c_str(),
+                           static_cast<DWORD>((ConfiguredReleaseFeedUrl.size() + 1) * sizeof(wchar_t)));
 
-    SalGeneral->SetFlagLoadOnSalamanderStart(Data.AutoCheckMode != achmNever);
+    // While an update is under way the next Sally must load this plugin to report it.
+    SalGeneral->SetFlagLoadOnSalamanderStart(Data.AutoCheckMode != achmNever || CloseSallyForUpdate);
 }
 
 BOOL LoadScripDataFromFile(const wchar_t* fileName)
@@ -392,6 +419,16 @@ void ModulesCreateLog(BOOL* moduleWasFound, BOOL rereadModules)
 BOOL ModulesHasCorrectData()
 {
     return ReleaseState.HasCorrectData ? TRUE : FALSE;
+}
+
+BOOL ReleaseCanBeInstalled()
+{
+    return ReleaseState.HasCorrectData && ReleaseState.CanInstall ? TRUE : FALSE;
+}
+
+const checkver::ReleaseCheckResult* GetReleaseCheckResult()
+{
+    return &ReleaseState;
 }
 
 void ModulesCleanup()

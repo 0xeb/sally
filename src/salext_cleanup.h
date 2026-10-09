@@ -17,8 +17,8 @@
 //
 // Returns true when 'registeredPath' names a Sally shell-extension DLL (basename salextx64.dll,
 // salextx86.dll, or salextARM64.dll, case-insensitive), is non-empty, and differs (case-insensitively) from the
-// current install's DLL path. The caller additionally confirms the file still exists on disk
-// before scheduling it for deletion on reboot. Pure / no I/O, so it is headless-testable.
+// current install's DLL path. The caller additionally confirms the file still exists on disk.
+// Pure / no I/O.
 bool IsStaleSalextRegistration(const wchar_t* currentSalextPath, const wchar_t* registeredPath);
 
 // Outcome of one cleanup sweep. Counters rather than log calls keep this module free of
@@ -26,16 +26,16 @@ bool IsStaleSalextRegistration(const wchar_t* currentSalextPath, const wchar_t* 
 struct SalextCleanupStats
 {
     int stale = 0;       // stale registrations whose DLL is still on disk
-    int scheduled = 0;   // DLLs successfully scheduled for delete-on-reboot
     int keysRemoved = 0; // stale CLSID keys removed from the registry
 };
 
 // Walks the shell-extension CLSID family {c78b61XX-f3ea-11d2-94a1-00e0292a01e3} and reclaims
-// every registration IsStaleSalextRegistration() accepts whose DLL still exists: schedules the
-// locked DLL for delete-on-reboot and drops the stale CLSID key.
+// every registration IsStaleSalextRegistration() accepts whose DLL still exists: drops the
+// stale CLSID key, so nothing loads that DLL again and its folder can be deleted once Explorer
+// lets go of it. The DLL itself is not touched (no delete-on-reboot: that writes to the
+// machine's registry).
 //
-// Best-effort. Scheduling needs administrator rights and degrades to a no-op, which is why the
-// caller gets counters back instead of a pass/fail. All registry and file access goes through
+// Best-effort; the caller gets counters back instead of a pass/fail. All registry and file access goes through
 // the injected interfaces, so the whole sweep is headless-testable with fakes and no call site
 // here touches Win32 directly. Passing null for either interface performs no work.
 SalextCleanupStats ReclaimStaleSalextRegistrations(const wchar_t* currentSalextPath,

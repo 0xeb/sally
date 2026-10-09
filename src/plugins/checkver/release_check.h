@@ -21,6 +21,12 @@ namespace checkver
         std::string ReleasePageUrl;
         std::string PrimaryUrl;
         std::string PrimaryAssetName;
+        unsigned long long PrimaryAssetSize = 0;
+        std::string PrimaryAssetDigest; // "sha256:<hex>" or empty
+        std::string ChecksumsUrl;       // the release's SHA256SUMS file, or empty
+        // A newer release whose package and checksum file can be fetched over HTTPS, so the
+        // updater can install it.
+        bool CanInstall = false;
     };
 
     // UI-free production workflow: parse a GitHub response, compare versions, and

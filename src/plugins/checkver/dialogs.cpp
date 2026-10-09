@@ -9,6 +9,7 @@
 #include "checkver_text.h"
 #include "lang\lang.rh"
 #include "checkver_path.h"
+#include "self_update.h"
 
 void CenterWindow(HWND hWindow, HWND hParent)
 {
@@ -339,6 +340,10 @@ void MainEnableControls(BOOL downloading)
     }
     HWND hCfgButton = GetDlgItem(HMainDialog, IDC_MAIN_CFG);
     HWND hCheckButton = GetDlgItem(HMainDialog, IDC_MAIN_CHECK);
+    const BOOL installing = IsReleaseInstallRunning();
+    EnableWindow(GetDlgItem(HMainDialog, IDC_MAIN_INSTALL),
+                 !downloading && !installing && ReleaseCanBeInstalled());
+    EnableWindow(hCheckButton, !installing);
 
     if (downloading)
     {
@@ -353,7 +358,7 @@ void MainEnableControls(BOOL downloading)
     }
     else
     {
-        EnableWindow(hCfgButton, TRUE);
+        EnableWindow(hCfgButton, !installing);
     }
 }
 
@@ -460,6 +465,17 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
         MainDlgAutoOpen2 = tvData->AutoOpen;
         if (MainDlgAutoOpen2)
             AddLogLine(LangStr(IDS_SKIP_CHECK).c_str(), FALSE);
+
+        // the outcome of an update this Sally was just started by
+        std::vector<std::wstring> updateReport;
+        BOOL updateFailed = FALSE;
+        if (TakeUpdateResult(updateReport, updateFailed))
+        {
+            AddLogLine(L"", FALSE);
+            for (const std::wstring& reportLine : updateReport)
+                AddLogLine(reportLine.c_str(), FALSE);
+        }
+        EnableWindow(GetDlgItem(hWindow, IDC_MAIN_INSTALL), FALSE);
 
         // assign the window icon
         SendMessage(hWindow, WM_SETICON, ICON_BIG,
@@ -599,6 +615,22 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
             return 0;
         }
 
+        case IDC_MAIN_INSTALL:
+        {
+            if (HDownloadThread != NULL || IsReleaseInstallRunning() || !ReleaseCanBeInstalled())
+                return 0;
+            if (HConfigurationDialog != NULL)
+            {
+                SalGeneral->SalMessageBox(hWindow, LangStr(IDS_CFG_CONFLICT2).c_str(),
+                                          LangStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION | MB_OK);
+                return 0;
+            }
+            if (!StartReleaseInstall(hWindow, *GetReleaseCheckResult()))
+                return 0;
+            MainEnableControls(FALSE);
+            return 0;
+        }
+
         case IDC_MAIN_CHECK:
         case CM_CHECK_FIRSTLOAD:
         {
@@ -660,6 +692,16 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
 
         case IDCANCEL:
         {
+            if (IsReleaseInstallRunning() && !CloseSallyForUpdate)
+            {
+                ShowMinNA_IfNotShownYet(hWindow, FALSE, TRUE);
+                if (SalGeneral->SalMessageBox(hWindow, LangStr(IDS_ABORT_DOWNLOAD).c_str(),
+                                              LangStr(IDS_PLUGINNAME).c_str(),
+                                              MB_ICONQUESTION | MB_YESNO) == IDNO)
+                    return 0;
+                AbandonReleaseInstall();
+            }
+
             if (HDownloadThread != NULL)
             {
                 // the download thread is running right now - should we let it finish on its own?
@@ -749,6 +791,25 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
                     FlashWindow(hWindow, TRUE);
             }
         }
+        return 0;
+    }
+
+    case WM_USER_INSTALL_LOG:
+    {
+        std::wstring* line = reinterpret_cast<std::wstring*>(lParam);
+        if (line != NULL)
+        {
+            AddLogLine(line->c_str(), TRUE);
+            delete line;
+        }
+        return 0;
+    }
+
+    case WM_USER_INSTALL_READY:
+    {
+        FinishReleaseInstall(hWindow, (BOOL)wParam);
+        if (!CloseSallyForUpdate)
+            MainEnableControls(FALSE);
         return 0;
     }
 

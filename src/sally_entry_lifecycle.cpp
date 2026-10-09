@@ -46,6 +46,7 @@
 #include "darkmode.h"
 #include "bottombar_keycaps.h"
 #include "salext_cleanup.h"
+#include "common/Win32UpdateFileOps.h"
 #include "common/IFileSystem.h"
 
 // Issue #82: shell-extension DLLs from OLD Sally/Salamander installs stay loaded/locked by
@@ -64,10 +65,7 @@ static void CleanupStaleShellExtensions(const wchar_t* currentSalextPathW)
 
     if (stats.stale > 0)
         TRACE_I("CleanupStaleShellExtensions(): " << stats.stale << " stale registration(s), "
-                                                  << stats.scheduled << " scheduled for reboot-delete, "
                                                   << stats.keysRemoved << " CLSID key(s) removed");
-    if (stats.scheduled < stats.stale)
-        TRACE_I("CleanupStaleShellExtensions(): reboot-delete not scheduled for all (administrator rights may be required)");
 }
 
 static BOOL FileExistsWLocal(const wchar_t* path)
@@ -126,6 +124,20 @@ static BOOL BuildModuleRelativePathW(HINSTANCE module, const wchar_t* relativePa
             return FALSE;
         capacity *= 2;
     }
+}
+
+// #128: a file the updater renamed aside because it was still in use (the shell extension,
+// loaded by Explorer) is deleted on a later start, once nothing holds it any more.
+static void CleanupUpdateLeftovers()
+{
+    std::wstring folder;
+    if (!BuildModuleRelativePathW(NULL, L"", folder) || folder.empty())
+        return;
+    folder.pop_back(); // the separator
+    Sally::Update::Win32UpdateFileOps ops;
+    const std::vector<std::wstring> remaining = Sally::Update::CleanUpdateLeftovers(folder, ops);
+    if (!remaining.empty())
+        TRACE_I("CleanupUpdateLeftovers(): " << remaining.size() << " file(s) from an update still in use");
 }
 
 static IRegistry* GetMainSalamanderRegistry()
@@ -4192,10 +4204,11 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         const std::wstring& cleanupPathW = Windows64Bit ? shellExtX64PathW : shellExtX86PathW;
 #endif
 
-        // #82: reclaim previous installs' salext DLLs still locked by Explorer so their folders
-        // become deletable (schedules delete-on-reboot; best-effort, needs admin).
+        // #82: drop previous installs' shell-extension registrations, so nothing loads their DLLs
+        // again and their folders become deletable once Explorer lets go (best-effort).
         CleanupStaleShellExtensions(cleanupPathW.c_str());
     }
+    CleanupUpdateLeftovers();
 
     //--- creating main window
     if (CMainWindow::RegisterUniversalClass(CS_DBLCLKS | CS_OWNDC,

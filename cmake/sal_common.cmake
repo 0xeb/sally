@@ -109,6 +109,19 @@ set(SAL_COMMON_INCLUDES
   "${SAL_SHARED}"
 )
 
+# The vendored zlib, for the ZIP reader and writer of the helper executables
+set(SAL_ZLIB_SOURCES
+  "${SAL_SRC}/common/dep/zlib/adler32.c"
+  "${SAL_SRC}/common/dep/zlib/compress.c"
+  "${SAL_SRC}/common/dep/zlib/crc32.c"
+  "${SAL_SRC}/common/dep/zlib/deflate.c"
+  "${SAL_SRC}/common/dep/zlib/inffast.c"
+  "${SAL_SRC}/common/dep/zlib/inflate.c"
+  "${SAL_SRC}/common/dep/zlib/inftrees.c"
+  "${SAL_SRC}/common/dep/zlib/trees.c"
+  "${SAL_SRC}/common/dep/zlib/zutil.c"
+)
+
 # Common link libraries
 set(SAL_COMMON_LIBS
   comctl32

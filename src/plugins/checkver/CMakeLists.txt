@@ -12,9 +12,14 @@ sal_add_plugin(NAME checkver
     "${SAL_PLUGINS}/checkver/logwnd.cpp"
     "${SAL_PLUGINS}/checkver/precomp.cpp"
     "${SAL_PLUGINS}/checkver/release_check.cpp"
+    "${SAL_PLUGINS}/checkver/self_update.cpp"
+    "${SAL_SRC}/common/update/ReleaseChecksums.cpp"
+    "${SAL_SRC}/common/update/UpdatePackage.cpp"
+    "${SAL_SRC}/common/update/UpdateProcesses.cpp"
+    "${SAL_SRC}/common/update/UpdaterCommand.cpp"
   RC "${SAL_PLUGINS}/checkver/checkver.rc"
   DEF "${SAL_PLUGINS}/checkver/checkver.def"
-  LIBS wininet yyjson
+  LIBS wininet yyjson bcrypt version shell32 ole32
   NO_SHARED
 )
 

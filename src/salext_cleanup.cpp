@@ -81,9 +81,11 @@ SalextCleanupStats ReclaimStaleSalextRegistrations(const wchar_t* currentSalextP
         if (!fileSystem->FileExists(registeredPath.c_str()))
             continue; // old DLL already gone
 
+        // The old DLL itself is left alone: it belongs to that other Sally folder, Explorer may
+        // still hold it, and scheduling a delete at reboot would mean writing to the machine's
+        // registry. Without its registration nothing loads it again, so the folder can be
+        // deleted once Explorer lets go.
         stats.stale++;
-        if (fileSystem->ScheduleDeleteOnReboot(registeredPath.c_str()).success)
-            stats.scheduled++;
 
         if (registry->DeleteKeyRecursive(HKEY_CLASSES_ROOT, ClsidKey(low, false).c_str()).success)
             stats.keysRemoved++;

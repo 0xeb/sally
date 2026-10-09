@@ -22,6 +22,7 @@
 #define CM_OPENFILE             94  // debug build only - appears in the system menu
 #define CM_ABOUT                95  // opens the About dialog
 #define CM_CHECK_FIRSTLOAD      96  // runs the very first check after installing Salamander (the CheckVer window stays open so the user understands why we access the internet when a firewall is present)
+#define CM_UPDATE_REPORT        97  // opens the window to report an update Sally was restarted by
 
 // texts
 #define IDS_PLUGIN_DESCRIPTION  190
@@ -96,6 +97,24 @@
 #define IDS_DOWNLOAD_RELEASE    282
 #define IDS_RELEASE_PAGE_LINK   283
 #define IDS_OPEN_RELEASE_PAGE   284
+
+// installing a release (self_update.cpp)
+#define IDS_LOGWNDHELP_INSTALL       285
+#define IDS_UPDATE_DOWNLOADING       286
+#define IDS_UPDATE_VERIFYING         287
+#define IDS_UPDATE_PREPARING         288
+#define IDS_UPDATE_READY             289
+#define IDS_UPDATE_CONFIRM           290
+#define IDS_UPDATE_CONFIRM_OTHERS    291
+#define IDS_UPDATE_FAILED            292
+#define IDS_UPDATE_NO_CHECKSUM       293
+#define IDS_UPDATE_CHECKSUM_MISMATCH 294
+#define IDS_UPDATE_CANNOT_START      295
+#define IDS_UPDATE_OTHERS_RUNNING    296
+#define IDS_UPDATE_DONE              297
+#define IDS_UPDATE_ABORTED           298
+#define IDS_UPDATE_ROLLED_BACK       299
+#define IDS_UPDATE_INCOMPLETE        300
 
 // help IDs
 

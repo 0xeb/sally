@@ -363,7 +363,7 @@ BOOL RestartSalamander(HWND hParent)
 // CleanBugReportsDirectory
 //
 
-BOOL CleanBugReportsDirectory(BOOL keep7ZipArchives)
+BOOL CleanBugReportsDirectory(BOOL keepArchives)
 {
     if (BugReportPath.empty())
         return FALSE;
@@ -381,10 +381,11 @@ BOOL CleanBugReportsDirectory(BOOL keep7ZipArchives)
                     if (find.cFileName[0] != 0 && wcscmp(find.cFileName, L".") != 0 && wcscmp(find.cFileName, L"..") != 0)
                     {
                         BOOL skipDelete = FALSE;
-                        if (keep7ZipArchives)
+                        if (keepArchives)
                         {
+                            // .zip since 1.0.36; .7z from earlier versions
                             const wchar_t* ext = wcsrchr(find.cFileName, L'.');
-                            if (ext != NULL && _wcsicmp(ext, L".7z") == 0)
+                            if (ext != NULL && (_wcsicmp(ext, L".zip") == 0 || _wcsicmp(ext, L".7z") == 0))
                                 skipDelete = TRUE;
                         }
                         if (!skipDelete)

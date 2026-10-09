@@ -222,6 +222,8 @@ add_executable(salmon WIN32
   "${SAL_SRC}/common/messages.cpp"
   "${SAL_SRC}/common/handles.cpp"
   "${SAL_SRC}/common/array.cpp"
+  "${SAL_SRC}/common/zip/ZipWriter.cpp"
+  ${SAL_ZLIB_SOURCES}
 )
 sal_set_rc_platform_defines("${SAL_SRC}/salmon/salmon.rc")
 
@@ -301,6 +303,52 @@ if(MSVC)
 endif()
 
 set_target_properties(salspawn PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
+)
+
+# ==============================================================================
+# Updater: salupdate.exe (installs a downloaded release; started by CheckVer)
+# ==============================================================================
+
+add_executable(salupdate WIN32
+  "${SAL_SRC}/salupdate/salupdate.cpp"
+  "${SAL_SRC}/salupdate/salupdate.rc"
+  "${SAL_SRC}/common/update/ReleaseChecksums.cpp"
+  "${SAL_SRC}/common/update/UpdateFiles.cpp"
+  "${SAL_SRC}/common/update/UpdatePackage.cpp"
+  "${SAL_SRC}/common/update/UpdateProcesses.cpp"
+  "${SAL_SRC}/common/update/UpdaterCommand.cpp"
+  "${SAL_SRC}/common/Win32UpdateFileOps.cpp"
+  "${SAL_SRC}/common/zip/ZipReader.cpp"
+  ${SAL_ZLIB_SOURCES}
+)
+sal_set_rc_platform_defines("${SAL_SRC}/salupdate/salupdate.rc")
+
+target_include_directories(salupdate PRIVATE
+  "${SAL_SRC}/salupdate"
+  ${SAL_COMMON_INCLUDES}
+)
+
+target_compile_definitions(salupdate PRIVATE
+  WIN32 _WINDOWS UNICODE _UNICODE NOMINMAX
+  $<$<CONFIG:Debug>:_DEBUG>
+  $<${SAL_IS_RELEASE}:NDEBUG>
+)
+
+target_link_libraries(salupdate PRIVATE
+  shell32 ole32 bcrypt version
+)
+
+if(MSVC)
+  target_link_options(salupdate PRIVATE /SUBSYSTEM:WINDOWS /MANIFEST:NO)
+elseif(MINGW)
+  target_link_options(salupdate PRIVATE -Wl,--subsystem,windows -municode)
+endif()
+
+# The C runtime is linked in: the updater runs from outside the Sally folder and replaces
+# the runtime DLLs there.
+set_target_properties(salupdate PROPERTIES
+  MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
   RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
 )
 
@@ -484,7 +532,7 @@ include(GNUInstallDirs)
 sal_install_main(sally)
 
 # Utils go in utils/
-install(TARGETS salmon salspawn tserver RUNTIME DESTINATION utils)
+install(TARGETS salmon salspawn tserver salupdate RUNTIME DESTINATION utils)
 install(CODE [[
   file(REMOVE
     "${CMAKE_INSTALL_PREFIX}/utils/translator.exe"
@@ -518,7 +566,7 @@ sal_generate_plugins_ver()
 sal_create_populate_target()
 
 # Ensure populate depends on main targets
-add_dependencies(populate sally salmon salspawn tserver salext)
+add_dependencies(populate sally salmon salspawn tserver salupdate salext)
 
 message(STATUS "")
 message(STATUS "=== Sally CMake Build ===")

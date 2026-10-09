@@ -9,6 +9,7 @@
 #include "checkver.rh2"
 #include "checkver_text.h"
 #include "lang\lang.rh"
+#include "self_update.h"
 
 // plugin interface object, its methods are called from Salamander
 CPluginInterface PluginInterface;
@@ -257,6 +258,8 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
 
     if (ret)
     {
+        AbandonReleaseInstall();
+
         // the user wants us to close the windows
         if (HConfigurationDialog != NULL)
             SendMessage(HConfigurationDialog, WM_COMMAND, IDCANCEL, 0);
@@ -417,6 +420,10 @@ unsigned WINAPI ThreadMessageLoopBody(void* param)
     DestroyWindow(HMainDialog);
     HMainDialog = NULL;
 
+    // the updater was started and waits for Sally to close
+    if (CloseSallyForUpdate)
+        PostMessage(SalGeneral->GetMainWindowHWND(), WM_CLOSE, 0, 0);
+
     // request the plugin to unload - it is no longer needed; exception: after a configuration change when saving the configuration is disabled
     // we allow the user to save the configuration manually, because if we unloaded the plugin,
     // the configuration changes would be discarded immediately and the user would not understand why their data are not saved after manual
@@ -518,6 +525,13 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     {
         // triggered by the plugin during its automatic load
         OnOpenCheckVersionDialog(parent, TRUE, FALSE);
+        break;
+    }
+
+    case CM_UPDATE_REPORT:
+    {
+        // the plugin was loaded at start to report an update; the window shows the outcome
+        OnOpenCheckVersionDialog(parent, FALSE, FALSE);
         break;
     }
 

@@ -11,8 +11,8 @@
 #include "checkver.rh"
 #include "checkver.rh2"
 #include "lang\lang.rh"
+#include "self_update.h"
 
-const wchar_t* GITHUB_RELEASES_API_URL = L"https://api.github.com/repos/0xeb/sally/releases/latest";
 const wchar_t* GITHUB_API_HEADERS =
     L"Accept: application/vnd.github+json\r\n"
     L"X-GitHub-Api-Version: 2022-11-28\r\n";
@@ -136,7 +136,7 @@ DWORD WINAPI ThreadDownload(void* param)
     {
         AddLogLine(LangStr(IDS_INET_CONNECT).c_str(), FALSE);
         (void)firstLoadAfterInstall;
-        hUrl = InternetOpenUrlW(hSession, GITHUB_RELEASES_API_URL, GITHUB_API_HEADERS, -1,
+        hUrl = InternetOpenUrlW(hSession, GetReleaseFeedUrl(), GITHUB_API_HEADERS, -1,
                                INTERNET_FLAG_DONT_CACHE | INTERNET_FLAG_RELOAD |
                                    INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_PRAGMA_NOCACHE |
                                    INTERNET_FLAG_SECURE,

@@ -27,6 +27,7 @@ BEGIN
     PUSHBUTTON      "Ayuda",IDHELP,279,220,50,14
     CONTROL         "",IDC_MAIN_LOG,"CheckVerLogWindow",WS_VSCROLL | WS_GROUP,5,5,328,209
     PUSHBUTTON      "C&onfigurar...",IDC_MAIN_CFG,6,220,60,14,WS_GROUP
+    PUSHBUTTON      "&Instalar y reiniciar",IDC_MAIN_INSTALL,70,220,86,14
 END
 
 IDD_CONFIGURATION DIALOGEX 15, 39, 357, 144
@@ -145,4 +146,20 @@ STRINGTABLE
  IDS_DOWNLOAD_RELEASE, "Descargar Sally %s para %s"
  IDS_RELEASE_PAGE_LINK, "Abrir página de versión en GitHub"
  IDS_OPEN_RELEASE_PAGE, "Abrir página de versión de Sally %s"
+ IDS_LOGWNDHELP_INSTALL, "Haga clic en Instalar y reiniciar para actualizar Sally ahora; se volverá a iniciar sola."
+ IDS_UPDATE_DOWNLOADING, "Descargando %s..."
+ IDS_UPDATE_VERIFYING, "Comprobando la descarga con la suma SHA-256 de la versión..."
+ IDS_UPDATE_PREPARING, "Descomprimiendo Sally %s..."
+ IDS_UPDATE_READY, "Sally %s está lista para instalarse."
+ IDS_UPDATE_CONFIRM, "Sally se cerrará, instalará la versión %s y se volverá a iniciar.\n\n¿Desea continuar?"
+ IDS_UPDATE_CONFIRM_OTHERS, "Sally se cerrará, instalará la versión %s y se volverá a iniciar.\nTambién se cerrarán otras ventanas de Sally iniciadas desde la misma carpeta: %d.\n\n¿Desea continuar?"
+ IDS_UPDATE_FAILED, "La actualización se detuvo: %s"
+ IDS_UPDATE_NO_CHECKSUM, "La versión no publica ninguna suma SHA-256 para %s."
+ IDS_UPDATE_CHECKSUM_MISMATCH, "La descarga no coincide con la suma SHA-256 publicada con la versión."
+ IDS_UPDATE_CANNOT_START, "No se pudo iniciar el actualizador %s."
+ IDS_UPDATE_OTHERS_RUNNING, "Cierre estos programas iniciados desde la carpeta de Sally e inténtelo de nuevo:\n%s"
+ IDS_UPDATE_DONE, "Sally se actualizó de %s a %s."
+ IDS_UPDATE_ABORTED, "La actualización a %s no se realizó porque Sally no se cerró."
+ IDS_UPDATE_ROLLED_BACK, "La actualización a %s falló y no se cambió nada: %s"
+ IDS_UPDATE_INCOMPLETE, "La actualización a %s falló y algunos archivos no se pudieron restaurar: %s Descargue y descomprima la versión de nuevo."
 }

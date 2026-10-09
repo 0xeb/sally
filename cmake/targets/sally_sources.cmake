@@ -15,6 +15,8 @@ set(SALLY_SOURCES
   "${SAL_SRC}/color.cpp"
   "${SAL_SRC}/sal_colors.cpp"
   "${SAL_SRC}/salext_cleanup.cpp"
+  "${SAL_SRC}/common/update/UpdateFiles.cpp"
+  "${SAL_SRC}/common/Win32UpdateFileOps.cpp"
   "${SAL_SRC}/common/allochan.cpp"
   "${SAL_SRC}/common/array.cpp"
   "${SAL_SRC}/common/BuildScriptADSProbe.cpp"

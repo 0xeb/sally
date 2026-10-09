@@ -158,6 +158,10 @@ bool ParseGitHubLatestReleaseJson(const char* json, size_t size, GitHubReleaseIn
             GitHubReleaseAsset asset;
             ReadString(value, "name", asset.Name);
             ReadString(value, "browser_download_url", asset.DownloadUrl);
+            ReadString(value, "digest", asset.Digest);
+            yyjson_val* size = yyjson_obj_get(value, "size");
+            if (yyjson_is_uint(size))
+                asset.Size = yyjson_get_uint(size);
             if (!asset.Name.empty() && !asset.DownloadUrl.empty())
                 release.Assets.push_back(std::move(asset));
         }
@@ -258,12 +262,8 @@ int CompareVersionTags(const std::string& lhs, const std::string& rhs)
     return 0;
 }
 
-std::string SelectReleaseAssetUrl(const GitHubReleaseInfo& release, GitHubAssetPlatform platform,
-                                  std::string* assetName)
+const GitHubReleaseAsset* FindPlatformAsset(const GitHubReleaseInfo& release, GitHubAssetPlatform platform)
 {
-    if (assetName != nullptr)
-        assetName->clear();
-
     const char* suffix = nullptr;
     switch (platform)
     {
@@ -281,20 +281,37 @@ std::string SelectReleaseAssetUrl(const GitHubReleaseInfo& release, GitHubAssetP
     }
 
     if (suffix == nullptr)
-        return std::string();
+        return nullptr;
 
     for (const GitHubReleaseAsset& asset : release.Assets)
     {
-        const std::string loweredName = ToLower(asset.Name);
-        if (EndsWith(loweredName, suffix))
-        {
-            if (assetName != nullptr)
-                *assetName = asset.Name;
-            return asset.DownloadUrl;
-        }
+        if (EndsWith(ToLower(asset.Name), suffix))
+            return &asset;
     }
+    return nullptr;
+}
 
-    return std::string();
+const GitHubReleaseAsset* FindChecksumsAsset(const GitHubReleaseInfo& release)
+{
+    for (const GitHubReleaseAsset& asset : release.Assets)
+    {
+        if (EndsWith(ToLower(asset.Name), "-sha256sums.txt"))
+            return &asset;
+    }
+    return nullptr;
+}
+
+std::string SelectReleaseAssetUrl(const GitHubReleaseInfo& release, GitHubAssetPlatform platform,
+                                  std::string* assetName)
+{
+    if (assetName != nullptr)
+        assetName->clear();
+    const GitHubReleaseAsset* asset = FindPlatformAsset(release, platform);
+    if (asset == nullptr)
+        return std::string();
+    if (assetName != nullptr)
+        *assetName = asset->Name;
+    return asset->DownloadUrl;
 }
 
 const char* GetPlatformLabel(GitHubAssetPlatform platform)

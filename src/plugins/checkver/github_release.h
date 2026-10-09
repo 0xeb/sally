@@ -22,6 +22,8 @@ struct GitHubReleaseAsset
 {
     std::string Name;
     std::string DownloadUrl;
+    unsigned long long Size = 0; // bytes, 0 when GitHub did not say
+    std::string Digest;          // "sha256:<hex>" when GitHub reports one
 };
 
 struct GitHubReleaseInfo
@@ -44,6 +46,11 @@ int CompareVersionTags(const std::string& lhs, const std::string& rhs);
 
 std::string SelectReleaseAssetUrl(const GitHubReleaseInfo& release, GitHubAssetPlatform platform,
                                   std::string* assetName = nullptr);
+
+// The package for a platform, and the release's checksum file (Sally-v<version>-SHA256SUMS.txt);
+// nullptr when the release has none.
+const GitHubReleaseAsset* FindPlatformAsset(const GitHubReleaseInfo& release, GitHubAssetPlatform platform);
+const GitHubReleaseAsset* FindChecksumsAsset(const GitHubReleaseInfo& release);
 
 const char* GetPlatformLabel(GitHubAssetPlatform platform);
 

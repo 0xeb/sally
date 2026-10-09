@@ -6,6 +6,7 @@
 #define IDC_MAIN_LOG                    101
 #define IDC_MAIN_CFG                    102
 #define IDC_MAIN_CHECK                  103
+#define IDC_MAIN_INSTALL                104
 #define IDD_CONFIGURATION               110
 #define IDC_CFG_AUTOCLOSE               111
 #define IDC_CFG_BETA                    112
