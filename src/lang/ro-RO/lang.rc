@@ -2001,23 +2001,22 @@ BEGIN
     PUSHBUTTON      "Help",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Raportare Eroare Programare Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "A avut loc o eroare grava, fortand inchiderea Sally. Pentru a ne ajuta sa evitam probleme similare pe viitor, va rugam sa completati mai jos un raport de erori.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Politica de intimitate: noi nu transmitem nici o informatie a dumneavoastra catre alte site-uri.",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "Descrierea erorii (optionala)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "&Vizualizeaza Raport",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "U&ltima actiune:",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "&Contacteaza pe email:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "&Restarteaza Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "&Trimite Raport",IDOK,158,176,90,14
-    PUSHBUTTON      "&Nu Trimite Raport",IDCANCEL,254,176,90,14
+    LTEXT           "Sally s-a oprit din cauza unei probleme, iar un raport de eroare a fost salvat pe acest computer. Vă rugăm să raportați problema pe GitHub: Sally deschide în browser un issue nou cu un scurt rezumat, pe care îl puteți verifica înainte de a-l trimite.",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "Descrierea erorii (optionala)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "&Vizualizeaza Raport",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "U&ltima actiune:",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Rezumatul conține doar versiunile, eroarea și nume de funcții. Raportul complet rămâne pe acest computer și poate conține date private, așa că nu îl atașați la issue-ul public; un responsabil al proiectului vi-l poate cere în privat.",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "&Restarteaza Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "Raportează pe &GitHub",IDOK,62,179,90,14
+    PUSHBUTTON      "&Deschide dosarul",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "Închide",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -3938,7 +3937,7 @@ IDS_OLDPLUGINVERSION2, "Plugin (%s) nu e suportat de aceasta versiune de Sally. 
  IDS_ACLNOTSUPPORTEDONTGTPATH, "Permisii si autorii nu pot fi pastrati. Ei nu sunt suportati\nu e cale tinta (nu e volum NTFS).\n\nDoriti sa continuati?"
 
  IDS_BUGREPORTCNFRM_TITLE, "Raporteaza Bug"
- IDS_BUGREPORTCNFRM_TEXT, "Pentru raporturi bug sau cereri de caracteristici va rugam folositi meniul Help > Forum Oficiall Suport.\n\nFolositi acest raport de bug doar pentru a ne trimite date sensibile sau cand va cerem noi."
+ IDS_BUGREPORTCNFRM_TEXT, "Pentru raportarea erorilor sau cereri de funcționalități deschideți un issue la https://github.com/0xeb/sally/issues.\n\nFolositi acest raport de bug doar pentru a ne trimite date sensibile sau cand va cerem noi."
  IDS_BUGREPORT_WRITTEN, "Raportul de bug a fost scris în:"
  IDS_BUGREPORT_FAILED, "Raportul de bug nu a putut fi scris."
  IDS_SHELLMENU_NOSHELLITEMS, "Windows nu a putut furniza un meniu contextual pentru elementele selectate."
@@ -4080,37 +4079,13 @@ IDS_OLDPLUGINVERSION2, "Plugin (%s) nu e suportat de aceasta versiune de Sally. 
  
  IDS_AS_ADMIN_TITLE, "Administrator"
 
- IDS_SALMON_INVALIDEMAIL "Va rugam introduceti o adresa de email valabila ca sa va putem ajuta cu problema raportata."
- IDS_SALMON_WAITFORUPLOAD "Va rugam asteptati pana ce compresia si transmiterea de date este terminata."
- IDS_SALMON_CONFIRMEXIT "Sunteti sigur ca nu doriti sa ne raportati aceasta problema? Fara raportul dumneavoastra nu vom reusi sa rezolvam problema.\n\nDati click pe OK pentru a sterge raportul fara a ne comunica." 
- IDS_SALMON_ERR_INI_SIZE "Fisierul transmis depaseste marimea alocata. Cod: %d."
- IDS_SALMON_ERR_PARTIAL "Fisierul transmis a fost doar partial transmis. Cod: %d."
- IDS_SALMON_ERR_NO_FILE "Nici un fisier nu a fost transmis. Cod: %d."
- IDS_SALMON_ERR_NO_TMP_DIR "Lipseste un director temporar. Cod: %d."
- IDS_SALMON_ERR_CANT_WRITE "Incercare esuata la scriere fisierului pe disk. Cod: %d."
- IDS_SALMON_ERR_EXTENSION "Niste extensii au oprit transmisia fisierului. Cod: %d."
- IDS_SALMON_ERR_UNKNOWN "Eroare necunoscuta de transmisie. Cod: %d."
- IDS_SALMON_SYNTAX_ERROR_CLOSE "Eroare de sintaxa in raspunsul serverului. Nu s-a gasit close tag."
- IDS_SALMON_SYNTAX_ERROR_OPEN "Eroare de sintaxa in raspunsul serverului. Nu s-a gasit open tag."
- IDS_SALMON_SYNTAX_ERROR_VALUE "Eroare de sintaxa in raspunsul serverului. Nu s-a gasit value."
- IDS_SALMON_SOCK_ERR_RECV "Nu primesc date. Cod: %d."
- IDS_SALMON_SOCK_ERR_SHUTDOWN "Nu pot inchide conexiunea. Cod: %d."
- IDS_SALMON_SOCK_ERR_SEND "Nu pot trimite date. Cod: %d."
- IDS_SALMON_SOCK_ERR_CONNECT "Nu ma pot conecta la server. Cod: %d."
- IDS_SALMON_SOCK_ERR_SOCKET "Nu pot deschide conexiunea. Cod: %d."
- IDS_SALMON_SOCK_ERR_HOST "Nu gasesc host name. Cod: %d."
- IDS_SALMON_SOCK_ERR_INIT "Nu pot initializa conexiunea. Cod: %d."
- IDS_SALMON_READING_FILE "Eroare la citirea fisierului %s" 
- IDS_SALMON_OUT_OF_MEMORY "Memorie insuficienta" 
- IDS_SALMON_FILE_SIZE "Obtinerea marimii fisierului care a esuat pentru %s"
- IDS_SALMON_FILE_OPEN "Eroare la deschidere %s"
- IDS_SALMON_MORE_REPORTS "Cateva raporturi de bug mai vechi au fost gasite. Ati dori sa raportati si aceste bug si sa ne ajutati sa imbunatatim Sally?\n\nApasati Yes pentru a procesa raporturile vechi de bug. Apasati No pentru a sterge raporturile de bug vechi."
+ IDS_SALMON_WAIT "Așteptați până când raportul de eroare este salvat."
+ IDS_SALMON_CONFIRMEXIT "Închideți fără să raportați problema?\n\nRaportul de eroare va fi șters de pe acest computer."
  IDS_SALMON_TITLE "Raport Bug Sally"
  IDS_SALMON_COMPRESSING "Comprim, va rugam asteptati..."
- IDS_SALMON_UPLOADING "Trasmit date, va rugam asteptati..."
- IDS_SALMON_UPLOADSUCCESS "Raportul a fost transmis cu succes.\n\nVa multumim ca ne ajutati sa imbunatatim Sally!" 
- IDS_SALMON_UPLOADFAILED "Transmiterea raportului a esuat, motiv: %s\n\nVa rugam deschideti un issue la https://github.com/0xeb/sally/issues si atasati raportul, apoi stergeti-l de pe disk-ul dumneavoastra. Dati OK pentru a vedea raportul."
- IDS_SALMON_COMPRESSFAILED "A esuat comprimarea raportului, motiv: %s\n\nVa rugam sa arhivati raportul de bug al dumneavoastra folosind 7-Zip, sa il atasati la un issue nou la https://github.com/0xeb/sally/issues, si sa stergeti fisierele de raport de pe disk-ul dumneavoastra. Dati OK pentru a vedea raportul."
+ IDS_SALMON_COMPRESSFAILED "Raportul de eroare nu a putut fi arhivat, motiv: %s\n\nFișierele lui au fost păstrate neschimbate. Apăsați OK pentru a le afișa."
+ IDS_SALMON_GITHUB_OPENED "În browser este deschis un issue nou pe GitHub. Vă rugăm să îl verificați și să îl trimiteți.\n\nRaportul de eroare a fost salvat în:\n%s\n\nPoate conține date private, așa că nu îl publicați. Dacă un responsabil al proiectului are nevoie de el, îl va cere în issue."
+ IDS_SALMON_GITHUB_FAILED "Sally nu a putut deschide browserul web.\n\nVă rugăm să raportați problema la https://github.com/0xeb/sally/issues și să descrieți ce făceați. Raportul de eroare a fost salvat în:\n%s"
  IDS_SALMON_LOAD_FAILED "Incarcarea %s a esuat."
  IDS_SALMON_WRONG_CMDLINE "Aceasta este un utilitar intern al Sally, va rugam sa nu il porniti in mod direct."
  IDS_SALMON_WRONG_VERSION "Versiune incorecta a Raportorului Bug al Sally. Va rugam raportati acest lucru la https://github.com/0xeb/sally/issues."

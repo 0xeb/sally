@@ -2001,23 +2001,22 @@ BEGIN
     PUSHBUTTON      "Súgó",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Sally Hibajelentő"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Probléma lépett fel, mely bezárásra kényszerítette az Sally. Hogy a jövőben eltudjuk kerülni a hasonló problémákat, kérem küldje el nekünk a lenti hibajelentést.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Adatvédelem: nem adunk ki Önről semmilyen információt harmadik félnek.",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "A hiba leírása (választható)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "Jelentés &megtekintése",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "Uto&lsó művelet:",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "Bejelentő e-mail &címe:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "Sally új&raindítása",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "Jelenté&s küldése",IDOK,158,176,90,14
-    PUSHBUTTON      "&Ne küldjön jelentést",IDCANCEL,254,176,90,14
+    LTEXT           "A Sally egy hiba miatt leállt, és ezen a számítógépen összeomlási jelentést mentett. Kérjük, jelentse a hibát a GitHubon: a Sally a böngészőben megnyit egy új bejelentést egy rövid összefoglalóval, amelyet beküldés előtt átnézhet.",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "A hiba leírása (választható)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "Jelentés &megtekintése",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "Uto&lsó művelet:",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Az összefoglaló csak a verziókat, a hibát és függvényneveket tartalmaz. A teljes jelentés ezen a számítógépen marad, és személyes adatokat tartalmazhat, ezért ne csatolja a nyilvános bejelentéshez; egy karbantartó privát módon elkérheti.",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "Sally új&raindítása",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "Bejelentés a &GitHubon",IDOK,62,179,90,14
+    PUSHBUTTON      "Ma&ppa megnyitása",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "Bezárás",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -3938,7 +3937,7 @@ IDS_OLDPLUGINVERSION2, "A plugint (%s) nem támogatja az Sally ezen verziója. S
  IDS_ACLNOTSUPPORTEDONTGTPATH, "A tulajdonosok és a jogosultságok nem maradnak meg. Nem támogatottak\na cél elérési úton (nem NTFS kötet).\n\nAkarja folytatni?"
 
  IDS_BUGREPORTCNFRM_TITLE, "Hiba jelentése"
- IDS_BUGREPORTCNFRM_TEXT, "Hiba jelentéséhez vagy szolgáltatás kéréséhez, használja a Súgó > Hivatalos támogatási fórum menüpontot.\n\nA hibajelentést csak kényes adatok küldésére használja vagy mikor mi kérjük rá."
+ IDS_BUGREPORTCNFRM_TEXT, "Hiba jelentéséhez vagy szolgáltatás kéréséhez nyisson bejelentést itt: https://github.com/0xeb/sally/issues.\n\nA hibajelentést csak kényes adatok küldésére használja vagy mikor mi kérjük rá."
  IDS_BUGREPORT_WRITTEN, "A hibajelentés ide lett kiírva:"
  IDS_BUGREPORT_FAILED, "A hibajelentést nem sikerült kiírni."
  IDS_SHELLMENU_NOSHELLITEMS, "A Windows nem tudott helyi menüt biztosítani a kijelölt elemekhez."
@@ -4080,37 +4079,13 @@ IDS_OLDPLUGINVERSION2, "A plugint (%s) nem támogatja az Sally ezen verziója. S
  
  IDS_AS_ADMIN_TITLE, "Rendszergazda"
 
- IDS_SALMON_INVALIDEMAIL "Érvényes e-mail címet adjon meg, hogy segíthessen a jelentett problémában."
- IDS_SALMON_WAITFORUPLOAD "Kérem várjon a tömörítés és a feltöltés befejezésére."
- IDS_SALMON_CONFIRMEXIT "Biztos nem akar minket tájékoztatni a problémáról? A jelentése nélkül, nem leszünk képesek javítani azt.\n\nA jelentés törléséhez OK gomb." 
- IDS_SALMON_ERR_INI_SIZE "A feltöltött fájl meghaladja az engedélyezett méretet. Kód: %d."
- IDS_SALMON_ERR_PARTIAL "A feltöltött fájl csak részben lett feltöltve. Kód: %d."
- IDS_SALMON_ERR_NO_FILE "nem lett fájl feltöltve. Kód: %d."
- IDS_SALMON_ERR_NO_TMP_DIR "Hiányzik egy ideiglenes mappa. Kód: %d."
- IDS_SALMON_ERR_CANT_WRITE "A lemezre írás sikertelen. Kód: %d."
- IDS_SALMON_ERR_EXTENSION "Néhány kiterjesztés leállította a fájl feltöltését. Kód: %d."
- IDS_SALMON_ERR_UNKNOWN "Ismeretlen feltöltési hiba. Kód: %d."
- IDS_SALMON_SYNTAX_ERROR_CLOSE "Szintaktikai hiba a szerver válaszában. Nincs záró címke."
- IDS_SALMON_SYNTAX_ERROR_OPEN "Szintaktikai hiba a szerver válaszában. Nincs nyitó címke."
- IDS_SALMON_SYNTAX_ERROR_VALUE "Szintaktikai hiba a szerver válaszában. Nincs érték."
- IDS_SALMON_SOCK_ERR_RECV "Nem fogadható adat. Kód: %d."
- IDS_SALMON_SOCK_ERR_SHUTDOWN "Nem zárható le a kapcsolat. Kód: %d."
- IDS_SALMON_SOCK_ERR_SEND "Nem küldhető adat. Kód: %d."
- IDS_SALMON_SOCK_ERR_CONNECT "A szerver nem érhető el. Kód: %d."
- IDS_SALMON_SOCK_ERR_SOCKET "A kapcsolat nem nyitható meg. Kód: %d."
- IDS_SALMON_SOCK_ERR_HOST "Nem oldható fel a gazda neve. Kód: %d."
- IDS_SALMON_SOCK_ERR_INIT "A kapcsolat nem inicializálható. Kód: %d."
- IDS_SALMON_READING_FILE "Sikertelen olvasás: %s" 
- IDS_SALMON_OUT_OF_MEMORY "Kevés a memória" 
- IDS_SALMON_FILE_SIZE "A fájl méretének lekérése sikertelen: %s"
- IDS_SALMON_FILE_OPEN "Sikertelen megnyitás: %s"
- IDS_SALMON_MORE_REPORTS "Néhány régi hibajelentés észlelhető. Szeretné jelenteni ezeket a hibákat és segíteni nekünk az Sally tökéletesítésében?\n\nRégi hibajelentés el elküldéséhez Igen gomb. A régi hibajelentések törléséhez Nem gomb."
+ IDS_SALMON_WAIT "Kérjük, várjon, amíg az összeomlási jelentés mentése befejeződik."
+ IDS_SALMON_CONFIRMEXIT "Bezárja a hiba bejelentése nélkül?\n\nAz összeomlási jelentés törlődik erről a számítógépről."
  IDS_SALMON_TITLE "Sally Hibajelentő"
  IDS_SALMON_COMPRESSING "Tömörítés, kérem várjon..."
- IDS_SALMON_UPLOADING "Feltöltés, kérem várjon..."
- IDS_SALMON_UPLOADSUCCESS "Jelentés sikeresen feltöltve.\n\nKöszönjük, hogy segít nekünk az Sally tökéletesítésében!" 
- IDS_SALMON_UPLOADFAILED "Jelentés feltöltése sikertelen, oka: %s\n\nKérem nyisson egy hibajegyet itt: https://github.com/0xeb/sally/issues és csatolja a jelentést, majd törölje azt a gépről. Jelentés megjelenítéséhez OK gomb."
- IDS_SALMON_COMPRESSFAILED "Jelentés tömörítése sikertelen, oka: %s\n\nKérem tömörítse be a hibajelentést 7-Zip segítségével, csatolja egy új hibajegyhez itt: https://github.com/0xeb/sally/issues, majd törölje azt a gépről. Jelentés megjelenítéséhez OK gomb."
+ IDS_SALMON_COMPRESSFAILED "Az összeomlási jelentést nem sikerült becsomagolni, ok: %s\n\nA fájljai változatlanul megmaradtak. Kattintson az OK gombra a megjelenítésükhöz."
+ IDS_SALMON_GITHUB_OPENED "A böngészőben megnyílt egy új GitHub-bejelentés. Kérjük, nézze át, majd küldje be.\n\nAz összeomlási jelentés helye:\n%s\n\nSzemélyes adatokat tartalmazhat, ezért ne tegye közzé. Ha egy karbantartónak szüksége lesz rá, a bejelentésben kéri el."
+ IDS_SALMON_GITHUB_FAILED "A Sally nem tudta megnyitni a webböngészőt.\n\nKérjük, jelentse a hibát itt: https://github.com/0xeb/sally/issues, és írja le, mit csinált. Az összeomlási jelentés helye:\n%s"
  IDS_SALMON_LOAD_FAILED "Betöltés sikertelen: %s."
  IDS_SALMON_WRONG_CMDLINE "Ez egy belső Sally segédprogram, ne közvetlen futtassa."
  IDS_SALMON_WRONG_VERSION "Helytelen Sally Bug Reporter verzió. Kérjük, jelentse itt: https://github.com/0xeb/sally/issues."

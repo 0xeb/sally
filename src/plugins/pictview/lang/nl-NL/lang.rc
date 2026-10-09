@@ -19,7 +19,7 @@ LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
 
 DLG_WIAPROGRESS DIALOGEX 0, 0, 214, 63
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | DS_CENTER
-CAPTION "Scan Image"
+CAPTION "Afbeelding scannen"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "Annuleren",IDCANCEL,157,43,50,14
@@ -36,11 +36,11 @@ BEGIN
     ICON            "",IDC_ABOUT_ICON,11,9,20,20
     LTEXT           "PictView %s - Afbeeldingsviewer voor Sally",IDC_ABOUT_TITLE,46,9,309,8
     LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,309,8,SS_NOPREFIX
-    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,138,8
+    LTEXT           "Afbeeldingen worden gedecodeerd en opgeslagen door",IDC_STATIC_2,46,40,298,8
     LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,298,8
     LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
-    LTEXT           "Email:",IDC_STATIC_6,46,81,30,8
-    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,99,81,85,8,WS_TABSTOP
+    LTEXT           "GitHub:",IDC_STATIC_6,46,81,30,8
+    LTEXT           "github.com/0xeb/sally/issues",IDC_ABOUT_SUPPORT,99,81,150,8,WS_TABSTOP
     LTEXT           "Start pagina:",IDC_STATIC_7,46,92,50,8
     LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,99,92,122,8,WS_TABSTOP
     CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,360,1
@@ -52,7 +52,7 @@ CAPTION "Weergave"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        "Venster grootte",IDC_STATIC_1,6,5,276,53,WS_GROUP
-    CONTROL         "Gelijk aan &Sally",IDC_CFGAPP_WINPOS_SAME,
+    CONTROL         "Gelijk &aan Sally",IDC_CFGAPP_WINPOS_SAME,
                     "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,151,12
     CONTROL         "&Groter indien nodig maar niet kleiner",IDC_CFGAPP_WINPOS_LARGER,
                     "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,148,12
@@ -64,8 +64,8 @@ BEGIN
                     "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,84,173,12
     CONTROL         "&Werkelijke grootte",IDC_CFGAPP_ZOOM_ORIG,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,96,148,12
     CONTROL         "Volledig &scherm",IDC_CFGAPP_ZOOM_FSCREEN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,108,148,12
-    CONTROL         "S&how image file path in titlebar",IDC_CFGAPP_PATH,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,167,12
+    CONTROL         "Bestandspad van afbeelding in &titelbalk tonen",IDC_CFGAPP_PATH,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,220,12
 END
 
 DLG_CFGPAGE_COLORS DIALOGEX 66, 53, 288, 150
@@ -459,6 +459,8 @@ STRINGTABLE
   IDS_MENU_FILE_DELETE, "&Verwijderen\tDel"
   IDS_MENU_FILE_PREVSEL, "V&orige selectie\tCtrl+Backspace"
   IDS_MENU_FILE_NEXTSEL, "Volg&ende Selectie\tCtrl+Spatie"
+  IDS_MENU_FILE_SELPREV, "Selecteer/deselecteer en vorige\tCtrl+Shift+Backspace"
+  IDS_MENU_FILE_SELNEXT, "Selecteer/deselecteer en volgende\tCtrl+Shift+Spatie"
   IDS_MENU_FILE_COPYTO, "&Kopiëren naar...\tX"
 
   IDS_MENU_EDIT, "&Wijzingen"

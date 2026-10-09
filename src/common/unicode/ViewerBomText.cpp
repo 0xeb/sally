@@ -204,6 +204,132 @@ std::int64_t AlignToCodeUnit(BomEncoding encoding, std::int64_t offset, std::int
     return offset;
 }
 
+ScalarStep NextScalar(BomEncoding encoding, const std::uint8_t* data, std::size_t size, bool atEnd)
+{
+    ScalarStep step;
+    if (data == nullptr || size == 0)
+    {
+        step.NeedMore = !atEnd;
+        return step;
+    }
+
+    if (encoding == BomEncoding::Utf8)
+    {
+        const std::uint8_t lead = data[0];
+        std::uint32_t scalar = 0;
+        std::size_t need = 0;
+        std::uint32_t minScalar = 0;
+        if (lead < 0x80)
+        {
+            step.Scalar = lead;
+            step.Length = 1;
+            return step;
+        }
+        if (lead >= 0xC2 && lead <= 0xDF)
+        {
+            scalar = lead & 0x1F;
+            need = 2;
+            minScalar = 0x80;
+        }
+        else if (lead >= 0xE0 && lead <= 0xEF)
+        {
+            scalar = lead & 0x0F;
+            need = 3;
+            minScalar = 0x800;
+        }
+        else if (lead >= 0xF0 && lead <= 0xF4)
+        {
+            scalar = lead & 0x07;
+            need = 4;
+            minScalar = 0x10000;
+        }
+        else
+        {
+            step.Scalar = Replacement;
+            step.Length = 1;
+            return step;
+        }
+
+        // A byte that does not continue the sequence ends it: the lead alone is invalid and
+        // the byte is decoded on its own, also when the data stops early.
+        const std::size_t present = size < need ? size : need;
+        for (std::size_t j = 1; j < present; ++j)
+        {
+            if (!IsContinuation(data[j]))
+            {
+                step.Scalar = Replacement;
+                step.Length = 1;
+                return step;
+            }
+            scalar = (scalar << 6) | (data[j] & 0x3F);
+        }
+        if (present < need)
+        {
+            if (!atEnd)
+            {
+                step.NeedMore = true;
+                return step;
+            }
+            step.Scalar = Replacement;
+            step.Length = (std::uint8_t)present;
+            return step;
+        }
+
+        step.Length = (std::uint8_t)need;
+        step.Scalar = (scalar < minScalar || scalar > 0x10FFFF || (scalar >= 0xD800 && scalar <= 0xDFFF))
+                          ? Replacement
+                          : scalar;
+        return step;
+    }
+
+    if (encoding == BomEncoding::Utf16Le || encoding == BomEncoding::Utf16Be)
+    {
+        if (size < 2)
+        {
+            if (!atEnd)
+            {
+                step.NeedMore = true;
+                return step;
+            }
+            step.Scalar = Replacement; // an odd trailing byte
+            step.Length = 1;
+            return step;
+        }
+        const std::uint16_t first = ReadUtf16(data, encoding);
+        if (IsHighSurrogate(first))
+        {
+            if (size < 4)
+            {
+                if (!atEnd)
+                {
+                    step.NeedMore = true;
+                    return step;
+                }
+                step.Scalar = Replacement;
+                step.Length = 2;
+                return step;
+            }
+            const std::uint16_t second = ReadUtf16(data + 2, encoding);
+            if (IsLowSurrogate(second))
+            {
+                step.Scalar = DecodeSurrogatePair(first, second);
+                step.Length = 4;
+                return step;
+            }
+            step.Scalar = Replacement;
+            step.Length = 2;
+            return step;
+        }
+        step.Scalar = IsLowSurrogate(first) ? Replacement : first;
+        step.Length = 2;
+        return step;
+    }
+
+    step.Scalar = data[0];
+    step.Length = 1;
+    return step;
+}
+
 DecodedRun DecodeBytes(BomEncoding encoding, const std::uint8_t* data, std::size_t size,
                        std::int64_t rawOffset, bool flush)
 {
@@ -224,128 +350,13 @@ DecodedRun DecodeBytes(BomEncoding encoding, const std::uint8_t* data, std::size
     run.Text.reserve(maxCells);
 
     std::size_t i = 0;
-    if (encoding == BomEncoding::Utf8)
+    while (i < size)
     {
-        while (i < size)
-        {
-            std::uint8_t lead = data[i];
-            std::uint32_t scalar = 0;
-            std::size_t need = 0;
-            std::uint32_t minScalar = 0;
-
-            if (lead < 0x80)
-            {
-                scalar = lead;
-                need = 1;
-            }
-            else if (lead >= 0xC2 && lead <= 0xDF)
-            {
-                scalar = lead & 0x1F;
-                need = 2;
-                minScalar = 0x80;
-            }
-            else if (lead >= 0xE0 && lead <= 0xEF)
-            {
-                scalar = lead & 0x0F;
-                need = 3;
-                minScalar = 0x800;
-            }
-            else if (lead >= 0xF0 && lead <= 0xF4)
-            {
-                scalar = lead & 0x07;
-                need = 4;
-                minScalar = 0x10000;
-            }
-            else
-            {
-                run.AppendCell(Replacement, rawOffset + (std::int64_t)i, rawOffset + (std::int64_t)i + 1);
-                ++i;
-                continue;
-            }
-
-            if (i + need > size)
-            {
-                if (!flush)
-                    break;
-                run.AppendCell(Replacement, rawOffset + (std::int64_t)i, rawOffset + (std::int64_t)size);
-                i = size;
-                break;
-            }
-
-            bool ok = true;
-            for (std::size_t j = 1; j < need; ++j)
-            {
-                if (!IsContinuation(data[i + j]))
-                {
-                    ok = false;
-                    break;
-                }
-                scalar = (scalar << 6) | (data[i + j] & 0x3F);
-            }
-
-            if (!ok)
-            {
-                run.AppendCell(Replacement, rawOffset + (std::int64_t)i, rawOffset + (std::int64_t)i + 1);
-                ++i;
-                continue;
-            }
-
-            if (scalar < minScalar || scalar > 0x10FFFF ||
-                (scalar >= 0xD800 && scalar <= 0xDFFF))
-            {
-                run.AppendCell(Replacement, rawOffset + (std::int64_t)i, rawOffset + (std::int64_t)i + (std::int64_t)need);
-            }
-            else
-            {
-                run.AppendCell(scalar, rawOffset + (std::int64_t)i, rawOffset + (std::int64_t)i + (std::int64_t)need);
-            }
-            i += need;
-        }
-    }
-    else
-    {
-        while (i + 1 < size)
-        {
-            std::int64_t start = rawOffset + (std::int64_t)i;
-            std::uint16_t first = ReadUtf16(data + i, encoding);
-            if (IsHighSurrogate(first))
-            {
-                if (i + 3 >= size)
-                {
-                    if (!flush)
-                        break;
-                    run.AppendCell(Replacement, start, start + 2);
-                    i += 2;
-                    continue;
-                }
-                std::uint16_t second = ReadUtf16(data + i + 2, encoding);
-                if (IsLowSurrogate(second))
-                {
-                    run.AppendCell(DecodeSurrogatePair(first, second), start, start + 4);
-                    i += 4;
-                }
-                else
-                {
-                    run.AppendCell(Replacement, start, start + 2);
-                    i += 2;
-                }
-            }
-            else if (IsLowSurrogate(first))
-            {
-                run.AppendCell(Replacement, start, start + 2);
-                i += 2;
-            }
-            else
-            {
-                run.AppendCell(first, start, start + 2);
-                i += 2;
-            }
-        }
-        if (i < size && flush)
-        {
-            run.AppendCell(Replacement, rawOffset + (std::int64_t)i, rawOffset + (std::int64_t)size);
-            i = size;
-        }
+        const ScalarStep step = NextScalar(encoding, data + i, size - i, flush);
+        if (step.NeedMore || step.Length == 0)
+            break;
+        run.AppendCell(step.Scalar, rawOffset + (std::int64_t)i, rawOffset + (std::int64_t)(i + step.Length));
+        i += step.Length;
     }
     run.RawBytesConsumed = i;
     return run;

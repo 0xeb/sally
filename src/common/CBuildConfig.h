@@ -289,9 +289,10 @@ struct CBuildConfig
     CBuildCancelPoll CancelPollCallback = nullptr;
     void* CancelPollContext = nullptr;
 
-    // Change-attributes tranche. Opt-in; DEFAULT OFF so the production gate
-    // still routes ChangeAttrs to legacy. When on, the builder emits ocChangeAttrs
-    // ops. The new attributes are (sourceAttr & ChangeAttrsAnd) | ChangeAttrsOr.
+    // Change attributes. When on, the builder emits ocChangeAttrs ops; the new
+    // attributes are (sourceAttr & ChangeAttrsAnd) | ChangeAttrsOr. A compression
+    // or encryption change only sizes the ops for progress here; the worker does
+    // the actual compress/encrypt work from the dialog data.
     BOOL EnableChangeAttrs = FALSE;
     DWORD ChangeAttrsAnd = 0xFFFFFFFF;
     DWORD ChangeAttrsOr = 0;

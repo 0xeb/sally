@@ -52,8 +52,6 @@ BOOL CompresBugReports(CCompressParams* compressParams)
                     compressParams->ErrorMessage = error != NULL ? error : L"The 7-Zip wrapper could not create the archive.";
                 CoTaskMemFree(error);
                 ret &= res;
-                if (!ReportOldBugs)
-                    break;
             }
         }
         else

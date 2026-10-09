@@ -1271,7 +1271,7 @@ BEGIN
         MENUITEM "В&ставить",                      CM_STRM_PASTE
         MENUITEM "&Удалить",                     CM_STRM_DELETE
         MENUITEM SEPARATOR
-        MENUITEM "Выделить &все",                 CM_STRM_SELECTALL
+        MENUITEM "Выделить вс&е",                 CM_STRM_SELECTALL
     END
 END
 

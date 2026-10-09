@@ -6,7 +6,7 @@
 #define IDC_ABOUT_FRAME                 2001
 #define IDC_ABOUT_TITLE                 2007
 #define IDC_ABOUT_PVW32                 2008
-#define IDC_ABOUT_EMAIL                 2009
+#define IDC_ABOUT_SUPPORT               2009
 #define IDC_ABOUT_WWW                   2010
 #define IDC_ABOUT_COPYRIGHT             2011
 #define IDC_ABOUT_ICON                  2013

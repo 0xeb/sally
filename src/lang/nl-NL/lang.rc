@@ -2001,23 +2001,22 @@ BEGIN
     PUSHBUTTON      "Help",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Sally Fout Rapportage"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Er is een probleem opgetreden waardoor Sally afgesloten wordt. U kunt ons helpen om vergelijkbare problemen in de toekomst te vermijden door ons een Fout Rapport te zenden.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Privacy beleid: wij geven geen enkele informatie aan derden verder.",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "Fout beschrijving (optioneel)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "Rapport &inzien",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "&Laatste actie:",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "&Contacteer email:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "&Sally herstarten",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "Rapport &zenden",IDOK,158,176,90,14
-    PUSHBUTTON      "&Rapport niet zenden",IDCANCEL,254,176,90,14
+    LTEXT           "Sally is gestopt door een probleem en er is een crashrapport op deze computer opgeslagen. Meld het probleem op GitHub: Sally opent in uw browser een nieuwe issue met een korte samenvatting, die u kunt nakijken voordat u deze indient.",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "Fout beschrijving (optioneel)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "Rapport &inzien",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "&Laatste actie:",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "De samenvatting bevat alleen versies, de fout en functienamen. Het volledige rapport blijft op deze computer en kan privégegevens bevatten; voeg het daarom niet toe aan de openbare issue. Een beheerder kan u er privé om vragen.",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "&Sally herstarten",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "Melden op &GitHub",IDOK,62,179,90,14
+    PUSHBUTTON      "Map &openen",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "Sluiten",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -3938,7 +3937,7 @@ IDS_OLDPLUGINVERSION2, "De plugin (%s) wordt niet door deze versie van Sally ond
  IDS_ACLNOTSUPPORTEDONTGTPATH, "Eigenaren en machtigingen kunnen niet worden bewaard. Ze worden niet ondersteund \nop het doelpad (het is geen NTFS-volume).\n\nWilt u doorgaan?"
 
  IDS_BUGREPORTCNFRM_TITLE, "Een fout melden"
- IDS_BUGREPORTCNFRM_TEXT, "Voor foutmeldingen of functieverzoeken kunt u gebruik maken van menu Help> Officiële Technische Dienst. \n\nGebruik dit foutrapport alleen voor het sturen van gevoelige gegevens of wanneer wij u specifiek hierom vragen."
+ IDS_BUGREPORTCNFRM_TEXT, "Voor foutmeldingen of functieverzoeken kunt u een issue openen op https://github.com/0xeb/sally/issues.\n\nGebruik dit foutrapport alleen voor het sturen van gevoelige gegevens of wanneer wij u specifiek hierom vragen."
  IDS_BUGREPORT_WRITTEN, "Het foutrapport is weggeschreven naar:"
  IDS_BUGREPORT_FAILED, "Het foutrapport kon niet worden weggeschreven."
  IDS_SHELLMENU_NOSHELLITEMS, "Windows kon geen contextmenu leveren voor de geselecteerde items."
@@ -4080,37 +4079,13 @@ IDS_OLDPLUGINVERSION2, "De plugin (%s) wordt niet door deze versie van Sally ond
  
  IDS_AS_ADMIN_TITLE, "Administrator"
 
- IDS_SALMON_INVALIDEMAIL "Vul een geldig e-mailadres in, zodat we u kunnen helpen met het gerapporteerde probleem."
- IDS_SALMON_WAITFORUPLOAD "Wacht a.u.b. totdat compressie en upload is voltooid."
- IDS_SALMON_CONFIRMEXIT "Weet je zeker dat je ons niet wilt laten weten over dit probleem? Zonder uw rapport zullen wij niet in staat zijn om het te verhelpen.\n\nKlik op OK om rapport zonder ons te laten weten te verwijderen." 
- IDS_SALMON_ERR_INI_SIZE "Het geüploade bestand overschrijdt de toegestane grootte. Code:%d."
- IDS_SALMON_ERR_PARTIAL "Het geüploade bestand is gedeeltelijk geüpload. Code: %d."
- IDS_SALMON_ERR_NO_FILE "Geen bestand werd geüpload. Code: %d."
- IDS_SALMON_ERR_NO_TMP_DIR "Mist een tijdelijk map. Code: %d."
- IDS_SALMON_ERR_CANT_WRITE "Kan niet naar de schijf schrijven. Code: %d."
- IDS_SALMON_ERR_EXTENSION "Een extensie heeft de upload van het bestand gestopt. Code: %d."
- IDS_SALMON_ERR_UNKNOWN "Onbekende upload fout. Code: %d."
- IDS_SALMON_SYNTAX_ERROR_CLOSE "Syntax fout in server antwoord. Close tag werd niet gevonden."
- IDS_SALMON_SYNTAX_ERROR_OPEN "Syntax fout in server antwoord. Open tag werd niet gevonden."
- IDS_SALMON_SYNTAX_ERROR_VALUE "Syntax fout in server antwoord. Waarde niet gevonden."
- IDS_SALMON_SOCK_ERR_RECV "Kan geen gegevens ontvangen. Code: %d."
- IDS_SALMON_SOCK_ERR_SHUTDOWN "Kan verbinding niet sluiten. Code: %d."
- IDS_SALMON_SOCK_ERR_SEND "Kan geen gegevens zenden. Code: %d."
- IDS_SALMON_SOCK_ERR_CONNECT "Kan niet met server verbinden. Code: %d."
- IDS_SALMON_SOCK_ERR_SOCKET "Kan verbinding niet openen. Code: %d."
- IDS_SALMON_SOCK_ERR_HOST "Kan host naam niet vinden. Code: %d."
- IDS_SALMON_SOCK_ERR_INIT "Kan verbinding niet initialiseren. Code: %d."
- IDS_SALMON_READING_FILE "Fout bij lezen van bestand %s" 
- IDS_SALMON_OUT_OF_MEMORY "Geen geheugen meer" 
- IDS_SALMON_FILE_SIZE "Determineren van bestandsgrootte voor %s is mislukt"
- IDS_SALMON_FILE_OPEN "Kan %s niet openen"
- IDS_SALMON_MORE_REPORTS "Sommige oudere fout rapporten werden gevonden. Wilt u deze ook aan ons melden en ons ??helpen Sally te verbeteren?\n\nKlik op Ja om oude fout rapporten te verwerken. Klik op Nee om oude fout rapporten te verwijderen."
+ IDS_SALMON_WAIT "Wacht tot het crashrapport is opgeslagen."
+ IDS_SALMON_CONFIRMEXIT "Sluiten zonder het probleem te melden?\n\nHet crashrapport wordt van deze computer verwijderd."
  IDS_SALMON_TITLE "Sally Bug Reporter"
  IDS_SALMON_COMPRESSING "Comprimeren, wachten a.u.b..."
- IDS_SALMON_UPLOADING "Uploaden, wacht a.u.b..."
- IDS_SALMON_UPLOADSUCCESS "Rapport is geüpload.\n\nBedankt voor uw hulp bij het verbeteren van Sally!" 
- IDS_SALMON_UPLOADFAILED "Rapport upload is mislukt, reden:%s\n\nMaak a.u.b. een issue aan op https://github.com/0xeb/sally/issues en voeg het rapport toe, verwijder het rapport daarna van uw harde schijf. Klik op OK om het rapport te tonen."
- IDS_SALMON_COMPRESSFAILED "Rapport compressie is mislukt, reden:%s\n\nPak a.u.b. uw fout rapport in met 7-Zip, voeg het toe aan een nieuw issue op https://github.com/0xeb/sally/issues, en verwijder daarna de rapport bestanden van uw harde schijf. Klik op OK om het rapport te tonen."
+ IDS_SALMON_COMPRESSFAILED "Het crashrapport kon niet worden ingepakt, reden: %s\n\nDe bestanden zijn ongewijzigd bewaard. Klik op OK om ze te tonen."
+ IDS_SALMON_GITHUB_OPENED "Er is een nieuwe GitHub-issue geopend in uw browser. Kijk deze na en dien deze in.\n\nHet crashrapport is opgeslagen in:\n%s\n\nHet kan privégegevens bevatten, dus publiceer het niet. Als een beheerder het nodig heeft, vraagt die er in de issue om."
+ IDS_SALMON_GITHUB_FAILED "Sally kon uw webbrowser niet openen.\n\nMeld het probleem op https://github.com/0xeb/sally/issues en beschrijf wat u aan het doen was. Het crashrapport is opgeslagen in:\n%s"
  IDS_SALMON_LOAD_FAILED "Laden van %s is mislukt."
  IDS_SALMON_WRONG_CMDLINE "Dit is een intern Sally hulpprogramma, start dit a.u.b. niet direct."
  IDS_SALMON_WRONG_VERSION "Foutieve versie van Sally Bug Reporter. Meld dit a.u.b. op https://github.com/0xeb/sally/issues."

@@ -2040,23 +2040,22 @@ BEGIN
     PUSHBUTTON      "Help",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Sally Bug Reporter"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "A problem has occured, forcing Sally to close. To help us avoid similar problems in the future, please send an error report below.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Privacy Policy: we don't give out any of your information to any third party.",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "Error description (optional)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "&View Report",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "&Last action:",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "&Contact email:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "&Restart Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "&Send Report",IDOK,158,176,90,14
-    PUSHBUTTON      "&Do Not Send Report",IDCANCEL,254,176,90,14
+    LTEXT           "Sally stopped because of a problem, and a crash report was saved on this computer. Please report the problem on GitHub: Sally opens a new issue in your browser with a short summary, which you can review before you submit it.",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "Error description (optional)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "&View Report",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "&Last action:",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "The summary holds only versions, the error and function names. The full report stays on this computer and can contain private data, so do not attach it to the public issue; a maintainer may ask you for it privately.",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "&Restart Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "Report on &GitHub",IDOK,62,179,90,14
+    PUSHBUTTON      "&Open Report Folder",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "Close",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -2273,8 +2272,8 @@ BEGIN
     BEGIN
         LEFTMARGIN, 8
         RIGHTMARGIN, 344
-        TOPMARGIN, 9
-        BOTTOMMARGIN, 190
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 193
     END
 
     IDD_CONFIRMLINKTGTCOPY, DIALOG

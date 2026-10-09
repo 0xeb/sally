@@ -208,12 +208,12 @@ target_sources(sally PRIVATE ${SAL_CORE_LANG_RC})
 add_executable(salmon WIN32
   "${SAL_SRC}/salmon/compress.cpp"
   "${SAL_SRC}/salmon/config.cpp"
+  "${SAL_SRC}/salmon/crash_issue.cpp"
   "${SAL_SRC}/salmon/dialogs.cpp"
   "${SAL_SRC}/salmon/minidump.cpp"
   "${SAL_SRC}/salmon/precomp.cpp"
   "${SAL_SRC}/salmon/salmon.cpp"
   "${SAL_SRC}/salmon/salmon_unicode.cpp"
-  "${SAL_SRC}/salmon/upload.cpp"
   "${SAL_SRC}/salmon/salmon.rc"
   # Common library sources
   "${SAL_SRC}/common/winlib.cpp"
@@ -251,7 +251,7 @@ target_compile_definitions(salmon PRIVATE
 )
 
 target_link_libraries(salmon PRIVATE
-  comctl32 shlwapi wininet ws2_32
+  comctl32 shlwapi
 )
 
 if(MSVC)

@@ -35,7 +35,7 @@ CAPTION "Versionsprüfung - Konfiguration"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Interneteinstellungen:",IDC_STATIC_1,11,8,330,8
-    GROUPBOX        "Beim Start von &Sally die Versionsprüfung aufrufen",IDC_STATIC_2,5,21,347,74,WS_GROUP
+    GROUPBOX        "&Beim Start von Sally die Versionsprüfung aufrufen",IDC_STATIC_2,5,21,347,74,WS_GROUP
     CONTROL         "Niemals",IDC_CFG_NEVER,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,13,32,60,12
     CONTROL         "Jeden Tag",IDC_CFG_DAY,"Button",BS_AUTORADIOBUTTON,107,32,60,12
     CONTROL         "Jede Woche",IDC_CFG_WEEK,"Button",BS_AUTORADIOBUTTON,232,32,60,12

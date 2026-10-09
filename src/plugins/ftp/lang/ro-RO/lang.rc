@@ -1194,7 +1194,7 @@ BEGIN
         POPUP "&Insereaza"
         BEGIN
             MENUITEM "I&nceperea Regulei",              CM_STRM_RULESTART
-            MENUITEM "&Sfarsitul Regulei",                CM_STRM_RULEEND
+            MENUITEM "S&farsitul Regulei",                CM_STRM_RULEEND
             MENUITEM "Comentariu de &Linie",               CM_STRM_COMMENT
             MENUITEM SEPARATOR
             POPUP "&Sari peste"
@@ -1255,7 +1255,7 @@ BEGIN
                 MENUITEM "Sirul se Termina cu Sir",     CM_STRM_OPERENDWITH
                 MENUITEM "Sirul nu se Termina cu Sir", CM_STRM_OPERNOTENDWITH
             END
-            POPUP "Alt&ele"
+            POPUP "Al&tele"
             BEGIN
                 MENUITEM "Continua Doar Daca",            CM_STRM_IF
                 MENUITEM "Adauga Sir La Coloana",        CM_STRM_ADDSTRTOCOL

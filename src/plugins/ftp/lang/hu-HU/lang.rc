@@ -1232,7 +1232,7 @@ BEGIN
                 MENUITEM "Unix eszköz",                 CM_STRM_ASGNUNIXDEV
                 MENUITEM "Kifejezés",                  CM_STRM_ASGNEXPR
             END
-            POPUP "&Szóközök levágása az oszlopban"
+            POPUP "Szóközök &levágása az oszlopban"
             BEGIN
                 MENUITEM "Kezdő",                     CM_STRM_CUTWSINIT
                 MENUITEM "Záró",                    CM_STRM_CUTWSTRAIL

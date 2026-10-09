@@ -2001,23 +2001,22 @@ BEGIN
     PUSHBUTTON      "Nápověda",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Hlášení chyby programu Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Došlo k problému, který si vynutil zavření programu Sally. Odešlete nám prosím hlášení o této chybě, abychom problému mohli předejít.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Ochrana osobních údajů: žádnou z vašich informací nedáme třetí osobě.",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "Popis chyby (nepovinné)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "&Zobrazit hlášení",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "&Poslední akce:",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "&Kontaktní email:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "Zno&vu spustit Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "&Odeslat hlášení",IDOK,158,176,90,14
-    PUSHBUTTON      "&Neodesílat hlášení",IDCANCEL,254,176,90,14
+    LTEXT           "Program Sally byl ukončen kvůli problému a v tomto počítači bylo uloženo hlášení o pádu. Nahlaste prosím problém na GitHubu: Sally otevře v prohlížeči nové issue se stručným souhrnem, který si před odesláním můžete zkontrolovat.",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "Popis chyby (nepovinné)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "&Zobrazit hlášení",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "&Poslední akce:",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Souhrn obsahuje jen verze, chybu a názvy funkcí. Úplné hlášení zůstává v tomto počítači a může obsahovat soukromá data, proto ho k veřejnému issue nepřikládejte; správce vás o něj může požádat soukromě.",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "Zno&vu spustit Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "Nahlásit na &GitHubu",IDOK,62,179,90,14
+    PUSHBUTTON      "&Otevřít složku",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "Zavřít",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -3938,7 +3937,7 @@ IDS_OLDPLUGINVERSION2, "Tento plugin (%s) není podporovaný v této verzi Sally
  IDS_ACLNOTSUPPORTEDONTGTPATH, "Vlastníky a práva nelze zachovat. Nejsou podporovány na cílové\ncestě (nejde o NTFS svazek).\n\nChcete pokračovat?"
 
  IDS_BUGREPORTCNFRM_TITLE, "Zaslat zprávu o chybě"
- IDS_BUGREPORTCNFRM_TEXT, "Pro oznámení chyb nebo žádosti o novou vlastnost programu prosím použijte nabídku Nápověda > Oficiální fórum podpory.\n\nToto hlášení chyby použijte pouze pro odeslání citlivých dat nebo pokud Vás o to požádáme."
+ IDS_BUGREPORTCNFRM_TEXT, "Chyby a žádosti o nové funkce prosím hlaste na https://github.com/0xeb/sally/issues.\n\nToto hlášení chyby použijte pouze pro odeslání citlivých dat nebo pokud Vás o to požádáme."
  IDS_BUGREPORT_WRITTEN, "Zpráva o chybě byla zapsána do:"
  IDS_BUGREPORT_FAILED, "Zprávu o chybě se nepodařilo zapsat."
  IDS_SHELLMENU_NOSHELLITEMS, "Systém Windows nedokázal poskytnout místní nabídku pro vybrané položky."
@@ -4080,37 +4079,13 @@ IDS_OLDPLUGINVERSION2, "Tento plugin (%s) není podporovaný v této verzi Sally
  
  IDS_AS_ADMIN_TITLE, "Správce"
 
- IDS_SALMON_INVALIDEMAIL "Zadejte prosím validní emailovou adresu, abychom Vám mohli s hlášeným problémem pomoci."
- IDS_SALMON_WAITFORUPLOAD "Počkejte prosím na dokončení komprimace a nahrání dat."
- IDS_SALMON_CONFIRMEXIT "Opravdu nás nechcete informovat o tomto problému? Bez hlášení o chybě nebudeme schopni problém opravit.\n\nKlikněte na tlačítko OK pro odstranění hlášení bez jeho odeslání." 
- IDS_SALMON_ERR_INI_SIZE "Nahrávaný soubor překračuje povolenou velikost. Kód: %d."
- IDS_SALMON_ERR_PARTIAL "Soubor byl nahrán pouze částečně. Kód: %d."
- IDS_SALMON_ERR_NO_FILE "Soubor nebyl nahrán. Kód: %d."
- IDS_SALMON_ERR_NO_TMP_DIR "Chybějící dočasný adresář. Kód: %d."
- IDS_SALMON_ERR_CANT_WRITE "Chyba při zápisu souboru na disk. Kód: %d."
- IDS_SALMON_ERR_EXTENSION "Rozšíření přerušilo nahrávání souboru. Kód: %d."
- IDS_SALMON_ERR_UNKNOWN "Neznámá chyba při nahrávání souboru. Kód: %d."
- IDS_SALMON_SYNTAX_ERROR_CLOSE "Syntaktická chyba v odpovědi serveru. Zavírací značka nebyla nalezena."
- IDS_SALMON_SYNTAX_ERROR_OPEN "Syntaktická chyba v odpovědi serveru. Otevírací značka nebyla nalezena."
- IDS_SALMON_SYNTAX_ERROR_VALUE "Syntaktická chyba v odpovědi serveru. Hodnota nebyla nalezena."
- IDS_SALMON_SOCK_ERR_RECV "Nelze přijmout data. Kód: %d."
- IDS_SALMON_SOCK_ERR_SHUTDOWN "Nelze zavřít připojení. Kód: %d."
- IDS_SALMON_SOCK_ERR_SEND "Nelze odeslat data. Kód: %d."
- IDS_SALMON_SOCK_ERR_CONNECT "Nelze se připojit na server. Kód: %d."
- IDS_SALMON_SOCK_ERR_SOCKET "Nelze navázat spojení. Kód: %d."
- IDS_SALMON_SOCK_ERR_HOST "Nelze získat adresu serveru. Kód: %d."
- IDS_SALMON_SOCK_ERR_INIT "Nelze inicializovat spojení. Kód: %d."
- IDS_SALMON_READING_FILE "Chyba čtení souboru %s" 
- IDS_SALMON_OUT_OF_MEMORY "Nedostatek paměti" 
- IDS_SALMON_FILE_SIZE "Chyba při získávání velikosti souboru %s"
- IDS_SALMON_FILE_OPEN "Chyba při otevírání %s"
- IDS_SALMON_MORE_REPORTS "Nalezeno starší chybové hlášení. Přejete si odeslat také tato hlášení a pomoci nám vylepšit Sally?\n\nStiskněte tlačítko Ano pro odeslání starých chybových hlášení. Stiskněte tlačítko Ne pro jejich odstranění."
+ IDS_SALMON_WAIT "Počkejte prosím, než se hlášení o pádu uloží."
+ IDS_SALMON_CONFIRMEXIT "Zavřít bez nahlášení problému?\n\nHlášení o pádu bude z tohoto počítače odstraněno."
  IDS_SALMON_TITLE "Chybové hlášení programu Sally"
  IDS_SALMON_COMPRESSING "Probíhá komprimace, čekejte prosím..."
- IDS_SALMON_UPLOADING "Probíhá nahrávání, čekejte prosím..."
- IDS_SALMON_UPLOADSUCCESS "Hlášení bylo úspěšně nahráno.\n\nDěkujeme, že nám pomáháte vylepšovat Sally!" 
- IDS_SALMON_UPLOADFAILED "Selhalo nahrání chybového hlášení, důvod: %s\n\nZaložte prosím issue na https://github.com/0xeb/sally/issues a přiložte chybové hlášení, poté hlášení odstraňte z pevného disku. Stiskněte tlačítko OK pro zobrazení chybového hlášení."
- IDS_SALMON_COMPRESSFAILED "Selhala komprimace chybového hlášení, důvod: %s\n\nZabalte prosím chybové hlášení pomocí 7-Zip, přiložte ho k novému issue na https://github.com/0xeb/sally/issues a následně odstraňte soubory z pevného disku. Stiskněte tlačítko OK pro zobrazení chybového hlášení."
+ IDS_SALMON_COMPRESSFAILED "Hlášení o pádu se nepodařilo zabalit, důvod: %s\n\nJeho soubory zůstaly beze změny. Klikněte na OK pro jejich zobrazení."
+ IDS_SALMON_GITHUB_OPENED "V prohlížeči je otevřené nové issue na GitHubu. Zkontrolujte ho prosím a odešlete.\n\nHlášení o pádu bylo uloženo do:\n%s\n\nMůže obsahovat soukromá data, proto ho nezveřejňujte. Pokud ho správce bude potřebovat, požádá o něj v issue."
+ IDS_SALMON_GITHUB_FAILED "Program Sally nemohl otevřít webový prohlížeč.\n\nNahlaste prosím problém na https://github.com/0xeb/sally/issues a popište, co jste dělali. Hlášení o pádu bylo uloženo do:\n%s"
  IDS_SALMON_LOAD_FAILED "Načtení %s selhalo."
  IDS_SALMON_WRONG_CMDLINE "Toto je interní nástroj programu Sally, nespouštějte ho prosím přímo."
  IDS_SALMON_WRONG_VERSION "Nesprávná verze programu Chybová hlášení programu Sally. Nahlaste to prosím na https://github.com/0xeb/sally/issues."

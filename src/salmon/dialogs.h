@@ -9,7 +9,6 @@
 enum CDialogTaskEnum
 {
     dteCompress,
-    dteUpload,
     dteMinidump,
     dteDialog
 };
@@ -19,20 +18,17 @@ class CMainDialog : public CDialog
 protected:
     HFONT HBoldFont;
     BOOL Compressing;
-    BOOL Uploading;
     BOOL Minidumping;
-    int UploadingIndex; // index into the BugReports array we are currently uploading
     CCompressParams CompressParams;
-    CUploadParams UploadParams;
     CMinidumpParams MinidumpParams;
     std::wstring CurrentProgressText;
-    BOOL MinidumpOnOpen; // should minidump generation start after opening the window?
+    BOOL MinidumpOnOpen;    // should minidump generation start after opening the window?
+    std::wstring IssueAddress; // the new GitHub issue, filled in from the newest report
 
 public:
     CMainDialog(HINSTANCE modul, int resID, BOOL minidumpOnOpen);
     ~CMainDialog();
 
-    virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
@@ -41,5 +37,7 @@ protected:
     void ShowChilds(CDialogTaskEnum task, BOOL enable);
     void CenterControl(int resID);
 
-    BOOL StartUploadIndex(int index);
+    // Opens the prepared issue in the browser and closes the reporter; 'packed' tells whether
+    // the report files were packed into archives, which are then all that is kept of them.
+    void FinishReport(BOOL packed);
 };

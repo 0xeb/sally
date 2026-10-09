@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+#include "crash_issue.h"
+#include "salmon_unicode.h"
+
 //*****************************************************************************
 //
 // MultiMonCenterWindow
@@ -191,7 +194,6 @@ CMainDialog::CMainDialog(HINSTANCE hInstance, int resID, BOOL minidumpOnOpen)
 {
     HBoldFont = NULL;
     Compressing = FALSE;
-    Uploading = FALSE;
     Minidumping = FALSE;
     MinidumpOnOpen = minidumpOnOpen;
 }
@@ -214,10 +216,9 @@ void CMainDialog::ShowChilds(CDialogTaskEnum task, BOOL show)
                  IDC_SALMON_DESCRIPTION,
                  IDC_SALMON_ACTION_LABEL,
                  IDC_SALMON_ACTION,
-                 IDC_SALMON_EMAIL_LABEL,
-                 IDC_SALMON_EMAIL,
                  IDC_SALMON_RESTART,
                  IDOK,
+                 IDC_SALMON_FOLDER,
                  IDCANCEL,
                  -1};
     for (int i = 0; ids[i] != -1; i++)
@@ -225,16 +226,13 @@ void CMainDialog::ShowChilds(CDialogTaskEnum task, BOOL show)
     if (!show)
     {
         // set the size of the child window according to the content
-        HWND hChild = GetDlgItem(HWindow, IDC_SALMON_UPLOADING);
+        HWND hChild = GetDlgItem(HWindow, IDC_SALMON_PROGRESS);
         std::wstring text;
         int resID = 0;
         switch (task)
         {
         case dteCompress:
             resID = IDS_SALMON_COMPRESSING;
-            break;
-        case dteUpload:
-            resID = IDS_SALMON_UPLOADING;
             break;
         case dteMinidump:
             resID = IDS_SALMON_MINIDUMP;
@@ -261,9 +259,9 @@ void CMainDialog::ShowChilds(CDialogTaskEnum task, BOOL show)
         sz.cx += 3; // just to be sure
         sz.cy += 1;
         SetWindowPos(hChild, NULL, 0, 0, sz.cx, sz.cy, SWP_NOZORDER | SWP_NOMOVE);
-        CenterControl(IDC_SALMON_UPLOADING);
+        CenterControl(IDC_SALMON_PROGRESS);
     }
-    ShowWindow(GetDlgItem(HWindow, IDC_SALMON_UPLOADING), show ? SW_HIDE : SW_SHOW);
+    ShowWindow(GetDlgItem(HWindow, IDC_SALMON_PROGRESS), show ? SW_HIDE : SW_SHOW);
 }
 
 void CMainDialog::CenterControl(int resID)
@@ -275,75 +273,54 @@ void CMainDialog::CenterControl(int resID)
     SetWindowPos(GetDlgItem(HWindow, resID), NULL, (wR.right - cR.right) / 2, (wR.bottom - cR.bottom) / 2, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
 }
 
-void StripWhiteSpaces(std::wstring& text)
-{
-    const size_t begin = text.find_first_not_of(L" \t");
-    if (begin == std::wstring::npos)
-    {
-        text.clear();
-        return;
-    }
-    const size_t end = text.find_last_not_of(L" \t");
-    text = text.substr(begin, end - begin + 1);
-}
-
-BOOL ValidateEmail(const wchar_t* buff) // primitive check of the email's syntactic validity
-{
-    // assumes leading/trailing whitespace is trimmed
-    const wchar_t* s = buff;
-    // the string must not be empty
-    if (*s == 0)
-        return FALSE;
-    // some character other than the at sign must precede it
-    if (*s == '@')
-        return FALSE;
-    // search for the at sign
-    while (*s != '@' && *s != 0)
-        s++;
-    // if we did not find it, the email is not valid
-    if (*s != '@')
-        return FALSE;
-    s++;
-    // the email cannot end with the at sign
-    if (*s == 0)
-        return FALSE;
-    // there must not be another at sign
-    while (*s != '@' && *s != 0)
-        s++;
-    if (*s == '@')
-        return FALSE;
-    return TRUE;
-}
-
-void CMainDialog::Validate(CTransferInfo& ti)
-{
-    std::wstring email;
-    ti.EditLineW(IDC_SALMON_EMAIL, email);
-    StripWhiteSpaces(email);
-    if (!email.empty() && !ValidateEmail(email.c_str()))
-    {
-        // wide: LoadStrW() is a new sibling of this module's LoadStr(), same
-        // rotating-buffer pattern with LoadStringW.
-        MessageBoxW(HWindow, LoadStrW(IDS_SALMON_INVALIDEMAIL, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
-        ti.ErrorOn(IDC_SALMON_EMAIL);
-    }
-}
-
 void CMainDialog::Transfer(CTransferInfo& ti)
 {
     ti.EditLineW(IDC_SALMON_ACTION, Config.Description);
-    ti.EditLineW(IDC_SALMON_EMAIL, Config.Email);
 }
 
-BOOL CMainDialog::StartUploadIndex(int index)
+// The new-issue address for the newest report: a summary of the crash that holds no private data,
+// and the user's own description of what they were doing.
+static std::wstring ComposeIssueAddress()
 {
-    UploadParams = {};
-    UploadParams.FileName = BugReportPath;
-    UploadParams.FileName += BugReports[index].Name;
-    UploadParams.FileName += L".7Z";
-    BOOL ret = StartUploadThread(&UploadParams);
-    ShowChilds(dteUpload, FALSE);
-    return ret;
+    std::string report;
+    if (!BugReports.empty())
+        ReadBugReportText(BugReports[0], report);
+    const sally::salmon::CrashSummary summary = sally::salmon::SummarizeBugReport(report);
+    std::string lastAction;
+    if (!sally::salmon::EncodeUtf8(Config.Description, lastAction))
+        lastAction.clear();
+    const std::string address = sally::salmon::BuildCrashIssueAddress(summary, lastAction,
+                                                                      GetUniqueBugReportCount() - 1);
+    return std::wstring(address.begin(), address.end()); // percent-encoded, so ASCII only
+}
+
+void CMainDialog::FinishReport(BOOL packed)
+{
+    ShowChilds(dteDialog, TRUE);
+    const BOOL opened = OpenWithShell(HWindow, IssueAddress.c_str());
+    if (packed)
+    {
+        // The archives hold the reports from now on; the reporter does not offer them again.
+        CleanBugReportsDirectory(TRUE);
+        const std::wstring msg = FormatText(LoadStrW(opened ? IDS_SALMON_GITHUB_OPENED : IDS_SALMON_GITHUB_FAILED, HLanguage).c_str(),
+                                            BugReportPath.c_str());
+        MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(),
+                    MB_OK | (opened ? MB_ICONINFORMATION : MB_ICONEXCLAMATION) | MB_SETFOREGROUND);
+    }
+    else
+    {
+        if (!opened)
+        {
+            const std::wstring msg = FormatText(LoadStrW(IDS_SALMON_GITHUB_FAILED, HLanguage).c_str(), BugReportPath.c_str());
+            MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+        }
+        const std::wstring msg = FormatText(LoadStrW(IDS_SALMON_COMPRESSFAILED, HLanguage).c_str(), CompressParams.ErrorMessage.c_str());
+        MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+        OpenFolder(NULL, BugReportPath.c_str());
+    }
+    if (IsDlgButtonChecked(HWindow, IDC_SALMON_RESTART) == BST_CHECKED)
+        RestartSalamander(HWindow);
+    PostQuitMessage(0);
 }
 
 INT_PTR
@@ -364,7 +341,7 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         MultiMonCenterWindow(HWindow, NULL, FALSE);
 
         ShowChilds(dteDialog, TRUE);
-        CenterControl(IDC_SALMON_UPLOADING);
+        CenterControl(IDC_SALMON_PROGRESS);
 
         LOGFONT lf;
         HFONT hFont = (HFONT)SendMessage(GetDlgItem(HWindow, IDC_SALMON_DESCRIPTION), WM_GETFONT, 0, 0);
@@ -410,14 +387,14 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (!AppIsBusy && wParam == 666) // skip updates while a message box is up; we do not want another one
         {
-            if (Compressing || Uploading || Minidumping)
+            if (Compressing || Minidumping)
             {
                 static DWORD counter = 0;
                 counter++;
                 std::wstring text = CurrentProgressText;
                 if (text.size() > 3 && text.compare(text.size() - 3, 3, L"...") == 0)
                     text.resize(text.size() - 3 + (counter % 4));
-                HWND hChild = GetDlgItem(HWindow, IDC_SALMON_UPLOADING);
+                HWND hChild = GetDlgItem(HWindow, IDC_SALMON_PROGRESS);
                 SetWindowTextW(hChild, text.c_str());
             }
 
@@ -432,68 +409,14 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
                 }
 
-                if (GetBugReportNames() && GetUniqueBugReportCount() > 1)
-                {
-                    // if multiple reports exist, ask whether to send them all
-                    // wide: same LoadStrW infra added for this file (233).
-                    int res = MessageBoxW(HWindow, LoadStrW(IDS_SALMON_MORE_REPORTS, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND);
-                    ReportOldBugs = (res == IDYES);
-                }
-                // bring back the main dialog along with the question prompt
+                GetBugReportNames();
                 ShowChilds(dteDialog, TRUE);
             }
 
             if (Compressing && !IsCompressThreadRunning())
             {
                 Compressing = FALSE;
-
-                if (CompressParams.Result)
-                {
-                    // start the upload thread
-                    UploadingIndex = 0;
-                    Uploading = StartUploadIndex(UploadingIndex);
-                }
-                else
-                {
-                    const std::wstring msg = FormatText(LoadStrW(IDS_SALMON_COMPRESSFAILED, HLanguage).c_str(), CompressParams.ErrorMessage.c_str());
-                    MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
-                    OpenFolder(NULL, BugReportPath.c_str());
-                    PostQuitMessage(0);
-                }
-            }
-
-            if (Uploading && !IsUploadThreadRunning())
-            {
-                Uploading = FALSE;
-                ShowChilds(dteDialog, TRUE);
-
-                if (UploadParams.Result)
-                {
-                    if (static_cast<size_t>(UploadingIndex + 1) < BugReports.size() && ReportOldBugs)
-                    {
-                        // start uploading the next file
-                        UploadingIndex++;
-                        Uploading = StartUploadIndex(UploadingIndex);
-                    }
-                    else
-                    {
-                        // wide: same LoadStrW infra added for this file's other
-                        // site (233).
-                        MessageBoxW(HWindow, LoadStrW(IDS_SALMON_UPLOADSUCCESS, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
-                        CleanBugReportsDirectory(FALSE); // clean first so Salamander does not complain when it starts
-                        if (IsDlgButtonChecked(HWindow, IDC_SALMON_RESTART) == BST_CHECKED)
-                            RestartSalamander(HWindow);
-                        PostQuitMessage(0);
-                    }
-                }
-                else
-                {
-                    const std::wstring msg = FormatText(LoadStrW(IDS_SALMON_UPLOADFAILED, HLanguage).c_str(), UploadParams.ErrorMessage.c_str());
-                    MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
-                    CleanBugReportsDirectory(TRUE); // delete the reports, keep only the archives
-                    OpenFolder(NULL, BugReportPath.c_str());
-                    PostQuitMessage(0);
-                }
+                FinishReport(CompressParams.Result);
             }
         }
         return 0;
@@ -505,25 +428,28 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDOK:
         {
-            if (!ValidateData() || !TransferData(ttDataFromWindow))
+            if (Compressing || Minidumping || !TransferData(ttDataFromWindow))
                 return TRUE;
-            SaveDescriptionAndEmail();
+            SaveDescription();
+            IssueAddress = ComposeIssueAddress();
 
+            // pack the reports so they can be shared privately if a maintainer asks for them
             CompressParams = {};
             Compressing = StartCompressThread(&CompressParams);
-            ShowChilds(dteCompress, FALSE);
+            if (Compressing)
+                ShowChilds(dteCompress, FALSE);
+            else
+                FinishReport(FALSE);
             return 0;
         }
 
         case IDCANCEL:
         {
-            if (Compressing || Uploading)
+            if (Compressing || Minidumping)
             {
-                // wide: same LoadStrW infra added for this file (233).
-                MessageBoxW(HWindow, LoadStrW(IDS_SALMON_WAITFORUPLOAD, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
+                MessageBoxW(HWindow, LoadStrW(IDS_SALMON_WAIT, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
                 return 0;
             }
-            // wide: same LoadStrW infra added for this file (233).
             int ret = MessageBoxW(HWindow, LoadStrW(IDS_SALMON_CONFIRMEXIT, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OKCANCEL | MB_ICONQUESTION | MB_SETFOREGROUND);
             if (ret == IDCANCEL)
                 return 0;
@@ -538,6 +464,21 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         case IDC_SALMON_VIEW:
+        {
+            // the text report of the newest crash, or the folder when there is none
+            std::wstring report;
+            if (!BugReports.empty())
+            {
+                report = BugReportPath + BugReports[0].Name + L".TXT";
+                if (GetFileAttributesW(report.c_str()) == INVALID_FILE_ATTRIBUTES)
+                    report.clear();
+            }
+            if (report.empty() || !OpenWithShell(HWindow, report.c_str()))
+                OpenFolder(HWindow, BugReportPath.c_str());
+            break;
+        }
+
+        case IDC_SALMON_FOLDER:
         {
             OpenFolder(HWindow, BugReportPath.c_str());
             break;

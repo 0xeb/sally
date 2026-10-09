@@ -14,6 +14,8 @@
 #include "dialogs.h"
 #include "plugin_services.h"
 #include "exif_text.h"
+#include "selection_outline.h"
+#include "source_selection.h"
 #include "pictview.rh2"
 #include "lang/lang.rh"
 
@@ -81,8 +83,10 @@ constexpr int CopyToLineCount = static_cast<int>(ViewerCopyToHistoryEntryCount);
 constexpr UINT_PTR CaptureTimerId = 2;
 constexpr UINT_PTR CursorTimerId = 3;   // hides the cursor in full screen
 constexpr UINT_PTR EdgeScrollTimerId = 4; // scrolls while a selection is dragged past the edge
+constexpr UINT_PTR MarqueeTimerId = 5;    // moves the selection outline while a selection is shown
 constexpr UINT FullScreenCursorDelayMs = 3000;
 constexpr UINT EdgeScrollIntervalMs = 50;
+constexpr UINT MarqueeIntervalMs = 100;
 constexpr int CaptureHotKeyId = 0x7057;
 constexpr int MinimumManualZoomPercent = 1;
 constexpr int MaximumManualZoomPercent = 1600; // as the old PictView (and Photoshop)
@@ -162,6 +166,8 @@ enum ViewerCommand
     CmdFirstSourceFile = CMD_FILE_FIRST,
     CmdLastSourceFile = CMD_FILE_LAST,
     CmdToggleSourceSelection = CMD_FILE_TOGGLESELECT,
+    CmdToggleSourceSelectionAndPrev = CMD_FILE_TOGGLESELECT_PREV,
+    CmdToggleSourceSelectionAndNext = CMD_FILE_TOGGLESELECT_NEXT,
     CmdFocusSourceFile = CMD_IMG_FOCUS,
     CmdFirstFrame = CMD_FIRSTPAGE,
     CmdPrevFrame = CMD_PREVPAGE,
@@ -340,6 +346,8 @@ MENU_TEMPLATE_ITEM MainMenuTemplate[] = {
     {MNTT_SP, -1, MenuSkill, 0, -1, 0, nullptr},
     {MNTT_IT, IDS_MENU_FILE_FOCUS, MenuSkill, CmdFocusSourceFile, -1, 0, PV_ENABLER(vweFocusFile)},
     {MNTT_IT, IDS_MENU_FILE_SELCRCFILE, MenuSkill, CmdToggleSourceSelection, IDX_TB_SELSRCFILE, 0, PV_ENABLER(vweSelSrcFile)},
+    {MNTT_IT, IDS_MENU_FILE_SELPREV, MenuSkill, CmdToggleSourceSelectionAndPrev, -1, 0, PV_ENABLER(vweSelSrcFile)},
+    {MNTT_IT, IDS_MENU_FILE_SELNEXT, MenuSkill, CmdToggleSourceSelectionAndNext, -1, 0, PV_ENABLER(vweSelSrcFile)},
     {MNTT_IT, IDS_MENU_FILE_RENAME, MenuSkill, CmdRenameFile, -1, 0, PV_ENABLER(vweFileOpened2)},
     {MNTT_IT, IDS_MENU_FILE_COPYTO, MenuSkill, CmdCopyFileTo, -1, 0, PV_ENABLER(vweFileOpened2)},
     {MNTT_IT, IDS_MENU_FILE_DELETE, MenuSkill, CmdDeleteFile, -1, 0, PV_ENABLER(vweFileOpened2)},
@@ -445,6 +453,8 @@ MENU_TEMPLATE_ITEM ContextMenuTemplate[] = {
     {MNTT_IT, IDS_MENU_FILE_HISTOGRAM, MenuSkill, CmdHistogram, -1, 0, PV_ENABLER(vweFileOpened)},
     {MNTT_SP, -1, MenuSkill, 0, -1, 0, nullptr},
     {MNTT_IT, IDS_MENU_FILE_SELCRCFILE, MenuSkill, CmdToggleSourceSelection, IDX_TB_SELSRCFILE, 0, PV_ENABLER(vweSelSrcFile)},
+    {MNTT_IT, IDS_MENU_FILE_SELPREV, MenuSkill, CmdToggleSourceSelectionAndPrev, -1, 0, PV_ENABLER(vweSelSrcFile)},
+    {MNTT_IT, IDS_MENU_FILE_SELNEXT, MenuSkill, CmdToggleSourceSelectionAndNext, -1, 0, PV_ENABLER(vweSelSrcFile)},
     {MNTT_IT, IDS_MENU_FILE_PREVSEL, MenuSkill, CmdPrevSelectedSourceFile, IDX_TB_PREVSELFILE, 0, PV_ENABLER(vwePrevSelFile)},
     {MNTT_IT, IDS_MENU_FILE_NEXTSEL, MenuSkill, CmdNextSelectedSourceFile, IDX_TB_NEXTSELFILE, 0, PV_ENABLER(vweNextSelFile)},
     {MNTT_SP, -1, MenuSkill, 0, -1, 0, nullptr},
@@ -3241,6 +3251,8 @@ private:
         case WM_ACTIVATE:
             if (LOWORD(wParam) == WA_INACTIVE && HostGeneral != nullptr)
                 HostGeneral->SkipOneActivateRefresh(); // leaving the viewer does not refresh Sally's panels
+            if (LOWORD(wParam) != WA_INACTIVE && !m_loading)
+                m_sourceSelection.Refresh(m_sourceNavigation); // the selection may have changed in Sally meanwhile
             UpdateCommands();
             break;
 
@@ -3374,6 +3386,11 @@ private:
             if (wParam == EdgeScrollTimerId)
             {
                 EdgeScrollTick();
+                return 0;
+            }
+            if (wParam == MarqueeTimerId)
+            {
+                MarqueeTick();
                 return 0;
             }
             if (wParam == CaptureTimerId)
@@ -3714,7 +3731,7 @@ private:
             break;
 
         case CML_FILE:
-            popup->CheckItem(CmdToggleSourceSelection, FALSE, m_sourceFileSelected ? TRUE : FALSE);
+            popup->CheckItem(CmdToggleSourceSelection, FALSE, m_sourceSelection.Selected() ? TRUE : FALSE);
             break;
 
         case CML_VIEW:
@@ -3732,7 +3749,7 @@ private:
 
         case CML_CONTEXT:
             popup->CheckItem(CmdFullScreen, FALSE, m_fullScreen ? TRUE : FALSE);
-            popup->CheckItem(CmdToggleSourceSelection, FALSE, m_sourceFileSelected ? TRUE : FALSE);
+            popup->CheckItem(CmdToggleSourceSelection, FALSE, m_sourceSelection.Selected() ? TRUE : FALSE);
             break;
         }
     }
@@ -4225,6 +4242,7 @@ private:
                 DeleteDC(memory);
             PaintFrame(dc, area); // no memory for a back buffer: draw directly
             EndPaint(m_hwnd, &ps);
+            UpdateMarqueeTimer();
             return;
         }
 
@@ -4236,6 +4254,34 @@ private:
         DeleteObject(bitmap);
         DeleteDC(memory);
         EndPaint(m_hwnd, &ps);
+        UpdateMarqueeTimer();
+    }
+
+    // The selection outline moves while a selection is shown. Paint starts the timer
+    // when it has drawn one; the tick stops it once the selection is gone.
+    void UpdateMarqueeTimer()
+    {
+        if (HasCropSelection() && !m_marqueeRunning)
+            m_marqueeRunning = SetTimer(m_hwnd, MarqueeTimerId, MarqueeIntervalMs, nullptr) != 0;
+    }
+
+    // Redraws only the outline at the next step, straight to the window: the outline
+    // overwrites every pixel it covers, so the image underneath is not repainted.
+    void MarqueeTick()
+    {
+        if (!HasCropSelection())
+        {
+            KillTimer(m_hwnd, MarqueeTimerId);
+            m_marqueeRunning = false;
+            return;
+        }
+        m_marqueePhase = (m_marqueePhase + 1) % pictview::SelectionOutlinePhaseCount;
+        HDC dc = GetDC(m_hwnd);
+        if (dc == nullptr)
+            return;
+        IntersectClipRect(dc, m_content.left, m_content.top, m_content.right, m_content.bottom);
+        DrawSelection(dc);
+        ReleaseDC(m_hwnd, dc);
     }
 
     void PaintFrame(HDC dc, const RECT& area)
@@ -4946,15 +4992,7 @@ private:
         if (!IntersectRect(&clipped, &selection, &m_content))
             return;
 
-        const int oldRop = SetROP2(dc, R2_NOTXORPEN);
-        HPEN pen = CreatePen(PS_DOT, 1, RGB(255, 255, 255));
-        HGDIOBJ oldPen = SelectObject(dc, pen);
-        HGDIOBJ oldBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
-        Rectangle(dc, clipped.left, clipped.top, clipped.right, clipped.bottom);
-        SelectObject(dc, oldBrush);
-        SelectObject(dc, oldPen);
-        DeleteObject(pen);
-        SetROP2(dc, oldRop);
+        pictview::DrawSelectionOutline(dc, clipped, m_marqueePhase);
     }
 
     void BeginPan(int x, int y)
@@ -5408,6 +5446,14 @@ private:
             ToggleSourceSelection();
             break;
 
+        case CmdToggleSourceSelectionAndPrev:
+            ToggleSourceSelectionAndStep(ViewerSourceNavigationMode::Previous);
+            break;
+
+        case CmdToggleSourceSelectionAndNext:
+            ToggleSourceSelectionAndStep(ViewerSourceNavigationMode::Next);
+            break;
+
         case CmdFocusSourceFile:
             FocusSourceFile();
             break;
@@ -5679,7 +5725,7 @@ private:
                 else if (!control && !shift)
                     NavigateSourceFile(ViewerSourceNavigationMode::Next);
                 else
-                    return false;
+                    ToggleSourceSelectionAndStep(ViewerSourceNavigationMode::Next);
                 return true;
             }
             else if (!control && !shift)
@@ -5698,7 +5744,7 @@ private:
                 else if (!control && !shift)
                     NavigateSourceFile(ViewerSourceNavigationMode::Previous);
                 else
-                    return false;
+                    ToggleSourceSelectionAndStep(ViewerSourceNavigationMode::Previous);
                 return true;
             }
             else if (!control && !shift)
@@ -6206,6 +6252,7 @@ private:
         m_sourceNavigation.CurrentPath.clear();
         m_hasPendingSourceFile = false;
         m_hasActiveSourceFile = false;
+        m_sourceSelection.Clear();
     }
 
     void SetStatusMessage(const std::wstring& message)
@@ -6254,27 +6301,30 @@ private:
         PostMessageW(m_hwnd, WM_PICTVIEW_LOAD_IMAGE, 0, 0);
     }
 
-    void ToggleSourceSelection()
+    bool ToggleSourceSelection()
     {
         if (m_loading || !HasSourceSelection())
-            return;
+            return false;
 
-        bool selected = false;
         bool sourceBusy = false;
-        if (!m_sourceNavigation.ToggleSelection(m_sourceNavigation.Context,
-                                                m_sourceNavigation.SourceUID,
-                                                m_sourceNavigation.CurrentIndex,
-                                                m_sourceNavigation.CurrentPath.c_str(),
-                                                selected,
-                                                sourceBusy))
+        if (!m_sourceSelection.Toggle(m_sourceNavigation, sourceBusy))
         {
             SetStatusMessage(sourceBusy ? ViewerText(IDS_SAL_IS_BUSY) : ViewerText(IDS_PV_SOURCE_SELECTION_IS_NO_LONGER));
-            return;
+            return false;
         }
 
-        m_sourceFileSelected = selected;
         UpdateToolbarChecks();
-        SetStatusMessage(selected ? ViewerText(IDS_PV_OPENED_FILE_IS_SELECTED_IN) : ViewerText(IDS_PV_OPENED_FILE_IS_UNSELECTED_IN));
+        SetStatusMessage(m_sourceSelection.Selected() ? ViewerText(IDS_PV_OPENED_FILE_IS_SELECTED_IN)
+                                                      : ViewerText(IDS_PV_OPENED_FILE_IS_UNSELECTED_IN));
+        return true;
+    }
+
+    // Ctrl+Shift+Space / Ctrl+Shift+Backspace: select or unselect the file, then go on. When the
+    // selection cannot change, the viewer stays on the file.
+    void ToggleSourceSelectionAndStep(ViewerSourceNavigationMode mode)
+    {
+        if (ToggleSourceSelection())
+            NavigateSourceFile(mode);
     }
 
     void RenameCurrentFile()
@@ -6347,7 +6397,10 @@ private:
         m_displayName = FileNameFromPath(m_path);
         // Next/Previous continue from the renamed file (same enumeration source and index).
         if (HasSourceNavigation())
+        {
             m_sourceNavigation.CurrentPath = m_path;
+            m_sourceSelection.Refresh(m_sourceNavigation);
+        }
         UpdateTitle();
         UpdateStatus();
         UpdateCommands();
@@ -7967,7 +8020,7 @@ private:
                 y = point.y;
             }
             popup->CheckItem(CmdFullScreen, FALSE, m_fullScreen ? TRUE : FALSE);
-            popup->CheckItem(CmdToggleSourceSelection, FALSE, m_sourceFileSelected ? TRUE : FALSE);
+            popup->CheckItem(CmdToggleSourceSelection, FALSE, m_sourceSelection.Selected() ? TRUE : FALSE);
             const DWORD command = popup->Track(MENU_TRACK_RETURNCMD | MENU_TRACK_RIGHTBUTTON, x, y, m_hwnd, nullptr);
             if (command != 0)
                 PostMessageW(m_hwnd, WM_COMMAND, MAKEWPARAM(command, 0), 0);
@@ -8098,7 +8151,7 @@ private:
         m_toolbar->CheckItem(CmdToolZoom, FALSE, m_tool == ViewerTool::Zoom ? TRUE : FALSE);
         m_toolbar->CheckItem(CmdToolSelect, FALSE, m_tool == ViewerTool::Select ? TRUE : FALSE);
         m_toolbar->CheckItem(CmdTogglePipette, FALSE, m_tool == ViewerTool::Pipette ? TRUE : FALSE);
-        m_toolbar->CheckItem(CmdToggleSourceSelection, FALSE, m_sourceFileSelected ? TRUE : FALSE);
+        m_toolbar->CheckItem(CmdToggleSourceSelection, FALSE, m_sourceSelection.Selected() ? TRUE : FALSE);
     }
 
 public:
@@ -8258,6 +8311,8 @@ private:
         m_activeLoadClearsSourceNavigation = false;
         m_hasActiveSourceFile = false;
         m_activeSourceFile = ViewerSourceFile();
+        // A file opened from the source: show whether that file is selected there.
+        m_sourceSelection.Refresh(m_sourceNavigation);
         m_currentFrame = 0;
         m_panX = 0;
         m_panY = 0;
@@ -8311,7 +8366,7 @@ private:
     HIMAGELIST m_hotImages = nullptr;
     HIMAGELIST m_grayImages = nullptr;
     DWORD m_enablers[vweCount] = {};
-    bool m_sourceFileSelected = false;
+    SourceSelectionState m_sourceSelection;
     HWND m_status = nullptr;
     HWND m_hScroll = nullptr; // shown while the image is wider than the view
     HWND m_vScroll = nullptr;
@@ -8342,6 +8397,8 @@ private:
     POINT m_selectionStart = {};
     RECT m_selectionImage = {};
     bool m_hasSelection = false;
+    int m_marqueePhase = 0;
+    bool m_marqueeRunning = false;
     bool m_selecting = false;
     bool m_constrainSelectionRatio = false;
     ViewerTool m_tool = ViewerTool::Hand;

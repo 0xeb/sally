@@ -671,10 +671,9 @@
 #define IDC_SALMON_DESCRIPTION          6134
 #define IDC_SALMON_ACTION_LABEL         6135
 #define IDC_SALMON_ACTION               6136
-#define IDC_SALMON_EMAIL_LABEL          6137
-#define IDC_SALMON_EMAIL                6138
+#define IDC_SALMON_FOLDER               6137
 #define IDC_SALMON_RESTART              6139
-#define IDC_SALMON_UPLOADING            6140
+#define IDC_SALMON_PROGRESS             6140
 #define IDD_CONFIRMLINKTGTCOPY          6208
 #define IDS_DETAILS                     6209
 #define IDC_DELETEARCHIVEFILES          6210

@@ -15,6 +15,7 @@ class CSalamanderGeneralAbstract;
 class CSalamanderGUIAbstract;
 
 #include "engine/wic_engine.h"
+#include "source_navigation.h"
 
 namespace pictview
 {
@@ -162,22 +163,6 @@ struct ViewerCaptureOptions
     bool IncludeCursor = false;
 };
 
-struct ViewerSourceFile
-{
-    std::wstring Path;
-    int SourceIndex = -1;
-};
-
-enum class ViewerSourceNavigationMode
-{
-    Previous,
-    Next,
-    PreviousSelected,
-    NextSelected,
-    First,
-    Last,
-};
-
 enum class ViewerWallpaperMode
 {
     Center,
@@ -185,31 +170,6 @@ enum class ViewerWallpaperMode
     Stretch,
     Restore,
     None,
-};
-
-struct ViewerSourceNavigation
-{
-    void* Context = nullptr;
-    int SourceUID = -1;
-    int CurrentIndex = -1;
-    std::wstring CurrentPath;
-    bool (*FindFile)(void* context,
-                     int sourceUID,
-                     int currentIndex,
-                     const wchar_t* currentPath,
-                     ViewerSourceNavigationMode mode,
-                     ViewerSourceFile& file,
-                     bool& noMoreFiles,
-                     bool& sourceBusy) = nullptr;
-    bool (*ToggleSelection)(void* context,
-                            int sourceUID,
-                            int currentIndex,
-                            const wchar_t* currentPath,
-                            bool& selected,
-                            bool& sourceBusy) = nullptr;
-    bool (*FocusCurrentFile)(void* context,
-                             const wchar_t* currentPath,
-                             bool& sourceBusy) = nullptr;
 };
 
 struct ViewerHostActions

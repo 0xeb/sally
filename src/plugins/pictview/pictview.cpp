@@ -514,12 +514,12 @@ bool FindSourceFileForViewer(void* context,
     }
 }
 
-bool ToggleSourceSelectionForViewer(void* context,
-                                    int sourceUID,
-                                    int currentIndex,
-                                    const wchar_t* currentPath,
-                                    bool& selected,
-                                    bool& sourceBusy)
+bool QuerySourceSelectionForViewer(void* context,
+                                   int sourceUID,
+                                   int currentIndex,
+                                   const wchar_t* currentPath,
+                                   bool& selected,
+                                   bool& sourceBusy)
 {
     selected = false;
     sourceBusy = false;
@@ -539,9 +539,25 @@ bool ToggleSourceSelectionForViewer(void* context,
         sourceBusy = busy != FALSE;
         return false;
     }
+    selected = isSelected != FALSE;
+    return true;
+}
 
-    const BOOL nextSelected = isSelected == FALSE ? TRUE : FALSE;
-    busy = FALSE;
+bool ToggleSourceSelectionForViewer(void* context,
+                                    int sourceUID,
+                                    int currentIndex,
+                                    const wchar_t* currentPath,
+                                    bool& selected,
+                                    bool& sourceBusy)
+{
+    selected = false;
+    bool isSelected = false;
+    if (!QuerySourceSelectionForViewer(context, sourceUID, currentIndex, currentPath, isSelected, sourceBusy))
+        return false;
+
+    CSalamanderGeneralAbstract* salamander = static_cast<CSalamanderGeneralAbstract*>(context);
+    const BOOL nextSelected = isSelected ? FALSE : TRUE;
+    BOOL busy = FALSE;
     if (!salamander->SetSelectionOnFileNameForViewer(sourceUID,
                                                      currentIndex,
                                                      currentPath,
@@ -601,6 +617,7 @@ public:
         sourceNavigation.CurrentIndex = enumFilesCurrentIndex;
         sourceNavigation.CurrentPath = wideName;
         sourceNavigation.FindFile = FindSourceFileForViewer;
+        sourceNavigation.QuerySelection = QuerySourceSelectionForViewer;
         sourceNavigation.ToggleSelection = ToggleSourceSelectionForViewer;
         sourceNavigation.FocusCurrentFile = FocusSourceFileForViewer;
 

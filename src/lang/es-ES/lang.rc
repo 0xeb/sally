@@ -2001,23 +2001,22 @@ BEGIN
     PUSHBUTTON      "Ayuda",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Informador de fallos de Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Ha surgido un problema que ha forzado el cierre de Sally. Para ayudarnos a evitar problemas similares en el futuro, por favor envíenos un informe de errores a continuación.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Privacidad: No se proporcionará ninguna información suya a terceros.",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "Descripción del error (opcional)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "&Ver informe",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "Última &acción:",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "&Email de contacto:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "&Reiniciar Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "Enviar &informe",IDOK,158,176,90,14
-    PUSHBUTTON      "&No enviar informe",IDCANCEL,254,176,90,14
+    LTEXT           "Sally se cerró debido a un problema y se guardó un informe del fallo en este equipo. Informe del problema en GitHub: Sally abre en su navegador una nueva incidencia con un breve resumen, que puede revisar antes de enviarla.",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "Descripción del error (opcional)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "&Ver informe",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "Última &acción:",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "El resumen solo contiene versiones, el error y nombres de funciones. El informe completo permanece en este equipo y puede contener datos privados, así que no lo adjunte a la incidencia pública; un responsable del proyecto puede pedírselo en privado.",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "&Reiniciar Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "Informar en &GitHub",IDOK,62,179,90,14
+    PUSHBUTTON      "Abrir &carpeta",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "Cerrar",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -3938,7 +3937,7 @@ IDS_OLDPLUGINVERSION2, "El plugin (%s) no está soportado en esta versión de Sa
  IDS_ACLNOTSUPPORTEDONTGTPATH, "Los propietarios y permisos no pueden ser preservados. No se admiten\nen la ruta destino (no es un volumen NTFS).\n\n?Desea continuar?"
 
  IDS_BUGREPORTCNFRM_TITLE, "Informar de un fallo"
- IDS_BUGREPORTCNFRM_TEXT, "Para informes de fallos o peticiones de funcionalidades use el menú Ayuda > Foro oficial de asistencia.\n\nUse este informe de fallos sólo para enviarnos datos confidenciales o cuando se lo pidamos."
+ IDS_BUGREPORTCNFRM_TEXT, "Para informes de fallos o peticiones de funcionalidades abra una incidencia en https://github.com/0xeb/sally/issues.\n\nUse este informe de fallos sólo para enviarnos datos confidenciales o cuando se lo pidamos."
  IDS_BUGREPORT_WRITTEN, "El informe de fallos se ha escrito en:"
  IDS_BUGREPORT_FAILED, "No se ha podido escribir el informe de fallos."
  IDS_SHELLMENU_NOSHELLITEMS, "Windows no ha podido proporcionar un menú contextual para los elementos seleccionados."
@@ -4080,37 +4079,13 @@ IDS_OLDPLUGINVERSION2, "El plugin (%s) no está soportado en esta versión de Sa
  
  IDS_AS_ADMIN_TITLE, "Administrador"
 
- IDS_SALMON_INVALIDEMAIL "Por favor, introduzca una dirección de email válida para que podamos ayudarle con el problema."
- IDS_SALMON_WAITFORUPLOAD "Por favor, espere mientras termina la compresión y la carga."
- IDS_SALMON_CONFIRMEXIT "¿Está segudo de no querer que conozcamos este problema? Sin su informe no seremos capaces de arreglarlo.\n\nPulse OK para borrar el informe sin que nosotros lo sepamos." 
- IDS_SALMON_ERR_INI_SIZE "El fichero cargado supera el tamaño permitido. Código: %d."
- IDS_SALMON_ERR_PARTIAL "El fichero cargado fue cargado sólo en parte. Código: %d."
- IDS_SALMON_ERR_NO_FILE "El fichero no fue cargado. Código: %d."
- IDS_SALMON_ERR_NO_TMP_DIR "Falta un fichero temporal. Código: %d."
- IDS_SALMON_ERR_CANT_WRITE "Fallo al guardar el fichero al disco. Código: %d."
- IDS_SALMON_ERR_EXTENSION "Alguna extensión ha interrumpido la carga. Código: %d."
- IDS_SALMON_ERR_UNKNOWN "Error de carga desconocido. Código: %d."
- IDS_SALMON_SYNTAX_ERROR_CLOSE "Error de sintaxis en la respuesta del servidor. No se encontró señal de cierre."
- IDS_SALMON_SYNTAX_ERROR_OPEN "Error de sintaxis en la respuesta del servidor. No se encontró señal de apertura."
- IDS_SALMON_SYNTAX_ERROR_VALUE "Error de sintaxis en la respuesta del servidor. Valor no encontrado."
- IDS_SALMON_SOCK_ERR_RECV "No es posible recibir datos. Código: %d."
- IDS_SALMON_SOCK_ERR_SHUTDOWN "No es posible detener la conexión. Código: %d."
- IDS_SALMON_SOCK_ERR_SEND "No es posible enviar datos. Código: %d."
- IDS_SALMON_SOCK_ERR_CONNECT "No es posible conectarse al servidor. Código: %d."
- IDS_SALMON_SOCK_ERR_SOCKET "No es posible abrir conexión. Código: %d."
- IDS_SALMON_SOCK_ERR_HOST "No es posible resolver el nombre del hospedador. Código: %d."
- IDS_SALMON_SOCK_ERR_INIT "No es posible inicializar la conexión. Código: %d."
- IDS_SALMON_READING_FILE "Error leyendo el fichero %s" 
- IDS_SALMON_OUT_OF_MEMORY "Memoria insuficiente" 
- IDS_SALMON_FILE_SIZE "Fallo al obtener el tamaño del fichero %s"
- IDS_SALMON_FILE_OPEN "Fallo al abrir %s"
- IDS_SALMON_MORE_REPORTS "Se encontraron informes de fallos antiguos. ¿Querría informar también de estos fallos y ayudarnos a mejorar Sally?\n\nPulse Sí para procesar informes de fallos antiguos. Pulse No para borrar informes de fallos antiguos."
+ IDS_SALMON_WAIT "Espere hasta que se guarde el informe del fallo."
+ IDS_SALMON_CONFIRMEXIT "¿Cerrar sin informar del problema?\n\nEl informe del fallo se eliminará de este equipo."
  IDS_SALMON_TITLE "Informador de Fallos de Sally"
  IDS_SALMON_COMPRESSING "Comprimiendo, espere por favor..."
- IDS_SALMON_UPLOADING "Cargando, espere por favor..."
- IDS_SALMON_UPLOADSUCCESS "El informe ha sido cargado con éxito.\n\nGracias por ayudarnos a mejorar Sally!" 
- IDS_SALMON_UPLOADFAILED "La carga del informe ha fallado; razón: %s\n\nPor favor, abra una incidencia en https://github.com/0xeb/sally/issues y adjunte el informe, después bórrelo de su disco. Pulse OK para ver el informe."
- IDS_SALMON_COMPRESSFAILED "La compresión del informe ha fallado; razón: %s\n\nPor favor, comprima su informe de fallos usando 7-Zip, adjúntelo a una nueva incidencia en https://github.com/0xeb/sally/issues, y borre el fichero de su disco. Pulse OK para ver el informe."
+ IDS_SALMON_COMPRESSFAILED "No se pudo empaquetar el informe del fallo, motivo: %s\n\nSus archivos se han conservado tal cual. Pulse Aceptar para verlos."
+ IDS_SALMON_GITHUB_OPENED "Hay una nueva incidencia de GitHub abierta en su navegador. Revísela y envíela.\n\nEl informe del fallo se guardó en:\n%s\n\nPuede contener datos privados, así que no lo publique. Si un responsable del proyecto lo necesita, se lo pedirá en la incidencia."
+ IDS_SALMON_GITHUB_FAILED "Sally no pudo abrir su navegador web.\n\nInforme del problema en https://github.com/0xeb/sally/issues y describa lo que estaba haciendo. El informe del fallo se guardó en:\n%s"
  IDS_SALMON_LOAD_FAILED "La carga de %s ha fallado."
  IDS_SALMON_WRONG_CMDLINE "Esta es una utilidad interna de Sally, no la inicie directamente."
  IDS_SALMON_WRONG_VERSION "Versión incorrecta del Informador de Fallos de Sally. Por favor, informe de esto en https://github.com/0xeb/sally/issues."

@@ -15,7 +15,6 @@ struct CBugReport
     std::wstring Name;
 };
 extern std::vector<CBugReport> BugReports;
-extern BOOL ReportOldBugs;
 
 extern CSalmonSharedMemory* SalmonSharedMemory;
 
@@ -27,6 +26,12 @@ std::wstring FormatText(const wchar_t* format, ...);
 BOOL GetCurrentModulePath(std::wstring& path);
 
 void OpenFolder(HWND hWnd, const wchar_t* szDir);
+
+// Opens a document or web address with its default program.
+BOOL OpenWithShell(HWND hWnd, const wchar_t* target);
+
+// Reads the text bug report of 'report'; FALSE when it has none.
+BOOL ReadBugReportText(const CBugReport& report, std::string& text);
 
 BOOL RestartSalamander(HWND hParent);
 
@@ -40,10 +45,8 @@ int GetUniqueBugReportCount();
 
 std::wstring GetReportBaseName(const wchar_t* targetPath, const wchar_t* shortName, DWORD64 uid, SYSTEMTIME lt);
 
-BOOL SaveDescriptionAndEmail();
+BOOL SaveDescription();
 
 BOOL CompresBugReports();
 
 extern BOOL AppIsBusy;
-
-//#define WM_USER_THREAD_EXIT WM_APP + 100 // upload thread has finished

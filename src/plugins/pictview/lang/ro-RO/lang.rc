@@ -36,12 +36,12 @@ BEGIN
     ICON            "",IDC_ABOUT_ICON,11,9,20,20
     LTEXT           "PictView %s - Vizualizator imagini pentru Sally",IDC_ABOUT_TITLE,46,9,322,8
     LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,322,8,SS_NOPREFIX
-    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,123,8
+    LTEXT           "Imaginile sunt decodate și salvate de",IDC_STATIC_2,46,40,311,8
     LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,311,8
     LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
-    LTEXT           "Email:",IDC_STATIC_6,46,81,23,8
-    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,91,81,85,8,WS_TABSTOP
-    LTEXT           "Home page:",IDC_STATIC_7,46,92,44,8
+    LTEXT           "GitHub:",IDC_STATIC_6,46,81,30,8
+    LTEXT           "github.com/0xeb/sally/issues",IDC_ABOUT_SUPPORT,91,81,150,8,WS_TABSTOP
+    LTEXT           "Site web:",IDC_STATIC_7,46,92,44,8
     LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,91,92,122,8,WS_TABSTOP
     CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,373,1
 END
@@ -459,6 +459,8 @@ STRINGTABLE
   IDS_MENU_FILE_DELETE, "Ster&ge\tDel"
   IDS_MENU_FILE_PREVSEL, "Selectat &anterior\tCtrl+Backspace"
   IDS_MENU_FILE_NEXTSEL, "Se&lectat Urmator\tCtrl+Space"
+  IDS_MENU_FILE_SELPREV, "Selectează/deselectează și precedentul\tCtrl+Shift+Backspace"
+  IDS_MENU_FILE_SELNEXT, "Selectează/deselectează și următorul\tCtrl+Shift+Space"
   IDS_MENU_FILE_COPYTO, "C&opie In...\tX"
 
   IDS_MENU_EDIT, "&Editeaza"

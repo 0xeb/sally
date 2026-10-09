@@ -53,6 +53,18 @@ BomInfo DetectBom(const std::uint8_t* data, std::size_t size);
 bool IsDecodedEncoding(BomEncoding encoding);
 std::int64_t AlignToCodeUnit(BomEncoding encoding, std::int64_t offset, std::int64_t textOffset);
 
+// One decoded scalar at the start of 'data'. 'Length' raw bytes belong to it. NeedMore means
+// the bytes end inside a sequence and 'atEnd' is false: the caller must supply more bytes.
+// With 'atEnd' an incomplete sequence decodes as U+FFFD covering only the bytes that really
+// continue it, so a line feed, carriage return or NUL byte is always a scalar of its own.
+struct ScalarStep
+{
+    std::uint32_t Scalar = 0;
+    std::uint8_t Length = 0;
+    bool NeedMore = false;
+};
+ScalarStep NextScalar(BomEncoding encoding, const std::uint8_t* data, std::size_t size, bool atEnd);
+
 DecodedRun DecodeBytes(BomEncoding encoding, const std::uint8_t* data, std::size_t size,
                        std::int64_t rawOffset, bool flush);
 

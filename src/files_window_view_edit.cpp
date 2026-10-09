@@ -23,6 +23,7 @@
 #include "common/widepath.h"
 #include "common/fsutil.h"
 #include "common/CreateDirectoryFlow.h"
+#include "common/ChangeAttrsMapping.h"
 #include "common/ViewerEditorLauncher.h"
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
@@ -522,73 +523,26 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
 
                     HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-                    // ensure a correct relationship between Compressed and Encrypted
-                    if (chDlg.Encrypted == 1)
-                    {
-                        if (chDlg.Compressed != 0)
-                            TRACE_E("CFilesWindow::ChangeAttr(): unexpected value of chDlg.Compressed!");
-                        chDlg.Compressed = 0;
-                    }
-                    else
-                    {
-                        if (chDlg.Compressed == 1)
-                        {
-                            if (chDlg.Encrypted != 0)
-                                TRACE_E("CFilesWindow::ChangeAttr(): unexpected value of chDlg.Encrypted!");
-                            chDlg.Encrypted = 0;
-                        }
-                    }
+                    sally::attrs::ChangeAttrsChoice choice;
+                    choice.Archive = chDlg.Archive;
+                    choice.ReadOnly = chDlg.ReadOnly;
+                    choice.Hidden = chDlg.Hidden;
+                    choice.System = chDlg.System;
+                    choice.Compressed = chDlg.Compressed;
+                    choice.Encrypted = chDlg.Encrypted;
+                    choice.RecurseSubDirs = chDlg.RecurseSubDirs;
+                    const sally::attrs::ChangeAttrsRequest request = sally::attrs::MapChangeAttrsChoice(choice);
+                    if (request.CorrectedCompressionEncryption)
+                        TRACE_E("CFilesWindow::ChangeAttr(): unexpected combination of Compressed and Encrypted!");
 
                     CAttrsData attrsData;
-                    attrsData.AttrAnd = 0xFFFFFFFF;
-                    attrsData.AttrOr = 0;
-                    attrsData.SubDirs = chDlg.RecurseSubDirs;
-                    attrsData.ChangeCompression = FALSE;
-                    attrsData.ChangeEncryption = FALSE;
-                    dlgData.ChangeCompression = FALSE;
-                    dlgData.ChangeEncryption = FALSE;
-
-                    if (chDlg.Archive == 0)
-                        attrsData.AttrAnd &= ~(FILE_ATTRIBUTE_ARCHIVE);
-                    if (chDlg.ReadOnly == 0)
-                        attrsData.AttrAnd &= ~(FILE_ATTRIBUTE_READONLY);
-                    if (chDlg.Hidden == 0)
-                        attrsData.AttrAnd &= ~(FILE_ATTRIBUTE_HIDDEN);
-                    if (chDlg.System == 0)
-                        attrsData.AttrAnd &= ~(FILE_ATTRIBUTE_SYSTEM);
-                    if (chDlg.Compressed == 0)
-                    {
-                        attrsData.AttrAnd &= ~(FILE_ATTRIBUTE_COMPRESSED);
-                        attrsData.ChangeCompression = TRUE;
-                        dlgData.ChangeCompression = TRUE;
-                    }
-                    if (chDlg.Encrypted == 0)
-                    {
-                        attrsData.AttrAnd &= ~(FILE_ATTRIBUTE_ENCRYPTED);
-                        attrsData.ChangeEncryption = TRUE;
-                        dlgData.ChangeEncryption = TRUE;
-                    }
-
-                    if (chDlg.Archive == 1)
-                        attrsData.AttrOr |= FILE_ATTRIBUTE_ARCHIVE;
-                    if (chDlg.ReadOnly == 1)
-                        attrsData.AttrOr |= FILE_ATTRIBUTE_READONLY;
-                    if (chDlg.Hidden == 1)
-                        attrsData.AttrOr |= FILE_ATTRIBUTE_HIDDEN;
-                    if (chDlg.System == 1)
-                        attrsData.AttrOr |= FILE_ATTRIBUTE_SYSTEM;
-                    if (chDlg.Compressed == 1)
-                    {
-                        attrsData.AttrOr |= FILE_ATTRIBUTE_COMPRESSED;
-                        attrsData.ChangeCompression = TRUE;
-                        dlgData.ChangeCompression = TRUE;
-                    }
-                    if (chDlg.Encrypted == 1)
-                    {
-                        attrsData.AttrOr |= FILE_ATTRIBUTE_ENCRYPTED;
-                        attrsData.ChangeEncryption = TRUE;
-                        dlgData.ChangeEncryption = TRUE;
-                    }
+                    attrsData.AttrAnd = request.AttrAnd;
+                    attrsData.AttrOr = request.AttrOr;
+                    attrsData.SubDirs = request.SubDirs;
+                    attrsData.ChangeCompression = request.ChangeCompression;
+                    attrsData.ChangeEncryption = request.ChangeEncryption;
+                    dlgData.ChangeCompression = request.ChangeCompression;
+                    dlgData.ChangeEncryption = request.ChangeEncryption;
 
                     script->ClearReadonlyMask = 0xFFFFFFFF;
                     BOOL res = BuildScriptMain(script, atChangeAttrs, NULL, NULL, count,

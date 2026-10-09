@@ -121,6 +121,8 @@ STRINGTABLE
   IDS_MENU_FILE_DELETE, "&Delete\tDel"
   IDS_MENU_FILE_PREVSEL, "Previ&ous Selected\tCtrl+Backspace"
   IDS_MENU_FILE_NEXTSEL, "N&ext Selected\tCtrl+Space"
+  IDS_MENU_FILE_SELPREV, "Select/Unselect and Previous\tCtrl+Shift+Backspace"
+  IDS_MENU_FILE_SELNEXT, "Select/Unselect and Next\tCtrl+Shift+Space"
   IDS_MENU_FILE_COPYTO, "Cop&y To...\tX"
 
   IDS_MENU_EDIT, "&Edit"

@@ -2001,23 +2001,22 @@ BEGIN
     PUSHBUTTON      "Aide",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Rapport d'anomalie Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Un problème a contrainty Sally à fermer. Envoyez-nous le rapport d'anomalie ci-dessous pour nous permettre de résoudre de tels problèmes à l'avenir.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Politique de confidentialité: nous ne fournissons aucune de vos informations à des tiers.",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "Description de l'erreur (optionnel)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "&Voir le rapport",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "&Dernière action:",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "Email de &contact:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "&Relancer Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "&Envoyer le rapport",IDOK,158,176,90,14
-    PUSHBUTTON      "&Ne pas envoyer le rapport",IDCANCEL,254,176,90,14
+    LTEXT           "Sally s'est arrêté à cause d'un problème et un rapport de plantage a été enregistré sur cet ordinateur. Signalez le problème sur GitHub : Sally ouvre dans votre navigateur un nouveau ticket avec un court résumé, à vérifier avant l'envoi.",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "Description de l'erreur (optionnel)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "&Voir le rapport",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "&Dernière action:",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Le résumé ne contient que les versions, l'erreur et des noms de fonctions. Le rapport complet reste sur cet ordinateur et peut contenir des données privées : ne le joignez donc pas au ticket public ; un mainteneur peut vous le demander en privé.",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "&Relancer Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "Signaler sur &GitHub",IDOK,62,179,90,14
+    PUSHBUTTON      "&Ouvrir le dossier",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "Fermer",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -2128,7 +2127,7 @@ IDM_VIEWERMENU MENU
   MENUITEM "C&opie automatique de la sélection dans le presse-papiers", CM_VIEWER_AUTOCOPY
  }
 
- POPUP "Aid&e"
+ POPUP "A&ide"
  {
   MENUITEM "&Sommaire de l'aide\tF1", CM_VIEWERHLP_INTRO
   MENUITEM "&Raccourcis du clavier", CM_VIEWERHLP_KEYBOARD
@@ -3938,7 +3937,7 @@ IDS_OLDPLUGINVERSION2, "Le module (%s) n'est pas pris en charge par cette versio
  IDS_ACLNOTSUPPORTEDONTGTPATH, "Les propriétaires et les permissions des fichiers ne seront pas conservés ; les lecteurs\ncible ne sont pas des volumes NTFS\n\nContinuer ?"
 
  IDS_BUGREPORTCNFRM_TITLE, "Rapporter une anomalie du logiciel"
- IDS_BUGREPORTCNFRM_TEXT, "Pour rapporter une anomalie lors du fonctionnement du logiciel (bogue), utiliser le menu Aide > Forum de support oFficiel.\n\nN'utiliser ce rapport d'anomalie que pour nous envoyer des données ou bien à notre demande."
+ IDS_BUGREPORTCNFRM_TEXT, "Pour signaler une anomalie ou demander une fonctionnalité, ouvrez un ticket sur https://github.com/0xeb/sally/issues.\n\nN'utiliser ce rapport d'anomalie que pour nous envoyer des données ou bien à notre demande."
  IDS_BUGREPORT_WRITTEN, "Le rapport d'anomalie a été écrit dans :"
  IDS_BUGREPORT_FAILED, "Le rapport d'anomalie n'a pas pu être écrit."
  IDS_SHELLMENU_NOSHELLITEMS, "Windows n'a pas pu fournir de menu contextuel pour les éléments sélectionnés."
@@ -4080,37 +4079,13 @@ IDS_OLDPLUGINVERSION2, "Le module (%s) n'est pas pris en charge par cette versio
  
  IDS_AS_ADMIN_TITLE, "Administrateur"
 
- IDS_SALMON_INVALIDEMAIL "Veuillez entrer une adresse email valide pour nous permettre de vous aider face au problème indiqué."
- IDS_SALMON_WAITFORUPLOAD "Veuillez attendre la fin de la compression et du téléchargement."
- IDS_SALMON_CONFIRMEXIT "Etes-vous sûr de ne pas vouloir nous indiquer ce problème? Sans votre rapport, nous ne pourrons pas le résou_dre.\n\nCliquez sur OK pour supprimer le rapport sans nous l'envoyer." 
- IDS_SALMON_ERR_INI_SIZE "Le fichier à envoyer dépasse la taille limite autorisée. Code: %d."
- IDS_SALMON_ERR_PARTIAL "Le fichier n'a été que partiellement envoyé. Code: %d."
- IDS_SALMON_ERR_NO_FILE "Aucun fichier n'a été envoyé. Code: %d."
- IDS_SALMON_ERR_NO_TMP_DIR "Absence d'un répertoire temporaire. Code: %d."
- IDS_SALMON_ERR_CANT_WRITE "Impossible d'écrire le fichier sur le disque. Code: %d."
- IDS_SALMON_ERR_EXTENSION "Une extension a empêché le téléchargement du fichier. Code: %d."
- IDS_SALMON_ERR_UNKNOWN "Erreur de téléchargement inconnue. Code: %d."
- IDS_SALMON_SYNTAX_ERROR_CLOSE "Erreur de syntaxe dans la réponse du serveur. Marqueur de fermeture non trouvé."
- IDS_SALMON_SYNTAX_ERROR_OPEN "Erreur de syntaxe dans la réponse du serveur. Marqueur d'ouverture non trouvé."
- IDS_SALMON_SYNTAX_ERROR_VALUE "Erreur de syntaxe dans la réponse du serveur. Valeur non trouvée."
- IDS_SALMON_SOCK_ERR_RECV "Réception de donnée impossible. Code: %d."
- IDS_SALMON_SOCK_ERR_SHUTDOWN "Fermeture de connexion impossible. Code: %d."
- IDS_SALMON_SOCK_ERR_SEND "Envoi de donnée impossible. Code: %d."
- IDS_SALMON_SOCK_ERR_CONNECT "Connexion au serveur impossible. Code: %d."
- IDS_SALMON_SOCK_ERR_SOCKET "Ouverture de connexion impossible. Code: %d."
- IDS_SALMON_SOCK_ERR_HOST "Résolution de nom d'hôte impossible. Code: %d."
- IDS_SALMON_SOCK_ERR_INIT "Initialisation de connexion impossible. Code: %d."
- IDS_SALMON_READING_FILE "Erreur de lecture du fichier %s" 
- IDS_SALMON_OUT_OF_MEMORY "Mémoire insuffisante" 
- IDS_SALMON_FILE_SIZE "Erreur de lecture de tazille du fichier %s"
- IDS_SALMON_FILE_OPEN "Echec d'ouverture de %s"
- IDS_SALMON_MORE_REPORTS "Des rapports d'anomalie plus anciens ont été trouvés. Voulez-vous nous signaler également ces anomalies pour nous aider à améliorer Sally?\n\nCliquez Oui pour traiter ces anciens rapports d'anomalie. Cliquez Non pour les supprimer."
+ IDS_SALMON_WAIT "Veuillez patienter pendant l'enregistrement du rapport de plantage."
+ IDS_SALMON_CONFIRMEXIT "Fermer sans signaler le problème ?\n\nLe rapport de plantage sera supprimé de cet ordinateur."
  IDS_SALMON_TITLE "Rapport d'anomalie Sally"
  IDS_SALMON_COMPRESSING "Compression en cours, veuillez patienter..."
- IDS_SALMON_UPLOADING "Téléchargement en cours, veuillez patienter..."
- IDS_SALMON_UPLOADSUCCESS "Téléchargement du rapport réussi.\n\nMerci de nous aider à améliorer Sally!" 
- IDS_SALMON_UPLOADFAILED "Le téléchargement du rapport a échoué: %s\n\nVeuillez ouvrir un ticket sur https://github.com/0xeb/sally/issues et y joindre ce rapport, puis effacez-le de votre disque. Cliquez sur OK pour voir le rapport."
- IDS_SALMON_COMPRESSFAILED "Le compression du rapport a échoué: %s\n\nVeuillez compresser le rapport d'anomalie avec 7-Zip, le joindre à un nouveau ticket sur https://github.com/0xeb/sally/issues, puis le supprimer de votre disque. Cliquez sur OK pour voir le rapport."
+ IDS_SALMON_COMPRESSFAILED "Le rapport de plantage n'a pas pu être compressé, raison : %s\n\nSes fichiers ont été conservés tels quels. Cliquez sur OK pour les afficher."
+ IDS_SALMON_GITHUB_OPENED "Un nouveau ticket GitHub est ouvert dans votre navigateur. Veuillez le vérifier puis l'envoyer.\n\nLe rapport de plantage a été enregistré dans :\n%s\n\nIl peut contenir des données privées : ne le publiez pas. Si un mainteneur en a besoin, il le demandera dans le ticket."
+ IDS_SALMON_GITHUB_FAILED "Sally n'a pas pu ouvrir votre navigateur web.\n\nVeuillez signaler le problème sur https://github.com/0xeb/sally/issues en décrivant ce que vous faisiez. Le rapport de plantage a été enregistré dans :\n%s"
  IDS_SALMON_LOAD_FAILED "Echec du chargement de %s."
  IDS_SALMON_WRONG_CMDLINE "Il s'agit d'un outil interne à Sally; ne le lancez pas directement."
  IDS_SALMON_WRONG_VERSION "Version incorrecte du Rapport d'anomalie Sally. Veuillez le signaler sur https://github.com/0xeb/sally/issues."

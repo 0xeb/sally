@@ -1272,7 +1272,7 @@ BEGIN
     CONTROL         "Иска&ть во вложенных папках",IDC_FIND_INCLUDE_SUBDIR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,55,87,12
     // This layout slot is intentionally reused by IDC_FIND_FILETYPE; archives remain hidden at runtime.
     CONTROL         "Искать в архивах",IDC_FIND_INCLUDE_ARCHIVES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,55,87,12
-    LTEXT           "Т&ип:",IDC_FIND_FILETYPE_TEXT,150,58,22,8
+    LTEXT           "Ти&п:",IDC_FIND_FILETYPE_TEXT,150,58,22,8
     COMBOBOX        IDC_FIND_FILETYPE,176,55,112,48,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     CONTROL         "Искать в содержи&мом файлов",IDC_FIND_GREP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,69,75,12
     CONTROL         "",IDC_FIND_LINE2,"Static",SS_ETCHEDHORZ | WS_GROUP,83,75,199,1
@@ -2001,23 +2001,22 @@ BEGIN
     PUSHBUTTON      "Справка",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Отчет об ошибке Sally"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Произошел сбой, который привел к прекращению работы Sally. Создан отчет об ошибке, который может быть отправлен разработчикам для устранения проблемы.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Политика конфиденциальности: Отчет конфиденциальный и анонимный.",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "Описание ошибки (не обязательно)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "П&росмотр отчета",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "Последнее выполнявшееся &действие:",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "Адрес &электронной почты:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "&Перезапуск Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "&Отправить отчет",IDOK,158,176,90,14
-    PUSHBUTTON      "&Не отправлять отчет",IDCANCEL,254,176,90,14
+    LTEXT           "Работа Sally была прервана из-за ошибки, и на этом компьютере сохранен отчет о сбое. Сообщите о проблеме на GitHub: Sally откроет в браузере новое обращение с кратким описанием, которое вы сможете проверить перед отправкой.",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "Описание ошибки (не обязательно)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "П&росмотр отчета",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "Последнее выполнявшееся &действие:",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Краткое описание содержит только версии, ошибку и имена функций. Полный отчет остается на этом компьютере и может содержать личные данные, поэтому не прикладывайте его к публичному обращению; сопровождающий может попросить его у вас лично.",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "&Перезапуск Sally",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "Сообщить на &GitHub",IDOK,62,179,90,14
+    PUSHBUTTON      "&Открыть папку",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "Закрыть",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -3938,7 +3937,7 @@ IDS_OLDPLUGINVERSION2, "Модуль (%s) не поддерживается те
  IDS_ACLNOTSUPPORTEDONTGTPATH, "Права доступа не могут быть сохранены. Они не поддерживаются\nв конечном пути (это не NTFS-раздел).\n\nПродолжить?"
 
  IDS_BUGREPORTCNFRM_TITLE, "Сообщение об ошибке"
- IDS_BUGREPORTCNFRM_TEXT, "Для сообщений об ошибках или предложений по улучшению программы используйте меню ""Справка - Официальный форум поддержки"".\n\nДанный же способ применяйте только в случае крайней необходимости, либо, когда мы вас об этом попросим."
+ IDS_BUGREPORTCNFRM_TEXT, "Сообщения об ошибках и предложения по улучшению программы оставляйте на https://github.com/0xeb/sally/issues.\n\nДанный же способ применяйте только в случае крайней необходимости, либо, когда мы вас об этом попросим."
  IDS_BUGREPORT_WRITTEN, "Сообщение об ошибке записано в:"
  IDS_BUGREPORT_FAILED, "Не удалось записать сообщение об ошибке."
  IDS_SHELLMENU_NOSHELLITEMS, "Windows не удалось предоставить контекстное меню для выбранных объектов."
@@ -4080,37 +4079,13 @@ IDS_OLDPLUGINVERSION2, "Модуль (%s) не поддерживается те
  
  IDS_AS_ADMIN_TITLE, "Administrator"
 
- IDS_SALMON_INVALIDEMAIL "Пожалуйста, укажите корректный адрес электронной почты для того, чтобы мы смогли помочь вам устранить проблему."
- IDS_SALMON_WAITFORUPLOAD "Пожалуйста, подождите пока выполняются сжатие и загрузка."
- IDS_SALMON_CONFIRMEXIT "Вы действительно не хотите сообщить нам о возникшей проблеме? Без вашего сообщения нам будет затруднительно устранить проблему.\n\nНажмите ""ОК"" для того, чтобы не отправлять сообщение и удалить его." 
- IDS_SALMON_ERR_INI_SIZE "Размер загружаемого файла превышает допустимый предел. Код: %d."
- IDS_SALMON_ERR_PARTIAL "Файл загружен не полностью. Код: %d."
- IDS_SALMON_ERR_NO_FILE "Файл не был загружен. Код: %d."
- IDS_SALMON_ERR_NO_TMP_DIR "Отсутствует временная папка. Код: %d."
- IDS_SALMON_ERR_CANT_WRITE "Невозможно записать файл на диск. Код: %d."
- IDS_SALMON_ERR_EXTENSION "Загрузка файла была прервана расширением. Код: %d."
- IDS_SALMON_ERR_UNKNOWN "Неизвестная ошибка загрузки. Код: %d."
- IDS_SALMON_SYNTAX_ERROR_CLOSE "Некорректный ответ сервера. Отсутствует закрывающий тэг."
- IDS_SALMON_SYNTAX_ERROR_OPEN "Некорректный ответ сервера. Отсутствует открывающий тэг."
- IDS_SALMON_SYNTAX_ERROR_VALUE "Некорректный ответ сервера. Отсутствует значение."
- IDS_SALMON_SOCK_ERR_RECV "Невозможно принять данные. Код: %d."
- IDS_SALMON_SOCK_ERR_SHUTDOWN "Невозможно прервать соединение. Код: %d."
- IDS_SALMON_SOCK_ERR_SEND "Невозможно передать данные. Код: %d."
- IDS_SALMON_SOCK_ERR_CONNECT "Невозможно установить соединение с сервером. Код: %d."
- IDS_SALMON_SOCK_ERR_SOCKET "Невозможно открыть соединение. Код: %d."
- IDS_SALMON_SOCK_ERR_HOST "Невозможно определить имя сервера. Код: %d."
- IDS_SALMON_SOCK_ERR_INIT "Невозможно инициализировать соединение. Код: %d."
- IDS_SALMON_READING_FILE "Ошибка чтения файла %s" 
- IDS_SALMON_OUT_OF_MEMORY "Недостаточно памяти" 
- IDS_SALMON_FILE_SIZE "Невозможно определить размер файла %s"
- IDS_SALMON_FILE_OPEN "Невозможно открыть %s"
- IDS_SALMON_MORE_REPORTS "Обнаружены ранее сформированные отчеты об ошибках. Вы хотите отправить также и эти отчеты, чтобы помочь разработчикам устранить возможные проблемы в Sally?\n\nНажмите ""Да"", чтобы отправить ранее сформированные отчеты об ошибках. Нажмите ""Нет"", чтобы удалить ранее сформированные отчеты об ошибках."
+ IDS_SALMON_WAIT "Подождите, пока отчет о сбое будет сохранен."
+ IDS_SALMON_CONFIRMEXIT "Закрыть, не сообщая о проблеме?\n\nОтчет о сбое будет удален с этого компьютера."
  IDS_SALMON_TITLE "Отчет об ошибке Sally"
  IDS_SALMON_COMPRESSING "Выполняется сжатие. Пожалуйста, подождите..."
- IDS_SALMON_UPLOADING "Выполняется загрузка. Пожалуйста, подождите..."
- IDS_SALMON_UPLOADSUCCESS "Сообщение успешно отправлено.\n\nБлагодарим вас за сотрудничество в улучшении Sally!" 
- IDS_SALMON_UPLOADFAILED "Невозможно выполнить отправку сообщения: %s\n\nПожалуйста, создайте issue на https://github.com/0xeb/sally/issues и приложите сообщение, затем удалите его с диска. Нажмите ""ОК"" для того, чтобы найти файл сообщения."
- IDS_SALMON_COMPRESSFAILED "Невозможно выполнить сжатие отчета. Ошибка: %s\n\nПожалуйста, поместите отчет об ошибке в архив 7-Zip и приложите архив к новому issue на https://github.com/0xeb/sally/issues. Потом удалите файлы отчетов с диска. Нажмите ""ОК"", чтобы найти файлы отчетов."
+ IDS_SALMON_COMPRESSFAILED "Не удалось упаковать отчет о сбое, причина: %s\n\nЕго файлы оставлены без изменений. Нажмите OK, чтобы их показать."
+ IDS_SALMON_GITHUB_OPENED "В браузере открыто новое обращение на GitHub. Проверьте его и отправьте.\n\nОтчет о сбое сохранен в папке:\n%s\n\nОн может содержать личные данные, поэтому не публикуйте его. Если он понадобится сопровождающему, тот попросит его в обращении."
+ IDS_SALMON_GITHUB_FAILED "Sally не удалось открыть веб-браузер.\n\nСообщите о проблеме на https://github.com/0xeb/sally/issues и опишите, что вы делали. Отчет о сбое сохранен в папке:\n%s"
  IDS_SALMON_LOAD_FAILED "Невозможно выполнить загрузку %s."
  IDS_SALMON_WRONG_CMDLINE "Данная программа является внутренним компонентом Sally, ее не следует запускать напрямую."
  IDS_SALMON_WRONG_VERSION "Компонент отправки отчетов об ошибках Sally имеет некорректный номер версии. Пожалуйста, сообщите об этом на https://github.com/0xeb/sally/issues."

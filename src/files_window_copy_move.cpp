@@ -682,9 +682,9 @@ BOOL CanBuildFirstTrancheFromSnapshot(BOOL isDiskPanel, CActionType type,
     if (onlySize && type != atCountSize)
         return FALSE; // counting is the one legitimate onlySize flow
 
-    // The six capabilities are production now: ChangeAttrs
-    // and ChangeCase route to the snapshot builder (attribute compression/
-    // encryption changes have no capability and stay out until one exists).
+    // The six capabilities are production now: ChangeAttrs (including a
+    // compression/encryption change, which the worker performs per item) and
+    // ChangeCase route to the snapshot builder.
     switch (type)
     {
     case atCopy:
@@ -692,7 +692,7 @@ BOOL CanBuildFirstTrancheFromSnapshot(BOOL isDiskPanel, CActionType type,
     case atDelete:
         break;
     case atChangeAttrs:
-        if (attrsData == NULL || attrsData->ChangeCompression || attrsData->ChangeEncryption)
+        if (attrsData == NULL)
             return FALSE;
         break;
     case atChangeCase:
@@ -2079,9 +2079,13 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                 buildConfig.ChangeAttrsAnd = attrsData->AttrAnd;
                 buildConfig.ChangeAttrsOr = attrsData->AttrOr;
                 buildConfig.ChangeAttrsSubDirs = attrsData->SubDirs;
+                buildConfig.ChangeAttrsCompression = attrsData->ChangeCompression;
+                buildConfig.ChangeAttrsEncryption = attrsData->ChangeEncryption;
                 snapshot.AttrsData.AttrAnd = attrsData->AttrAnd;
                 snapshot.AttrsData.AttrOr = attrsData->AttrOr;
                 snapshot.AttrsData.SubDirs = attrsData->SubDirs != FALSE;
+                snapshot.AttrsData.ChangeCompression = attrsData->ChangeCompression != FALSE;
+                snapshot.AttrsData.ChangeEncryption = attrsData->ChangeEncryption != FALSE;
             }
             if (type == atChangeCase && chCaseData != NULL)
             {
@@ -2163,10 +2167,9 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             return TRUE;
         }
 
-// no legacy fallback. Every admitted shape routes
-        // through the snapshot builder above; a gate reject reaching here is a
-        // genuinely unsupported form (ADS probe error, attribute compression/
-        // encryption change) and refuses honestly instead of running the
+        // No legacy fallback. Every admitted shape routes through the snapshot
+        // builder above; a gate reject reaching here is a genuinely unsupported
+        // form (an ADS probe error) and refuses honestly instead of running the
         // retired lossy pipeline. The panel flows are single-builder from here.
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ERRORBUILDINGSCRIPT));
         SetCurrentDirectoryToSystem();

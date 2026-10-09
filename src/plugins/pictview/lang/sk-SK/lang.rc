@@ -36,11 +36,11 @@ BEGIN
     ICON            "",IDC_ABOUT_ICON,11,9,20,20
     LTEXT           "Prehliadač PictView %s - Prehliadač obrázkov pre Sally",IDC_ABOUT_TITLE,46,9,352,8
     LTEXT           "",IDC_ABOUT_COPYRIGHT,46,19,352,8,SS_NOPREFIX
-    LTEXT           "Images are decoded and saved by",IDC_STATIC_2,46,40,123,8
+    LTEXT           "Obrázky dekóduje a ukladá",IDC_STATIC_2,46,40,341,8
     LTEXT           "Windows Imaging Component (WIC)",IDC_ABOUT_PVW32,46,51,341,8
     LTEXT           "Original PictView © 1994-2023  Jan Patera",IDC_STATIC_3,46,62,198,8
-    LTEXT           "Email:",IDC_STATIC_6,46,81,30,8
-    LTEXT           "support@pictview.com",IDC_ABOUT_EMAIL,113,81,85,8,WS_TABSTOP
+    LTEXT           "GitHub:",IDC_STATIC_6,46,81,30,8
+    LTEXT           "github.com/0xeb/sally/issues",IDC_ABOUT_SUPPORT,113,81,150,8,WS_TABSTOP
     LTEXT           "Domovská stránka:",IDC_STATIC_7,46,92,66,8
     LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,113,92,122,8,WS_TABSTOP
     CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,403,1
@@ -459,6 +459,8 @@ STRINGTABLE
   IDS_MENU_FILE_DELETE, "Z&mazať\tDel"
   IDS_MENU_FILE_PREVSEL, "Pre&došlý označený\tCtrl+Backspace"
   IDS_MENU_FILE_NEXTSEL, "Na&sledujúci označený\tCtrl+Medzera"
+  IDS_MENU_FILE_SELPREV, "Označiť/odznačiť a predchádzajúci\tCtrl+Shift+Backspace"
+  IDS_MENU_FILE_SELNEXT, "Označiť/odznačiť a nasledujúci\tCtrl+Shift+Medzerník"
   IDS_MENU_FILE_COPYTO, "Kopí&rovať do...\tX"
 
   IDS_MENU_EDIT, "Úpr&avy"

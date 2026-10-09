@@ -1232,7 +1232,7 @@ BEGIN
                 MENUITEM "Unix Gerät",                 CM_STRM_ASGNUNIXDEV
                 MENUITEM "Ausdruck",                  CM_STRM_ASGNEXPR
             END
-            POPUP "&Leerraum in Spalte entfernen"
+            POPUP "Leer&raum in Spalte entfernen"
             BEGIN
                 MENUITEM "am Anfang",                     CM_STRM_CUTWSINIT
                 MENUITEM "am Ende",                    CM_STRM_CUTWSTRAIL
@@ -1268,7 +1268,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Ausschnei&den",                        CM_STRM_CUT
         MENUITEM "&Kopieren",                       CM_STRM_COPY
-        MENUITEM "&Einfügen",                      CM_STRM_PASTE
+        MENUITEM "E&infügen",                      CM_STRM_PASTE
         MENUITEM "&Löschen",                     CM_STRM_DELETE
         MENUITEM SEPARATOR
         MENUITEM "&Alles auswählen",                 CM_STRM_SELECTALL

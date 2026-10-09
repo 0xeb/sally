@@ -16,6 +16,8 @@
 #include <vector>
 #include "common/unicode/HexPattern.h"
 #include "common/unicode/ViewerBomText.h"
+#include "viewer_text_core.h"
+#include "viewer_text_file.h"
 #include "common/text/LegacySearchTextEncoding.h"
 
 #define VIEWER_HISTORY_SIZE 30 // number of remembered strings
@@ -309,28 +311,15 @@ protected:
     __int64 ClampToTextStart(__int64 offset) const { return max(offset, TextStartOffset()); }
     BOOL DecodeTextRange(HANDLE* hFile, __int64 start, __int64 end, Sally::Unicode::DecodedRun& run,
                          BOOL& fatalErr, bool flush = true);
-    BOOL ReadDecodedScalar(HANDLE* hFile, __int64 offset, Sally::Unicode::DecodedRun& scalar, BOOL& fatalErr);
-    // One implementation for both callers of the decoded-line walk. 'visualLine' may be NULL:
-    // then cells are only COUNTED, not materialised.
-    //
-    // The whole-file scan behind DecodedLineIndex reads exactly one thing from the run it used
-    // to build - CellCount() - yet paid for five vectors per line to get it. Counting instead
-    // removes one of the three per-character materialisations on that pass. Tab expansion
-    // depends only on the running count, so both modes stay in lockstep by construction; this
-    // is deliberately ONE function so the EOL / CR-LF / wrap logic cannot drift between them.
-    BOOL DecodeOrScanTextLine(HANDLE* hFile, __int64 lineOffset, __int64 maxCells,
-                              Sally::Unicode::DecodedRun* visualLine, __int64& cellCount,
-                              __int64& lineEnd, __int64& nextLineBegin, BOOL& eol, BOOL& wrapped,
-                              int& eolBytes, BOOL& fatalErr);
-    // Materialising form - used by painting and anything that needs the decoded cells.
-    BOOL ReadDecodedTextLine(HANDLE* hFile, __int64 lineOffset, __int64 maxCells,
-                             Sally::Unicode::DecodedRun& visualLine, __int64& lineEnd,
-                             __int64& nextLineBegin, BOOL& eol, BOOL& wrapped,
-                             int& eolBytes, BOOL& fatalErr);
-    // Counting form - used by the whole-file line index, which never looks at the cells.
-    BOOL ScanDecodedTextLine(HANDLE* hFile, __int64 lineOffset, __int64 maxCells,
-                             __int64& cellCount, __int64& lineEnd, __int64& nextLineBegin,
-                             BOOL& eol, BOOL& wrapped, int& eolBytes, BOOL& fatalErr);
+    // Decoded text is laid out by Sally::Viewer::TextEngine (viewer_text_core.h); these build its
+    // view of this window. 'wrapColumns' is 0 for unwrapped rows; 'armLongLine' lets a line longer
+    // than TEXT_MAX_LINE_LEN be reported so the user can be offered hex mode.
+    Sally::Viewer::TextLayoutConfig DecodedLayoutConfig(int wrapColumns, BOOL armLongLine) const;
+    // The wrap width the line walk uses: 0 when text is not wrapped or the window has no size yet.
+    int DecodedWrapColumns() const;
+    // A line is too long for text mode: switch to hex (TRUE, ExitTextMode is set) or, when the
+    // user insists, stay in text mode from now on (FALSE, ForceTextMode is set).
+    BOOL OfferHexForLongLine();
     void PaintDecodedText(HDC dc, const RECT& fullLine, int lines, int columns, int clipFirstRow,
                           int clipLastRow, BOOL& fatalErr, BOOL& setFindOffset);
     BOOL FindDecodedLiteral(HANDLE* hFile, BOOL forward, WORD flags, BOOL& foundMatch, BOOL& fatalErr);
@@ -432,49 +421,10 @@ protected:
     __int64 TextContentOffset;                // first raw byte after the BOM in decoded text mode
 
 
-    // Sparse checkpoints into the decoded (BOM-marked Unicode) line stream.
-    //
-    // FindPreviousDecodedEOL() locates the line preceding a position by scanning FORWARD from
-    // the start of the text, and FindSeekBefore() calls it once per line, so paging was O(n^2).
-    // Memoising it fixed that but stored one record PER LINE: a 100 MiB file of
-    // one-character lines is 52.4M
-    // records = 1.56 GiB, and 2.3-2.6 GiB at the reallocation peak. x86 is a supported target,
-    // where that is an unrecoverable bad_alloc, and nothing on this path catches it.
-    //
-    // So keep only every Nth line. A checkpoint holds the line BEFORE a resume point, which is
-    // exactly the state the scan loop needs to continue: position, and the previous line's end
-    // and length. Lookup binary-searches the checkpoints and rescans at most a stride forward,
-    // which keeps the quadratic fix while making memory O(lines / stride).
-    struct CDecodedLine
-    {
-        __int64 Begin;     // offset of the first raw byte of the line
-        __int64 End;       // offset just past the last displayed byte
-        __int64 NextBegin; // offset where the following line starts
-        __int64 CellCount; // decoded cells on the line
-    };
-    static const int DECODED_CHECKPOINT_STRIDE = 256;
-    std::vector<CDecodedLine> DecodedLineCheckpoints;
-
-    // Validity key: everything the scan reads. Getting this wrong is silent - boundaries shift
-    // rather than anything failing - so it lists the EOL policy and TabSize explicitly.
-    // Regular-expression search sets Configuration.EOL_NULL directly, bypassing the config-change
-    // reset, and TabSize moves the wrap point under WrapText.
-    __int64 DecodedLineIndexTextStart;
-    __int64 DecodedLineIndexMaxCells;
-    __int64 DecodedLineIndexFileSize;
-    int DecodedLineIndexEncoding;
-    int DecodedLineIndexEolFlags; // EOL_CRLF | EOL_CR | EOL_LF | EOL_NULL, packed
-    int DecodedLineIndexTabSize;
-    BOOL DecodedLineIndexWrap;
-    BOOL DecodedLineIndexComplete; // the scan reached EOF or stopped making progress
-
-    // Packs the EOL policy into the validity key.
-    int CurrentDecodedEolFlags() const;
-    // Resets the checkpoints when any keyed input changed. Returns TRUE if usable.
-    void EnsureDecodedIndexValid(__int64 textStart, __int64 maxCells);
-    // Largest checkpoint whose following line starts strictly before 'seek', or NULL.
-    const CDecodedLine* NearestDecodedCheckpoint(__int64 seek) const;
-    void ResetDecodedLineIndex();
+    // The viewed file as decoded text reads it: chunks cached while the file stays the same size,
+    // so scrolling and repainting reread nothing. Reset whenever the viewer reloads the file.
+    Sally::Viewer::Win32HandleReader DecodedReader;
+    Sally::Viewer::ChunkedByteSource DecodedSource;
 
     BOOL WaitForViewerRefresh;   // TRUE - waiting for WM_USER_VIEWERREFRESH; other commands are skipped
     __int64 LastSeekY;           // SeekY before the error

@@ -545,10 +545,11 @@ protected:
                 CGUIHyperLinkAbstract* link = DialogGui->AttachHyperLink(HWindow, IDC_ABOUT_WWW, STF_UNDERLINE | STF_HYPERLINK_COLOR);
                 if (link != nullptr)
                     link->SetActionOpen(L"https://sally-filemanager.app/");
+                // Support is Sally's issue tracker; the closed engine's e-mail address went with it.
+                link = DialogGui->AttachHyperLink(HWindow, IDC_ABOUT_SUPPORT, STF_UNDERLINE | STF_HYPERLINK_COLOR);
+                if (link != nullptr)
+                    link->SetActionOpen(L"https://github.com/0xeb/sally/issues");
             }
-            // The closed engine's support address is gone with the engine.
-            ShowWindow(GetDlgItem(HWindow, IDC_ABOUT_EMAIL), SW_HIDE);
-            ShowWindow(GetDlgItem(HWindow, IDC_STATIC_6), SW_HIDE);
         }
         return CPictViewDialog::DialogProc(message, wParam, lParam);
     }

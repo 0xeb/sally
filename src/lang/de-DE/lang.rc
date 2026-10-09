@@ -2001,23 +2001,22 @@ BEGIN
     PUSHBUTTON      "Hilfe",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Sally Bug-Reporter"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Ein Problem ist aufgetreten, die Schließung von Sally wird erzwungen. Senden Sie uns bitte den unten aufgeführten Fehlerbericht zu, das kann uns helfen ähnliche Fehler in Zukunft zu vermeiden.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Datenschutzrichtlinie: wir geben keinerlei Daten von Ihnen an Dritte weiter.",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "Fehlerbeschreibung (optional)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "&Bericht ansehen",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "&Letzter Vorgang:",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "&E-Mail-Adresse:",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "&Sally neu starten",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "Bericht &senden",IDOK,158,176,90,14
-    PUSHBUTTON      "&Keinen Bericht senden",IDCANCEL,254,176,90,14
+    LTEXT           "Sally wurde wegen eines Problems beendet; ein Absturzbericht liegt auf diesem Computer. Bitte melden Sie das Problem auf GitHub: Sally öffnet im Browser ein neues Issue mit einer kurzen Zusammenfassung, die Sie vor dem Absenden prüfen können.",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "Fehlerbeschreibung (optional)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "&Bericht ansehen",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "&Letzter Vorgang:",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "Die Zusammenfassung enthält nur Versionen, den Fehler und Funktionsnamen. Der vollständige Bericht bleibt auf diesem Computer und kann private Daten enthalten, also hängen Sie ihn nicht an das Issue an; ein Maintainer kann privat danach fragen.",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "Sally &neu starten",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "Auf &GitHub melden",IDOK,62,179,90,14
+    PUSHBUTTON      "&Ordner öffnen",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "Schließen",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -3938,7 +3937,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_ACLNOTSUPPORTEDONTGTPATH, "Besitzer und Rechte können nicht übernommen werden. Es wird auf dem Zielpfad\nnicht unterstützt (das ist kein NTFS Laufwerk).\n\nWollen Sie fortfahren?"
 
  IDS_BUGREPORTCNFRM_TITLE, "Fehlerbericht"
- IDS_BUGREPORTCNFRM_TEXT, "Für einen Fehlerbericht oder eine Anfrage wählen Sie im Hilfemenü > Offizielles Supportforum.\n\nBenutzen Sie diesen Fehlerbericht nur um uns sensible Daten zu senden oder wenn wir Sie danach fragen."
+ IDS_BUGREPORTCNFRM_TEXT, "Für Fehlerberichte oder Funktionswünsche eröffnen Sie bitte ein Issue auf https://github.com/0xeb/sally/issues.\n\nBenutzen Sie diesen Fehlerbericht nur um uns sensible Daten zu senden oder wenn wir Sie danach fragen."
  IDS_BUGREPORT_WRITTEN, "Der Fehlerbericht wurde geschrieben nach:"
  IDS_BUGREPORT_FAILED, "Der Fehlerbericht konnte nicht geschrieben werden."
  IDS_SHELLMENU_NOSHELLITEMS, "Windows konnte für die ausgewählten Elemente kein Kontextmenü bereitstellen."
@@ -4080,37 +4079,13 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  
  IDS_AS_ADMIN_TITLE, "Administrator"
 
- IDS_SALMON_INVALIDEMAIL "Geben Sie bitte eine gültige E-Mail-Adresse an, damit wir Ihnen bei dem gemeldeten Problem helfen können."
- IDS_SALMON_WAITFORUPLOAD "Warten Sie bitte bis die Komprimierung und der Upload beendet wurde."
- IDS_SALMON_CONFIRMEXIT "Sind Sie sicher, dass Sie uns nicht über dieses Problem informieren wollen? Ohne Ihren Bericht wird es nicht behoben werden.\n\nDrücken Sie 'OK', um den Bericht, ohne uns zu informieren, zu löschen." 
- IDS_SALMON_ERR_INI_SIZE "Die hochgeladene Datei übersteigt die zulässige Größe. Code: %d."
- IDS_SALMON_ERR_PARTIAL "Die Datei wurde nur unvollständig hochgeladen. Code: %d."
- IDS_SALMON_ERR_NO_FILE "Datei wurde nicht hochgeladen. Code: %d."
- IDS_SALMON_ERR_NO_TMP_DIR "Temporärer Ordner fehlt. Code: %d."
- IDS_SALMON_ERR_CANT_WRITE "Schreiben auf Datenträger fehlgeschlagen. Code: %d."
- IDS_SALMON_ERR_EXTENSION "Erweiterung beendete den Dateiupload. Code: %d."
- IDS_SALMON_ERR_UNKNOWN "Unbekannter Uploadfehler. Code: %d."
- IDS_SALMON_SYNTAX_ERROR_CLOSE "Syntaxfehler in der Serverantwort. Close-Tag nicht gefunden."
- IDS_SALMON_SYNTAX_ERROR_OPEN "Syntaxfehler in der Serverantwort. Open-Tag nicht gefunden."
- IDS_SALMON_SYNTAX_ERROR_VALUE "Syntaxfehler in der Serverantwort. Wert nicht gefunden."
- IDS_SALMON_SOCK_ERR_RECV "Daten können nicht empfangen werden. Code: %d."
- IDS_SALMON_SOCK_ERR_SHUTDOWN "Verbindung kann nicht getrennt werden. Code: %d."
- IDS_SALMON_SOCK_ERR_SEND "Daten können nicht gesendet werden. Code: %d."
- IDS_SALMON_SOCK_ERR_CONNECT "Verbindung mit dem Server kann nicht hergestellt werden. Code: %d."
- IDS_SALMON_SOCK_ERR_SOCKET "Verbindung kann nicht geöffnet werden. Code: %d."
- IDS_SALMON_SOCK_ERR_HOST "Hostname kann nicht aufgelöst werden. Code: %d."
- IDS_SALMON_SOCK_ERR_INIT "Verbindung kann nicht initialisiert werden. Code: %d."
- IDS_SALMON_READING_FILE "Fehler beim Lesen der Datei %s" 
- IDS_SALMON_OUT_OF_MEMORY "Nicht genug Speicher" 
- IDS_SALMON_FILE_SIZE "Fehler beim Einlesen der Dateigröße bei %s"
- IDS_SALMON_FILE_OPEN "Fehler beim Öffnen von %s"
- IDS_SALMON_MORE_REPORTS "Einige ältere Fehlerberichte wurden gefunden. Möchten Sie auch diese Fehlerberichte senden und uns helfen Sally zu verbessern?\n\nDrücken Sie 'JA' , um die älteren Fehlerberichte zu bearbeiten. Drücken Sie 'NEIN' um die älteren Fehlerberichte zu löschen."
+ IDS_SALMON_WAIT "Bitte warten Sie, bis der Absturzbericht gespeichert ist."
+ IDS_SALMON_CONFIRMEXIT "Schließen, ohne das Problem zu melden?\n\nDer Absturzbericht wird von diesem Computer gelöscht."
  IDS_SALMON_TITLE "Sally Bug-Reporter"
  IDS_SALMON_COMPRESSING "Komprimiere, bitte warten..."
- IDS_SALMON_UPLOADING "Upload, bitte warten..."
- IDS_SALMON_UPLOADSUCCESS "Bericht wurde erfolgreich hochgeladen.\n\nDanke für Ihre Hilfe Sally zu verbessern!" 
- IDS_SALMON_UPLOADFAILED "Aus folgendem Grund ist der Upload fehlgeschlagen: %s\n\nBitte erstellen Sie ein Issue auf https://github.com/0xeb/sally/issues und hängen Sie den Bericht an, anschließend können Sie ihn von ihrer Festplatte löschen. Drücken Sie 'OK', um den Bericht anzusehen."
- IDS_SALMON_COMPRESSFAILED "Aus folgendem Grund ist die Komprimierung des Berichts fehlgeschlagen: %s\n\nPacken Sie bitte den Fehlerbericht mit 7-Zip und hängen Sie ihn an ein neues Issue auf https://github.com/0xeb/sally/issues an, anschließend können Sie die Dateien von ihrer Festplatte löschen. Drücken Sie 'OK', um den Bericht anzusehen."
+ IDS_SALMON_COMPRESSFAILED "Der Absturzbericht konnte nicht gepackt werden, Grund: %s\n\nSeine Dateien wurden unverändert behalten. Drücken Sie 'OK', um sie anzuzeigen."
+ IDS_SALMON_GITHUB_OPENED "In Ihrem Browser ist ein neues GitHub-Issue geöffnet. Bitte prüfen Sie es und senden Sie es ab.\n\nDer Absturzbericht wurde gespeichert in:\n%s\n\nEr kann private Daten enthalten, veröffentlichen Sie ihn daher nicht. Falls ein Maintainer ihn benötigt, fragt er im Issue danach."
+ IDS_SALMON_GITHUB_FAILED "Sally konnte Ihren Webbrowser nicht öffnen.\n\nBitte melden Sie das Problem unter https://github.com/0xeb/sally/issues und beschreiben Sie, was Sie gerade getan haben. Der Absturzbericht wurde gespeichert in:\n%s"
  IDS_SALMON_LOAD_FAILED "Laden von %s fehlgeschlagen."
  IDS_SALMON_WRONG_CMDLINE "Dies ist ein internes Hilfsprogramm von Sally, öffnen Sie es bitte nicht direkt."
  IDS_SALMON_WRONG_VERSION "Unzulässige Bug-Reporter Version von Sally. Bitte melden Sie dies auf https://github.com/0xeb/sally/issues."

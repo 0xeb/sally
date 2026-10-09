@@ -1115,7 +1115,7 @@ BEGIN
     LTEXT           "大小:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "像素",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " 主题(&T) ",IDC_STATIC_7,1,192,295,30
+    GROUPBOX        " 主题(&E) ",IDC_STATIC_7,1,192,295,30
     LTEXT           "模式:",IDC_STATIC_8,8,206,45,8
     COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
 END
@@ -2001,23 +2001,22 @@ BEGIN
     PUSHBUTTON      "帮助",IDHELP,139,122,50,14
 END
 
-IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 199
+IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 200
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Sally 缺陷报告程序"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "出现了一个问题，迫使 Sally 关闭。为了帮助我们在将来避免类似问题，请发送下面的错误报告。",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "隐私政策：我们不会透露任何你的信息给任何第三方。",IDC_SALMON_PRIVACY,8,33,259,8
-    LTEXT           "...",IDC_SALMON_UPLOADING,8,42,84,8
-    LTEXT           "错误描述(可选)",IDC_SALMON_DESCRIPTION,8,51,169,8
-    PUSHBUTTON      "查看报告(&V)",IDC_SALMON_VIEW,254,48,90,14
-    LTEXT           "最近的动作(&L):",IDC_SALMON_ACTION_LABEL,8,69,40,8
-    EDITTEXT        IDC_SALMON_ACTION,8,79,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
-    LTEXT           "联系 email(&C):",IDC_SALMON_EMAIL_LABEL,8,144,50,8
-    EDITTEXT        IDC_SALMON_EMAIL,8,154,336,14,ES_AUTOHSCROLL
-    CONTROL         "重启 Sally(&R)",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,178,98,10
-    DEFPUSHBUTTON   "发送报告(&S)",IDOK,158,176,90,14
-    PUSHBUTTON      "不发送报告(&D)",IDCANCEL,254,176,90,14
+    LTEXT           "Sally 因出现问题而停止运行，崩溃报告已保存在这台计算机上。请在 GitHub 上报告此问题：Sally 会在浏览器中打开一个新问题，并附上一份简短摘要，你可以在提交前查看。",IDC_SALMON_INTRO,8,7,336,32
+    LTEXT           "...",IDC_SALMON_PROGRESS,8,42,84,8
+    LTEXT           "错误描述(可选)",IDC_SALMON_DESCRIPTION,8,46,240,8
+    PUSHBUTTON      "查看报告(&V)",IDC_SALMON_VIEW,254,43,90,14
+    LTEXT           "最近的动作(&L):",IDC_SALMON_ACTION_LABEL,8,61,240,8
+    EDITTEXT        IDC_SALMON_ACTION,8,71,336,50,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "摘要只包含版本、错误和函数名称。完整报告保留在这台计算机上，可能包含隐私数据，因此请不要将其附加到公开问题中；维护者可能会私下向你索取。",IDC_SALMON_PRIVACY,8,127,336,32
+    CONTROL         "重启 Sally(&R)",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,163,240,10
+    DEFPUSHBUTTON   "在 GitHub 上报告(&G)",IDOK,62,179,90,14
+    PUSHBUTTON      "打开文件夹(&O)",IDC_SALMON_FOLDER,158,179,90,14
+    PUSHBUTTON      "关闭",IDCANCEL,254,179,90,14
 END
 
 IDD_CONFIRMLINKTGTCOPY DIALOGEX 15, 34, 352, 96
@@ -3938,7 +3937,7 @@ IDS_OLDPLUGINVERSION2, "这个插件 (%s) 不被 Sally 的这个版本所支持�
  IDS_ACLNOTSUPPORTEDONTGTPATH, "所有者和权限不能被保留。他们不被支持\n在目标路径(它不是 NTFS 卷)。\n\n你要继续吗？"
 
  IDS_BUGREPORTCNFRM_TITLE, "报告缺陷"
- IDS_BUGREPORTCNFRM_TEXT, "缺陷报告或功能需求请使用菜单 帮助 > 官方支持论坛。\n\n仅为给我们发送敏感数据或当我们请求您时使用此缺陷报告。"
+ IDS_BUGREPORTCNFRM_TEXT, "缺陷报告或功能需求请在 https://github.com/0xeb/sally/issues 提交。\n\n仅为给我们发送敏感数据或当我们请求您时使用此缺陷报告。"
  IDS_BUGREPORT_WRITTEN, "缺陷报告已写入："
  IDS_BUGREPORT_FAILED, "无法写入缺陷报告。"
  IDS_SHELLMENU_NOSHELLITEMS, "Windows 无法为所选项目提供上下文菜单。"
@@ -4080,37 +4079,13 @@ IDS_OLDPLUGINVERSION2, "这个插件 (%s) 不被 Sally 的这个版本所支持�
  
  IDS_AS_ADMIN_TITLE, "管理员"
 
- IDS_SALMON_INVALIDEMAIL "请输入一个有效的电子邮件地址，以便我们协助您解决报告的问题。"
- IDS_SALMON_WAITFORUPLOAD "请等待压缩和上传完成。"
- IDS_SALMON_CONFIRMEXIT "你确定你不想让我们知道这个问题吗？如果没有您的报告中，我们将不能够解决它。\n\n点击""确定""以删除报告不让我们知道。" 
- IDS_SALMON_ERR_INI_SIZE "上传的文件超过允许的大小。代码: %d。"
- IDS_SALMON_ERR_PARTIAL "上传的文件只上传了一部分。代码: %d。"
- IDS_SALMON_ERR_NO_FILE "没有上传文件。代码: %d。"
- IDS_SALMON_ERR_NO_TMP_DIR "缺少临时文件夹。代码: %d。"
- IDS_SALMON_ERR_CANT_WRITE "写文件到磁盘失败。代码: %d。"
- IDS_SALMON_ERR_EXTENSION "一些扩展阻止了文件上传。代码: %d。"
- IDS_SALMON_ERR_UNKNOWN "未知的上传错误。代码: %d。"
- IDS_SALMON_SYNTAX_ERROR_CLOSE "服务器响应中有语法错误。未找到关闭标签。"
- IDS_SALMON_SYNTAX_ERROR_OPEN "服务器响应中有语法错误。未找到打开标签。"
- IDS_SALMON_SYNTAX_ERROR_VALUE "服务器响应中有语法错误。没有发现值。"
- IDS_SALMON_SOCK_ERR_RECV "无法接收数据。代码: %d。"
- IDS_SALMON_SOCK_ERR_SHUTDOWN "无法关闭连接。代码: %d。"
- IDS_SALMON_SOCK_ERR_SEND "无法发送数据。代码: %d。"
- IDS_SALMON_SOCK_ERR_CONNECT "无法连接到服务器。代码: %d。"
- IDS_SALMON_SOCK_ERR_SOCKET "无法打开连接。代码: %d。"
- IDS_SALMON_SOCK_ERR_HOST "无法解析主机名。代码: %d。"
- IDS_SALMON_SOCK_ERR_INIT "无法初始化连接。代码: %d。"
- IDS_SALMON_READING_FILE "读取文件错误 %s" 
- IDS_SALMON_OUT_OF_MEMORY "内存溢出" 
- IDS_SALMON_FILE_SIZE "由于 %s 获取文件大小失败"
- IDS_SALMON_FILE_OPEN "打开 %s 失败"
- IDS_SALMON_MORE_REPORTS "找到了一些旧的缺陷报告。你想同样报告这些缺陷并帮助我们改进 Sally 吗？\n\n点击""是""处理旧的缺陷报告。点击""否""删除旧的缺陷报告。"
+ IDS_SALMON_WAIT "请等待崩溃报告保存完成。"
+ IDS_SALMON_CONFIRMEXIT "不报告问题就关闭吗？\n\n崩溃报告将从这台计算机上删除。"
  IDS_SALMON_TITLE "Sally 缺陷报告程序"
  IDS_SALMON_COMPRESSING "正在压缩，请稍候..."
- IDS_SALMON_UPLOADING "正在上传，请稍候..."
- IDS_SALMON_UPLOADSUCCESS "报告已被成功上传。\n\n感谢你帮助我们改进 Sally！" 
- IDS_SALMON_UPLOADFAILED "上传报告失败，原因: %s\n\n请在 https://github.com/0xeb/sally/issues 提交问题并附上报告，然后从你的磁盘删除它们。点击""确定""来显示报告。"
- IDS_SALMON_COMPRESSFAILED "报告压缩失败，原因: %s\n\n请用 7-Zip 打包你的缺陷报告，将它附加到 https://github.com/0xeb/sally/issues 上的新问题，并从你的磁盘删除报告文件。点击""确定""来显示报告。"
+ IDS_SALMON_COMPRESSFAILED "无法打包崩溃报告，原因: %s\n\n其文件已原样保留。点击确定来显示它们。"
+ IDS_SALMON_GITHUB_OPENED "浏览器中已打开一个新的 GitHub 问题。请检查后提交。\n\n崩溃报告已保存在:\n%s\n\n它可能包含隐私数据，请不要公开发布。如果维护者需要它，会在问题中提出。"
+ IDS_SALMON_GITHUB_FAILED "Sally 无法打开网页浏览器。\n\n请在 https://github.com/0xeb/sally/issues 报告此问题，并描述你当时在做什么。崩溃报告已保存在:\n%s"
  IDS_SALMON_LOAD_FAILED "加载 %s 失败。"
  IDS_SALMON_WRONG_CMDLINE "这是 Sally 内部的工具，请不要直接启动它。"
  IDS_SALMON_WRONG_VERSION "不正确的 Sally 缺陷报告版本。请在 https://github.com/0xeb/sally/issues 报告此问题。"

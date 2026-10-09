@@ -13,8 +13,6 @@
 // CreateWindowExW on a RegisterClassW class reports IsWindowUnicode == TRUE.
 
 #include "precomp.h"
-#include "common/text/EncodingDetector.h"
-#include "viewer_line_index.h"
 #include "viewer_find_seed.h"
 
 #include "viewer.h"
@@ -678,15 +676,7 @@ void CViewerWindow::HeightChanged(BOOL& fatalErr)
 
     case vtText:
     {
-        int fullLines = max(Height / CharHeight, 1);
-        MaxSeekY = FindSeekBefore(FileSize, fullLines, fatalErr);
-        if (!fatalErr && fullLines > 1)
-        {
-            BOOL lastLineFatalErr = FALSE;
-            __int64 lastLineSeekY = FindSeekBefore(FileSize, fullLines - 1, lastLineFatalErr);
-            if (!lastLineFatalErr && lastLineSeekY > MaxSeekY)
-                MaxSeekY = lastLineSeekY;
-        }
+        MaxSeekY = FindSeekBefore(FileSize, max(Height / CharHeight, 1), fatalErr);
         break;
     }
     }
@@ -814,11 +804,6 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
     if (FileNameW.empty())
         return;
 
-    // The cached line scan describes the previous contents. The validity key would catch a
-    // size change, but a file edited in place keeps its size, so drop the cache whenever the
-    // viewer reloads rather than relying on the key alone.
-    ResetDecodedLineIndex();
-
     const wchar_t* sW = wcsrchr(FileNameW.c_str(), L'\\');
     const wchar_t* namePartW = sW != NULL ? sW + 1 : FileNameW.c_str();
 
@@ -844,6 +829,8 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
             Seek = 0;
             Loaded = 0;
             FileSize = 0;
+            DecodedReader.Attach(nullptr, nullptr, 0);
+            DecodedSource.Reset(0);
             FindOffset = 0;
             StartSelection = EndSelection = -1;
             ReleaseMouseDrag();
@@ -880,6 +867,11 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
                 LastFindSeekY = -1;
                 TextEncoding = Sally::Unicode::BomEncoding::LegacyBytes;
                 TextContentOffset = 0;
+                // Decoded text reads the file through its own chunk cache; a reload (also of a
+                // file edited in place, which keeps its size) must not see the old bytes.
+                DecodedReader.Attach([this]() { return OpenViewedFile(FILE_FLAG_RANDOM_ACCESS); },
+                                     [](HANDLE handle) { HANDLES(CloseHandle(handle)); }, FileSize);
+                DecodedSource.Reset(FileSize);
 
                 if (FileSize > 0)
                 {
@@ -898,15 +890,9 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
                     if ((bomSeek.LoDWord != INVALID_SET_FILE_POINTER || seekErr == NO_ERROR) &&
                         ReadFile(file, head, (DWORD)min((__int64)sizeof(head), FileSize), &read, NULL))
                     {
-                        sally::text::DetectionOptions detectOptions;
-                        detectOptions.scanBudget = read;
-                        // The window legitimately ends mid-character for any file
-                        // larger than the buffer.
-                        detectOptions.windowMayEndMidCharacter = true;
-                        const sally::text::DetectionResult detected =
-                            sally::text::Detect(head, read, detectOptions);
-                        TextEncoding = detected.encoding;
-                        TextContentOffset = detected.textOffset;
+                        const Sally::Unicode::BomInfo detected = Sally::Viewer::ProbeTextEncoding(head, read);
+                        TextEncoding = detected.Encoding;
+                        TextContentOffset = detected.TextOffset;
                     }
                 }
 
@@ -1105,73 +1091,15 @@ BOOL CViewerWindow::FindNextEOL(HANDLE* hFile, __int64 seek, __int64 maxSeek, __
     fatalErr = FALSE;
     if (HasDecodedTextMode())
     {
-        seek = max(seek, TextContentOffset);
-        maxSeek = min(maxSeek, FileSize);
-        Sally::Unicode::DecodedRun decoded;
-        __int64 decodeEnd = min(FileSize, maxSeek + 8);
-        if (!DecodeTextRange(hFile, seek, decodeEnd, decoded, fatalErr, decodeEnd >= FileSize))
-            return FALSE;
-        if (fatalErr)
-            return FALSE;
-        for (std::size_t i = 0; i < decoded.CellCount(); ++i)
+        UNREFERENCED_PARAMETER(hFile);
+        Sally::Viewer::TextEngine engine(DecodedSource, DecodedLayoutConfig(0, FALSE));
+        bool found = false;
+        if (engine.FindLineEnd(seek, maxSeek, lineEnd, nextLineBegin, found) != Sally::Viewer::TextStatus::Ok)
         {
-            if (decoded.RawStart[i] > maxSeek)
-                break;
-            std::uint32_t scalar = decoded.Scalars[i];
-            if (scalar == L'\r')
-            {
-                if (Configuration.EOL_CRLF)
-                {
-                    Sally::Unicode::DecodedRun nextScalar;
-                    bool haveNext = false;
-                    if (i + 1 < decoded.CellCount())
-                    {
-                        nextScalar.AppendCell(decoded.Scalars[i + 1], decoded.RawStart[i + 1], decoded.RawEnd[i + 1]);
-                        haveNext = true;
-                    }
-                    else if (ReadDecodedScalar(hFile, decoded.RawEnd[i], nextScalar, fatalErr) && !fatalErr &&
-                             nextScalar.CellCount() > 0)
-                        haveNext = true;
-                    if (fatalErr)
-                        return FALSE;
-                    if (haveNext && nextScalar.Scalars[0] == L'\n')
-                    {
-                        lineEnd = decoded.RawStart[i];
-                        nextLineBegin = nextScalar.RawEnd[0];
-                        return TRUE;
-                    }
-                }
-                if (Configuration.EOL_CR)
-                {
-                    lineEnd = decoded.RawStart[i];
-                    nextLineBegin = decoded.RawEnd[i];
-                    return TRUE;
-                }
-            }
-            else if (scalar == L'\n')
-            {
-                if (Configuration.EOL_LF)
-                {
-                    lineEnd = decoded.RawStart[i];
-                    nextLineBegin = decoded.RawEnd[i];
-                    return TRUE;
-                }
-            }
-            else if (scalar == 0 && Configuration.EOL_NULL)
-            {
-                lineEnd = decoded.RawStart[i];
-                nextLineBegin = decoded.RawEnd[i];
-                return TRUE;
-            }
+            fatalErr = TRUE;
+            return FALSE;
         }
-        if (maxSeek >= FileSize)
-        {
-            lineEnd = FileSize;
-            nextLineBegin = FileSize;
-            return TRUE;
-        }
-        nextLineBegin = -1;
-        return FALSE;
+        return found ? TRUE : FALSE;
     }
     if (seek > 0) // not the start of the file
     {
@@ -1296,21 +1224,9 @@ BOOL CViewerWindow::FindPreviousEOL(HANDLE* hFile, __int64 seek, __int64 minSeek
     while (lineBegin >= minSeek)
     {
         if (!FindingSoDonotSwitchToHex && CanSwitchToHex && minSeek == 0 && !ForceTextMode &&
-            seek - lineBegin > TEXT_MAX_LINE_LEN)
+            seek - lineBegin > TEXT_MAX_LINE_LEN && OfferHexForLongLine())
         {
-            if (!CanSwitchQuietlyToHex)
-                CanSwitchToHex = FALSE;
-            if (CanSwitchQuietlyToHex ||
-                SalMessageBoxViewerPaintBlocked(HWindow, LoadStrW(IDS_VIEWER_BINFILE), LoadStrW(IDS_VIEWERTITLE),
-                                                MB_YESNO | MB_ICONQUESTION) == IDYES)
-            {
-                CanSwitchQuietlyToHex = FALSE;
-                ExitTextMode = TRUE;
-                PostMessage(HWindow, WM_COMMAND, CM_TO_HEX, 0);
-                return FALSE;
-            }
-            else
-                ForceTextMode = TRUE;
+            return FALSE;
         }
 
         len = min(APROX_LINE_LEN, lineBegin);
@@ -1473,68 +1389,44 @@ BOOL CViewerWindow::FindPreviousEOL(HANDLE* hFile, __int64 seek, __int64 minSeek
     return !fatalErr && previousLineEnd != -1;
 }
 
-void CViewerWindow::ResetDecodedLineIndex()
+BOOL CViewerWindow::OfferHexForLongLine()
 {
-    // swap-with-empty, not clear(): clear() keeps capacity, so the peak footprint of a huge
-    // file stayed committed for the lifetime of the viewer window even after a reload.
-    std::vector<CDecodedLine>().swap(DecodedLineCheckpoints);
-    DecodedLineIndexTextStart = -1;
-    DecodedLineIndexMaxCells = -1;
-    DecodedLineIndexFileSize = -1;
-    DecodedLineIndexEncoding = -1;
-    DecodedLineIndexEolFlags = -1;
-    DecodedLineIndexTabSize = -1;
-    DecodedLineIndexWrap = FALSE;
-    DecodedLineIndexComplete = FALSE;
-}
-
-int CViewerWindow::CurrentDecodedEolFlags() const
-{
-    return PackDecodedEolFlags(Configuration.EOL_CRLF != 0, Configuration.EOL_CR != 0,
-                               Configuration.EOL_LF != 0, Configuration.EOL_NULL != 0);
-}
-
-void CViewerWindow::EnsureDecodedIndexValid(__int64 textStart, __int64 maxCells)
-{
-    const int eolFlags = CurrentDecodedEolFlags();
-    if (DecodedLineIndexTextStart != textStart ||
-        DecodedLineIndexMaxCells != maxCells ||
-        DecodedLineIndexFileSize != FileSize ||
-        DecodedLineIndexEncoding != (int)TextEncoding ||
-        DecodedLineIndexEolFlags != eolFlags ||
-        DecodedLineIndexTabSize != Configuration.TabSize ||
-        DecodedLineIndexWrap != WrapText)
+    if (!CanSwitchQuietlyToHex)
+        CanSwitchToHex = FALSE;
+    if (CanSwitchQuietlyToHex ||
+        SalMessageBoxViewerPaintBlocked(HWindow, LoadStrW(IDS_VIEWER_BINFILE), LoadStrW(IDS_VIEWERTITLE),
+                                        MB_YESNO | MB_ICONQUESTION) == IDYES)
     {
-        ResetDecodedLineIndex();
-        DecodedLineIndexTextStart = textStart;
-        DecodedLineIndexMaxCells = maxCells;
-        DecodedLineIndexFileSize = FileSize;
-        DecodedLineIndexEncoding = (int)TextEncoding;
-        DecodedLineIndexEolFlags = eolFlags;
-        DecodedLineIndexTabSize = Configuration.TabSize;
-        DecodedLineIndexWrap = WrapText;
+        CanSwitchQuietlyToHex = FALSE;
+        ExitTextMode = TRUE;
+        PostMessage(HWindow, WM_COMMAND, CM_TO_HEX, 0);
+        return TRUE;
     }
+    ForceTextMode = TRUE;
+    return FALSE;
 }
 
-const CViewerWindow::CDecodedLine* CViewerWindow::NearestDecodedCheckpoint(__int64 seek) const
+int CViewerWindow::DecodedWrapColumns() const
 {
-    // Checkpoints are appended in increasing order, so a binary search is valid. We want the
-    // last one whose FOLLOWING line still starts before seek - resuming there cannot overshoot.
-    size_t lo = 0;
-    size_t hi = DecodedLineCheckpoints.size();
-    const CDecodedLine* best = NULL;
-    while (lo < hi)
-    {
-        const size_t mid = lo + (hi - lo) / 2;
-        if (DecodedLineCheckpoints[mid].NextBegin < seek)
-        {
-            best = &DecodedLineCheckpoints[mid];
-            lo = mid + 1;
-        }
-        else
-            hi = mid;
-    }
-    return best;
+    if (!WrapText || Width <= 0 || Height <= 0 || CharWidth <= 0)
+        return 0;
+    return max(1, (Width - BORDER_WIDTH) / CharWidth);
+}
+
+Sally::Viewer::TextLayoutConfig CViewerWindow::DecodedLayoutConfig(int wrapColumns, BOOL armLongLine) const
+{
+    Sally::Viewer::TextLayoutConfig config;
+    config.Encoding = TextEncoding;
+    config.TextStart = TextContentOffset;
+    config.FileSize = FileSize;
+    config.Eol.Crlf = Configuration.EOL_CRLF != FALSE;
+    config.Eol.Cr = Configuration.EOL_CR != FALSE;
+    config.Eol.Lf = Configuration.EOL_LF != FALSE;
+    config.Eol.Nul = Configuration.EOL_NULL != FALSE;
+    config.TabSize = Configuration.TabSize;
+    config.WrapColumns = wrapColumns;
+    config.LongLineBytes = armLongLine ? TEXT_MAX_LINE_LEN : 0;
+    return config;
 }
 
 BOOL CViewerWindow::FindPreviousDecodedEOL(HANDLE* hFile, __int64 seek, __int64 minSeek, __int64& lineBegin,
@@ -1542,129 +1434,42 @@ BOOL CViewerWindow::FindPreviousDecodedEOL(HANDLE* hFile, __int64 seek, __int64 
                                            BOOL& fatalErr, int* lines, __int64* firstLineEndOff,
                                            __int64* firstLineCharLen, BOOL addLineIfSeekIsWrap)
 {
-    UNREFERENCED_PARAMETER(allowWrap);
-    UNREFERENCED_PARAMETER(takeLineBegin);
-    UNREFERENCED_PARAMETER(lines);
-    UNREFERENCED_PARAMETER(addLineIfSeekIsWrap);
-
+    UNREFERENCED_PARAMETER(hFile);
     fatalErr = FALSE;
-    lineBegin = max(minSeek, TextContentOffset);
-    previousLineEnd = lineBegin;
-    if (firstLineEndOff != NULL)
-        *firstLineEndOff = -1;
-    if (firstLineCharLen != NULL)
-        *firstLineCharLen = -1;
-
-    minSeek = max(minSeek, TextContentOffset);
-    seek = max(seek, minSeek);
-    if (seek <= minSeek)
+    Sally::Viewer::PreviousLineQuery query;
+    query.Seek = seek;
+    query.MinSeek = minSeek;
+    query.AllowWrap = allowWrap != FALSE;
+    query.TakeLineBegin = takeLineBegin != FALSE;
+    query.WantFirstLineEndOff = firstLineEndOff != NULL;
+    query.WantFirstLineCharLen = firstLineCharLen != NULL;
+    query.AddLineIfSeekIsWrap = addLineIfSeekIsWrap != FALSE;
+    for (;;)
     {
-        previousLineEnd = lineBegin = minSeek;
-        if (firstLineCharLen != NULL)
-            *firstLineCharLen = 0;
-        return TRUE;
-    }
-
-    // Resume from the nearest checkpoint instead of re-walking from the start of the text.
-    //
-    // The index is keyed on the TEXT START, not on the caller minSeek. Keying on minSeek made
-    // display and search evict each other: a backward regex search moves minSeek every
-    // iteration, so the whole index was rebuilt once per line examined - quietly restoring the
-    // quadratic cost the memoisation removed. One shared index; results are clamped to minSeek
-    // at the end.
-    const __int64 textStart = max(TextContentOffset, (__int64)0);
-    __int64 maxCells = WrapText ? max(1, (Width - BORDER_WIDTH) / CharWidth) : TEXT_MAX_LINE_LEN + 1;
-    EnsureDecodedIndexValid(textStart, maxCells);
-
-    __int64 pos = textStart;
-    __int64 lastBegin = minSeek;
-    __int64 lastEnd = minSeek;
-    __int64 lastPreviousEnd = minSeek;
-    __int64 lastLen = 0;
-    __int64 lineOrdinal = 0;
-
-    const CDecodedLine* checkpoint = NearestDecodedCheckpoint(seek);
-    if (checkpoint != NULL)
-    {
-        // A checkpoint records the line BEFORE its resume point, which is exactly the loop
-        // state: position to continue from, plus the preceding line end and length.
-        pos = checkpoint->NextBegin;
-        lastBegin = checkpoint->Begin;
-        lastEnd = checkpoint->End;
-        lastPreviousEnd = checkpoint->End;
-        lastLen = checkpoint->CellCount;
-    }
-
-    while (pos < seek && pos < FileSize)
-    {
-        __int64 cellCount = 0;
-        __int64 scanEnd = pos;
-        __int64 scanNext = pos;
-        BOOL eol = FALSE;
-        BOOL wrapped = FALSE;
-        int eolBytes = 0;
-        if (!ScanDecodedTextLine(hFile, pos, maxCells, cellCount, scanEnd, scanNext,
-                                 eol, wrapped, eolBytes, fatalErr) ||
-            fatalErr)
+        const BOOL armLongLine = !FindingSoDonotSwitchToHex && CanSwitchToHex && !ForceTextMode &&
+                                 minSeek <= TextStartOffset();
+        Sally::Viewer::TextEngine engine(DecodedSource, DecodedLayoutConfig(allowWrap ? DecodedWrapColumns() : 0, armLongLine));
+        Sally::Viewer::PreviousLineResult found;
+        const Sally::Viewer::TextStatus status = engine.FindPreviousLine(query, found, lines);
+        if (status == Sally::Viewer::TextStatus::LongLine)
         {
-            // Never leave a half-built index behind: a later call must be able to retry.
-            ResetDecodedLineIndex();
+            if (OfferHexForLongLine())
+                return FALSE;
+            continue; // the user insists on text mode: no limit any more
+        }
+        if (status != Sally::Viewer::TextStatus::Ok)
+        {
+            fatalErr = TRUE;
             return FALSE;
         }
-        if (scanNext <= pos)
-            break; // no forward progress - the original scan stopped here too
-
-        CDecodedLine line;
-        line.Begin = pos;
-        line.End = scanEnd;
-        line.NextBegin = scanNext;
-        line.CellCount = cellCount;
-
-        if (line.NextBegin >= seek)
-        {
-            lineBegin = line.Begin;
-            previousLineEnd = lastPreviousEnd;
-            lastEnd = line.End;
-            lastLen = line.CellCount;
-            break;
-        }
-
-        // Remember every Nth line so a later call resumes near here rather than at the text
-        // start. Appended in increasing order, which the binary search depends on.
-        if ((lineOrdinal % DECODED_CHECKPOINT_STRIDE) == 0 &&
-            (DecodedLineCheckpoints.empty() || DecodedLineCheckpoints.back().Begin < line.Begin))
-        {
-            DecodedLineCheckpoints.push_back(line);
-        }
-        lineOrdinal++;
-
-        lastPreviousEnd = line.End;
-        lastBegin = line.Begin;
-        lastEnd = line.End;
-        lastLen = line.CellCount;
-        pos = line.NextBegin;
+        lineBegin = found.LineBegin;
+        previousLineEnd = found.PreviousLineEnd;
+        if (firstLineEndOff != NULL)
+            *firstLineEndOff = found.FirstLineEndOff;
+        if (firstLineCharLen != NULL)
+            *firstLineCharLen = found.FirstLineCharLen;
+        return found.Found ? TRUE : FALSE;
     }
-
-    // The index runs from the text start, so a caller asking about a later window must not be
-    // handed a line that begins before what it asked for.
-    if (lineBegin < minSeek)
-        lineBegin = minSeek;
-    if (previousLineEnd < minSeek)
-        previousLineEnd = minSeek;
-
-    if (pos >= seek)
-    {
-        lineBegin = lastBegin;
-        previousLineEnd = lastPreviousEnd;
-    }
-
-    if (lineBegin > TextContentOffset && firstLineEndOff != NULL)
-        *firstLineEndOff = previousLineEnd;
-    if (firstLineCharLen != NULL)
-        *firstLineCharLen = lastLen;
-    if (firstLineEndOff != NULL && *firstLineEndOff == -1)
-        *firstLineEndOff = lastEnd;
-    return TRUE;
 }
 
 __int64
@@ -1677,6 +1482,27 @@ CViewerWindow::FindSeekBefore(__int64 seek, int lines, BOOL& fatalErr, __int64* 
         *firstLineEndOff = -1;
     if (firstLineCharLen != NULL)
         *firstLineCharLen = -1;
+    if (HasDecodedTextMode())
+    {
+        Sally::Viewer::ChunkedByteSource::Scope readScope(DecodedSource);
+        for (;;)
+        {
+            const BOOL armLongLine = !FindingSoDonotSwitchToHex && CanSwitchToHex && !ForceTextMode;
+            Sally::Viewer::TextEngine engine(DecodedSource, DecodedLayoutConfig(DecodedWrapColumns(), armLongLine));
+            __int64 result = 0;
+            const Sally::Viewer::TextStatus status =
+                engine.FindSeekBefore(seek, lines, result, firstLineEndOff, firstLineCharLen, addLineIfSeekIsWrap != FALSE);
+            if (status == Sally::Viewer::TextStatus::Ok)
+                return result;
+            if (status == Sally::Viewer::TextStatus::IoError)
+            {
+                fatalErr = TRUE;
+                return 0;
+            }
+            if (OfferHexForLongLine())
+                return 0;
+        }
+    }
     __int64 beg = seek, prevEnd;
     __int64 minSeek = TextStartOffset();
     if (seek < minSeek)

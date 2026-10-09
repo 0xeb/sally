@@ -26,7 +26,6 @@ CSalmonSharedMemory* SalmonSharedMemory = NULL;
 std::wstring BugReportPath;
 std::wstring CrashReportName;
 std::vector<CBugReport> BugReports;
-BOOL ReportOldBugs = TRUE;            // the user allowed uploading old reports as well
 
 const wchar_t* APP_NAME = L"Sally Bug Reporter";
 
@@ -190,6 +189,25 @@ void OpenFolder(HWND hWnd, const wchar_t* szDir)
             alloc->Release();
         }
     }
+}
+
+BOOL OpenWithShell(HWND hWnd, const wchar_t* target)
+{
+    // The handler of a web address or a document can be a COM server, so the shell needs COM on
+    // this thread; and the reporter may close right after, so the launch completes first.
+    const HRESULT com = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    SHELLEXECUTEINFOW se;
+    memset(&se, 0, sizeof(se));
+    se.cbSize = sizeof(se);
+    se.fMask = SEE_MASK_NOASYNC;
+    se.lpVerb = L"open";
+    se.hwnd = hWnd;
+    se.nShow = SW_SHOWNORMAL;
+    se.lpFile = target;
+    const BOOL ret = ShellExecuteExW(&se);
+    if (SUCCEEDED(com))
+        CoUninitialize();
+    return ret;
 }
 
 //*****************************************************************************
@@ -440,7 +458,7 @@ BOOL GetBugReportNames()
                 BOOL skipFile = FALSE;
                 if (ext != NULL && _wcsicmp(ext + 1, L"dmp") == 0)
                 {
-                    // delete minidumps over 200 MB because I do not believe they would pass to the server even after packing
+                    // delete minidumps over 200 MB, they are too large to share even after packing
                     if (find.nFileSizeHigh > 0 || find.nFileSizeLow > 200 * 1000 * 1024)
                     {
                         DeleteFileW(JoinPath(BugReportPath, find.cFileName).c_str());
@@ -543,7 +561,41 @@ int GetUniqueBugReportCount()
 
 //------------------------------------------------------------------------------------------------
 //
-// SaveDescriptionAndEmail
+// ReadBugReportText
+//
+
+BOOL ReadBugReportText(const CBugReport& report, std::string& text)
+{
+    text.clear();
+    if (BugReportPath.empty())
+        return FALSE;
+    const std::wstring name = JoinPath(BugReportPath, report.Name + L".TXT");
+    HANDLE hFile = CreateFileW(name.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE)
+        return FALSE;
+    // The parts of a report that are read come first; a longer report is cut.
+    const size_t maxBytes = 16 * 1024 * 1024;
+    BOOL ret = TRUE;
+    std::vector<char> buffer(64 * 1024);
+    DWORD read = 0;
+    while (text.size() < maxBytes)
+    {
+        if (!ReadFile(hFile, buffer.data(), static_cast<DWORD>(buffer.size()), &read, NULL))
+        {
+            ret = FALSE;
+            break;
+        }
+        if (read == 0)
+            break;
+        text.append(buffer.data(), read);
+    }
+    CloseHandle(hFile);
+    return ret && !text.empty();
+}
+
+//------------------------------------------------------------------------------------------------
+//
+// SaveDescription
 //
 
 static BOOL WriteAll(HANDLE file, std::string_view bytes)
@@ -559,7 +611,7 @@ static BOOL WriteAll(HANDLE file, std::string_view bytes)
     return TRUE;
 }
 
-BOOL SaveDescriptionAndEmail()
+BOOL SaveDescription()
 {
     if (BugReportPath.empty() || BugReports.empty())
         return FALSE;
@@ -569,15 +621,8 @@ BOOL SaveDescriptionAndEmail()
     HANDLE hFile = CreateFileW(name.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile != INVALID_HANDLE_VALUE)
     {
-        std::string email;
         std::string description;
-        ret = sally::salmon::EncodeUtf8(Config.Email, email) &&
-              sally::salmon::EncodeUtf8(Config.Description, description);
-        if (ret)
-        {
-            std::string emailLine = "Email: " + email + "\r\n";
-            ret = WriteAll(hFile, emailLine) && WriteAll(hFile, description);
-        }
+        ret = sally::salmon::EncodeUtf8(Config.Description, description) && WriteAll(hFile, description);
         CloseHandle(hFile);
     }
     return ret;
@@ -948,13 +993,6 @@ void ChechForBugs(CSalmonSharedMemory* mem, const wchar_t* slgName)
                 // we need to display the GUI, we must load the language resources
                 if (LoadHLanguageVerbose(slgName))
                 {
-                    if (GetUniqueBugReportCount() > 1)
-                    {
-                        // if multiple reports exist, ask whether to send them all
-                        int res = MessageBoxW(NULL, LoadStr(IDS_SALMON_MORE_REPORTS, HLanguage).c_str(), LoadStr(IDS_SALMON_TITLE, HLanguage).c_str(), MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND);
-                        ReportOldBugs = (res == IDYES);
-                    }
-                    // with that decision made we can open the dialog
                     OpenMainDialog(FALSE);
                 }
             }
@@ -999,8 +1037,6 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
     // there. wWinMain is guaranteed to run after every global object (including __Handles) has
     // finished constructing, so HANDLES_Q(CreateMutexA(...)) inside Init() is safe here.
     MainDialogMutex.Init();
-
-    Config.Load();
 
     wchar_t fileMappingName[SALMON_FILEMAPPIN_NAME_SIZE] = {}; // frozen command/IPC rendezvous contract
     std::wstring slgName; // persisted name of Sally's UI language (e.g. "english.slg"; no file) for HLanguage; can be empty (then a default is chosen)
@@ -1144,7 +1180,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
     UnmapViewOfFile(mem);
     CloseHandle(fm);
 
-    Config.Save();
+    Config.ForgetEmail();
 
     if (HLanguage != NULL)
     {

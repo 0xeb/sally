@@ -482,7 +482,7 @@ CViewerWindow::CViewerWindow(const wchar_t* fileName, CViewType type, const wcha
                              BOOL wholeCaption, CObjectOrigin origin,
                              int enumFileNamesSourceUID, int enumFileNamesLastFileIndex)
     : CWindow(origin), LineOffset(300, 100),
-      FindDialog(HLanguage, IDD_FINDSET, IDD_FINDSET)
+      FindDialog(HLanguage, IDD_FINDSET, IDD_FINDSET), DecodedSource(DecodedReader)
 {
     // GDI variables
     BkgndBrush = NULL;
@@ -514,7 +514,6 @@ CViewerWindow::CViewerWindow(const wchar_t* fileName, CViewType type, const wcha
     UseCodeTable = FALSE;
     TextEncoding = Sally::Unicode::BomEncoding::LegacyBytes;
     TextContentOffset = 0;
-    ResetDecodedLineIndex();
     if (fileName == NULL)
         ClearViewedFile(); // error
     else
@@ -722,52 +721,6 @@ void DrawUnicodeCells(HDC hdc, int nXStart, int nYStart,
 namespace
 {
 
-bool IsViewerDecodedEOL(std::uint32_t scalar)
-{
-    return scalar == L'\r' || scalar == L'\n' || scalar == 0;
-}
-
-void AppendVisualCell(Sally::Unicode::DecodedRun& visual, std::uint32_t scalar,
-                      __int64 rawStart, __int64 rawEnd, int tabSize)
-{
-    if (scalar == L'\t')
-    {
-        int tab = (int)(tabSize - (visual.CellCount() % tabSize));
-        if (tab <= 0)
-            tab = 1;
-        while (tab-- > 0)
-            visual.AppendCell(L' ', rawStart, rawEnd);
-    }
-    else
-        visual.AppendCell(scalar, rawStart, rawEnd);
-}
-
-// Same expansion as AppendVisualCell, but the run is optional: when 'visual' is NULL the cells
-// are only counted. Tab width depends solely on the running cell count, so the counting and
-// materialising modes cannot disagree - which is the property the line index relies on.
-void AppendOrCountVisualCell(Sally::Unicode::DecodedRun* visual, __int64& cellCount,
-                             std::uint32_t scalar, __int64 rawStart, __int64 rawEnd, int tabSize)
-{
-    if (scalar == L'\t')
-    {
-        int tab = (int)(tabSize - (cellCount % tabSize));
-        if (tab <= 0)
-            tab = 1;
-        cellCount += tab;
-        if (visual != NULL)
-        {
-            while (tab-- > 0)
-                visual->AppendCell(L' ', rawStart, rawEnd);
-        }
-    }
-    else
-    {
-        cellCount++;
-        if (visual != NULL)
-            visual->AppendCell(scalar, rawStart, rawEnd);
-    }
-}
-
 std::size_t DecodedSelectionStartCell(const Sally::Unicode::DecodedRun& visual, __int64 offset)
 {
     for (std::size_t i = 0; i < visual.CellCount(); ++i)
@@ -808,197 +761,18 @@ void DrawDecodedCells(HDC dc, const Sally::Unicode::DecodedRun& visual, std::siz
 BOOL CViewerWindow::DecodeTextRange(HANDLE* hFile, __int64 start, __int64 end,
                                     Sally::Unicode::DecodedRun& run, BOOL& fatalErr, bool flush)
 {
+    UNREFERENCED_PARAMETER(hFile);
     run.Clear();
     fatalErr = FALSE;
     if (!HasDecodedTextEncoding())
         return FALSE;
-
-    start = max(start, TextContentOffset);
-    end = min(end, FileSize);
-    start = Sally::Unicode::AlignToCodeUnit(TextEncoding, start, TextContentOffset);
-    if (end <= start)
-        return TRUE;
-
-    __int64 off = start;
-    while (off < end)
+    Sally::Viewer::TextEngine engine(DecodedSource, DecodedLayoutConfig(0, FALSE));
+    if (engine.DecodeRange(start, end, flush, run) != Sally::Viewer::TextStatus::Ok)
     {
-        __int64 want = min((__int64)APROX_LINE_LEN + 8, end - off);
-        __int64 len = Prepare(hFile, off, want, fatalErr);
-        if (fatalErr)
-            return FALSE;
-        if (len <= 0)
-            break;
-
-        bool finalChunk = flush && off + len >= end;
-        Sally::Unicode::DecodedRun part = Sally::Unicode::DecodeBytes(TextEncoding, Buffer + (off - Seek), (std::size_t)len, off, finalChunk);
-        if (part.RawBytesConsumed == 0 && part.CellCount() == 0)
-        {
-            if (finalChunk)
-                break;
-            len = min((__int64)APROX_LINE_LEN + 16, FileSize - off);
-            len = Prepare(hFile, off, len, fatalErr);
-            if (fatalErr || len <= 0)
-                return !fatalErr;
-            part = Sally::Unicode::DecodeBytes(TextEncoding, Buffer + (off - Seek), (std::size_t)len, off, off + len >= FileSize);
-            if (part.RawBytesConsumed == 0)
-                break;
-        }
-        run.AppendRun(part);
-        off += (__int64)part.RawBytesConsumed;
+        fatalErr = TRUE;
+        return FALSE;
     }
     return TRUE;
-}
-
-BOOL CViewerWindow::ReadDecodedScalar(HANDLE* hFile, __int64 offset, Sally::Unicode::DecodedRun& scalar, BOOL& fatalErr)
-{
-    scalar.Clear();
-    fatalErr = FALSE;
-    if (!HasDecodedTextEncoding())
-        return FALSE;
-    offset = max(offset, TextContentOffset);
-    offset = Sally::Unicode::AlignToCodeUnit(TextEncoding, offset, TextContentOffset);
-    if (offset >= FileSize)
-        return TRUE;
-
-    __int64 len = Prepare(hFile, offset, min((__int64)8, FileSize - offset), fatalErr);
-    if (fatalErr || len <= 0)
-        return !fatalErr;
-    scalar = Sally::Unicode::DecodeBytes(TextEncoding, Buffer + (offset - Seek), (std::size_t)len, offset, TRUE);
-    return TRUE;
-}
-
-BOOL CViewerWindow::DecodeOrScanTextLine(HANDLE* hFile, __int64 lineOffset, __int64 maxCells,
-                                         Sally::Unicode::DecodedRun* visualLine, __int64& cellCount,
-                                         __int64& lineEnd, __int64& nextLineBegin, BOOL& eol,
-                                         BOOL& wrapped, int& eolBytes, BOOL& fatalErr)
-{
-    if (visualLine != NULL)
-        visualLine->Clear();
-    cellCount = 0;
-    fatalErr = FALSE;
-    eol = FALSE;
-    wrapped = FALSE;
-    eolBytes = 0;
-
-    if (!HasDecodedTextEncoding())
-        return FALSE;
-
-    __int64 off = max(lineOffset, TextContentOffset);
-    off = Sally::Unicode::AlignToCodeUnit(TextEncoding, off, TextContentOffset);
-    lineEnd = off;
-    nextLineBegin = off;
-    if (off >= FileSize)
-        return TRUE;
-
-    while (off < FileSize)
-    {
-        __int64 readEnd = min(FileSize, off + APROX_LINE_LEN + 8);
-        Sally::Unicode::DecodedRun decoded;
-        if (!DecodeTextRange(hFile, off, readEnd, decoded, fatalErr, readEnd >= FileSize))
-            return FALSE;
-        if (fatalErr)
-            return FALSE;
-        if (decoded.CellCount() == 0)
-        {
-            lineEnd = nextLineBegin = off;
-            return TRUE;
-        }
-
-        for (std::size_t i = 0; i < decoded.CellCount(); ++i)
-        {
-            std::uint32_t scalar = decoded.Scalars[i];
-            if (IsViewerDecodedEOL(scalar))
-            {
-                if (scalar == L'\r')
-                {
-                    if (Configuration.EOL_CRLF)
-                    {
-                        Sally::Unicode::DecodedRun nextScalar;
-                        bool haveNext = false;
-                        if (i + 1 < decoded.CellCount())
-                        {
-                            nextScalar.AppendCell(decoded.Scalars[i + 1], decoded.RawStart[i + 1], decoded.RawEnd[i + 1]);
-                            haveNext = true;
-                        }
-                        else if (ReadDecodedScalar(hFile, decoded.RawEnd[i], nextScalar, fatalErr) && !fatalErr &&
-                                 nextScalar.CellCount() > 0)
-                            haveNext = true;
-                        if (fatalErr)
-                            return FALSE;
-                        if (haveNext && nextScalar.Scalars[0] == L'\n')
-                        {
-                            lineEnd = decoded.RawStart[i];
-                            nextLineBegin = nextScalar.RawEnd[0];
-                            eol = TRUE;
-                            eolBytes = (int)(nextLineBegin - lineEnd);
-                            return TRUE;
-                        }
-                    }
-                    if (Configuration.EOL_CR)
-                    {
-                        lineEnd = decoded.RawStart[i];
-                        nextLineBegin = decoded.RawEnd[i];
-                        eol = TRUE;
-                        eolBytes = (int)(nextLineBegin - lineEnd);
-                        return TRUE;
-                    }
-                }
-                else if (scalar == L'\n')
-                {
-                    if (Configuration.EOL_LF)
-                    {
-                        lineEnd = decoded.RawStart[i];
-                        nextLineBegin = decoded.RawEnd[i];
-                        eol = TRUE;
-                        eolBytes = (int)(nextLineBegin - lineEnd);
-                        return TRUE;
-                    }
-                }
-                else if (Configuration.EOL_NULL)
-                {
-                    lineEnd = decoded.RawStart[i];
-                    nextLineBegin = decoded.RawEnd[i];
-                    eol = TRUE;
-                    eolBytes = (int)(nextLineBegin - lineEnd);
-                    return TRUE;
-                }
-            }
-
-            AppendOrCountVisualCell(visualLine, cellCount, scalar, decoded.RawStart[i],
-                                    decoded.RawEnd[i], Configuration.TabSize);
-            lineEnd = decoded.RawEnd[i];
-            nextLineBegin = lineEnd;
-            if (WrapText && maxCells > 0 && cellCount >= maxCells)
-            {
-                wrapped = TRUE;
-                return TRUE;
-            }
-        }
-        off += (__int64)decoded.RawBytesConsumed;
-        if (decoded.RawBytesConsumed == 0)
-            break;
-    }
-    lineEnd = nextLineBegin = max(lineEnd, off);
-    return TRUE;
-}
-
-BOOL CViewerWindow::ReadDecodedTextLine(HANDLE* hFile, __int64 lineOffset, __int64 maxCells,
-                                        Sally::Unicode::DecodedRun& visualLine, __int64& lineEnd,
-                                        __int64& nextLineBegin, BOOL& eol, BOOL& wrapped,
-                                        int& eolBytes, BOOL& fatalErr)
-{
-    __int64 cellCount = 0;
-    return DecodeOrScanTextLine(hFile, lineOffset, maxCells, &visualLine, cellCount, lineEnd,
-                                nextLineBegin, eol, wrapped, eolBytes, fatalErr);
-}
-
-BOOL CViewerWindow::ScanDecodedTextLine(HANDLE* hFile, __int64 lineOffset, __int64 maxCells,
-                                        __int64& cellCount, __int64& lineEnd,
-                                        __int64& nextLineBegin, BOOL& eol, BOOL& wrapped,
-                                        int& eolBytes, BOOL& fatalErr)
-{
-    return DecodeOrScanTextLine(hFile, lineOffset, maxCells, NULL, cellCount, lineEnd,
-                                nextLineBegin, eol, wrapped, eolBytes, fatalErr);
 }
 
 void CViewerWindow::PaintDecodedText(HDC dc, const RECT& fullLine, int lines, int columns,
@@ -1013,6 +787,8 @@ void CViewerWindow::PaintDecodedText(HDC dc, const RECT& fullLine, int lines, in
     RECT endRect = fullLine;
     __int64 lineOffset = max(SeekY, TextContentOffset);
     BOOL previousEOL = FALSE;
+    const int wrapColumns = WrapText ? max(1, columns) : 0;
+    Sally::Viewer::ChunkedByteSource::Scope readScope(DecodedSource);
     for (int i = 0; i < lines; i++)
     {
         Sally::Unicode::DecodedRun visual;
@@ -1044,12 +820,27 @@ void CViewerWindow::PaintDecodedText(HDC dc, const RECT& fullLine, int lines, in
             break;
         }
 
-        __int64 maxCells = WrapText ? max(1, columns) : TEXT_MAX_LINE_LEN + 1;
-        if (!ReadDecodedTextLine(NULL, lineOffset, maxCells, visual, lineEnd, nextLineBegin,
-                                 EOL, lineEndIsWrapped, lineEOLSize, fatalErr))
+        Sally::Viewer::RowLayout row;
+        Sally::Viewer::TextStatus status;
+        for (;;)
+        {
+            // An unwrapped line longer than TEXT_MAX_LINE_LEN offers hex mode, as for code-page text.
+            Sally::Viewer::TextEngine engine(DecodedSource, DecodedLayoutConfig(wrapColumns, CanSwitchToHex && !ForceTextMode));
+            Sally::Viewer::DecodedRunSink sink(visual);
+            visual.Clear();
+            status = engine.LayoutRow(lineOffset, &sink, row);
+            if (status != Sally::Viewer::TextStatus::LongLine || OfferHexForLongLine())
+                break;
+        }
+        if (status == Sally::Viewer::TextStatus::IoError)
+            fatalErr = TRUE;
+        if (status != Sally::Viewer::TextStatus::Ok)
             break;
-        if (fatalErr)
-            break;
+        lineEnd = row.LineEnd;
+        nextLineBegin = row.NextLineBegin;
+        EOL = row.Eol;
+        lineEndIsWrapped = row.Wrapped;
+        lineEOLSize = row.EolBytes;
 
         __int64 fullLineLen = max((__int64)0, nextLineBegin - lineOffset);
         __int64 lineLen = (__int64)visual.CellCount();

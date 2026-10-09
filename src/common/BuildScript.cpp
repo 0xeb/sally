@@ -12,6 +12,7 @@
 #endif
 
 #include <algorithm>
+#include <cstring>
 #include <vector>
 
 #include "worker.h"
@@ -128,9 +129,38 @@ static bool HasUnsupportedAttributes(DWORD attr)
 // placeholder. Counting walks a reparse dir like any other directory; an
 // unresolvable tag then simply fails to enumerate and reaches the Skip / Skip
 // All / Cancel prompt, exactly as in the pre-Unicode build.
+//
+// ChangeAttrs and ChangeCase have no such question either: they act on a link (a
+// junction or directory symlink) itself, changing its attributes or the case of
+// its name, and never descend through it. Following a link here would reach a
+// tree elsewhere on the disk, or loop on a cyclic junction. A reparse point that
+// is not a link (a cloud-file placeholder, a deduplicated folder) is an ordinary
+// directory to them, so its contents are still visited. IsLinkDirectory below
+// tells the two apart where the tree walk enters a directory.
+static bool ActsOnReparseEntryItself(EActionType action)
+{
+    return action == EActionType::ChangeAttrs || action == EActionType::ChangeCase;
+}
+
 static bool ReparseNeedsSpecialHandling(EActionType action, DWORD attr)
 {
-    return HasUnsupportedAttributes(attr) && action != EActionType::CountSize;
+    return HasUnsupportedAttributes(attr) && action != EActionType::CountSize &&
+           !ActsOnReparseEntryItself(action);
+}
+
+// True for a junction or directory symlink (a name-surrogate reparse tag). A tag
+// that cannot be read is treated as a link, so it is never followed.
+static bool IsLinkDirectory(const std::wstring& pathW, DWORD attr)
+{
+    if (!HasUnsupportedAttributes(attr))
+        return false;
+    IFileSystem* fs = gFileSystem != nullptr ? gFileSystem : GetWin32FileSystem();
+    std::vector<BYTE> data;
+    if (!fs->GetReparseData(pathW.c_str(), data).success || data.size() < sizeof(DWORD))
+        return true;
+    DWORD tag = 0;
+    memcpy(&tag, data.data(), sizeof(tag));
+    return IsReparseTagNameSurrogate(tag) != 0;
 }
 
 static bool ShouldPromptForSystemHiddenDelete(EActionType action,
@@ -951,6 +981,45 @@ static bool EmitDeleteDirLinkOp(const std::wstring& fullPath, DWORD attr,
     return AddOperation(script, op);
 }
 
+// The ChangeAttrs / ChangeCase operation on a directory entry itself: its new
+// attributes, or the rename to the altered case of its name (none when the name
+// already has that case).
+static bool AddChangeDirectoryItselfOperation(EActionType action,
+                                              const opplan::CPlannedSnapshotItem& dirPlan,
+                                              DWORD attr,
+                                              const CBuildConfig& config,
+                                              COperations* script)
+{
+    if (action == EActionType::ChangeAttrs)
+    {
+        COperation dop;
+        dop.Opcode = ocChangeAttrs;
+        dop.OpFlags = 0;
+        dop.Attr = attr;
+        dop.Size = CHATTRS_FILE_SIZE;
+        dop.SetSourceNameW(dirPlan.SourcePathW, std::wstring());
+        dop.NewAttrs = (attr & config.ChangeAttrsAnd) | config.ChangeAttrsOr;
+        return AddOperation(script, dop);
+    }
+
+    const std::wstring alteredW =
+        AlterFileNameW(dirPlan.ItemNameW.c_str(), config.ChangeCaseFormat,
+                       config.ChangeCaseChange, true);
+    if (alteredW.empty() || alteredW == dirPlan.ItemNameW)
+        return true;
+
+    COperation dop;
+    dop.Opcode = ocMoveDir;
+    dop.OpFlags = 0;
+    dop.Size = MOVE_DIR_SIZE;
+    dop.Attr = attr;
+    dop.SetSourceNameW(dirPlan.SourcePathW, std::wstring());
+    dop.SetTargetNameW(dirPlan.SourceParentW, alteredW);
+    if (!script->FastMoveUsed)
+        script->FastMoveUsed = TRUE;
+    return AddOperation(script, dop);
+}
+
 static bool BuildDirectoryTree(EActionType action,
                                const std::wstring& sourceParentW,
                                const std::wstring& targetParentW,
@@ -983,6 +1052,16 @@ static bool BuildDirectoryTree(EActionType action,
                                   dirPlan))
     {
         return false;
+    }
+
+    if (ActsOnReparseEntryItself(action) && IsLinkDirectory(dirPlan.SourcePathW, attr))
+    {
+        // A link: change the link itself, never what it points at.
+        if (!AddChangeDirectoryItselfOperation(action, dirPlan, attr, config, script))
+            return false;
+        emittedAny = true;
+        movedAll = true;
+        return true;
     }
 
     if (ReparseNeedsSpecialHandling(action, attr))
@@ -1174,14 +1253,7 @@ static bool BuildDirectoryTree(EActionType action,
         // ChangeAttrs: the directory's own op comes first.
         if (action == EActionType::ChangeAttrs)
         {
-            COperation dop;
-            dop.Opcode = ocChangeAttrs;
-            dop.OpFlags = 0;
-            dop.Attr = attr;
-            dop.Size = CHATTRS_FILE_SIZE;
-            dop.SetSourceNameW(sourceDirW, std::wstring());
-            dop.NewAttrs = (attr & config.ChangeAttrsAnd) | config.ChangeAttrsOr;
-            if (!AddOperation(script, dop))
+            if (!AddChangeDirectoryItselfOperation(action, dirPlan, attr, config, script))
                 return false;
             emittedAny = true;
         }
@@ -1190,8 +1262,10 @@ static bool BuildDirectoryTree(EActionType action,
         {
             for (const DirectoryEntry& entry : entries)
             {
-                if (HasUnsupportedAttributes(entry.Attr))
-                    return false;
+                // A reparse child is planned like any other entry: a link
+                // directory is handled where BuildDirectoryTree enters it, and a
+                // reparse file (a file symlink, a cloud placeholder) is changed
+                // as the file entry it is.
                 opplan::CPlannedSnapshotItem childPlan;
                 if (!opplan::TryPlanChildItem(action,
                                               sourceDirW, targetDirW,
@@ -1226,23 +1300,8 @@ static bool BuildDirectoryTree(EActionType action,
         // ChangeCase: the directory's own rename comes LAST (after contents).
         if (action == EActionType::ChangeCase)
         {
-            const std::wstring alteredW =
-                AlterFileNameW(dirPlan.ItemNameW.c_str(), config.ChangeCaseFormat,
-                               config.ChangeCaseChange, true);
-            if (!alteredW.empty() && alteredW != dirPlan.ItemNameW)
-            {
-                COperation dop;
-                dop.Opcode = ocMoveDir;
-                dop.OpFlags = 0;
-                dop.Size = MOVE_DIR_SIZE;
-                dop.Attr = attr;
-                dop.SetSourceNameW(sourceDirW, std::wstring());
-                dop.SetTargetNameW(dirPlan.SourceParentW, alteredW);
-                if (!script->FastMoveUsed)
-                    script->FastMoveUsed = TRUE;
-                if (!AddOperation(script, dop))
-                    return false;
-            }
+            if (!AddChangeDirectoryItselfOperation(action, dirPlan, attr, config, script))
+                return false;
             emittedAny = true;
         }
 
@@ -1419,6 +1478,10 @@ static bool ValidateDirectoryTree(EActionType action,
     {
         return false;
     }
+
+    // A link is changed itself and never entered: nothing below it to validate.
+    if (ActsOnReparseEntryItself(action) && IsLinkDirectory(dirPlan.SourcePathW, attr))
+        return true;
 
     if (ReparseNeedsSpecialHandling(action, attr))
     {

@@ -16,6 +16,8 @@ sal_add_plugin(NAME pictview
     "${SAL_PLUGINS}/pictview/print_layout.cpp"
     "${SAL_PLUGINS}/pictview/rename_utils.cpp"
     "${SAL_PLUGINS}/pictview/runtime.cpp"
+    "${SAL_PLUGINS}/pictview/selection_outline.cpp"
+    "${SAL_PLUGINS}/pictview/source_selection.cpp"
     "${SAL_PLUGINS}/pictview/thumbnail.cpp"
     "${SAL_PLUGINS}/pictview/viewer.cpp"
   RC "${SAL_PLUGINS}/pictview/pictview.rc"
