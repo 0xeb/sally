@@ -14,7 +14,13 @@ Sally is a fast, keyboard-first dual-panel file manager for Windows power users.
   <a href="https://github.com/0xeb/sally"><img alt="Star Sally on GitHub" src="https://img.shields.io/github/stars/0xeb/sally?style=for-the-badge&logo=github&label=Star&color=24292f"></a>
 </p>
 
-**Website:** [sally-filemanager.app](https://sally-filemanager.app/) | **Manual:** [online](https://sally-filemanager.app/manual/), [keyboard shortcuts](https://sally-filemanager.app/manual/sally/shortcuts_keyboard.html) | **Download:** [latest release](https://github.com/0xeb/sally/releases/latest), [changelog](https://sally-filemanager.app/changelog/) | **Help Sally:** [ways to help](https://sally-filemanager.app/get-involved/)
+<p align="center">
+  <a href="https://sally-filemanager.app/">Website</a> ·
+  <a href="https://sally-filemanager.app/manual/">Manual</a> ·
+  <a href="https://sally-filemanager.app/manual/sally/shortcuts_keyboard.html">Keyboard shortcuts</a> ·
+  <a href="https://sally-filemanager.app/changelog/">Changelog</a> ·
+  <a href="https://sally-filemanager.app/get-involved/">Ways to help</a>
+</p>
 
 <p align="center">
   <img src="doc/images/sally-dark-unicode-long-path.png" alt="Sally in dark mode showing Unicode filenames and a long path" width="900">
