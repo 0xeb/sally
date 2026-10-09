@@ -7,7 +7,14 @@
 
 Sally is a fast, keyboard-first dual-panel file manager for Windows power users. It keeps the classic [Open Salamander](https://github.com/OpenSalamander/salamander) workflow alive and moves it forward for current machines: Unicode and long paths, dark mode, Windows Terminal integration, native ARM64, modern viewing, active plugin packaging, Wine compatibility, built-in languages, and a real release pipeline.
 
-**Website:** [sally-filemanager.app](https://sally-filemanager.app/) | **Manual:** [online](https://sally-filemanager.app/manual/), [keyboard shortcuts](https://sally-filemanager.app/manual/sally/shortcuts_keyboard.html) | **Download:** [latest release](https://github.com/0xeb/sally/releases/latest), [changelog](https://sally-filemanager.app/changelog/) | **Star:** [help Sally get discovered](https://github.com/0xeb/sally) | **Support:** [PayPal](https://paypal.me/EliasBachaalany) or [Buy Me a Coffee](https://buymeacoffee.com/0xeb)
+<p align="center">
+  <a href="https://github.com/0xeb/sally/releases/latest"><img alt="Download Sally" src="https://img.shields.io/badge/Download-Sally_for_Windows-1e6fd9?style=for-the-badge"></a>
+  <a href="https://paypal.me/EliasBachaalany"><img alt="Donate with PayPal" src="https://img.shields.io/badge/Donate-PayPal-0070e0?style=for-the-badge&logo=paypal&logoColor=white"></a>
+  <a href="https://buymeacoffee.com/0xeb"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black"></a>
+  <a href="https://github.com/0xeb/sally"><img alt="Star Sally on GitHub" src="https://img.shields.io/github/stars/0xeb/sally?style=for-the-badge&logo=github&label=Star&color=24292f"></a>
+</p>
+
+**Website:** [sally-filemanager.app](https://sally-filemanager.app/) | **Manual:** [online](https://sally-filemanager.app/manual/), [keyboard shortcuts](https://sally-filemanager.app/manual/sally/shortcuts_keyboard.html) | **Download:** [latest release](https://github.com/0xeb/sally/releases/latest), [changelog](https://sally-filemanager.app/changelog/) | **Help Sally:** [ways to help](https://sally-filemanager.app/get-involved/)
 
 <p align="center">
   <img src="doc/images/sally-dark-unicode-long-path.png" alt="Sally in dark mode showing Unicode filenames and a long path" width="900">
@@ -132,12 +139,15 @@ a launcher wrapper, and troubleshooting.
 
 ## Support Sally
 
-If Sally saves you time, please [star the repository](https://github.com/0xeb/sally). Stars matter for discovery, especially for a small Windows desktop project that is doing a lot of unglamorous modernization work.
+Sally is free, with no ads, no telemetry and no paid edition. If it saves you time, a donation pays for the next fix, and a star helps a small Windows project get found.
 
-Financial support helps pay for the AI-assisted development workflow and keeps more time and tokens flowing into Sally:
+<p>
+  <a href="https://paypal.me/EliasBachaalany"><img alt="Donate with PayPal" src="https://img.shields.io/badge/Donate-PayPal-0070e0?style=for-the-badge&logo=paypal&logoColor=white"></a>
+  <a href="https://buymeacoffee.com/0xeb"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black"></a>
+  <a href="https://github.com/0xeb/sally"><img alt="Star Sally on GitHub" src="https://img.shields.io/github/stars/0xeb/sally?style=for-the-badge&logo=github&label=Star&color=24292f"></a>
+</p>
 
-- [Support via PayPal](https://paypal.me/EliasBachaalany)
-- [Support via Buy Me a Coffee](https://buymeacoffee.com/0xeb)
+Donations help pay for the AI-assisted development workflow and keep more time and tokens flowing into Sally.
 
 Bug reports, focused testing, translation help, and careful feature requests are also valuable. Sally has moved fastest when users reported exact workflows and came back to verify the fix.
 
