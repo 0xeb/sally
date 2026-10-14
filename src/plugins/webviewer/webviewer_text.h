@@ -15,3 +15,7 @@ bool WebViewerDecodeHtmlUtf8(const std::string& html, std::wstring& wideHtml);
 // 'message', then what WebView2 reported ('detail') and the URL, HTML-escaped.
 std::wstring WebViewerNavigationErrorHtml(const std::wstring& message, const std::wstring& detail,
                                           const std::wstring& url);
+
+// A readable native fallback when WebView2 itself is unavailable.
+std::wstring WebViewerInitializationErrorText(const std::wstring& message, const std::wstring& detail,
+                                             const std::wstring& path);

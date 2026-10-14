@@ -23,8 +23,13 @@ Sally is a fast, keyboard-first dual-panel file manager for Windows power users.
 </p>
 
 <p align="center">
-  <img src="doc/images/sally-dark-unicode-long-path.png" alt="Sally in dark mode showing Unicode filenames and a long path" width="900">
+  <img src="doc/images/sally-dark-panels.png" alt="Sally 1.0.38 in dark mode with two panels and Greek and Cyrillic folder names" width="900">
+  <br>
+  <em>Sally 1.0.38 on Windows, captured from the x64 review candidate.</em>
 </p>
+
+See the [screenshot gallery](https://sally-filemanager.app/screenshots/) for light mode,
+archive browsing, viewers, Find and plugin dialogs.
 
 ## Why Sally
 
@@ -49,6 +54,12 @@ Sally's biggest modernization effort is path correctness. A file manager is only
 - Non-ASCII install paths work for startup, language loading, `config.reg`, and crash reporter launch.
 - Cancellable network/UNC path checks prevent unreachable saved paths from hanging startup.
 - Ongoing hardening covers ADS streams, reparse points, recursive delete prompts, same-volume moves, and Unicode worker error reporting.
+
+<p align="center">
+  <img src="doc/images/sally-dark-unicode-long-path.png" alt="Sally 1.0.38 browsing a path longer than 260 characters alongside Greek and Cyrillic folder names" width="900">
+  <br>
+  <em>Sally 1.0.38 browsing a folder beyond the old 260-character path limit.</em>
+</p>
 
 ### Fast Find And Safer Results
 
@@ -146,10 +157,11 @@ Pre-built binaries are available on the [Releases](https://github.com/0xeb/sally
 
 Sally is a native Windows application, but it runs well under
 [Wine](https://www.winehq.org/) on Linux — no Windows and no virtual machine
-required. The screenshot below is Sally on Ubuntu 24.04 (x64) under Wine.
+required. The screenshot below shows Sally 1.0.22 on Ubuntu 24.04 (x64) under Wine;
+it is an earlier-release compatibility illustration.
 
 <p align="center">
-  <img src="doc/images/sally-wine.png" alt="Sally running under Wine on an Ubuntu/GNOME x64 desktop" width="900">
+  <img src="doc/images/sally-wine.png" alt="Earlier Sally 1.0.22 release running under Wine on an Ubuntu/GNOME x64 desktop" width="900">
 </p>
 
 Grab an x64 runtime zip from the [Releases](https://github.com/0xeb/sally/releases)

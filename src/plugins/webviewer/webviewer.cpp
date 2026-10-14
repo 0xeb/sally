@@ -319,34 +319,38 @@ bool CWebView2Host::Create(HWND hwndParent)
     m_hwndParent = hwndParent;
 
     // WebView2 requires COM initialized on this thread (STA)
-    if (FAILED(OleInitialize(NULL)))
+    const HRESULT oleResult = OleInitialize(NULL);
+    if (FAILED(oleResult))
     {
         TRACE_E("OleInitialize failed");
-        return false;
+        return ShowInitializationFailure(L"COM initialization", oleResult);
     }
+    m_oleInitialized = true;
 
     std::wstring userDataFolder = GetWebView2UserDataFolder();
     BOOL ready = FALSE;
     HRESULT initResult = S_OK;
+    const wchar_t* initStage = L"WebView2 environment";
 
     HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
         nullptr, // browserExecutableFolder (use installed Edge)
         userDataFolder.empty() ? nullptr : userDataFolder.c_str(),
         nullptr, // options
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-            [this, &ready, &initResult](HRESULT result, ICoreWebView2Environment* env) -> HRESULT
+            [this, &ready, &initResult, &initStage](HRESULT result, ICoreWebView2Environment* env) -> HRESULT
             {
                 if (FAILED(result) || env == nullptr)
                 {
                     TRACE_E("CreateCoreWebView2Environment failed");
-                    initResult = result;
+                    initResult = FAILED(result) ? result : E_POINTER;
                     ready = TRUE;
                     return result;
                 }
 
                 m_environment = env;
 
-                env->CreateCoreWebView2Controller(
+                initStage = L"WebView2 controller";
+                const HRESULT controllerResult = env->CreateCoreWebView2Controller(
                     m_hwndParent,
                     Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
                         [this, &ready, &initResult](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT
@@ -354,13 +358,19 @@ bool CWebView2Host::Create(HWND hwndParent)
                             if (FAILED(result) || controller == nullptr)
                             {
                                 TRACE_E("CreateCoreWebView2Controller failed");
-                                initResult = result;
+                                initResult = FAILED(result) ? result : E_POINTER;
                                 ready = TRUE;
                                 return result;
                             }
 
                             m_controller = controller;
-                            controller->get_CoreWebView2(&m_webview);
+                            const HRESULT webviewResult = controller->get_CoreWebView2(&m_webview);
+                            if (FAILED(webviewResult) || m_webview == nullptr)
+                            {
+                                initResult = FAILED(webviewResult) ? webviewResult : E_POINTER;
+                                ready = TRUE;
+                                return S_OK;
+                            }
 
                             // Make the controller visible
                             m_controller->put_IsVisible(TRUE);
@@ -452,6 +462,11 @@ bool CWebView2Host::Create(HWND hwndParent)
                             return S_OK;
                         })
                         .Get());
+                if (FAILED(controllerResult))
+                {
+                    initResult = controllerResult;
+                    ready = TRUE;
+                }
 
                 return S_OK;
             })
@@ -460,7 +475,7 @@ bool CWebView2Host::Create(HWND hwndParent)
     if (FAILED(hr))
     {
         TRACE_E("CreateCoreWebView2EnvironmentWithOptions failed");
-        return false;
+        return ShowInitializationFailure(L"WebView2 environment", hr);
     }
 
     // Pump messages until WebView2 initialization completes
@@ -479,7 +494,7 @@ bool CWebView2Host::Create(HWND hwndParent)
     }
 
     if (FAILED(initResult) || m_webview == nullptr)
-        return false;
+        return ShowInitializationFailure(initStage, FAILED(initResult) ? initResult : E_POINTER);
 
     // Register accelerator key handler — WebView2 swallows keyboard input,
     // so we must use this event to intercept Escape, Ctrl+R, etc.
@@ -545,14 +560,57 @@ void CWebView2Host::Close()
     m_environment = nullptr;
 
     // Match the OleInitialize in Create()
-    SafeOleUninitialize();
+    if (m_oleInitialized)
+    {
+        SafeOleUninitialize();
+        m_oleInitialized = false;
+    }
+    if (m_failureView != nullptr && IsWindow(m_failureView))
+        DestroyWindow(m_failureView);
+    m_failureView = nullptr;
+}
+
+bool CWebView2Host::ShowInitializationFailure(const wchar_t* stage, HRESULT result)
+{
+    wchar_t code[16];
+    swprintf_s(code, L"0x%08lX", static_cast<unsigned long>(result));
+    m_initializationFailure = std::wstring(stage) + L": " + code;
+    if (m_controller != nullptr)
+        m_controller->put_IsVisible(FALSE);
+    m_failureView = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+                                   WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL |
+                                       ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
+                                   0, 0, 0, 0, m_hwndParent, nullptr, DLLInstance, nullptr);
+    if (m_failureView == nullptr)
+        return false;
+    SendMessageW(m_failureView, WM_SETFONT,
+                 reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)), TRUE);
+    UpdateFailureText();
+    RECT client;
+    GetClientRect(m_hwndParent, &client);
+    Resize(client.right, client.bottom);
+    return true;
+}
+
+void CWebView2Host::UpdateFailureText()
+{
+    if (m_failureView != nullptr)
+    {
+        const std::wstring text = WebViewerInitializationErrorText(
+            SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_NAVIGATIONFAILED),
+            m_initializationFailure, m_markdownPath.empty() ? m_requestedUrl : m_markdownPath);
+        SetWindowTextW(m_failureView, text.c_str());
+    }
 }
 
 void CWebView2Host::Navigate(const std::wstring& url)
 {
     m_requestedUrl = url;
     if (!m_webview)
+    {
+        UpdateFailureText();
         return;
+    }
     const HRESULT hr = m_webview->Navigate(url.c_str());
     if (FAILED(hr))
     {
@@ -574,6 +632,11 @@ void CWebView2Host::ShowNavigationError(const std::wstring& detail)
 
 void CWebView2Host::NavigateToString(const std::string& htmlContent)
 {
+    if (!m_webview)
+    {
+        UpdateFailureText();
+        return;
+    }
     if (m_webview)
     {
         std::wstring wideHtml;
@@ -588,6 +651,8 @@ void CWebView2Host::NavigateToString(const std::string& htmlContent)
 
 void CWebView2Host::Resize(int width, int height)
 {
+    if (m_failureView != nullptr)
+        MoveWindow(m_failureView, 0, 0, width, height, TRUE);
     if (m_controller)
     {
         RECT bounds = {0, 0, width, height};

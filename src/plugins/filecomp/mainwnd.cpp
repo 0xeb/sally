@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "toolbar_images.h"
 
 using namespace std;
 
@@ -58,6 +59,8 @@ CMainWindow::CMainWindow(const wchar_t* path1, const wchar_t* path2,
     Path2WStr = path2 ? path2 : L"";
     FileView[fviLeft] = NULL;
     FileView[fviRight] = NULL;
+    HToolbar = NULL;
+    ToolbarImages = NULL;
     Active = 0;
     Initialized = FALSE;
     SelectedDifference = -1;
@@ -84,6 +87,12 @@ CMainWindow::~CMainWindow()
     if (WorkerEvent)
         CloseHandle(WorkerEvent);
     MainWindowQueue.Remove(HWindow);
+    if (ToolbarImages != NULL)
+    {
+        if (IsWindow(HToolbar))
+            SendMessageW(HToolbar, TB_SETIMAGELIST, 0, 0);
+        ImageList_Destroy(ToolbarImages);
+    }
     ::Configuration.ViewMode = ViewMode;
     ::Configuration.ShowWhiteSpace = ShowWhiteSpace;
     //::Configuration.DetailedDifferences = DetailedDifferences;
@@ -99,7 +108,7 @@ BOOL CMainWindow::Init()
     PrevSplitProp = SplitProp = 0.5;
     HeaderHeight = EnvFontHeight + 4;
 
-    TBBUTTON buttons[7];
+    TBBUTTON buttons[7] = {};
     int i;
     for (i = 0; i < SizeOf(buttons); i++)
     {
@@ -127,30 +136,35 @@ BOOL CMainWindow::Init()
         buttons[i].fsState = TBSTATE_ENABLED;
         buttons[i].iString = 0;
     }
-    COLORMAP cm;
-    cm.from = 0x00FF00FF;
-    cm.to = GetSysColor(COLOR_BTNFACE);
-    HToolbar = CreateToolbarEx(HWindow,
+    HDC dc = GetDC(HWindow);
+    const int iconSize = filecomp::ToolbarIconSize(dc != NULL ? GetDeviceCaps(dc, LOGPIXELSX) : 96);
+    if (dc != NULL)
+        ReleaseDC(HWindow, dc);
+    HBITMAP bitmap = static_cast<HBITMAP>(LoadImageW(DLLInstance, MAKEINTRESOURCEW(IDB_TOOLBAR),
+                                                    IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION));
+    ToolbarImages = filecomp::CreateToolbarImages(bitmap, iconSize);
+    if (bitmap != NULL)
+        DeleteObject(bitmap);
+    if (ToolbarImages == NULL)
+        return FALSE;
+    HToolbar = CreateWindowExW(0, TOOLBARCLASSNAMEW, L"",
                                WS_VISIBLE | WS_CHILD |
                                    WS_CLIPCHILDREN | WS_CLIPSIBLINGS |
                                    CCS_NORESIZE | CCS_NODIVIDER | CCS_NOPARENTALIGN |
                                    TBSTYLE_FLAT | TBSTYLE_TOOLTIPS,
-                               IDC_TOOLBAR,
-                               8,
-                               0, //DLLInstance,
-                               (UINT_PTR)CreateMappedBitmap(DLLInstance, IDB_TOOLBAR, 0, &cm, 1),
-                               buttons,
-                               SizeOf(buttons),
-                               16,
-                               16,
-                               16,
-                               16,
-                               sizeof(TBBUTTON));
+                               0, 0, 0, 0, HWindow,
+                               reinterpret_cast<HMENU>(IDC_TOOLBAR), DLLInstance, NULL);
     if (!HToolbar)
     {
-        TRACE_E("CreateToolbarEx has failed; last error: " << GetLastError());
+        TRACE_E("Creating toolbar has failed; last error: " << GetLastError());
         return FALSE;
     }
+    SendMessageW(HToolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
+    SendMessageW(HToolbar, TB_SETIMAGELIST, 0, reinterpret_cast<LPARAM>(ToolbarImages));
+    SendMessageW(HToolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(iconSize, iconSize));
+    if (!SendMessageW(HToolbar, TB_ADDBUTTONS, SizeOf(buttons), reinterpret_cast<LPARAM>(buttons)))
+        return FALSE;
+    SendMessageW(HToolbar, TB_AUTOSIZE, 0, 0);
 
     ComboBox = new CComboBox();
     if (!ComboBox)

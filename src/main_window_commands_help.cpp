@@ -7,6 +7,7 @@
 
 #include "common/IShell.h"
 #include "common/ShellUndoPolicy.h"
+#include "common/NonClientPaint.h"
 #include "menu_item_text.h"
 #include "ui/UnicodeHistoryUtils.h"
 
@@ -305,6 +306,15 @@ static void PaintDarkRebarNonClientFrame(HWND hwnd)
 
     RECT r;
     GetWindowRect(hwnd, &r);
+    RECT client;
+    GetClientRect(hwnd, &client);
+    MapWindowPoints(hwnd, NULL, reinterpret_cast<POINT*>(&client), 2);
+    // WM_NCPAINT must not erase the menus/toolbars inside the client when the frame is exposed.
+    if (!sally::ui::ExcludeClientFromWindowDC(hdc, r, client))
+    {
+        HANDLES(ReleaseDC(hwnd, hdc));
+        return;
+    }
     OffsetRect(&r, -r.left, -r.top);
 
     HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(DC_BRUSH));

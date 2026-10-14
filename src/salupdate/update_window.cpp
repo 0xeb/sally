@@ -18,6 +18,7 @@
 #include "ExtendedLengthPath.h"
 #include "salupdate.h"
 #include "salupdate.rh"
+#include "ui_style.h"
 #include "Win32HttpsClient.h"
 #include "Win32TextCodec.h"
 #include "update/GitHubRelease.h"
@@ -686,18 +687,17 @@ bool CreateUpdateWindow()
     windowClass.hCursor = LoadCursorW(NULL, IDC_ARROW);
     windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1);
     windowClass.lpszClassName = kWindowClass;
-    windowClass.hIcon = LoadIconW(NULL, IDI_APPLICATION);
+    windowClass.hIcon = LoadIconW(windowClass.hInstance, MAKEINTRESOURCEW(IDI_UPDATER));
+    windowClass.hIconSm = windowClass.hIcon;
     RegisterClassExW(&windowClass);
 
     HDC screen = GetDC(NULL);
     s.Dpi = GetDeviceCaps(screen, LOGPIXELSY);
     ReleaseDC(NULL, screen);
-    NONCLIENTMETRICSW metrics = {sizeof(metrics)};
-    SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0);
-    s.Font = CreateFontIndirectW(&metrics.lfMessageFont);
-    LOGFONTW bold = metrics.lfMessageFont;
+    LOGFONTW font = DialogFontForDpi(s.Dpi);
+    s.Font = CreateFontIndirectW(&font);
+    LOGFONTW bold = font;
     bold.lfWeight = FW_BOLD;
-    bold.lfHeight = bold.lfHeight * 9 / 8;
     s.Bold = CreateFontIndirectW(&bold);
 
     s.Window = CreateWindowExW(WS_EX_DLGMODALFRAME, kWindowClass, Text(IDS_UPDATER_TITLE).c_str(),
@@ -705,6 +705,8 @@ bool CreateUpdateWindow()
                                Px(600), Px(400), NULL, NULL, GetModuleHandleW(NULL), NULL);
     if (s.Window == NULL)
         return false;
+    SendMessageW(s.Window, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(windowClass.hIcon));
+    SendMessageW(s.Window, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(windowClass.hIconSm));
     const DWORD label = SS_LEFT | SS_NOPREFIX;
     AddControl(L"STATIC", kIdHeadline, label, 0, std::wstring(), s.Bold);
     AddControl(L"STATIC", kIdInstalled, label, 0, std::wstring(), s.Font);

@@ -74,6 +74,12 @@ class CWebView2Host
     ComPtr<ICoreWebView2Controller> m_controller;
     ComPtr<ICoreWebView2> m_webview;
     HWND m_hwndParent = nullptr;
+    HWND m_failureView = nullptr;
+    std::wstring m_initializationFailure;
+    bool m_oleInitialized = false;
+
+    bool ShowInitializationFailure(const wchar_t* stage, HRESULT result);
+    void UpdateFailureText();
 
     // For Ctrl+R refresh of markdown files
     std::wstring m_markdownPath;
@@ -83,7 +89,7 @@ class CWebView2Host
 
 public:
     // Synchronously creates WebView2 (pumps messages until ready).
-    // Returns true on success.
+    // Shows a native diagnostic view if browser initialization fails.
     bool Create(HWND hwndParent);
 
     // Releases all COM objects and closes the controller.

@@ -19,6 +19,7 @@
 #include "registry_names.h"
 #include "salupdate.h"
 #include "salupdate.rh"
+#include "ui_style.h"
 #include "Win32TextCodec.h"
 #include "update/UpdateProcesses.h"
 #include "update/UpdaterCommand.h"
@@ -150,6 +151,7 @@ namespace
 // languages Sally has, else English.
 void ChooseLanguage()
 {
+    std::wstring configuredName;
     // The configuration of the Sally that started us (a -profile has its own), else the usual one.
     std::wstring root(SAL_REG_ROOT_SALLY_1_0_W);
     wchar_t started[512] = {};
@@ -166,13 +168,9 @@ void ChooseLanguage()
         if (RegQueryValueExW(key, L"Language", NULL, &type, reinterpret_cast<BYTE*>(name), &size) == ERROR_SUCCESS &&
             type == REG_SZ)
         {
-            const LANGID configured = sally::languages::LangIdFromPersistedName(name);
-            if (configured != 0)
-                Language = configured;
+            configuredName = name;
         }
         RegCloseKey(key);
-        if (Language != sally::languages::kEnglishLangId)
-            return;
     }
     std::vector<LANGID> available;
     for (const sally::languages::BuiltinLanguage& language : sally::languages::kBuiltinLanguages)
@@ -193,18 +191,82 @@ void ChooseLanguage()
             }
         }
     }
-    Language = sally::languages::ChooseDefault(available, preferred, nullptr);
+    Language = sally::languages::ChooseConfiguredOrDefault(configuredName.c_str(), available, preferred);
 }
 
 } // namespace
 
+namespace
+{
+thread_local HFONT MessageFont = NULL;
+
+BOOL CALLBACK StyleMessageControl(HWND control, LPARAM)
+{
+    SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(MessageFont), TRUE);
+    const int id = GetDlgCtrlID(control);
+    const UINT text = id == IDYES ? IDS_UPDATER_YES : id == IDNO ? IDS_UPDATER_NO
+                                                   : id == IDOK ? IDS_UPDATER_OK : 0;
+    if (text != 0)
+        SetWindowTextW(control, Text(text).c_str());
+    return TRUE;
+}
+
+LRESULT CALLBACK StyleMessageBox(int code, WPARAM wParam, LPARAM lParam)
+{
+    if (code == HCBT_ACTIVATE)
+    {
+        HWND window = reinterpret_cast<HWND>(wParam);
+        wchar_t className[32] = {};
+        GetClassNameW(window, className, _countof(className));
+        if (lstrcmpW(className, L"#32770") != 0)
+            return CallNextHookEx(NULL, code, wParam, lParam);
+        HICON icon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_UPDATER));
+        SendMessageW(window, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon));
+        SendMessageW(window, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(icon));
+        if (MessageFont != NULL)
+            EnumChildWindows(window, StyleMessageControl, 0);
+    }
+    return CallNextHookEx(NULL, code, wParam, lParam);
+}
+
+class MessageBoxStyle
+{
+    HHOOK Hook = NULL;
+    HFONT PreviousFont = MessageFont;
+    HFONT Font = NULL;
+
+public:
+    MessageBoxStyle()
+    {
+        HDC screen = GetDC(NULL);
+        const unsigned dpi = screen != NULL ? GetDeviceCaps(screen, LOGPIXELSY) : 96;
+        if (screen != NULL)
+            ReleaseDC(NULL, screen);
+        LOGFONTW font = DialogFontForDpi(dpi);
+        Font = CreateFontIndirectW(&font);
+        MessageFont = Font;
+        Hook = SetWindowsHookExW(WH_CBT, StyleMessageBox, NULL, GetCurrentThreadId());
+    }
+    ~MessageBoxStyle()
+    {
+        if (Hook != NULL)
+            UnhookWindowsHookEx(Hook);
+        MessageFont = PreviousFont;
+        if (Font != NULL)
+            DeleteObject(Font);
+    }
+};
+} // namespace
+
 void Tell(const std::wstring& text, UINT icon, HWND owner)
 {
+    MessageBoxStyle style;
     MessageBoxW(owner, text.c_str(), Text(IDS_UPDATER_TITLE).c_str(), MB_OK | icon | MB_SETFOREGROUND | MB_TOPMOST);
 }
 
 bool Ask(const std::wstring& text, HWND owner)
 {
+    MessageBoxStyle style;
     return MessageBoxW(owner, text.c_str(), Text(IDS_UPDATER_TITLE).c_str(),
                        MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2 | MB_SETFOREGROUND | MB_TOPMOST) == IDYES;
 }

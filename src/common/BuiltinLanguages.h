@@ -200,6 +200,17 @@ inline LANGID ChooseDefault(const std::vector<LANGID>& available,
     return kEnglishLangId;
 }
 
+// A valid configured language, including English, takes precedence over Windows' preference.
+inline LANGID ChooseConfiguredOrDefault(const wchar_t* persistedName,
+                                       const std::vector<LANGID>& available,
+                                       const std::vector<std::wstring>& userPreferredTags)
+{
+    const LANGID configured = LangIdFromPersistedName(persistedName);
+    return configured != 0 && Contains(available, configured)
+               ? configured
+               : ChooseDefault(available, userPreferredTags, nullptr);
+}
+
 // The MUI_LANGUAGE_NAME multi-string for SetProcessPreferredUILanguages: the language's tag, then
 // en-US so a resource missing from a translation falls back to English ("cs-CZ\0en-US\0\0").
 // 'count' receives the number of languages in the list. An unknown LANGID gives en-US alone.

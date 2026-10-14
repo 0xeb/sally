@@ -123,3 +123,9 @@ std::wstring WebViewerNavigationErrorHtml(const std::wstring& message, const std
            EscapeHtml(message) + L"</h3><p class=\"d\">" + EscapeHtml(detail) + L"</p><p class=\"d\">" +
            EscapeHtml(url) + L"</p></body></html>";
 }
+
+std::wstring WebViewerInitializationErrorText(const std::wstring& message, const std::wstring& detail,
+                                             const std::wstring& path)
+{
+    return message + L"\r\n\r\n" + detail + (path.empty() ? L"" : L"\r\n\r\n" + path);
+}

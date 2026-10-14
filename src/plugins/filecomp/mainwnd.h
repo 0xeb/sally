@@ -66,6 +66,7 @@ protected:
     LONG RebarHeight; // height of the rebar plus the gap below it
     CComboBox* ComboBox;
     HWND HToolbar;
+    HIMAGELIST ToolbarImages;
     CIntIndexes LinesToChanges;
     CIntIndexes ChangesToLines[2]; // fvmStandard, fvmOnlyDifferences
     CIntIndexes ChangesLengths;
