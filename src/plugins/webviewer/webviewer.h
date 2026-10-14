@@ -77,6 +77,8 @@ class CWebView2Host
 
     // For Ctrl+R refresh of markdown files
     std::wstring m_markdownPath;
+    std::wstring m_requestedUrl;     // the file the viewer was asked to show
+    bool m_showingError = false;      // the error page is up; its own navigation is not checked
     std::string m_lastHtml;
 
 public:
@@ -89,6 +91,8 @@ public:
 
     // Navigate to a file:// URL.
     void Navigate(const std::wstring& url);
+    // Shows what went wrong in place of a blank page.
+    void ShowNavigationError(const std::wstring& detail);
 
     // Navigate to in-memory HTML content (for Markdown).
     void NavigateToString(const std::string& htmlContent);

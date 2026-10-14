@@ -12,10 +12,6 @@
 {L"checksum", 1001u, L"dlgboxes_config"}, // IDD_CONFIGURATION
 {L"checksum", 3000u, L"using_calcchecksum"}, // IDH_CALCCHKSUM
 {L"checksum", 3001u, L"using_verify"}, // IDH_VERIFYCHKSUM
-{L"checkver", 100u, L"dlgboxes_checkver"}, // IDD_MAIN
-{L"checkver", 110u, L"dlgboxes_config"}, // IDD_CONFIGURATION
-{L"checkver", 130u, L"dlgboxes_inetsettings"}, // IDD_INTERNET
-{L"checkver", 500u, L"using_checkfornewver"}, // IDH_CHECKVER
 {L"dbviewer", 9000u, L"introduction_intro"}, // IDH_INTRODUCTION
 {L"dbviewer", 12220u, L"dlgboxes_config"}, // IDD_CONFIGURATION
 {L"dbviewer", 12240u, L"dlgboxes_fields"}, // IDD_COLUMNS
@@ -295,6 +291,7 @@
 {L"sally", 867u, L"advwork_select"}, // CM_RESTORESEL
 {L"sally", 870u, L"advwork_new"}, // CM_NEWDROP
 {L"sally", 921u, L"security_permissions"}, // CM_SEC_PERMISSIONS
+{L"sally", 923u, L"basicwork_delete"}, // CM_UNDO
 {L"sally", 928u, L"advwork_ntfscmds"}, // CM_ENCRYPT
 {L"sally", 929u, L"advwork_ntfscmds"}, // CM_DECRYPT
 {L"sally", 930u, L"customize_pluginsbar"}, // CM_CUSTOMIZEPLUGINS

@@ -86,6 +86,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "U&držiavať premenné prostredia aktualizované na systémové hodnoty",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "Navr&hovať názvy priečinkov pri písaní cesty (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "Kon&trolovať aktualizácie:",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2211,6 +2215,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "NT&FS Príkazy"
 
  IDS_MENU_EDIT,              "&Upraviť"
+ IDS_MENU_EDIT_UNDO, "&Späť\tCtrl+Z"
+ IDS_UNDO_FAILED, "Systém Windows nemohol vrátiť poslednú operáciu prostredia."
  IDS_MENU_EDIT_CUT,          "&Vystrihnúť\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "&Kopírovať\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "Kopírovať &cestu + názov ako text\tAlt+Insert"
@@ -4117,5 +4123,12 @@ IDS_OLDPLUGINVERSION2, "Tento plugin (%s) nie je podporovaný v tejto verzii Sal
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "Slovenská verzia"
  IDS_EXITING_RUNNING_INFO, "Sally nie je možné ukončiť, kým nebudú dokončené všetky diskové operácie. Počkajte prosím, kým budú operácie dokončené alebo ich zrušte. Ak ešte nechcete ukončiť Sally, kliknite na tlačidlo Zrušiť."
+ IDS_UPDATECHECK_NEVER, "Nikdy"
+ IDS_UPDATECHECK_DAY, "Každý deň"
+ IDS_UPDATECHECK_WEEK, "Každý týždeň"
+ IDS_UPDATECHECK_MONTH, "Každý mesiac"
+ IDS_UPDATECHECK_3MONTHS, "Každé tri mesiace"
+ IDS_UPDATECHECK_6MONTHS, "Každých šesť mesiacov"
+ IDS_UPDATER_CANNOT_START, "Aktualizačný program Sally nemožno spustiť:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Hlavné heslo sa používa na zabezpečenie citlivých informácií, ako FTP alebo WinSCP hesiel silnou AES šifrou. Ak vytvoríte hlavné heslo, budete požiadaní o jeho zadanie jedenkrát za reláciu, keď Sally pristupuje k zabezpečeným informáciám."
 }

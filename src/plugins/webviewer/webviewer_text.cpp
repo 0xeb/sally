@@ -9,6 +9,32 @@
 
 namespace
 {
+std::wstring EscapeHtml(const std::wstring& text)
+{
+    std::wstring escaped;
+    for (wchar_t c : text)
+    {
+        switch (c)
+        {
+        case L'&':
+            escaped += L"&amp;";
+            break;
+        case L'<':
+            escaped += L"&lt;";
+            break;
+        case L'>':
+            escaped += L"&gt;";
+            break;
+        case L'"':
+            escaped += L"&quot;";
+            break;
+        default:
+            escaped += c;
+        }
+    }
+    return escaped;
+}
+
 bool IsAsciiPathByteSafe(unsigned char value)
 {
     return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') ||
@@ -85,4 +111,15 @@ bool WebViewerBuildMarkdownBaseHref(const std::wstring& filePath, std::string& b
 bool WebViewerDecodeHtmlUtf8(const std::string& html, std::wstring& wideHtml)
 {
     return Win32DecodeText(CP_UTF8, html, wideHtml).Succeeded();
+}
+
+std::wstring WebViewerNavigationErrorHtml(const std::wstring& message, const std::wstring& detail,
+                                          const std::wstring& url)
+{
+    return L"<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>"
+           L"body{font-family:'Segoe UI',sans-serif;margin:2em;color:#222;background:#fff}"
+           L"@media (prefers-color-scheme:dark){body{color:#ddd;background:#1e1e1e}}"
+           L"p.d{color:#777;font-size:90%;word-break:break-all}</style></head><body><h3>" +
+           EscapeHtml(message) + L"</h3><p class=\"d\">" + EscapeHtml(detail) + L"</p><p class=\"d\">" +
+           EscapeHtml(url) + L"</p></body></html>";
 }

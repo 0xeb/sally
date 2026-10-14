@@ -8,6 +8,7 @@
 
 #include <set>
 
+#include "common/ExtendedLengthPath.h"
 #include "engine/wic_engine.h"
 #include "jpeg_thumbnail.h"
 #include "viewer.h"
@@ -220,6 +221,9 @@ ThumbnailUpdateSummary UpdateJpegThumbnails(const std::vector<std::wstring>& pat
     for (size_t index = 0; index < paths.size() && !summary.Canceled; ++index)
     {
         const std::wstring& path = paths[index];
+        // File operations use the "\\?\" form, so a file works at any path length; questions and
+        // messages keep showing the path as the user knows it.
+        const std::wstring filePath = Sally::ToExtendedLengthPath(path);
         if (host.Progress && !host.Progress(index, paths.size(), path))
         {
             summary.Canceled = true;
@@ -231,7 +235,7 @@ ThumbnailUpdateSummary UpdateJpegThumbnails(const std::vector<std::wstring>& pat
         std::wstring detail;
         bool isJpeg = false;
         std::vector<uint8_t> thumbnail;
-        if (!ReadWholeFile(path, file, error))
+        if (!ReadWholeFile(filePath, file, error))
             detail = SystemErrorText(error);
         else
             thumbnail = MakeJpegThumbnail(engine, file, isJpeg, detail);
@@ -284,7 +288,7 @@ ThumbnailUpdateSummary UpdateJpegThumbnails(const std::vector<std::wstring>& pat
         }
 
         std::wstring tempPath;
-        if (!WriteTempFile(path, rewritten, tempPath, error))
+        if (!WriteTempFile(filePath, rewritten, tempPath, error))
         {
             if (!decided.SkipWriteFailures)
                 summary.Canceled = SkipOrCancel(ask(ThumbnailUpdateQuestion::WriteFailed, path, SystemErrorText(error)),
@@ -292,8 +296,8 @@ ThumbnailUpdateSummary UpdateJpegThumbnails(const std::vector<std::wstring>& pat
             continue;
         }
 
-        bool swapped = SwapInTempFile(path, tempPath, error);
-        const DWORD attributes = GetFileAttributesW(path.c_str());
+        bool swapped = SwapInTempFile(filePath, tempPath, error);
+        const DWORD attributes = GetFileAttributesW(filePath.c_str());
         if (!swapped && attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_READONLY) != 0)
         {
             bool modify = decided.ModifyReadOnly;
@@ -305,10 +309,10 @@ ThumbnailUpdateSummary UpdateJpegThumbnails(const std::vector<std::wstring>& pat
                 decided.SkipReadOnly = answer == ThumbnailUpdateAnswer::SkipAll;
                 modify = answer == ThumbnailUpdateAnswer::Yes || answer == ThumbnailUpdateAnswer::All;
             }
-            if (modify && SetFileAttributesW(path.c_str(), attributes & ~FILE_ATTRIBUTE_READONLY))
+            if (modify && SetFileAttributesW(filePath.c_str(), attributes & ~FILE_ATTRIBUTE_READONLY))
             {
-                swapped = SwapInTempFile(path, tempPath, error);
-                SetFileAttributesW(path.c_str(), GetFileAttributesW(path.c_str()) | FILE_ATTRIBUTE_READONLY); // stays read-only
+                swapped = SwapInTempFile(filePath, tempPath, error);
+                SetFileAttributesW(filePath.c_str(), GetFileAttributesW(filePath.c_str()) | FILE_ATTRIBUTE_READONLY); // stays read-only
             }
             if (!modify)
             {

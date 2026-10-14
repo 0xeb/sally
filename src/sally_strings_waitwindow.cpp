@@ -1575,8 +1575,14 @@ UINT MyGetDriveTypeW(const wchar_t* path)
 
             // NOTE: differs from MyGetVolumeInformation because GetDriveType returns
             // success for any path (not just root + mounted volume)
-            while ((ret = GetDriveTypeW(ourPath.c_str())) == DRIVE_UNKNOWN)
+            for (;;)
             {
+                ret = GetDriveTypeW(ourPath.c_str());
+                if (ret != DRIVE_UNKNOWN && ret != DRIVE_NO_ROOT_DIR)
+                    break;
+                // Long directory paths can return DRIVE_NO_ROOT_DIR even on a
+                // fixed disk. Retry ancestors only when the reparse-point walk
+                // permits it, so an unresolved mount never becomes another volume.
                 if (!res.CutResPathIsPossible || !CutDirectoryW(ourPath))
                     break; // we must not cut it or even the root did not succeed
                 SalPathAddBackslashW(ourPath);

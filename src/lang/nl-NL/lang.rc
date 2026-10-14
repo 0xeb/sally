@@ -86,6 +86,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "&Houd omgevingsvariabelen bijgewerkt op systeem waarden",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "Mapnamen &voorstellen tijdens het typen van een pad (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "Controleren op &updates:",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2211,6 +2215,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "NTF&S Opdrachten"
 
  IDS_MENU_EDIT,              "B&ewerken"
+ IDS_MENU_EDIT_UNDO, "&Ongedaan maken\tCtrl+Z"
+ IDS_UNDO_FAILED, "Windows kon de laatste shellbewerking niet ongedaan maken."
  IDS_MENU_EDIT_CUT,          "Kni&ppen\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "&Kopieer\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "K&opieer Pad + Naam als Tekst\tAlt+Insert"
@@ -4117,5 +4123,12 @@ IDS_OLDPLUGINVERSION2, "De plugin (%s) wordt niet door deze versie van Sally ond
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "Nederlandse versie"
  IDS_EXITING_RUNNING_INFO, "Kan Sally niet afsluiten totdat alle disk operaties afgesloten zijn. Wacht a.u.b. totdat deze operaties afgesloten zijn of annuleer ze nu. Als u Sally niet wilt afsluiten, druk op Annuleren."
+ IDS_UPDATECHECK_NEVER, "Nooit"
+ IDS_UPDATECHECK_DAY, "Dagelijks"
+ IDS_UPDATECHECK_WEEK, "Wekelijks"
+ IDS_UPDATECHECK_MONTH, "Maandelijks"
+ IDS_UPDATECHECK_3MONTHS, "Elke drie maanden"
+ IDS_UPDATECHECK_6MONTHS, "Elke zes maanden"
+ IDS_UPDATER_CANNOT_START, "Het updateprogramma van Sally kon niet worden gestart:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Een Hoofd Wachtwoord wordt gebruikt on gevoelige informatie zoals FTP of WinSCP wachtwoorden via AES cipher te beveiligen. Wanneer u een Hoofd Wachtwoord aanlegt, wordt u een keer per sessie naar dit wachtwoord gevraagd als Sally gevoelige informatie ophaalt."
 }

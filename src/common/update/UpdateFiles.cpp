@@ -13,6 +13,7 @@ namespace Sally::Update
 const wchar_t* const kJournalFileName = L"sally-update.journal";
 const wchar_t* const kLeftoverSuffix = L".sally-old";
 const wchar_t* const kLeftoverListFileName = L"sally-update.leftovers";
+const wchar_t* const kObsoleteManifestName = L"sally-update.obsolete";
 
 namespace
 {
@@ -20,6 +21,13 @@ namespace
 const char* const kJournalHeader = "SALLY-UPDATE 1";
 const char* const kJournalCommit = "COMMIT";
 const char* const kLeftoverListHeader = "SALLY-UPDATE-LEFTOVERS 1";
+const char* const kObsoleteManifestHeader = "SALLY-UPDATE-OBSOLETE 1";
+
+bool SameNameNoCase(const std::wstring& a, const std::wstring& b)
+{
+    return CompareStringOrdinal(a.c_str(), static_cast<int>(a.size()), b.c_str(), static_cast<int>(b.size()), TRUE) ==
+           CSTR_EQUAL;
+}
 
 std::wstring Join(const std::wstring& root, const std::wstring& relative)
 {
@@ -86,6 +94,34 @@ std::vector<std::wstring> ReadLeftoverList(const std::wstring& list, IUpdateFile
             leftovers.push_back(leftover);
     }
     return leftovers;
+}
+
+// Adds renamed-aside files (relative) to the leftover list, once each.
+void ListLeftovers(const std::wstring& installRoot, const std::vector<std::wstring>& leftovers, IUpdateFileOps& ops)
+{
+    if (leftovers.empty())
+        return;
+    const std::wstring list = Join(installRoot, kLeftoverListFileName);
+    std::vector<std::wstring> listed = ReadLeftoverList(list, ops);
+    DWORD error = 0;
+    if (listed.empty())
+        ops.AppendLine(list, kLeftoverListHeader, error);
+    for (const std::wstring& leftover : leftovers)
+    {
+        if (std::find(listed.begin(), listed.end(), leftover) == listed.end())
+        {
+            ops.AppendLine(list, ToUtf8(leftover), error);
+            listed.push_back(leftover);
+        }
+    }
+}
+
+// Folders deepest first, so that a parent comes after the folders inside it.
+void SortDeepestFirst(std::vector<std::wstring>& folders)
+{
+    std::stable_sort(folders.begin(), folders.end(), [](const std::wstring& a, const std::wstring& b) {
+        return std::count(a.begin(), a.end(), L'\\') > std::count(b.begin(), b.end(), L'\\');
+    });
 }
 
 // One step of the journal: F (folder created), N (new file copied in), R (installed file
@@ -297,6 +333,28 @@ bool BuildUpdatePlan(const std::wstring& sourceRoot, const std::wstring& install
         }
         plan.Files.push_back(file);
     }
+
+    // The files earlier releases installed and this one retired.
+    ObsoleteManifest manifest;
+    if (ReadObsoleteManifest(sourceRoot, ops, manifest))
+    {
+        auto inRelease = [&](const std::wstring& relative) {
+            for (const std::wstring& file : plan.Files)
+                if (SameNameNoCase(file, relative))
+                    return true;
+            for (const std::wstring& folder : folders)
+                if (SameNameNoCase(folder, relative))
+                    return true;
+            return false;
+        };
+        for (const std::wstring& file : manifest.Files)
+            if (!inRelease(file) && ops.Query(Join(installRoot, file)) == PathKind::File)
+                plan.Removals.push_back(file);
+        for (const std::wstring& folder : manifest.Folders)
+            if (!inRelease(folder) && ops.Query(Join(installRoot, folder)) == PathKind::Folder)
+                plan.EmptyFolders.push_back(folder);
+        SortDeepestFirst(plan.EmptyFolders);
+    }
     return true;
 }
 
@@ -370,6 +428,24 @@ ApplyOutcome ApplyUpdate(const UpdatePlan& plan, IUpdateFileOps& ops)
         if (!ops.Copy(Join(plan.SourceRoot, file), target, error))
             return fail(target, error, L"Cannot copy the new file");
     }
+    // A retired file is renamed aside like a replaced one, without a new file taking its name:
+    // undoing the step (any updater since 1.0.36 can) renames it back.
+    for (const std::wstring& file : plan.Removals)
+    {
+        const std::wstring target = Join(plan.InstallRoot, file);
+        if (ops.Query(target) != PathKind::File)
+            continue;
+        Step step;
+        step.Kind = 'R';
+        step.Relative = file;
+        step.Backup = ChooseBackupName(plan.InstallRoot, file, ops);
+        if (step.Backup.empty())
+            return fail(target, ERROR_ALREADY_EXISTS, L"Cannot rename a retired file aside");
+        if (!record(step))
+            return fail(journal, error, L"Cannot write to the Sally folder");
+        if (!ops.Rename(target, Join(plan.InstallRoot, step.Backup), error))
+            return fail(target, error, L"Cannot rename a retired file aside");
+    }
     if (!ops.AppendLine(journal, kJournalCommit, error))
         return fail(journal, error, L"Cannot write to the Sally folder");
 
@@ -388,20 +464,13 @@ ApplyOutcome ApplyUpdate(const UpdatePlan& plan, IUpdateFileOps& ops)
         }
     }
     // The files still in use are listed, so that a later start can delete just those.
-    if (!leftovers.empty())
-    {
-        const std::wstring list = Join(plan.InstallRoot, kLeftoverListFileName);
-        std::vector<std::wstring> listed = ReadLeftoverList(list, ops);
-        if (listed.empty())
-            ops.AppendLine(list, kLeftoverListHeader, error);
-        for (const std::wstring& leftover : leftovers)
-        {
-            if (std::find(listed.begin(), listed.end(), leftover) == listed.end())
-                ops.AppendLine(list, ToUtf8(leftover), error);
-        }
-    }
+    ListLeftovers(plan.InstallRoot, leftovers, ops);
     DWORD ignored = 0;
     ops.RemoveFile(journal, ignored);
+    // A retired plugin's folder goes once it is empty (a loaded leftover keeps it until a later
+    // start removes both).
+    for (const std::wstring& folder : plan.EmptyFolders)
+        ops.RemoveFolder(Join(plan.InstallRoot, folder), ignored);
     return outcome;
 }
 
@@ -446,6 +515,141 @@ bool RecoverInterruptedUpdate(const std::wstring& installRoot, IUpdateFileOps& o
         return false;
     }
     return true;
+}
+
+bool IsRetirablePath(const std::wstring& relative)
+{
+    auto under = [&](const wchar_t* folder) {
+        const size_t length = wcslen(folder);
+        return relative.size() > length &&
+               CompareStringOrdinal(relative.c_str(), static_cast<int>(length), folder, static_cast<int>(length),
+                                    TRUE) == CSTR_EQUAL;
+    };
+    if (!under(L"plugins\\") && !under(L"utils\\"))
+        return false;
+    if (relative.find_first_of(L"/:*?\"<>|") != std::wstring::npos)
+        return false;
+    size_t start = 0;
+    while (start <= relative.size())
+    {
+        size_t end = relative.find(L'\\', start);
+        if (end == std::wstring::npos)
+            end = relative.size();
+        const std::wstring part = relative.substr(start, end - start);
+        // No empty part (a doubled or trailing backslash), no "." or "..", and no name Windows
+        // would read differently (a trailing dot or space).
+        if (part.empty() || part == L"." || part == L".." || part.back() == L'.' || part.back() == L' ')
+            return false;
+        start = end + 1;
+    }
+    return true;
+}
+
+bool ParseObsoleteManifest(const std::string& utf8, ObsoleteManifest& manifest, std::string& error)
+{
+    manifest = ObsoleteManifest();
+    error.clear();
+    size_t start = 0;
+    bool first = true;
+    int number = 0;
+    while (start < utf8.size())
+    {
+        size_t end = utf8.find('\n', start);
+        if (end == std::string::npos)
+            end = utf8.size();
+        std::string line = utf8.substr(start, end - start);
+        start = end + 1;
+        ++number;
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (first)
+        {
+            if (line.size() >= 3 && line.compare(0, 3, "\xEF\xBB\xBF") == 0)
+                line.erase(0, 3);
+            if (line != kObsoleteManifestHeader)
+            {
+                error = "not an obsolete-files manifest";
+                return false;
+            }
+            first = false;
+            continue;
+        }
+        if (line.empty() || line[0] == '#')
+            continue;
+        std::wstring path = FromUtf8(line);
+        const bool folder = !path.empty() && path.back() == L'\\';
+        if (folder)
+            path.pop_back();
+        if (path.empty() || !IsRetirablePath(path))
+        {
+            error = "line " + std::to_string(number) + ": not a path below plugins\\ or utils\\";
+            manifest = ObsoleteManifest();
+            return false;
+        }
+        (folder ? manifest.Folders : manifest.Files).push_back(path);
+    }
+    if (first)
+    {
+        error = "empty";
+        return false;
+    }
+    return true;
+}
+
+bool ReadObsoleteManifest(const std::wstring& root, IUpdateFileOps& ops, ObsoleteManifest& manifest)
+{
+    manifest = ObsoleteManifest();
+    const std::wstring path = Join(root, kObsoleteManifestName);
+    std::string text;
+    std::string error;
+    DWORD code = 0;
+    return ops.Query(path) == PathKind::File && ops.ReadText(path, text, code) &&
+           ParseObsoleteManifest(text, manifest, error);
+}
+
+ObsoleteSweep RemoveObsoleteFiles(const std::wstring& installRoot, const ObsoleteManifest& manifest,
+                                  IUpdateFileOps& ops)
+{
+    ObsoleteSweep sweep;
+    if (ops.Query(Join(installRoot, kJournalFileName)) != PathKind::Missing)
+        return sweep;
+    std::vector<std::wstring> leftovers;
+    for (const std::wstring& file : manifest.Files)
+    {
+        const std::wstring target = Join(installRoot, file);
+        if (ops.Query(target) != PathKind::File)
+            continue;
+        DWORD error = 0;
+        if (ops.RemoveFile(target, error))
+        {
+            ++sweep.Removed;
+            continue;
+        }
+        // Loaded somewhere (a DLL): it can still be renamed aside, and deleted once it is free.
+        const std::wstring backup = ChooseBackupName(installRoot, file, ops);
+        if (backup.empty() || !ops.Rename(target, Join(installRoot, backup), error))
+        {
+            sweep.Failures.push_back({target, error, L"Cannot remove a retired file"});
+            continue;
+        }
+        ++sweep.Removed;
+        if (!ops.RemoveFile(Join(installRoot, backup), error))
+        {
+            sweep.StillInUse.push_back(Join(installRoot, backup));
+            leftovers.push_back(backup);
+        }
+    }
+    ListLeftovers(installRoot, leftovers, ops);
+    std::vector<std::wstring> folders = manifest.Folders;
+    SortDeepestFirst(folders);
+    for (const std::wstring& folder : folders)
+    {
+        DWORD ignored = 0;
+        const std::wstring target = Join(installRoot, folder);
+        if (ops.Query(target) == PathKind::Folder)
+            ops.RemoveFolder(target, ignored); // only an empty one goes
+    }
+    return sweep;
 }
 
 std::vector<std::wstring> CleanUpdateLeftovers(const std::wstring& installRoot, IUpdateFileOps& ops)

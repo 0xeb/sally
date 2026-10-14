@@ -296,6 +296,10 @@ const wchar_t* CONFIG_KEEPPLUGINSSORTED_REG_W = L"Keep Plugins Sorted";
 const wchar_t* CONFIG_LANGUAGECHANGED_REG_W = L"Language Changed";
 const wchar_t* CONFIG_LASTFOCUSEDPAGE_W = L"Last Focused Page";
 const wchar_t* CONFIG_LASTPLUGINVER_W = L"Plugins.ver Version (x64)";
+const wchar_t* CONFIG_REMOVEDBUNDLEDPLUGINS_REG = L"Removed Bundled Plugins";
+const wchar_t* CONFIG_SUGGESTPATHNAMES_REG_W = L"Suggest Path Names";
+// The update check's own times are written by update_check.cpp, beside this value.
+const wchar_t* CONFIG_UPDATECHECKMODE_REG_W = L"Update Check Mode";
 const wchar_t* CONFIG_LASTPLUGINVER_OP_W = L"Plugins.ver Version (x86)";
 const wchar_t* CONFIG_LASTUSEDSPEEDLIM_REG_W = L"Speed Limit";
 const wchar_t* CONFIG_MAINWINDOWICONINDEX_REG_W = L"Main window icon index";
@@ -1109,6 +1113,8 @@ BOOL FindLanguageFromPrevVerOfSal(std::wstring& slgName)
     {
         // check if the key exists and if a configuration is stored under it
         root = SalamanderConfigurationRoots[rootIndex];
+        if (root == NULL) // the list ends early with -profile (common/ConfigProfile.h)
+            break;
         BOOL rootFound = registry->OpenKeyRead(HKEY_CURRENT_USER, root, hRootKey).success;
         BOOL cfgFound = rootFound &&
                         registry->OpenKeyRead(hRootKey, SALAMANDER_CONFIG_REG_W, hCfgKey).success;
@@ -1297,6 +1303,8 @@ BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const wchar_t*& loadCon
     do
     {
         root = SalamanderConfigurationRoots[rootIndex];
+        if (root == NULL) // the list ends early with -profile (common/ConfigProfile.h)
+            break;
         // check whether the key exists
         BOOL rootFound = registry != NULL &&
                          registry->OpenKeyRead(HKEY_CURRENT_USER, root, hRootKey).success;
@@ -2038,6 +2046,8 @@ void CMainWindow::SaveConfig(HWND parent)
                          &Configuration.LastPluginVer, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_LASTPLUGINVER_OP_W, REG_DWORD,
                          &Configuration.LastPluginVerOP, sizeof(DWORD));
+                SetValue(actKey, CONFIG_REMOVEDBUNDLEDPLUGINS_REG, REG_SZ,
+                         Configuration.RemovedBundledPlugins.c_str(), -1);
                 SetValueW(actKey, CONFIG_NETWAREFASTDIRMOVE_REG_W, REG_DWORD,
                          &Configuration.NetwareFastDirMove, sizeof(DWORD));
                 if (Windows7AndLater)
@@ -2045,6 +2055,10 @@ void CMainWindow::SaveConfig(HWND parent)
                              &Configuration.UseAsyncCopyAlg, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_RELOAD_ENV_VARS_REG_W, REG_DWORD,
                          &Configuration.ReloadEnvVariables, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_SUGGESTPATHNAMES_REG_W, REG_DWORD,
+                         &Configuration.SuggestPathNames, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_UPDATECHECKMODE_REG_W, REG_DWORD,
+                         &Configuration.UpdateCheckMode, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_QUICKRENAME_SELALL_REG_W, REG_DWORD,
                          &Configuration.QuickRenameSelectAll, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_EDITNEW_SELALL_REG_W, REG_DWORD,
@@ -3644,6 +3658,8 @@ BOOL CMainWindow::LoadConfig(
                      &Configuration.LastPluginVer, sizeof(DWORD));
             GetValueW(actKey, CONFIG_LASTPLUGINVER_OP_W, REG_DWORD,
                      &Configuration.LastPluginVerOP, sizeof(DWORD));
+            GetStringValueW(actKey, CONFIG_REMOVEDBUNDLEDPLUGINS_REG,
+                            Configuration.RemovedBundledPlugins);
             GetValueW(actKey, CONFIG_QUICKRENAME_SELALL_REG_W, REG_DWORD,
                      &Configuration.QuickRenameSelectAll, sizeof(DWORD));
             GetValueW(actKey, CONFIG_EDITNEW_SELALL_REG_W, REG_DWORD,
@@ -3658,6 +3674,12 @@ BOOL CMainWindow::LoadConfig(
                          &Configuration.UseAsyncCopyAlg, sizeof(DWORD));
             GetValueW(actKey, CONFIG_RELOAD_ENV_VARS_REG_W, REG_DWORD,
                      &Configuration.ReloadEnvVariables, sizeof(DWORD));
+            GetValueW(actKey, CONFIG_SUGGESTPATHNAMES_REG_W, REG_DWORD,
+                     &Configuration.SuggestPathNames, sizeof(DWORD));
+            GetValueW(actKey, CONFIG_UPDATECHECKMODE_REG_W, REG_DWORD,
+                     &Configuration.UpdateCheckMode, sizeof(DWORD));
+            if (Configuration.UpdateCheckMode < 0 || Configuration.UpdateCheckMode > 5)
+                Configuration.UpdateCheckMode = 2;
             GetValueW(actKey, CONFIG_SHIFTFORHOTPATHS_REG_W, REG_DWORD,
                      &Configuration.ShiftForHotPaths, sizeof(DWORD));
             // CONFIG_LANGUAGE_REG is read at startup, before the language is applied

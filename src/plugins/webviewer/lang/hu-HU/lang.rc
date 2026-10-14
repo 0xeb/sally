@@ -24,4 +24,5 @@ STRINGTABLE
  IDS_PLUGINNAME, "Web Néző"
  IDS_UNABLETOOPENIE, "Nem sikerült megnyitni a Web Nézőt.\nKérjük, ellenőrizze, hogy a Microsoft Edge WebView2 Runtime telepítve van-e."
  IDS_ERRORTITLE, "Hiba"
+ IDS_NAVIGATIONFAILED, "A webes megjelenítő nem tudta megjeleníteni ezt a fájlt."
 }

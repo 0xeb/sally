@@ -6,6 +6,7 @@
 #include "precomp.h"
 
 #include "common/IShell.h"
+#include "common/ShellUndoPolicy.h"
 #include "menu_item_text.h"
 #include "ui/UnicodeHistoryUtils.h"
 
@@ -59,10 +60,8 @@ extern "C"
 #include "find.h"
 #include "viewer.h"
 #include "common/widepath.h"
-
-static const wchar_t* CHECKVER_PLUGIN_DLL_SUFFIX = L"checkver\\checkver.dll";
-// Keep this in sync with CM_CHECK_VERSION in src/plugins/checkver/checkver.rh2.
-static const int CHECKVER_CMD_CHECK_VERSION = 90;
+#include "update_check.h"
+#include "common/StartupActions.h"
 
 // critical shutdown: the maximum time we can spend in WM_QUERYENDSESSION (after that,
 // KILL comes from Windows). It is 5s (5s with an open message box, 10s without pumping
@@ -107,6 +106,70 @@ static IRegistry* GetMainWindow3Registry()
 }
 
 extern BOOL CacheNextSetFocus;
+
+namespace
+{
+sally::undo::Focus GetUndoFocus(CMainWindow* main, HWND target)
+{
+    if (target == nullptr || !IsWindow(target) || !IsChild(main->HWindow, target))
+        return sally::undo::Focus::Other;
+    if (target == main->LeftPanel->GetListBoxHWND() || target == main->RightPanel->GetListBoxHWND())
+        return sally::undo::Focus::Panel;
+    std::vector<wchar_t> name(32);
+    for (;;)
+    {
+        const int count = GetClassNameW(target, name.data(), static_cast<int>(name.size()));
+        if (count == 0)
+            return sally::undo::Focus::Other;
+        if (static_cast<size_t>(count) < name.size() - 1)
+            break;
+        name.resize(name.size() * 2);
+    }
+    return _wcsicmp(name.data(), L"Edit") == 0 || _wcsnicmp(name.data(), L"RichEdit", 8) == 0
+               ? sally::undo::Focus::Text : sally::undo::Focus::Other;
+}
+}
+
+void CMainWindow::UpdateUndoMenu(CMenuPopup* popup)
+{
+    const auto focus = GetUndoFocus(this, UndoMenuTarget);
+    ShellUndoState state;
+    const bool busy = HasLockedUI() || UndoInProgress || OperationsQueue.GetNumOfOperations() != 0 ||
+                      ProgressDlgArray.RemoveFinishedDlgs() != 0;
+    if (focus == sally::undo::Focus::Panel && !busy)
+        gShell->GetShellUndoState(HWindow, state);
+    const bool textCanUndo = focus == sally::undo::Focus::Text && SendMessageW(UndoMenuTarget, EM_CANUNDO, 0, 0) != 0;
+    const auto action = sally::undo::ChooseTarget(focus, textCanUndo, state.available, busy);
+    std::wstring caption = sally::undo::MenuCaption(state.caption, LoadStrW(IDS_MENU_EDIT_UNDO));
+    MENU_ITEM_INFO item = {};
+    item.Mask = MENU_MASK_STRING;
+    item.String = caption.data();
+    popup->SetItemInfo(CM_UNDO, FALSE, &item);
+    popup->EnableItem(CM_UNDO, FALSE, action != sally::undo::Target::None);
+}
+
+void CMainWindow::ExecuteUndo(HWND target)
+{
+    const auto focus = GetUndoFocus(this, target);
+    if (focus == sally::undo::Focus::Text)
+    {
+        if (SendMessageW(target, EM_CANUNDO, 0, 0) != 0)
+            SendMessageW(target, EM_UNDO, 0, 0);
+        return;
+    }
+    const bool busy = HasLockedUI() || UndoInProgress || OperationsQueue.GetNumOfOperations() != 0 ||
+                      ProgressDlgArray.RemoveFinishedDlgs() != 0;
+    if (focus != sally::undo::Focus::Panel || busy)
+        return;
+    UndoInProgress = TRUE; // Shell dialogs can pump messages; block reentrant file undo.
+    const ShellResult result = gShell->UndoLastShellOperation(HWindow);
+    UndoInProgress = FALSE;
+    LeftPanel->RefreshForConfig();
+    RightPanel->RefreshForConfig();
+    if (!result.success && result.errorCode != ERROR_CANCELLED &&
+        result.errorCode != static_cast<DWORD>(HRESULT_FROM_WIN32(ERROR_CANCELLED)))
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNDO_FAILED));
+}
 
 BOOL MainFrameIsActive = FALSE;
 
@@ -932,6 +995,27 @@ void CMainWindow::ApplyCommandLineParams(
         Configuration.TitleBarPrefixForced = cmdLineParams->titlePrefix;
         SetWindowTitle();
     }
+
+    // -do <action>: posted, so that it runs once Sally has finished starting, on the focused item of
+    // the active panel, as the menu command does.
+    for (const std::wstring& name : cmdLineParams->actions)
+    {
+        sally::actions::StartupAction action;
+        if (!sally::actions::FindStartupAction(name, action))
+            continue;
+        int command = 0;
+        switch (action)
+        {
+        case sally::actions::StartupAction::View:
+            command = CM_VIEW;
+            break;
+        case sally::actions::StartupAction::Edit:
+            command = CM_EDIT;
+            break;
+        }
+        if (command != 0)
+            PostMessage(HWindow, WM_COMMAND, command, 0);
+    }
 }
 
 BOOL CMainWindow::SHChangeNotifyInitialize()
@@ -1710,6 +1794,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             SendMessage(tme.hwndTrack, WM_MOUSELEAVE, 0, 0);
 
         // let the existing caret hide (or show again) so it does not distract the user
+        if (uMsg == WM_USER_ENTERMENULOOP)
+            UndoMenuTarget = GetFocus();
         CancelPanelsUI(); // cancel QuickSearch and QuickEdit
         if (EditMode)
         {
@@ -2324,6 +2410,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     ici.dwHotKey = 0;
                     ici.hIcon = 0;
                     activePanel->FocusFirstNewItem = TRUE; // select the newly generated file/directory
+                    activePanel->RenameFirstNewItem = TRUE; // and rename it in place, as in Explorer
 
                     CMainWindowWindowProcAux(menu2, *(CMINVOKECOMMANDINFO*)&ici);
 
@@ -2719,6 +2806,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         switch (LOWORD(wParam))
         {
+        case CM_UNDO:
+            ExecuteUndo(UndoMenuTarget != nullptr ? UndoMenuTarget : GetFocus());
+            UndoMenuTarget = nullptr;
+            return 0;
+
         case CM_HELP_CONTEXT:
         {
             OnContextHelp();
@@ -2739,27 +2831,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_HELP_CHECKNEWVERSION:
         {
-            CPluginData* checkVer = Plugins.GetPluginDataFromSuffix(CHECKVER_PLUGIN_DLL_SUFFIX);
-            if (checkVer == NULL)
-            {
-                TRACE_E("Check Version plugin is not available.");
-                return 0;
-            }
-
-            int checkVerIndex = Plugins.GetIndexJustForConnect(checkVer);
-            if (checkVerIndex < 0)
-            {
-                TRACE_E("Unable to locate Check Version plugin index.");
-                return 0;
-            }
-
-            if (!checkVer->GetLoaded() && !checkVer->InitDLL(HWindow))
-                return 0;
-
-            BOOL unselect = FALSE;
-            checkVer->ExecuteMenuItem2(activePanel, HWindow, checkVerIndex, CHECKVER_CMD_CHECK_VERSION, unselect);
-            if (unselect)
-                activePanel->StoreSelection(); // save selection for Restore Selection command
+            // utils\salupdate.exe looks for a newer release and shows it in its window.
+            UpdateCheck::CheckNow(HWindow);
             return 0;
         }
 
@@ -4903,11 +4976,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CML_HELP:
         {
-            int checkVerPos = popup->FindItemPosition(CM_HELP_CHECKNEWVERSION);
-            if (checkVerPos != -1)
-                popup->RemoveItemsRange(checkVerPos, checkVerPos);
-
-            if (Plugins.GetPluginDataFromSuffix(CHECKVER_PLUGIN_DLL_SUFFIX) != NULL)
+            // Check for New Versions, before About (the menu template does not have it).
+            if (popup->FindItemPosition(CM_HELP_CHECKNEWVERSION) == -1)
             {
                 MENU_ITEM_INFO mii;
                 mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
@@ -5008,6 +5078,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CML_EDIT:
         {
+            UpdateUndoMenu(popup);
             // If this is a "change directory" paste operation, show it in the Paste item
             std::wstring text = LoadStrW(IDS_MENU_EDIT_PASTE);
 
@@ -7067,6 +7138,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     }
 
     case WM_DESTROY:
+        gShell->ReleaseShellUndoState();
     {
         if (!CanDestroyMainWindow)
         {
@@ -7100,6 +7172,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         if (Configuration.StatusArea)
             RemoveTrayIcon();
         //--- destroy child windows
+        ReleaseParkedShellExecuteWnds(); // first: a parked one destroyed with its parent would report a faulty extension
         if (EditWindow != NULL)
         {
             if (EditWindow->HWindow != NULL)

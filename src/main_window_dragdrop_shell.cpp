@@ -1071,6 +1071,10 @@ BOOL CMainWindow::HandleCtrlLetter(wchar_t c)
         WPARAM cmd;
         switch (c) // only upper-case characters reach here
         {
+        case 'Z':
+            ExecuteUndo(GetFocus());
+            return TRUE;
+
         case 'A':
             cmd = CM_ACTIVESELECTALL;
             break;

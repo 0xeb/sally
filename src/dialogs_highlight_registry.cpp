@@ -319,6 +319,8 @@ CConfiguration::CConfiguration()
     NetwareFastDirMove = FALSE; // choose the slower but 100% working mode; power users can switch it
     UseAsyncCopyAlg = TRUE;
     ReloadEnvVariables = TRUE;
+    SuggestPathNames = TRUE;
+    UpdateCheckMode = 2; // weekly (Sally::Update::kDefaultUpdateCheckMode)
     QuickRenameSelectAll = FALSE;
     EditNewSelectAll = TRUE;
     ShiftForHotPaths = TRUE;
@@ -839,6 +841,24 @@ void CCfgPageGeneral::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_ASYNCCOPYALG, Windows7AndLater ? Configuration.UseAsyncCopyAlg : dummy);
     int oldReloadEnvVariables = Configuration.ReloadEnvVariables;
     ti.CheckBox(IDC_RELOADENVVARS, Configuration.ReloadEnvVariables);
+    ti.CheckBox(IDC_SUGGESTPATHNAMES, Configuration.SuggestPathNames);
+    // How often utils\salupdate.exe looks for a newer release (update_check.cpp); in the order
+    // of Sally::Update::UpdateCheckMode.
+    if (ti.Type == ttDataToWindow)
+    {
+        const int names[] = {IDS_UPDATECHECK_NEVER, IDS_UPDATECHECK_DAY, IDS_UPDATECHECK_WEEK,
+                             IDS_UPDATECHECK_MONTH, IDS_UPDATECHECK_3MONTHS, IDS_UPDATECHECK_6MONTHS};
+        SendDlgItemMessage(HWindow, IDC_UPDATECHECK, CB_RESETCONTENT, 0, 0);
+        for (int name : names)
+            SendDlgItemMessageW(HWindow, IDC_UPDATECHECK, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(name).c_str());
+        SendDlgItemMessage(HWindow, IDC_UPDATECHECK, CB_SETCURSEL, Configuration.UpdateCheckMode, 0);
+    }
+    else
+    {
+        const int mode = (int)SendDlgItemMessage(HWindow, IDC_UPDATECHECK, CB_GETCURSEL, 0, 0);
+        if (mode >= 0 && mode <= 5)
+            Configuration.UpdateCheckMode = mode;
+    }
     if (ti.Type == ttDataFromWindow && Configuration.ReloadEnvVariables && oldReloadEnvVariables != Configuration.ReloadEnvVariables)
     {
         InitEnvironmentVariablesDifferences();

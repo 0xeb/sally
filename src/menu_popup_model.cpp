@@ -2570,6 +2570,47 @@ void CMenuPopup::DoDispatchMessage(MSG* msg, BOOL* leaveMenu, DWORD* retValue, B
     DispatchMessageW(msg);
 }
 
+// Shell submenus such as Send To, Include in Library or an extension's submenu are often filled
+// after WM_INITMENUPOPUP: the shell posts the items back as it finds them, over tens to hundreds of
+// milliseconds (Send To lists every drive). A native menu shows them as they arrive; this menu reads
+// its items once, so it would show a placeholder ("Retrieving...") or, with nothing yet, refuse to
+// open the submenu at all. Let the posted messages through until the item count has been steady for
+// a moment (never longer than a bound), then read it.
+static void WaitForWindowsSubmenuToSettle(HMENU menu)
+{
+    const ULONGLONG quietMs = 150;
+    const ULONGLONG maxMs = 600;
+    const ULONGLONG start = GetTickCount64();
+    ULONGLONG lastChange = start;
+    int count = GetMenuItemCount(menu);
+    for (;;)
+    {
+        const ULONGLONG now = GetTickCount64();
+        if (now - start >= maxMs || (count > 0 && now - lastChange >= quietMs))
+            break;
+        MSG msg;
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE | PM_QS_POSTMESSAGE | PM_QS_SENDMESSAGE))
+        {
+            if (msg.message == WM_QUIT)
+            {
+                PostQuitMessage((int)msg.wParam); // leave it for the application's loop
+                return;
+            }
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+        MsgWaitForMultipleObjects(0, NULL, FALSE, 10, QS_POSTMESSAGE | QS_SENDMESSAGE);
+        const int newCount = GetMenuItemCount(menu);
+        if (newCount < 0)
+            break; // the menu went away
+        if (newCount != count)
+        {
+            count = newCount;
+            lastChange = GetTickCount64();
+        }
+    }
+}
+
 BOOL CMenuPopup::CreatePopupWindow(CMenuPopup* firstPopup, int x, int y, int submenuItemPos, const RECT* exclude)
 {
     CALL_STACK_MESSAGE4("CMenuPopup::CreatePopupWindow(, %d, %d, %d, )", x, y, submenuItemPos);
@@ -2587,7 +2628,11 @@ BOOL CMenuPopup::CreatePopupWindow(CMenuPopup* firstPopup, int x, int y, int sub
     if (HWindowsMenu != NULL)
     {
         if (!(TrackFlags & MENU_TRACK_NONOTIFY))
+        {
             SendMessage(SharedRes->HParent, WM_INITMENUPOPUP, (WPARAM)HWindowsMenu, MAKELPARAM(submenuItemPos, 0));
+            if (firstPopup != this) // a submenu; the shell fills the top level synchronously
+                WaitForWindowsSubmenuToSettle(HWindowsMenu);
+        }
         LoadFromHandle();
     }
 

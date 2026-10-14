@@ -2681,7 +2681,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
 
                                 DWORD disks = GetLogicalDrives();
 
-                                CShellExecuteWnd shellExecuteWnd;
+                                CKeptShellExecuteWnd shellExecuteWnd; // outlives the invoke: Send To and others keep using it
                                 CMINVOKECOMMANDINFOEX ici;
                                 ZeroMemory(&ici, sizeof(CMINVOKECOMMANDINFOEX));
                                 ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
@@ -2767,6 +2767,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 {
                                     if (panel->ContextSubmenuNew->MenuIsAssigned()) // exception could have occurred
                                     {
+                                        panel->RenameFirstNewItem = TRUE; // the New menu: rename the new item in place
                                         HRESULT invokeHr = AuxInvokeCommand2(panel, (CMINVOKECOMMANDINFO*)&ici);
                                         if (diag != NULL)
                                         {

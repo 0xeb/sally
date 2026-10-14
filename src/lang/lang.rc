@@ -125,6 +125,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "&Keep environment variables updated to system values",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "Su&ggest folder names while typing a path (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "Check for up&dates:",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231

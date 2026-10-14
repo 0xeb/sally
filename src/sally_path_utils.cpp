@@ -1032,9 +1032,11 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
             // This used to pick between the native-wide ChangePathToDisk and the narrow
             // ChangePathToDisk on "is the wide twin populated?". There is one value now and
             // it is always wide, so the predicate was constant-true and the narrow arm dead.
+            // shorterPathWarning FALSE: a remembered folder that was deleted since lands in its
+            // nearest existing parent without an error box, as a drive change does.
             BOOL diskOk = panel->ChangePathToDisk(panel->HWindow, PathOrArchiveOrFSName.c_str(), TopIndex,
                                                    FocusedName.empty() ? NULL : FocusedName.c_str(), NULL,
-                                                   TRUE, FALSE, FALSE, &failReason, TRUE, FSTRYCLOSE_CHANGEPATH);
+                                                   TRUE, FALSE, FALSE, &failReason, FALSE, FSTRYCLOSE_CHANGEPATH);
             if (!diskOk)
             {
                 if (failReason == CHPPFR_CANNOTCLOSEPATH)

@@ -781,6 +781,7 @@ public:
     std::wstring NextFocusNameW; // exact UTF-16 name that receives focus on the next refresh
     BOOL DontClearNextFocusName;  // TRUE = do not clear NextFocusName when the main Salamander window is activated
     BOOL FocusFirstNewItem;       // refresh: should the newly added item be selected? (for system New)
+    BOOL RenameFirstNewItem;      // refresh: and renamed in place? (an item created from the New menu, as in Explorer)
     CTopIndexMem TopIndexMem;     // memory of top index for Execute()
 
     int LastRefreshTime; // used to handle the chaos of directory change notifications

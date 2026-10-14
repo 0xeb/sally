@@ -867,15 +867,30 @@ public:
 
         // Formats the installed codecs add (HEIF, AVIF, WebP, camera RAW, ...): each joins the
         // viewer list once, when it first appears; thumbnails follow whatever is installed.
+        // AddViewer(masks, FALSE) acts only while the plugin is being installed and
+        // AddViewer(masks, TRUE) only on a later load, so a new format is offered both ways.
+        const size_t maxViewerMasksLength = 250; // the core copies each list into a 300-character buffer
         const std::vector<std::wstring> codecExtensions = InstalledCodecExtensions();
         const std::vector<std::wstring> offered = pictview::GetOfferedCodecExtensions();
         const std::vector<std::wstring> fresh = pictview::ExtensionsNotOffered(codecExtensions, offered);
         if (!fresh.empty())
         {
-            salamander->AddViewer(pictview::MasksFromExtensions(fresh).c_str(), TRUE);
+            for (const std::wstring& masks : pictview::MaskChunksFromExtensions(fresh, maxViewerMasksLength))
+            {
+                salamander->AddViewer(masks.c_str(), FALSE);
+                salamander->AddViewer(masks.c_str(), TRUE);
+            }
             std::vector<std::wstring> updated = offered;
             updated.insert(updated.end(), fresh.begin(), fresh.end());
             pictview::SetOfferedCodecExtensions(updated);
+        }
+        // PictView 1.0.34 to 1.0.36 recorded the formats as offered at install without adding them
+        // (only the upgrade form was called), so WebP and the others never reached the viewer list.
+        // Offer them once; masks the list already has are skipped, so the user's order stays.
+        if (pictview::LoadedConfigurationVersion() < 24)
+        {
+            for (const std::wstring& masks : pictview::MaskChunksFromExtensions(codecExtensions, maxViewerMasksLength))
+                salamander->AddViewer(masks.c_str(), TRUE);
         }
         pictview::SetAdditionalOpenMasks(pictview::MasksFromExtensions(codecExtensions));
         std::wstring thumbnailMasks = WicImageMasks;

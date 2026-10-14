@@ -2722,11 +2722,23 @@
 #define IDS_CFGSEC_MASTERPWD_INFO       14230
 #define IDS_EXITING_RUNNING_INFO        14231
 
+// Configuration > General > Check for updates, and Help > Check for New Versions (update_check.cpp)
+#define IDS_UPDATECHECK_NEVER           14232
+#define IDS_UPDATECHECK_DAY             14233
+#define IDS_UPDATECHECK_WEEK            14234
+#define IDS_UPDATECHECK_MONTH           14235
+#define IDS_UPDATECHECK_3MONTHS         14236
+#define IDS_UPDATECHECK_6MONTHS         14237
+#define IDS_UPDATER_CANNOT_START        14238
+
 // About this translation, shown when choosing a language. They have a 16-string bundle of their
 // own (14240-14255): Sally lists its built-in languages by the language copies of this bundle.
 #define IDS_LANGMETA_AUTHOR             14240
 #define IDS_LANGMETA_WEB                14241
 #define IDS_LANGMETA_COMMENT            14242
+
+#define IDS_MENU_EDIT_UNDO               14256
+#define IDS_UNDO_FAILED                  14257
 
 //#define CM_TEXTS_MAX                  18000    // maximal texts id
 

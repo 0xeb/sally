@@ -41,13 +41,17 @@ bool SyncCancellation(CSalamanderThumbnailMakerAbstract* thumbMaker, Cancellatio
 
 } // namespace
 
+// One pixel for ProcessBuffer, which builds a 32-bit BI_RGB DIB from the buffer: 0x00RRGGBB, so
+// blue is the low byte (B, G, R, unused in memory). A COLORREF (RGB(), red in the low byte) would
+// show red as blue. 'background' is a COLORREF and shows through transparent pixels.
 DWORD BlendThumbnailPixel(const unsigned char* bgra, COLORREF background)
 {
+    auto pack = [](unsigned r, unsigned g, unsigned b) { return static_cast<DWORD>(b | (g << 8) | (r << 16)); };
     const unsigned alpha = bgra[3];
     if (alpha == 255)
-        return RGB(bgra[2], bgra[1], bgra[0]);
+        return pack(bgra[2], bgra[1], bgra[0]);
     auto mix = [alpha](unsigned value, unsigned under) { return static_cast<BYTE>((value * alpha + under * (255 - alpha) + 127) / 255); };
-    return RGB(mix(bgra[2], GetRValue(background)), mix(bgra[1], GetGValue(background)), mix(bgra[0], GetBValue(background)));
+    return pack(mix(bgra[2], GetRValue(background)), mix(bgra[1], GetGValue(background)), mix(bgra[0], GetBValue(background)));
 }
 
 bool ThumbnailIsOnlyPreview(bool fromFullFrame, uint32_t thumbWidth, uint32_t thumbHeight, uint32_t boxWidth,

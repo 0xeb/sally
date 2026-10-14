@@ -3052,7 +3052,7 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
             SetCurrentDirectoryToSystem();
             DWORD disks = GetLogicalDrives();
 
-            CShellExecuteWnd shellExecuteWnd;
+            CKeptShellExecuteWnd shellExecuteWnd; // outlives the invoke: some commands keep using it
             CMINVOKECOMMANDINFOEX ici;
             ZeroMemory(&ici, sizeof(CMINVOKECOMMANDINFOEX));
             ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);

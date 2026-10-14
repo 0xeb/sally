@@ -44,6 +44,8 @@ enum class Option
     ForceOnlyOneInstance,
     ActivatePanel,
     RunNotepad,
+    Profile,
+    Do,
     Unknown,
 };
 
@@ -55,6 +57,8 @@ struct CommandLineRequest
     std::wstring configFile;
     std::wstring titlePrefix;
     std::wstring runNotepadPath;
+    std::wstring profile; // -profile <name>: a separate configuration (common/ConfigProfile.h)
+    std::vector<std::wstring> actions; // -do <action>, in order (common/StartupActions.h)
 
     bool activePathUsesHotPath = false;
     bool configFileSpecified = false;

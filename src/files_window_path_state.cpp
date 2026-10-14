@@ -1454,6 +1454,7 @@ CFilesWindow::CFilesWindow(CMainWindow* parent)
     DrawOnlyIndex = -1;
 
     FocusFirstNewItem = FALSE;
+    RenameFirstNewItem = FALSE;
 
     ExecuteAssocEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
     AssocUsed = FALSE;

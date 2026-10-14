@@ -24,4 +24,5 @@ STRINGTABLE
  IDS_PLUGINNAME, "Web Viewer"
  IDS_UNABLETOOPENIE, "Kan Web Viewer niet openen.\nControleer a.u.b. of de Microsoft Edge WebView2 Runtime is geïnstalleerd."
  IDS_ERRORTITLE, "Fout"
+ IDS_NAVIGATIONFAILED, "De webviewer kon dit bestand niet weergeven."
 }

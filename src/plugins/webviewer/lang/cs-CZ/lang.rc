@@ -24,4 +24,5 @@ STRINGTABLE
  IDS_PLUGINNAME, "Webový prohlížeč"
  IDS_UNABLETOOPENIE, "Nelze otevřít Webový prohlížeč.\nZkontrolujte prosím, že je nainstalováno prostředí Microsoft Edge WebView2 Runtime."
  IDS_ERRORTITLE, "Chyba"
+ IDS_NAVIGATIONFAILED, "Webový prohlížeč nemohl tento soubor zobrazit."
 }

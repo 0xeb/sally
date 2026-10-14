@@ -20,4 +20,7 @@
 #define IDS_PLUGIN_DESCRIPTION     10103
 #define IDS_ABOUT                  10105
 
+// shown in the viewer instead of a blank page when a file cannot be displayed
+#define IDS_NAVIGATIONFAILED       10106
+
 #endif // __WEBVIEWER_RH2

@@ -16,6 +16,8 @@
 #include "exif_text.h"
 #include "selection_outline.h"
 #include "source_selection.h"
+#include "ui_assets.h"
+#include "ui_metrics.h"
 #include "pictview.rh2"
 #include "lang/lang.rh"
 
@@ -137,7 +139,7 @@ constexpr int StatusPartCursor = 1;
 constexpr int StatusPartSize = 2;
 constexpr int StatusPartSample = 3;
 constexpr int StatusPartCount = 4;
-constexpr int StatusIconMargin = 32;
+constexpr int StatusIconIds[] = {IDI_SB_CURSOR, IDI_SB_SIZE, IDI_SB_ANCHOR, IDI_SB_PIPETTE};
 
 // Command IDs are PictView's own (pictview.rh2): the menu templates, the toolbar and
 // WM_COMMAND all use them, as the old viewer did.
@@ -603,14 +605,14 @@ HCURSOR LoadViewerCursor(int resourceId, int fallbackResourceId)
     return LoadStockCursor(fallbackResourceId);
 }
 
-HICON LoadViewerStatusIcon(int resourceId)
+HICON LoadViewerStatusIcon(int resourceId, int size)
 {
     return static_cast<HICON>(LoadImageW(ModuleInstance,
                                          MAKEINTRESOURCEW(resourceId),
                                          IMAGE_ICON,
-                                         16,
-                                         16,
-                                         LR_DEFAULTCOLOR | LR_SHARED));
+                                         size,
+                                         size,
+                                         LR_DEFAULTCOLOR));
 }
 
 class ViewerWindowList
@@ -3454,6 +3456,11 @@ private:
     // come from PictView's templates and every item is enabled through m_enablers.
     bool CreateChildControls()
     {
+        HDC dc = GetDC(m_hwnd);
+        m_uiMetrics = UiMetricsForDpi(dc != nullptr ? static_cast<unsigned>(GetDeviceCaps(dc, LOGPIXELSX)) : 96);
+        if (dc != nullptr)
+            ReleaseDC(m_hwnd, dc);
+
         DragAcceptFiles(m_hwnd, TRUE); // an image dropped on the viewer opens in it
         m_hScroll = CreateWindowExW(0, L"SCROLLBAR", nullptr, WS_CHILD | SBS_HORZ, 0, 0, 0, 0, m_hwnd, nullptr, ModuleInstance, nullptr);
         m_vScroll = CreateWindowExW(0, L"SCROLLBAR", nullptr, WS_CHILD | SBS_VERT, 0, 0, 0, 0, m_hwnd, nullptr, ModuleInstance, nullptr);
@@ -3514,6 +3521,9 @@ private:
                                    nullptr);
         if (m_status == nullptr)
             return false;
+        for (size_t i = 0; i < m_statusIcons.size(); ++i)
+            m_statusIcons[i] = LoadViewerStatusIcon(StatusIconIds[i], m_uiMetrics.IconSize());
+        SendMessageW(m_status, SB_SETMINHEIGHT, m_uiMetrics.IconSize() + m_uiMetrics.Scale(2), 0);
         if (!m_statusVisible)
             ShowWindow(m_status, SW_HIDE);
 
@@ -3534,22 +3544,29 @@ private:
         if (color == nullptr)
             return false;
 
+        const int imageSize = m_uiMetrics.IconSize();
+        HBITMAP scaled = ScaleToolbarBitmap(color, IDX_TB_COUNT, imageSize);
+        DeleteObject(color);
+        color = scaled;
+        if (color == nullptr)
+            return false;
+
         HBITMAP gray = nullptr;
         HBITMAP mask = nullptr;
         const BOOL converted = HostGui->CreateGrayscaleAndMaskBitmaps(color, RGB(255, 0, 255), gray, mask);
-        m_hotImages = ImageList_Create(16, 16, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
-        m_grayImages = ImageList_Create(16, 16, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+        m_hotImages = ImageList_Create(imageSize, imageSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+        m_grayImages = ImageList_Create(imageSize, imageSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+        bool added = false;
         if (converted && m_hotImages != nullptr && m_grayImages != nullptr)
         {
-            ImageList_Add(m_hotImages, color, mask);
-            ImageList_Add(m_grayImages, gray, mask);
+            added = ImageList_Add(m_hotImages, color, mask) == 0 && ImageList_Add(m_grayImages, gray, mask) == 0;
         }
         if (gray != nullptr)
             DeleteObject(gray);
         if (mask != nullptr)
             DeleteObject(mask);
         DeleteObject(color);
-        return converted && m_hotImages != nullptr && m_grayImages != nullptr;
+        return added;
     }
 
     // The menu bar is the first band; the tool bar starts its own row below it (RBBS_BREAK)
@@ -3637,6 +3654,17 @@ private:
 
     void DestroyFrame()
     {
+        if (m_status != nullptr)
+        {
+            for (int part = 0; part < StatusPartCount; ++part)
+                SendMessageW(m_status, SB_SETICON, part, 0);
+        }
+        for (HICON& icon : m_statusIcons)
+        {
+            if (icon != nullptr)
+                DestroyIcon(icon);
+            icon = nullptr;
+        }
         if (HostGui != nullptr)
         {
             if (m_menuBar != nullptr)
@@ -3999,9 +4027,10 @@ private:
         RECT rect = {};
         GetClientRect(m_status, &rect);
         const int width = std::max<LONG>(0, rect.right - rect.left);
-        const int cursorWidth = StatusIconMargin + std::max(MeasureStatusTextWidth(L"99999, 99999"), 80);
-        const int sizeWidth = StatusIconMargin + std::max(MeasureStatusTextWidth(L"99999 x 99999"), 78);
-        const int sampleWidth = StatusIconMargin + std::max(MeasureStatusTextWidth(FormatPipetteSample(99999, 99999, 255, 255, 255, false).c_str()), 134) + GetSystemMetrics(SM_CXVSCROLL);
+        const int margin = m_uiMetrics.StatusIconMargin();
+        const int cursorWidth = margin + std::max(MeasureStatusTextWidth(L"99999, 99999"), m_uiMetrics.Scale(80));
+        const int sizeWidth = margin + std::max(MeasureStatusTextWidth(L"99999 x 99999"), m_uiMetrics.Scale(78));
+        const int sampleWidth = margin + std::max(MeasureStatusTextWidth(FormatPipetteSample(99999, 99999, 255, 255, 255, false).c_str()), m_uiMetrics.Scale(134)) + GetSystemMetrics(SM_CXVSCROLL);
 
         int parts[StatusPartCount] = {};
         parts[StatusPartMessage] = std::max(0, width - cursorWidth - sizeWidth - sampleWidth);
@@ -4020,7 +4049,16 @@ private:
     void SetStatusPartIcon(int part, int resourceId)
     {
         if (m_status != nullptr)
-            SendMessageW(m_status, SB_SETICON, static_cast<WPARAM>(part), reinterpret_cast<LPARAM>(LoadViewerStatusIcon(resourceId)));
+        {
+            for (size_t i = 0; i < m_statusIcons.size(); ++i)
+            {
+                if (StatusIconIds[i] == resourceId)
+                {
+                    SendMessageW(m_status, SB_SETICON, static_cast<WPARAM>(part), reinterpret_cast<LPARAM>(m_statusIcons[i]));
+                    break;
+                }
+            }
+        }
     }
 
     void UpdateStatusBarDetails()
@@ -8365,6 +8403,8 @@ private:
     HWND m_rebar = nullptr;
     HIMAGELIST m_hotImages = nullptr;
     HIMAGELIST m_grayImages = nullptr;
+    ViewerUiMetrics m_uiMetrics;
+    std::array<HICON, 4> m_statusIcons = {};
     DWORD m_enablers[vweCount] = {};
     SourceSelectionState m_sourceSelection;
     HWND m_status = nullptr;

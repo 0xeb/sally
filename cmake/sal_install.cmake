@@ -77,17 +77,29 @@ endfunction()
 function(sal_generate_plugins_ver)
   sal_get_all_plugins(PLUGINS)
 
-  # Start with version 2. Version 1 was generated into the install root with
-  # root-relative paths, while the loader reads plugins/plugins.ver and treats
-  # entries as relative to the plugins directory.
-  set(PLUGINS_VER_CONTENT "2\n")
+  # The number comes from the release (1.0.36 -> 10036), so every release offers its
+  # plugins to existing profiles again; a profile takes only lines above the number it last
+  # processed, and skips plugins already registered or removed by the user. It must match
+  # sally::plugins_ver::NumberForVersion() in src/common/PluginsVerPolicy.h. (Version 1 was
+  # generated into the install root with root-relative paths; 2 was fixed from 1.0.17 to
+  # 1.0.36, so plugins added in between never reached existing profiles.)
+  file(READ "${CMAKE_SOURCE_DIR}/src/plugins/shared/spl_vers.h" _plugins_ver_header)
+  foreach(_part MAJOR MINORA MINORB)
+    string(REGEX MATCH "#define[ \t]+VERSINFO_SALAMANDER_${_part}[ \t]+([0-9]+)" _plugins_ver_match "${_plugins_ver_header}")
+    if(NOT _plugins_ver_match)
+      message(FATAL_ERROR "plugins.ver: could not read VERSINFO_SALAMANDER_${_part} from spl_vers.h")
+    endif()
+    set(_plugins_ver_${_part} "${CMAKE_MATCH_1}")
+  endforeach()
+  math(EXPR PLUGINS_VER_NUMBER "${_plugins_ver_MAJOR} * 10000 + ${_plugins_ver_MINORA} * 100 + ${_plugins_ver_MINORB}")
+  set(PLUGINS_VER_CONTENT "${PLUGINS_VER_NUMBER}\n")
 
   foreach(PLUGIN_TARGET ${PLUGINS})
     get_target_property(PLUGIN_DIR_NAME ${PLUGIN_TARGET} SAL_PLUGIN_NAME)
     get_target_property(PLUGIN_OUTPUT_NAME ${PLUGIN_TARGET} OUTPUT_NAME)
     # Use paths relative to the plugins directory, matching the DLL names saved
     # by the directory scanner so existing plugins are not installed twice.
-    string(APPEND PLUGINS_VER_CONTENT "2:${PLUGIN_DIR_NAME}\\${PLUGIN_OUTPUT_NAME}.dll\n")
+    string(APPEND PLUGINS_VER_CONTENT "${PLUGINS_VER_NUMBER}:${PLUGIN_DIR_NAME}\\${PLUGIN_OUTPUT_NAME}.dll\n")
   endforeach()
 
   # Write to build directory
@@ -99,6 +111,33 @@ function(sal_generate_plugins_ver)
   # Version 1 was installed at the runtime root. Incremental populate must remove that obsolete
   # copy so a shipping tree has one authoritative manifest in the location the loader reads.
   install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/plugins.ver\")")
+endfunction()
+
+# The files earlier releases installed and this one retired (src/salupdate/retired-files.txt),
+# installed at the root as sally-update.obsolete for the updater and Sally to remove them from an
+# installed Sally. An incremental populate removes them from the install tree too, so that a
+# package never carries a retired file.
+function(sal_install_obsolete_manifest)
+  set(_manifest "${SAL_SRC}/salupdate/retired-files.txt")
+  install(FILES "${_manifest}" DESTINATION . RENAME sally-update.obsolete)
+  file(STRINGS "${_manifest}" _lines)
+  foreach(_line IN LISTS _lines)
+    if(_line STREQUAL "" OR _line MATCHES "^#" OR _line MATCHES "^SALLY-UPDATE-OBSOLETE")
+      continue()
+    endif()
+    string(REPLACE "\\" "/" _path "${_line}")
+    if(_path MATCHES "/$")
+      string(REGEX REPLACE "/$" "" _path "${_path}")
+      install(CODE "if(IS_DIRECTORY \"\${CMAKE_INSTALL_PREFIX}/${_path}\")
+  file(GLOB _left \"\${CMAKE_INSTALL_PREFIX}/${_path}/*\")
+  if(NOT _left)
+    file(REMOVE_RECURSE \"\${CMAKE_INSTALL_PREFIX}/${_path}\")
+  endif()
+endif()")
+    else()
+      install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/${_path}\")")
+    endif()
+  endforeach()
 endfunction()
 
 # Install resource files (toolbars, convert tables, etc.)

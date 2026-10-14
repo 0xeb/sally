@@ -89,6 +89,12 @@ struct FolderPickerOptions
 
 // Abstract interface for shell operations
 // Enables mocking for tests and centralized shell interaction
+struct ShellUndoState
+{
+    bool available = false;
+    std::wstring caption;
+};
+
 class IShell
 {
 public:
@@ -137,6 +143,16 @@ public:
     virtual ShellResult MoveToRecycleBin(const std::vector<std::wstring>& paths,
                                          HWND parentWnd = NULL)
     { (void)paths; (void)parentWnd; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+
+    // UI STA only: the Windows adapter retains a windowed view until ReleaseShellUndoState.
+    virtual ShellResult GetShellUndoState(HWND owner, ShellUndoState& state)
+    { (void)owner; state = {}; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+
+    virtual ShellResult UndoLastShellOperation(HWND owner)
+    { (void)owner; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+
+    // Release windowed COM resources before the UI thread calls OleUninitialize.
+    virtual void ReleaseShellUndoState() {}
 };
 
 // Global shell interface - default is Win32 implementation

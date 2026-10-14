@@ -22,6 +22,7 @@
 #include "dialogs.h"
 #include "tasklist.h"
 #include "md5.h"
+#include "common/ShellParentParking.h"
 
 CProgressDlgArray ProgressDlgArray; // array of disk operation dialogs (only dialogs running in their own threads)
 
@@ -1071,6 +1072,13 @@ HWND CShellExecuteWnd::Create(HWND hParent, const wchar_t* format, ...)
 {
     va_list args;
     va_start(args, format);
+    HWND hwnd = CreateV(hParent, format, args);
+    va_end(args);
+    return hwnd;
+}
+
+HWND CShellExecuteWnd::CreateV(HWND hParent, const wchar_t* format, va_list args)
+{
     if (HWindow != NULL)
     {
         TRACE_E("CShellExecuteWnd::Create HWindow=0x" << HWindow);
@@ -1112,11 +1120,66 @@ HWND CShellExecuteWnd::Create(HWND hParent, const wchar_t* format, ...)
                            HInstance,
                            this);
     }
-    va_end(args);
     if (HWindow != NULL)
         return HWindow;
     else
         return hParent; // in case of an error we return at least the correct parent
+}
+
+// Parked CShellExecuteWnd windows (see CKeptShellExecuteWnd), oldest first, with the tick count
+// at which each was parked. Main thread only.
+static std::vector<std::pair<CShellExecuteWnd*, ULONGLONG>> ParkedShellExecuteWnds;
+
+static void ParkShellExecuteWnd(CShellExecuteWnd* wnd)
+{
+    if (wnd == NULL)
+        return;
+    if (wnd->HWindow == NULL || !IsWindow(wnd->HWindow))
+    {
+        delete wnd; // never created (the command used another parent)
+        return;
+    }
+    // Hidden, it can no longer take mouse input over the main window; alive, the command that
+    // still uses it as its parent keeps working.
+    ShowWindow(wnd->HWindow, SW_HIDE);
+    ParkedShellExecuteWnds.push_back({wnd, GetTickCount64()});
+
+    std::vector<std::uint64_t> parkedAt;
+    parkedAt.reserve(ParkedShellExecuteWnds.size());
+    for (const auto& parked : ParkedShellExecuteWnds)
+        parkedAt.push_back(parked.second);
+    const std::vector<std::size_t> release = Sally::Shell::ParkedShellParentsToRelease(parkedAt, GetTickCount64());
+    for (auto it = release.rbegin(); it != release.rend(); ++it)
+    {
+        delete ParkedShellExecuteWnds[*it].first; // the destructor allows and performs DestroyWindow
+        ParkedShellExecuteWnds.erase(ParkedShellExecuteWnds.begin() + *it);
+    }
+}
+
+void ReleaseParkedShellExecuteWnds()
+{
+    for (auto& parked : ParkedShellExecuteWnds)
+        delete parked.first;
+    ParkedShellExecuteWnds.clear();
+}
+
+CKeptShellExecuteWnd::CKeptShellExecuteWnd()
+    : Wnd(new CShellExecuteWnd)
+{
+}
+
+CKeptShellExecuteWnd::~CKeptShellExecuteWnd()
+{
+    ParkShellExecuteWnd(Wnd);
+}
+
+HWND CKeptShellExecuteWnd::Create(HWND hParent, const wchar_t* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    HWND hwnd = Wnd->CreateV(hParent, format, args);
+    va_end(args);
+    return hwnd;
 }
 
 LRESULT
@@ -1195,7 +1258,10 @@ BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam)
 {
     // is this a window whose class is SHELLEXECUTE_CLASSNAME?
     const std::wstring className = GetWindowClassNameStringW(hwnd);
-    if (!className.empty() && _wcsicmp(className.c_str(), SHELLEXECUTE_CLASSNAMEW) == 0)
+    // A parked one (hidden, its WS_VISIBLE style cleared) belongs to a command that already
+    // returned; only a visible one means a command is still inside InvokeCommand.
+    if (!className.empty() && _wcsicmp(className.c_str(), SHELLEXECUTE_CLASSNAMEW) == 0 &&
+        (GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_VISIBLE) != 0)
     {
         EnumWndStruct* data = (EnumWndStruct*)lParam;
         // the window title holds the requested string

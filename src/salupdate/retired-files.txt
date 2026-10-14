@@ -1,0 +1,9 @@
+SALLY-UPDATE-OBSOLETE 1
+# Files that earlier Sally releases installed and later ones no longer have. Installed at the root
+# of every release as sally-update.obsolete; the updater and Sally remove what it lists (see
+# common/update/UpdateFiles.h). The list only grows: never remove a line.
+#
+# 1.0.37: the CheckVer plugin. salupdate.exe checks for updates now.
+plugins\checkver\checkver.dll
+plugins\checkver\checkver.pdb
+plugins\checkver\

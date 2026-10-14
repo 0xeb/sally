@@ -52,6 +52,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "NT&FS Commands"
 
  IDS_MENU_EDIT,              "&Edit"
+ IDS_MENU_EDIT_UNDO, "&Undo\tCtrl+Z"
+ IDS_UNDO_FAILED, "Windows could not undo the last shell operation."
  IDS_MENU_EDIT_CUT,          "Cu&t\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "&Copy\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "C&opy Path + Name as Text\tAlt+Insert"
@@ -1958,5 +1960,12 @@ IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Sall
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "English version"
  IDS_EXITING_RUNNING_INFO, "Unable to exit Sally until all disk operations are finished. Please wait until these operations are finished or cancel them now. If you do not want to exit Sally now, press the Cancel button."
+ IDS_UPDATECHECK_NEVER, "Never"
+ IDS_UPDATECHECK_DAY, "Every day"
+ IDS_UPDATECHECK_WEEK, "Every week"
+ IDS_UPDATECHECK_MONTH, "Every month"
+ IDS_UPDATECHECK_3MONTHS, "Every three months"
+ IDS_UPDATECHECK_6MONTHS, "Every six months"
+ IDS_UPDATER_CANNOT_START, "Sally's updater could not be started:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "A Master Password is used to protect sensitive information like FTP or WinSCP passwords by strong AES cipher. If you create a Master Password you will be asked to enter it once per session when Sally retrieves protected information."
 }

@@ -12,6 +12,8 @@
 #include <shobjidl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <VersionHelpers.h>
+#include "ShellUndoPolicy.h"
 
 namespace
 {
@@ -86,7 +88,155 @@ ShellResult ResultFromHResult(HRESULT result)
 
 class Win32Shell : public IShell
 {
+    IExplorerBrowser* UndoBrowser = nullptr;
+    HWND UndoHost = nullptr;
+
+    HRESULT PrepareUndoView(HWND owner, IShellView** view)
+    {
+        *view = nullptr;
+        if (UndoBrowser == nullptr)
+        {
+            HRESULT hr = CoCreateInstance(CLSID_ExplorerBrowser, nullptr, CLSCTX_INPROC_SERVER,
+                                          IID_PPV_ARGS(&UndoBrowser));
+            if (FAILED(hr))
+                return hr;
+            UndoHost = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 1, 1,
+                                       owner, nullptr, GetModuleHandleW(nullptr), nullptr);
+            if (UndoHost == nullptr)
+            {
+                hr = HRESULT_FROM_WIN32(GetLastError());
+                ReleaseShellUndoState();
+                return hr;
+            }
+            RECT rect = {0, 0, 1, 1};
+            FOLDERSETTINGS settings = {FVM_DETAILS, FWF_NOCLIENTEDGE};
+            hr = UndoBrowser->SetOptions(EBO_NOTRAVELLOG | EBO_NOPERSISTVIEWSTATE);
+            if (SUCCEEDED(hr))
+                hr = UndoBrowser->Initialize(UndoHost, &rect, &settings);
+            PIDLIST_ABSOLUTE desktop = nullptr;
+            if (SUCCEEDED(hr))
+                hr = SHGetSpecialFolderLocation(owner, CSIDL_DESKTOPDIRECTORY, &desktop);
+            if (SUCCEEDED(hr))
+                hr = UndoBrowser->BrowseToIDList(desktop, SBSP_ABSOLUTE);
+            CoTaskMemFree(desktop);
+            if (FAILED(hr))
+            {
+                ReleaseShellUndoState();
+                return hr;
+            }
+        }
+        return UndoBrowser->GetCurrentView(IID_PPV_ARGS(view));
+    }
+
+    HRESULT QueryUndo(HWND owner, IContextMenu** context, HMENU& menu, UINT& command,
+                      ShellUndoState& state)
+    {
+        state = {};
+        *context = nullptr;
+        menu = nullptr;
+        command = 0;
+        IShellView* view = nullptr;
+        HRESULT hr = PrepareUndoView(owner, &view);
+        if (FAILED(hr))
+            return hr;
+        hr = view->GetItemObject(SVGIO_BACKGROUND, IID_PPV_ARGS(context));
+        view->Release();
+        if (FAILED(hr))
+            return hr;
+        menu = CreatePopupMenu();
+        if (menu == nullptr)
+            return HRESULT_FROM_WIN32(GetLastError());
+        constexpr UINT first = 1;
+        hr = (*context)->QueryContextMenu(menu, 0, first, 0x7fff, CMF_NORMAL | CMF_EXPLORE | CMF_DISABLEDVERBS);
+        if (FAILED(hr))
+            return hr;
+        for (int i = 0; i < GetMenuItemCount(menu); ++i)
+        {
+            MENUITEMINFOW item = {};
+            item.cbSize = sizeof(item);
+            item.fMask = MIIM_ID | MIIM_STATE | MIIM_FTYPE | MIIM_SUBMENU;
+            if (!GetMenuItemInfoW(menu, i, TRUE, &item) || item.hSubMenu != nullptr ||
+                (item.fType & MFT_SEPARATOR) != 0 || item.wID < first || item.wID > 0x7fff)
+                continue;
+            std::vector<wchar_t> verb(128);
+            for (;;)
+            {
+                hr = (*context)->GetCommandString(item.wID - first, GCS_VERBW, nullptr,
+                                                  reinterpret_cast<LPSTR>(verb.data()), static_cast<UINT>(verb.size()));
+                if (FAILED(hr) || wcslen(verb.data()) < verb.size() - 1)
+                    break;
+                verb.assign(verb.size() * 2, L'\0');
+            }
+            if (FAILED(hr) || _wcsicmp(verb.data(), L"undo") != 0)
+                continue;
+            command = item.wID - first;
+            state.available = (item.fState & (MFS_DISABLED | MFS_GRAYED)) == 0;
+            item.fMask = MIIM_STRING;
+            item.dwTypeData = nullptr;
+            item.cch = 0;
+            if (GetMenuItemInfoW(menu, i, TRUE, &item) && item.cch != 0)
+            {
+                std::vector<wchar_t> caption(static_cast<size_t>(item.cch) + 1);
+                item.dwTypeData = caption.data();
+                item.cch = static_cast<UINT>(caption.size());
+                if (GetMenuItemInfoW(menu, i, TRUE, &item))
+                    state.caption.assign(caption.data(), item.cch);
+            }
+            return S_OK;
+        }
+        return S_OK; // An empty or unavailable history is not an adapter error.
+    }
+
 public:
+    ShellResult GetShellUndoState(HWND owner, ShellUndoState& state) override
+    {
+        IContextMenu* context = nullptr;
+        HMENU menu = nullptr;
+        UINT command = 0;
+        const HRESULT hr = QueryUndo(owner, &context, menu, command, state);
+        if (menu != nullptr) DestroyMenu(menu);
+        if (context != nullptr) context->Release();
+        return ResultFromHResult(hr);
+    }
+
+    ShellResult UndoLastShellOperation(HWND owner) override
+    {
+        IContextMenu* context = nullptr;
+        HMENU menu = nullptr;
+        UINT command = 0;
+        ShellUndoState state;
+        HRESULT hr = QueryUndo(owner, &context, menu, command, state);
+        if (SUCCEEDED(hr) && state.available)
+        {
+            CMINVOKECOMMANDINFOEX info = {};
+            info.cbSize = sizeof(info);
+            info.fMask = CMIC_MASK_UNICODE | CMIC_MASK_NOASYNC;
+            info.hwnd = owner;
+            info.lpVerb = MAKEINTRESOURCEA(command);
+            info.lpVerbW = MAKEINTRESOURCEW(command);
+            info.nShow = SW_SHOWNORMAL;
+            hr = context->InvokeCommand(reinterpret_cast<CMINVOKECOMMANDINFO*>(&info));
+        }
+        if (menu != nullptr) DestroyMenu(menu);
+        if (context != nullptr) context->Release();
+        return ResultFromHResult(hr);
+    }
+
+    void ReleaseShellUndoState() override
+    {
+        if (UndoBrowser != nullptr)
+        {
+            UndoBrowser->Destroy();
+            UndoBrowser->Release();
+            UndoBrowser = nullptr;
+        }
+        if (UndoHost != nullptr)
+        {
+            DestroyWindow(UndoHost);
+            UndoHost = nullptr;
+        }
+    }
+
     ShellExecResult Execute(const ShellExecInfo& info) override
     {
         SHELLEXECUTEINFOW sei;
@@ -131,6 +281,12 @@ public:
         if (FAILED(hr) || fileOperation == NULL)
             return ResultFromHResult(FAILED(hr) ? hr : E_NOINTERFACE);
 
+        if ((flags & FOF_ALLOWUNDO) != 0 && IsWindows8OrGreater())
+        {
+            flags |= FOFX_ADDUNDORECORD;
+            if (operation == ShellFileOp::Delete)
+                flags |= FOFX_RECYCLEONDELETE;
+        }
         hr = fileOperation->SetOperationFlags(flags);
         if (SUCCEEDED(hr) && hwnd != NULL)
             hr = fileOperation->SetOwnerWindow(hwnd);

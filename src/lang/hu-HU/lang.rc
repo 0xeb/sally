@@ -86,6 +86,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "&Környezeti változók frissítése a rendszerbeli értékekhez",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "Mappane&vek javaslata elérési út beírásakor (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "&Frissítések keresése:",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2211,6 +2215,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "NT&FS parancsok"
 
  IDS_MENU_EDIT,              "Sz&erkesztés"
+ IDS_MENU_EDIT_UNDO, "&Visszavonás\tCtrl+Z"
+ IDS_UNDO_FAILED, "A Windows nem tudta visszavonni az utolsó műveletet."
  IDS_MENU_EDIT_CUT,          "Ki&vágás\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "M&ásolás\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "Elérés + Név más&olása szövegként\tAlt+Insert"
@@ -4117,5 +4123,12 @@ IDS_OLDPLUGINVERSION2, "A plugint (%s) nem támogatja az Sally ezen verziója. S
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "Magyar változat"
  IDS_EXITING_RUNNING_INFO, "Most nem lehet kilépni az Sally-ből, míg minden lemezművelet be nem fejeződik. Várjon amíg a műveletek befejeződnek vagy szakítsa meg őket. Ha mégsem akar most kilépni azt Sally-ből, nyomja meg a Mégse gombot."
+ IDS_UPDATECHECK_NEVER, "Soha"
+ IDS_UPDATECHECK_DAY, "Naponta"
+ IDS_UPDATECHECK_WEEK, "Hetente"
+ IDS_UPDATECHECK_MONTH, "Havonta"
+ IDS_UPDATECHECK_3MONTHS, "Háromhavonta"
+ IDS_UPDATECHECK_6MONTHS, "Félévente"
+ IDS_UPDATER_CANNOT_START, "A Sally frissítőprogramja nem indítható el:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "A mester jelszó erős AES titkosítással védi le az olyan kényes információit, mint az FTP vagy WinSCP jelszavak. Ha létrehoz egy mester jelszót, hozzáférés előtt meg kell adnia, mikor az Sally védett információkhoz akar hozzáférni."
 }

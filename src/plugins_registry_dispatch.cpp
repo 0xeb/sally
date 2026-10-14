@@ -22,6 +22,7 @@
 #include "pack.h"
 #include "dialogs.h"
 #include "common/peutils.h"
+#include "common/PluginsVerPolicy.h"
 
 // header for saving a DIB to the registry
 
@@ -2217,6 +2218,9 @@ void CPlugins::CheckData()
 BOOL CPlugins::AddPlugin(HWND parent, const wchar_t* fileName)
 {
     CALL_STACK_MESSAGE2("CPlugins::AddPlugin(, %ls)", fileName);
+    // A retired plugin left on disk is never registered (and so never loaded) again.
+    if (fileName != NULL && sally::plugins_ver::IsRetiredPluginDll(fileName))
+        return FALSE;
     static wchar_t emptyBuffer[] = L"";
     if (AddPlugin(emptyBuffer, fileName, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
                   emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer, NULL, FALSE, NULL))
@@ -2783,8 +2787,9 @@ BOOL SearchForAddedPlugins(const std::wstring& pluginsDirectory,
                 }
                 else // other lines of the file
                 {
-                    if (ver > lastPluginVer && // newly added plugin
-                        !name.empty())         // only if the line is OK
+                    // newly listed, and not removed by the user
+                    if (sally::plugins_ver::ShouldOffer(ver, lastPluginVer, name,
+                                                        Configuration.RemovedBundledPlugins))
                     {
                         name = GetPluginFullPath(pluginsDirectory, name);
                         DWORD attrs = gFileSystem->GetFileAttributes(name.c_str());

@@ -11,6 +11,8 @@
 #endif
 
 #include "common/CommandLineParser.h"
+#include "common/ConfigProfile.h"
+#include "common/StartupActions.h"
 
 #include <new>
 
@@ -39,6 +41,8 @@ const OptionSpec kOptions[] = {
     {L"o", Option::ForceOnlyOneInstance, false},
     {L"p", Option::ActivatePanel, true},
     {L"run_notepad", Option::RunNotepad, true},
+    {L"profile", Option::Profile, true},
+    {L"do", Option::Do, true},
 };
 
 bool IsSwitchPrefix(wchar_t c) { return c == L'-'; }
@@ -146,11 +150,33 @@ CommandLineRequest Parse(const std::vector<std::wstring>& tokens)
         case Option::RunNotepad:
             result.runNotepadPath = value;
             break;
+        case Option::Do:
+        {
+            sally::actions::StartupAction action;
+            if (sally::actions::FindStartupAction(value, action))
+                result.actions.push_back(value);
+            else
+                result.errors.push_back(L"unknown action: " + value);
+            break;
+        }
+        case Option::Profile:
+            // Applied before anything reads the configuration (see common/ConfigProfile.h);
+            // here only checked, so that a bad name is reported like any other bad argument.
+            if (!sally::profile::IsValidProfileName(value))
+                result.errors.push_back(L"invalid profile name: " + value);
+            result.profile = value;
+            break;
         default:
             break;
         }
     }
 
+    // A profile's window says so, unless -t names a title of its own.
+    if (!result.profile.empty() && !result.titlePrefixSpecified)
+    {
+        result.setTitlePrefix = true;
+        result.titlePrefix = result.profile;
+    }
     return result;
 }
 

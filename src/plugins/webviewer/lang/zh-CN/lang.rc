@@ -24,4 +24,5 @@ STRINGTABLE
  IDS_PLUGINNAME, "Web 查看器"
  IDS_UNABLETOOPENIE, "无法打开 Web 查看器。\n请确认已安装 Microsoft Edge WebView2 Runtime。"
  IDS_ERRORTITLE, "错误"
+ IDS_NAVIGATIONFAILED, "Web 查看器无法显示此文件。"
 }

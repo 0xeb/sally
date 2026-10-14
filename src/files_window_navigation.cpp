@@ -1219,6 +1219,8 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         if (wParam >= 'A' && wParam <= 'Z')
         {
             SkipCharacter = TRUE;
+            if (wParam == 'Z' && controlPressed && (lParam & 0x40000000) != 0)
+                return TRUE;
             if (MainWindow->HandleCtrlLetter((wchar_t)wParam))
                 return TRUE;
         }
@@ -2278,6 +2280,8 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     BeginStopRefresh();
 
     BOOL focusFirstNewItem = FocusFirstNewItem; // the first ReadDirectory resets it, so we make a backup
+    const BOOL renameFirstNewItem = RenameFirstNewItem;
+    RenameFirstNewItem = FALSE; // asked for one refresh only, so a New that created nothing leaves nothing behind
     BOOL cutToClipChanged = CutToClipChanged;   // the first ReadDirectory resets it, so we make a backup
 
     // we'll save the top-index and xoffset so that there won't be unnecessary "jumps" in the panel content
@@ -3121,6 +3125,21 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
 
     // panel recovery
     RefreshListBox(xOffset, topIndex, focusIndex, ensureFocusIndexVisible, wholeItemVisible);
+
+    // An item just created from the New menu opens for renaming in place, as in Explorer. The
+    // quick-rename timer starts it once Sally is in the foreground with this panel active.
+    if (renameFirstNewItem && firstNewItemIsDir != -1 && foundFocus &&
+        focusIndex >= 0 && focusIndex < Dirs->Count + Files->Count)
+    {
+        RECT itemRect;
+        if (ListBox->GetItemRect(focusIndex, &itemRect) &&
+            ListBox->GetIndex(itemRect.left, itemRect.top, FALSE, &QuickRenameRect) == focusIndex)
+        {
+            KillQuickRenameTimer();
+            QuickRenameIndex = focusIndex;
+            QuickRenameTimer = SetTimer(GetListBoxHWND(), IDT_QUICKRENAMEBEGIN, 50, NULL);
+        }
+    }
 
     // restore the cursor position and show the cursor in quick-search mode after drawing
     if (QuickSearchMode)

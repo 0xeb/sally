@@ -83,7 +83,7 @@ static_assert(sizeof(HistogramRegistryData) == 7 * sizeof(int), "legacy layout")
 constexpr DWORD HistogramRegistryVersion = 1;
 // 22: the last closed-engine PictView; 23: the WIC PictView (viewer extensions reduced to what
 // WIC decodes).
-constexpr DWORD CurrentConfigVersion = 23;
+constexpr DWORD CurrentConfigVersion = 24; // 24: codec formats offered to 1.0.34-1.0.36 profiles
 DWORD LoadedVersion = 0;
 constexpr DWORD DontShowUpdateThumbnails = 1;
 constexpr DWORD DontShowSaveSuccess = 2;

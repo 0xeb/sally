@@ -86,6 +86,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "保持环境变量更新为系统值(&K)",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "输入路径时建议文件夹名称 (F5、F6、Shift+F7)(&G)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "检查更新(&D):",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2211,6 +2215,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "NT&FS 命令"
 
  IDS_MENU_EDIT,              "编辑(&E)"
+ IDS_MENU_EDIT_UNDO, "撤销(&U)\tCtrl+Z"
+ IDS_UNDO_FAILED, "Windows 无法撤销上一次 Shell 操作。"
  IDS_MENU_EDIT_CUT,          "剪切(&t)\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "复制(&C)\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "复制 路径 + 名称 为文本(&o)\tAlt+Insert"
@@ -4117,5 +4123,12 @@ IDS_OLDPLUGINVERSION2, "这个插件 (%s) 不被 Sally 的这个版本所支持�
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "简体中文版"
  IDS_EXITING_RUNNING_INFO, "在所有磁盘操作完成之前无法退出 Sally. 请等到这些操作完成或现在取消它们。如果你现在不想退出 Sally，点击""取消""按钮。"
+ IDS_UPDATECHECK_NEVER, "从不"
+ IDS_UPDATECHECK_DAY, "每天"
+ IDS_UPDATECHECK_WEEK, "每周"
+ IDS_UPDATECHECK_MONTH, "每月"
+ IDS_UPDATECHECK_3MONTHS, "每三个月"
+ IDS_UPDATECHECK_6MONTHS, "每六个月"
+ IDS_UPDATER_CANNOT_START, "无法启动 Sally 更新程序：\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "主密码通过强大的 AES 加密算法来保护敏感信息，像 FTP 或 WinSCP 密码。如果你创建一个主密码，当 Sally 检索受保护的信息时，每次会话你将被要求输入一次主密码。"
 }

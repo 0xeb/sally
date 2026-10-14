@@ -3,6 +3,8 @@
 
 #include "wic_engine.h"
 
+#include "common/ExtendedLengthPath.h"
+
 #include <algorithm>
 #include <cwchar>
 #include <limits>
@@ -1928,7 +1930,10 @@ OpenDocumentResult ImageEngine::OpenPath(const wchar_t* path,
     }
 
     Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
-    HRESULT hr = m_factory->CreateDecoderFromFilename(path, nullptr, GENERIC_READ,
+    // Callers pass plain paths (the panel's thumbnail requests among them); the "\\?\" form opens
+    // a file at any length, whether or not Windows has long paths turned on.
+    const std::wstring openPath = Sally::ToExtendedLengthPath(path);
+    HRESULT hr = m_factory->CreateDecoderFromFilename(openPath.c_str(), nullptr, GENERIC_READ,
                                                       WICDecodeMetadataCacheOnDemand,
                                                       &decoder);
     if (FAILED(hr))

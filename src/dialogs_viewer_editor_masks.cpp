@@ -1127,7 +1127,7 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         SendDlgItemMessageW(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)LoadStrW(IDS_IMPORTCFG_DEFCFG));
         int selIndex = 0; // use the default item if nothing better is found
         int i;
-        for (i = 0; i < SALCFG_ROOTS_COUNT; i++)
+        for (i = 0; i < SALCFG_ROOTS_COUNT && SalamanderConfigurationRoots[i] != NULL; i++)
         {
             if (ConfigurationExist[i])
             {
@@ -1155,7 +1155,7 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         HWND hListView = GetDlgItem(HWindow, IDC_REMOVECONFIG);
         selIndex = -1;
         int index = 0;
-        for (i = 0; i < SALCFG_ROOTS_COUNT; i++)
+        for (i = 0; i < SALCFG_ROOTS_COUNT && SalamanderConfigurationRoots[i] != NULL; i++)
         {
             if (ConfigurationExist[i])
             {
@@ -1195,7 +1195,7 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
             sel--; // the first item is Don't import
             int index = 0;
             int i;
-            for (i = 0; i < SALCFG_ROOTS_COUNT; i++)
+            for (i = 0; i < SALCFG_ROOTS_COUNT && SalamanderConfigurationRoots[i] != NULL; i++)
             {
                 if (ConfigurationExist[i])
                 {
@@ -1214,7 +1214,7 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         int itemsCount = ListView_GetItemCount(hListView);
         int index = 0;
         int i;
-        for (i = 0; i < SALCFG_ROOTS_COUNT; i++)
+        for (i = 0; i < SALCFG_ROOTS_COUNT && SalamanderConfigurationRoots[i] != NULL; i++)
         {
             if (ConfigurationExist[i])
             {

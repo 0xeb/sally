@@ -47,6 +47,8 @@
 #include "bottombar_keycaps.h"
 #include "salext_cleanup.h"
 #include "common/Win32UpdateFileOps.h"
+#include "update_check.h"
+#include "common/ConfigProfile.h"
 #include "common/IFileSystem.h"
 
 // Issue #82: shell-extension DLLs from OLD Sally/Salamander installs stay loaded/locked by
@@ -124,6 +126,20 @@ static BOOL BuildModuleRelativePathW(HINSTANCE module, const wchar_t* relativePa
             return FALSE;
         capacity *= 2;
     }
+}
+
+// -profile <name> (common/ConfigProfile.h): the configuration lives in its own key, and no other
+// configuration is read or offered for import. Before anything reads the configuration; a name that
+// is not valid is left to the command-line parse, which reports it.
+static void ApplyConfigurationProfile()
+{
+    const std::wstring name = sally::cmdline::ParseRawCommandLine(GetCommandLineW()).profile;
+    if (!sally::profile::IsValidProfileName(name))
+        return;
+    static std::wstring root; // SalamanderConfigurationRoots keeps pointing at it
+    root = sally::profile::ProfileRegistryRoot(SalamanderConfigurationRoots[0], name);
+    SalamanderConfigurationRoots[0] = root.c_str();
+    SalamanderConfigurationRoots[1] = NULL; // the older versions' configurations are not looked at
 }
 
 // #128: a file the updater renamed aside because it was still in use (the shell extension,
@@ -3598,6 +3614,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     MainThreadID = GetCurrentThreadId();
     HInstance = hInstance;
     CALL_STACK_MESSAGE4("WinMainBody(0x%p, , %s, %d)", hInstance, cmdLine, cmdShow);
+    ApplyConfigurationProfile();
 
     // Well, I'm not to blame for this... what to do when the competition does it, we must
     // too - inspired by Explorer.
@@ -4209,6 +4226,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         CleanupStaleShellExtensions(cleanupPathW.c_str());
     }
     CleanupUpdateLeftovers();
+    UpdateCheck::RemoveRetiredFiles();
 
     //--- creating main window
     if (CMainWindow::RegisterUniversalClass(CS_DBLCLKS | CS_OWNDC,
@@ -4324,6 +4342,10 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
                     }
                     else
                     {
+                        // 1.0.37: the update check moved from the CheckVer plugin to Sally and its
+                        // updater. Before the plugins are registered, which would forget its settings.
+                        if (UpdateCheck::RetireCheckVer(MainWindow->HWindow, !currentCfgDoesNotExist))
+                            saveNewConfig = TRUE;
                         if (Configuration.ConfigVersion < THIS_CONFIG_VERSION
 #ifndef _WIN64 // FIXME_X64_WINSCP
                             || Configuration.AddX86OnlyPlugins
@@ -4403,6 +4425,9 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 
                     // ask Salmon to check if there are old bug reports on disk that need to be sent
                     SalmonCheckBugs();
+
+                    // the report of the update that restarted Sally, or the scheduled update check
+                    UpdateCheck::OnStarted();
 
                     //--- application loop
                     CALL_STACK_MESSAGE1("WinMainBody::message_loop");

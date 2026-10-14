@@ -314,6 +314,9 @@
 #define IDC_EDITNEW_SELALL              623
 #define IDC_ASYNCCOPYALG                624
 #define IDC_RELOADENVVARS               625
+#define IDC_SUGGESTPATHNAMES            627
+#define IDC_UPDATECHECK                 628
+#define IDC_UPDATECHECK_LABEL           629
 #define IDC_THEME_MODE                  626
 #define IDD_CFGPAGE_VIEWER              630
 #define IDC_COPYFINDTEXT                631

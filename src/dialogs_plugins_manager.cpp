@@ -25,6 +25,7 @@
 #include "menu.h"
 #include "shellib.h"
 #include "darkmode.h"
+#include "common/PluginsVerPolicy.h"
 
 static std::wstring LastSelectedPluginDLLName; // after reopening Plugins Manager, select the last chosen plugin
 
@@ -731,6 +732,9 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                     if (add && Plugins.AddPlugin(HWindow, pluginName.c_str()))
                     {
+                        // added back by hand: plugins.ver may offer it again
+                        Configuration.RemovedBundledPlugins =
+                            sally::plugins_ver::ListWithout(Configuration.RemovedBundledPlugins, pluginName);
                         pluginAdded = TRUE;
                         int pluginIndex;
                         if (Plugins.FindDLL(pluginName.c_str(), pluginIndex))
@@ -760,6 +764,15 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINREMOVEOK), name.c_str());
                 if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
+                    // A plugin from the plugins folder (a relative name) is remembered, so
+                    // plugins.ver does not install it again at the next release.
+                    const std::wstring dllName = p->DLLName;
+                    if (!dllName.empty() && dllName.find(L':') == std::wstring::npos &&
+                        dllName.compare(0, 2, L"\\\\") != 0)
+                    {
+                        Configuration.RemovedBundledPlugins =
+                            sally::plugins_ver::ListWith(Configuration.RemovedBundledPlugins, dllName);
+                    }
                     Plugins.Remove(HWindow, index, TRUE);
                     RefreshListView(FALSE, lvIndex); // a DLL was removed, we have fresher data ...
                 }

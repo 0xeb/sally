@@ -86,6 +86,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "&Garder les variables d'environnement à jour suivant les valeurs système",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "Sugg&érer des noms de dossiers lors de la saisie d'un chemin (F5, F6, Maj+F7)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "Rec&hercher les mises à jour :",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2211,6 +2215,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "Commandes NT&FS"
 
  IDS_MENU_EDIT,              "&Éditer"
+ IDS_MENU_EDIT_UNDO, "&Annuler\tCtrl+Z"
+ IDS_UNDO_FAILED, "Windows n’a pas pu annuler la dernière opération du shell."
  IDS_MENU_EDIT_CUT,          "Co&uper\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "Co&pier\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "Copier le texte du c&hemin d'accès et du nom\tAlt+Inser"
@@ -4117,5 +4123,12 @@ IDS_OLDPLUGINVERSION2, "Le module (%s) n'est pas pris en charge par cette versio
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "Version française"
  IDS_EXITING_RUNNING_INFO, "Sortie impossible d'Sally jusqu'à tant que toutes les opérations sur disque soient terminées. Attendre la fin de ces opérations ou les annuler. Pour quitter Sally immédiatement, actionner le bouton Annuler."
+ IDS_UPDATECHECK_NEVER, "Jamais"
+ IDS_UPDATECHECK_DAY, "Chaque jour"
+ IDS_UPDATECHECK_WEEK, "Chaque semaine"
+ IDS_UPDATECHECK_MONTH, "Chaque mois"
+ IDS_UPDATECHECK_3MONTHS, "Tous les trois mois"
+ IDS_UPDATECHECK_6MONTHS, "Tous les six mois"
+ IDS_UPDATER_CANNOT_START, "Le programme de mise à jour de Sally n'a pas pu être lancé :\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "On utilise un mot de passe principal et un chiffre AES robuste pour protéger des données confidentielles comme des mots de passe FTP ou WinSCP. Si vous utilisez un mot de passe principal, il vous sera demandé à chaque fois qu'Sally devra aller chercher des données protégées."
 }

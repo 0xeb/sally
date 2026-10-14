@@ -1043,9 +1043,34 @@ public:
     // on success returns the handle of the created window
     // WARNING: on failure returns hParent
     HWND Create(HWND hParent, const wchar_t* format, ...);
+    HWND CreateV(HWND hParent, const wchar_t* format, va_list args);
 
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
+
+// A CShellExecuteWnd for context-menu commands, which may keep working after InvokeCommand
+// returns (Send To > Compressed (zipped) folder does, and stops when its parent window goes
+// away). At the end of its scope the window is hidden and parked instead of destroyed; parked
+// windows are released later (common/ShellParentParking.h) and all of them by
+// ReleaseParkedShellExecuteWnds() when the main window closes.
+class CKeptShellExecuteWnd
+{
+public:
+    CKeptShellExecuteWnd();
+    ~CKeptShellExecuteWnd();
+    CKeptShellExecuteWnd(const CKeptShellExecuteWnd&) = delete;
+    CKeptShellExecuteWnd& operator=(const CKeptShellExecuteWnd&) = delete;
+
+    // as CShellExecuteWnd::Create
+    HWND Create(HWND hParent, const wchar_t* format, ...);
+
+private:
+    CShellExecuteWnd* Wnd;
+};
+
+// Destroys every parked CShellExecuteWnd; called while the main window is being destroyed,
+// before its child windows go.
+void ReleaseParkedShellExecuteWnds();
 
 // for window 'hParent' enumerates all children and searches for CShellExecuteWnd windows
 // appends their names to 'text', separated by line endings "\r\n"

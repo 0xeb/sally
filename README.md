@@ -87,15 +87,28 @@ Sally meets the tools you already use instead of assuming a bare `cmd.exe`.
 - **Set your default**: `Commands` > `Default Shell...` picks what the Command Shell action (`Num /`) opens — `%COMSPEC%`, the Terminal default, or a named profile — and remembers it. One-off profile launches never overwrite the saved default, and the submenu simply disappears when Windows Terminal is not installed.
 - **Rich icon overlays**: version-control and cloud status badges from tools like TortoiseGit, TortoiseSVN, OneDrive, Dropbox, and Google Drive appear in the panels — and Sally can show more of them at once than Explorer's tighter overlay-handler limit allows.
 
+### Startup Profiles And Actions
+
+From 1.0.37, `-profile name` uses a separate named configuration, and `-do view`
+or `-do edit` opens the active panel's focused item in its configured viewer or editor.
+A panel path can name a file, so a shortcut can open a picture immediately:
+
+```text
+sally.exe -profile preview -l "C:\Pictures\beach.jpg" -p 1 -do view
+```
+
+See [Starting Sally with Parameters](https://sally-filemanager.app/manual/sally/othertask_param.html)
+for the full syntax and single-instance limitations.
+
 ### Bundled Plugins
 
 Current Sally builds package a broad first-party plugin set instead of leaving users to assemble the basics.
 
 - Archive and package tools: 7-Zip, ZIP, TAR, UnRAR, UnISO, UnARJ, UnCAB, UnCHM, UnLHA, UnMIME, UnOLE2, PAK, Split & Combine.
 - File and system tools: FTP Client, File Comparator, Checksum, DiskMap, Registry Editor, Renamer, PE Viewer, Database Viewer, Network, Portable Devices, Windows Mobile.
-- Viewer and automation tools: Web Viewer, Multimedia Viewer, Automation, Check Version.
-- Plugin packaging now generates `plugins.ver`, resolves side-by-side plugin dependencies from plugin DLL directories, and auto-discovers newly shipped plugins for existing users.
-- Legacy Altap Salamander 4.0 plugins are loaded only after user consent.
+- Viewer and automation tools: PictView, Web Viewer, Multimedia Viewer, Automation.
+- Plugin packaging now generates `plugins.ver`, resolves side-by-side plugin dependencies from plugin DLL directories, and offers newly shipped plugins to existing users at each release (a plugin removed in the Plugins Manager stays removed).
+- Plugins use Sally's SDK 109; legacy Altap Salamander 4.0 DLLs need to be rebuilt for the current SDK.
 
 ### Platforms, Releases, And Compatibility
 
@@ -103,7 +116,8 @@ Sally is not a one-off binary drop. The release machinery is part of the product
 
 - Runtime zips for x64, x86, and ARM64, including Windows on ARM.
 - Separate debug-symbol zips for crash dump investigation.
-- GitHub release updater over HTTPS through the Check Version plugin.
+- Integrated GitHub release checks over HTTPS, with the update window in `utils\salupdate.exe`;
+  use Help > Check For New Versions or the configurable automatic schedule.
 - [Wine compatibility work](#running-on-linux-with-wine) makes Sally run under Wine (10.0 and newer) by avoiding hard dependency on `imageres.dll` and falling back to `shell32.dll` resources where needed.
 - Modern CMake build covers Sally, bundled plugins, trace server, shell extension, helper tools, every UI language, and release population.
 - Clang-CL/xwin toolchains support Windows x64 and ARM64 cross-compilation with the MSVC ABI.

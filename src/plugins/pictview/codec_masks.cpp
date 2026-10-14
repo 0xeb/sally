@@ -114,6 +114,27 @@ std::wstring MasksFromExtensions(const std::vector<std::wstring>& extensions)
     return masks;
 }
 
+std::vector<std::wstring> MaskChunksFromExtensions(const std::vector<std::wstring>& extensions, size_t maxLength)
+{
+    std::vector<std::wstring> chunks;
+    std::wstring chunk;
+    for (const std::wstring& extension : extensions)
+    {
+        const std::wstring mask = L"*." + extension;
+        if (!chunk.empty() && chunk.size() + 1 + mask.size() > maxLength)
+        {
+            chunks.push_back(chunk);
+            chunk.clear();
+        }
+        if (!chunk.empty())
+            chunk += L';';
+        chunk += mask;
+    }
+    if (!chunk.empty())
+        chunks.push_back(chunk);
+    return chunks;
+}
+
 std::wstring JoinExtensions(const std::vector<std::wstring>& extensions)
 {
     std::wstring joined;

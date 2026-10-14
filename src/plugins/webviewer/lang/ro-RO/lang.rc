@@ -24,4 +24,5 @@ STRINGTABLE
  IDS_PLUGINNAME, "Vizualizator Web"
  IDS_UNABLETOOPENIE, "Nu se poate deschide Vizualizatorul Web.\nVă rugăm să verificați dacă Microsoft Edge WebView2 Runtime este instalat."
  IDS_ERRORTITLE, "Eroare"
+ IDS_NAVIGATIONFAILED, "Vizualizatorul web nu a putut afișa acest fișier."
 }

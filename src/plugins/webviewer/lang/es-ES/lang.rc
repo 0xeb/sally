@@ -24,4 +24,5 @@ STRINGTABLE
  IDS_PLUGINNAME, "Visor Web"
  IDS_UNABLETOOPENIE, "No se puede abrir el Visor Web.\nPor favor, asegúrese de que Microsoft Edge WebView2 Runtime está instalado."
  IDS_ERRORTITLE, "Error"
+ IDS_NAVIGATIONFAILED, "El visor web no pudo mostrar este archivo."
 }

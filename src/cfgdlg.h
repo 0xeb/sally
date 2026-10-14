@@ -220,6 +220,8 @@ struct CConfiguration
         NetwareFastDirMove,     // should fast-dir-move (rename directories) be used on the Novell Netware? (otherwise rename files only, directories are created + old empty ones deleted) (REASON: for some users, fast-dir-move works on Novell and they don’t want to wait)
         UseAsyncCopyAlg,        // Win7+ only (older OS: always FALSE): should asynchronous file copy algorithm be used on network drives?
         ReloadEnvVariables,     // should we perform regeneration when environment variables change??
+        SuggestPathNames,       // suggest folder names while a path is typed (F5, F6, Shift+F7)
+        UpdateCheckMode,        // how often Sally looks for a newer release (Sally::Update::UpdateCheckMode, update_check.h)
         QuickRenameSelectAll,   // Quick Rename/Pack selects everything (not just the name) (users disliked the new selection)
         EditNewSelectAll,       // EditNew should select everything (not just the name). users requested a separate option because some always create .TXT (and are fine with overwriting just the name) while others use different extensions and want to overwrite the entire filename
         ShiftForHotPaths,       // use Shift+1..0 for go to hot path?
@@ -412,6 +414,9 @@ struct CConfiguration
     // plug-ins
     int LastPluginVer;   // ACTUAL_VERSION from plugins.ver (detect newly installed plugins)
     int LastPluginVerOP; // ACTUAL_VERSION from plugins.ver for the other platform (x86/x64); must be saved, otherwise we won't know if the configuration was overwritten by the other version.
+    // Bundled plugins the user removed in the Plugins Manager (DLL names relative to "plugins",
+    // separated by ';'): plugins.ver does not offer them again until the user adds them back.
+    std::wstring RemovedBundledPlugins;
                          // Example: start x64, auto-save x64 with added pictview, start x86, auto-save x86 with added winscp (x86 pictview not added because it was already in the x64 config), exit/save x86, WARNING: exit/save x64 would remove the record of winscp (x64 knows nothing about winscp and continues running)
 
     // globals

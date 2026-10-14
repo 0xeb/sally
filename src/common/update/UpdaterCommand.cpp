@@ -160,14 +160,31 @@ bool ParseUpdaterCommand(const std::vector<std::wstring>& args, UpdaterCommand& 
             command.Mode = UpdaterMode::Manual;
             command.Package = name;
         }
-        else if (name == L"--prepare" || name == L"--apply")
+        else if (name == L"--prepare" || name == L"--apply" || name == L"--check" || name == L"--report")
         {
             if (command.Mode != UpdaterMode::None)
             {
-                error = L"only one of --prepare and --apply";
+                error = L"only one of --prepare, --apply, --check and --report";
                 return false;
             }
-            command.Mode = name == L"--prepare" ? UpdaterMode::Prepare : UpdaterMode::Apply;
+            command.Mode = name == L"--prepare" ? UpdaterMode::Prepare
+                           : name == L"--apply" ? UpdaterMode::Apply
+                           : name == L"--check" ? UpdaterMode::Check
+                                                : UpdaterMode::Report;
+        }
+        else if (name == L"--auto")
+        {
+            command.Auto = true;
+        }
+        else if (name == L"--feed")
+        {
+            if (!value(command.FeedUrl))
+                return false;
+            if (command.FeedUrl.compare(0, 8, L"https://") != 0)
+            {
+                error = L"--feed needs an https:// address";
+                return false;
+            }
         }
         else if (name == L"--package")
         {
@@ -265,6 +282,10 @@ bool ParseUpdaterCommand(const std::vector<std::wstring>& args, UpdaterCommand& 
     case UpdaterMode::Apply:
         return require(command.Staging, L"--staging") && require(command.InstallRoot, L"--install") &&
                require(command.ResultFile, L"--result");
+    case UpdaterMode::Check:
+        return true; // the Sally folder defaults to the one the updater belongs to
+    case UpdaterMode::Report:
+        return require(command.ResultFile, L"--result");
     default:
         // Nothing but options: a manual run without a package (it recovers an interrupted update).
         if (command.Mode == UpdaterMode::None && command.Package.empty() && command.Staging.empty() &&
@@ -301,6 +322,13 @@ std::wstring FormatUpdaterCommand(const UpdaterCommand& command)
         flag(L"--prepare");
     else if (command.Mode == UpdaterMode::Apply)
         flag(L"--apply");
+    else if (command.Mode == UpdaterMode::Check)
+        flag(L"--check");
+    else if (command.Mode == UpdaterMode::Report)
+        flag(L"--report");
+    if (command.Auto)
+        flag(L"--auto");
+    add(L"--feed", command.FeedUrl);
     add(L"--package", command.Package);
     add(L"--sha256", command.Sha256);
     add(L"--staging", command.Staging);

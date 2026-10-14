@@ -86,6 +86,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "Син&хронизировать переменные окружения с системными значениями",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "&Предлагать имена папок при вводе пути (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "Пр&оверять обновления:",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2211,6 +2215,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "&Команды NTFS"
 
  IDS_MENU_EDIT,              "Пр&авка"
+ IDS_MENU_EDIT_UNDO, "&Отменить\tCtrl+Z"
+ IDS_UNDO_FAILED, "Windows не удалось отменить последнюю операцию оболочки."
  IDS_MENU_EDIT_CUT,          "&Вырезать\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "Копиров&ать\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "Копировать п&уть и имя в буфер\tAlt+Insert"
@@ -4117,5 +4123,12 @@ IDS_OLDPLUGINVERSION2, "Модуль (%s) не поддерживается те
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "Русская версия"
  IDS_EXITING_RUNNING_INFO, "Невозможно закрыть Sally пока не завершены все дисковые операции. Дождитесь завершения операций или отмените их. Если вы не хотите сейчас закрывать Sally, нажмите ""Отмена""."
+ IDS_UPDATECHECK_NEVER, "Никогда"
+ IDS_UPDATECHECK_DAY, "Каждый день"
+ IDS_UPDATECHECK_WEEK, "Каждую неделю"
+ IDS_UPDATECHECK_MONTH, "Каждый месяц"
+ IDS_UPDATECHECK_3MONTHS, "Каждые три месяца"
+ IDS_UPDATECHECK_6MONTHS, "Каждые полгода"
+ IDS_UPDATER_CANNOT_START, "Не удалось запустить программу обновления Sally:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Мастер-пароль используется для защиты конфиденциальной информации (такой как пароли) стойким шифром AES. Если вы установите мастер-пароль, будет необходимо вводить его каждый раз при извлечении защищаемой информации."
 }

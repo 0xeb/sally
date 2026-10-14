@@ -117,7 +117,7 @@ BEGIN
     LTEXT           "minutes",IDC_STATIC_11,156,120,34,8
     CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,95,145,236,1
     LTEXT           "Default file transfer mode",IDC_STATIC_13,5,141,88,8
-    CONTROL         "&Binary mode (no changes during tranfers)",IDC_BINARYMODE,
+    CONTROL         "&Binary mode (no changes during transfers)",IDC_BINARYMODE,
                     "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,151,154,12
     CONTROL         "AS&CII mode (convert files to use system default line ends)",IDC_ASCIIMODE,
                     "Button",BS_AUTORADIOBUTTON,14,164,207,12

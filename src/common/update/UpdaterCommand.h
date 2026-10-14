@@ -4,13 +4,20 @@
 // How Sally talks to its updater, utils\salupdate.exe: the command line that starts it and
 // the result file it leaves for the next Sally to report.
 //
+//   salupdate --check [--auto] --install <Sally folder> [--feed <https address>]
+//     Asks GitHub for the latest release and shows the update window, which installs a newer
+//     one. With --auto (Sally's scheduled check) nothing is shown unless a newer release
+//     exists; the exit code is then 0 (up to date), 1 (the window was shown) or 2 (GitHub
+//     could not be reached, or did not answer with a release).
+//   salupdate --report --result <file> --install <Sally folder>
+//     Shows how the update that left <file> went, once (Sally starts it after an update).
 //   salupdate --prepare --package <zip> --sha256 <hex> --staging <folder> --version <x.y.z>
 //             --arch <x64|x86|ARM64> --result <file>
 //     Checks the downloaded package and extracts it to <folder>\files.
 //   salupdate --apply --staging <folder> --install <Sally folder> --wait <pid,pid>
 //             --from <x.y.z> --to <x.y.z> --result <file> [--no-relaunch] [--elevated] [--notify]
 //     Waits for Sally to close, replaces the files and starts Sally again; --notify shows the
-//     outcome in a message (an update started by hand rather than by CheckVer).
+//     outcome in a message (an update started by hand rather than from the update window).
 //   salupdate [<zip>] [--yes] [--install <Sally folder>]
 //     By hand, or with a release package dropped onto it: checks the package, asks (unless
 //     --yes), closes Sally and installs the package into the Sally folder the updater belongs
@@ -32,6 +39,8 @@ enum class UpdaterMode
     Prepare,
     Apply,
     Manual,
+    Check,
+    Report,
 };
 
 struct UpdaterCommand
@@ -50,7 +59,9 @@ struct UpdaterCommand
     bool Relaunch = true;
     bool Elevated = false;
     bool Notify = false;
-    bool Yes = false; // manual: accept every question
+    bool Yes = false;  // manual: accept every question
+    bool Auto = false; // check: Sally's scheduled check, silent unless there is a newer release
+    std::wstring FeedUrl; // check: another release feed (a mirror), HTTPS only
 };
 
 bool ParseUpdaterCommand(const std::vector<std::wstring>& args, UpdaterCommand& command, std::wstring& error);

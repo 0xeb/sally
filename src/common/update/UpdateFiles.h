@@ -63,6 +63,10 @@ struct UpdatePlan
     std::wstring InstallRoot; // the Sally folder
     std::vector<std::wstring> Folders; // relative; only those the install lacks, parents first
     std::vector<std::wstring> Files;   // relative; every file of the release
+    // relative; installed files the release retired (its obsolete-files manifest), renamed aside
+    // like replaced files, so that a failed update brings them back
+    std::vector<std::wstring> Removals;
+    std::vector<std::wstring> EmptyFolders; // relative; removed after the update when empty, deepest first
 };
 
 struct UpdateFailure
@@ -89,6 +93,43 @@ ApplyOutcome ApplyUpdate(const UpdatePlan& plan, IUpdateFileOps& ops);
 // Undoes the steps of a journal left in installRoot by an interrupted update. True when there
 // was nothing to undo or everything was undone; the journal is then removed.
 bool RecoverInterruptedUpdate(const std::wstring& installRoot, IUpdateFileOps& ops, UpdateFailure& failure);
+
+// --- files a release retired ---------------------------------------------------------------------
+//
+// A release lists the files earlier releases installed and it no longer has (a retired plugin)
+// in kObsoleteManifestName at its root: the line "SALLY-UPDATE-OBSOLETE 1", then one path per
+// line relative to the Sally folder; a path ending with a backslash is a folder, removed once it
+// is empty. The list only grows, so any release removes what every earlier one retired. Only
+// paths below plugins\ and utils\ are accepted, and never one the release itself contains.
+
+extern const wchar_t* const kObsoleteManifestName;
+
+struct ObsoleteManifest
+{
+    std::vector<std::wstring> Files;
+    std::vector<std::wstring> Folders; // without the trailing backslash
+};
+
+// A relative path inside plugins\ or utils\, with no "..", drive, wildcard or empty part.
+bool IsRetirablePath(const std::wstring& relative);
+// One bad line refuses the whole manifest.
+bool ParseObsoleteManifest(const std::string& utf8, ObsoleteManifest& manifest, std::string& error);
+// The manifest at root\kObsoleteManifestName; false when there is none or it is refused.
+bool ReadObsoleteManifest(const std::wstring& root, IUpdateFileOps& ops, ObsoleteManifest& manifest);
+
+struct ObsoleteSweep
+{
+    int Removed = 0;
+    std::vector<std::wstring> StillInUse; // renamed aside and listed as leftovers
+    std::vector<UpdateFailure> Failures;  // left in place (no access)
+};
+
+// Removes the retired files of an installed Sally, for an update installed by an updater that did
+// not know the manifest yet. Nothing needs undoing, so there is no journal: each file is renamed
+// aside and deleted, or listed as a leftover while it is still loaded; a later start finishes.
+// Does nothing while a journal shows an update in progress. Cheap when everything is gone.
+ObsoleteSweep RemoveObsoleteFiles(const std::wstring& installRoot, const ObsoleteManifest& manifest,
+                                  IUpdateFileOps& ops);
 
 // Deletes the renamed-aside files an update listed as still in use; returns those that still
 // are. A file that is renamed aside while an earlier one of the same name is still held gets the

@@ -93,7 +93,7 @@ set(CMAKE_C_STANDARD 11)
 # Load common settings
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sal_common.cmake)
 
-# yyjson 0.12.0 is shared by the core settings reader and CheckVer plugin.
+# yyjson 0.12.0 is shared by the core settings reader and the updater (salupdate.exe).
 add_library(yyjson STATIC "${SAL_SRC}/common/dep/yyjson/yyjson.c")
 target_include_directories(yyjson PUBLIC "${SAL_SRC}/common/dep")
 
@@ -307,12 +307,18 @@ set_target_properties(salspawn PROPERTIES
 )
 
 # ==============================================================================
-# Updater: salupdate.exe (installs a downloaded release; started by CheckVer)
+# Updater: salupdate.exe (finds, downloads and installs releases; Sally's only program that
+# goes online for updates)
 # ==============================================================================
 
 add_executable(salupdate WIN32
   "${SAL_SRC}/salupdate/salupdate.cpp"
+  "${SAL_SRC}/salupdate/install.cpp"
+  "${SAL_SRC}/salupdate/update_window.cpp"
   "${SAL_SRC}/salupdate/salupdate.rc"
+  "${SAL_SRC}/common/Win32HttpsClient.cpp"
+  "${SAL_SRC}/common/update/GitHubRelease.cpp"
+  "${SAL_SRC}/common/update/ReleaseDownload.cpp"
   "${SAL_SRC}/common/update/ReleaseChecksums.cpp"
   "${SAL_SRC}/common/update/UpdateFiles.cpp"
   "${SAL_SRC}/common/update/UpdatePackage.cpp"
@@ -320,12 +326,16 @@ add_executable(salupdate WIN32
   "${SAL_SRC}/common/update/UpdaterCommand.cpp"
   "${SAL_SRC}/common/Win32UpdateFileOps.cpp"
   "${SAL_SRC}/common/zip/ZipReader.cpp"
+  # Compiled in rather than linked from the yyjson library: the updater links the C runtime
+  # statically (below).
+  "${SAL_SRC}/common/dep/yyjson/yyjson.c"
   ${SAL_ZLIB_SOURCES}
 )
 sal_set_rc_platform_defines("${SAL_SRC}/salupdate/salupdate.rc")
 
 target_include_directories(salupdate PRIVATE
   "${SAL_SRC}/salupdate"
+  "${SAL_SRC}/common/dep"
   ${SAL_COMMON_INCLUDES}
 )
 
@@ -336,7 +346,7 @@ target_compile_definitions(salupdate PRIVATE
 )
 
 target_link_libraries(salupdate PRIVATE
-  shell32 ole32 bcrypt version
+  shell32 ole32 bcrypt version wininet
 )
 
 if(MSVC)
@@ -558,6 +568,9 @@ sal_install_resources()
 
 # Plugin version file for incremental plugin updates
 sal_generate_plugins_ver()
+
+# The files earlier releases installed and this one retired
+sal_install_obsolete_manifest()
 
 # ==============================================================================
 # Populate Target (install to build output)

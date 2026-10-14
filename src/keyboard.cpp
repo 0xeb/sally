@@ -681,7 +681,7 @@ BOOL IsSalHotKey(WORD hotKey)
         switch (mods)
         {
         case NONE:    // quick search/type in command line
-        case CONTROL: // undo in command line
+        case CONTROL: // text undo in command line; shell undo in panels
         case ALT:     // enter menu
         case SHIFT:   // change drive
             found = TRUE;

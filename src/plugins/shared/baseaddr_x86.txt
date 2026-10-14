@@ -35,8 +35,6 @@ unrar           0x21000000
 lang_unrar      0x31000000
 zip             0x21100000
 lang_zip        0x31100000
-checkver        0x21200000
-lang_checkver   0x31200000
 eroiica         0x21300000
 lang_eroiica    0x31300000
 peviewer        0x21400000

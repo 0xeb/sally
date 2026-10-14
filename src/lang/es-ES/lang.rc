@@ -86,6 +86,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "Mantener las &variables de entorno actualizadas a los valores del sistema",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "&Sugerir nombres de carpetas al escribir una ruta (F5, F6, Mayús+F7)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "Buscar actuali&zaciones:",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2211,6 +2215,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "Comandos NT&FS"
 
  IDS_MENU_EDIT,              "&Editar"
+ IDS_MENU_EDIT_UNDO, "&Deshacer\tCtrl+Z"
+ IDS_UNDO_FAILED, "Windows no pudo deshacer la última operación del shell."
  IDS_MENU_EDIT_CUT,          "Cort&ar\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "&Copiar\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "C&opiar ruta + nombre como texto\tAlt+Insertar"
@@ -4117,5 +4123,12 @@ IDS_OLDPLUGINVERSION2, "El plugin (%s) no está soportado en esta versión de Sa
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "Versión en español"
  IDS_EXITING_RUNNING_INFO, "Imposible salir de Sally hasta que todas las operaciones de disco terminen. Espere hasta que estas operaciones finalicen o cancélelas ahora. Si no quiere salir de Sally ahora, pulse el botón Cancelar."
+ IDS_UPDATECHECK_NEVER, "Nunca"
+ IDS_UPDATECHECK_DAY, "Cada día"
+ IDS_UPDATECHECK_WEEK, "Cada semana"
+ IDS_UPDATECHECK_MONTH, "Cada mes"
+ IDS_UPDATECHECK_3MONTHS, "Cada tres meses"
+ IDS_UPDATECHECK_6MONTHS, "Cada seis meses"
+ IDS_UPDATER_CANNOT_START, "No se pudo iniciar el actualizador de Sally:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Una contraseña maestra se usa para proteger información confidencial como contraseñas de FTP o WinSCP mediante cifrado AES fuerte. Si genera una contraseña maestra se le pedirá que la escriba una vez por sesión cuando Sally vaya a recoger información protegida."
 }

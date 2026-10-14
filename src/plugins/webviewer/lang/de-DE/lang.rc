@@ -24,4 +24,5 @@ STRINGTABLE
  IDS_PLUGINNAME, "Web-Betrachter"
  IDS_UNABLETOOPENIE, "Web-Betrachter konnte nicht geöffnet werden.\nBitte stellen Sie sicher, dass die Microsoft Edge WebView2 Runtime installiert ist."
  IDS_ERRORTITLE, "Fehler"
+ IDS_NAVIGATIONFAILED, "Der Web-Betrachter konnte diese Datei nicht anzeigen."
 }

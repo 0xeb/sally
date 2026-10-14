@@ -5478,7 +5478,7 @@ void CSalamanderGeneral::OpenNetworkContextMenu(HWND parent, int panel, BOOL for
                     }
                     else
                     {
-                        CShellExecuteWnd shellExecuteWnd;
+                        CKeptShellExecuteWnd shellExecuteWnd; // outlives the invoke: some commands keep using it
                         CMINVOKECOMMANDINFOEX ici;
                         ZeroMemory(&ici, sizeof(CMINVOKECOMMANDINFOEX));
                         ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);

@@ -85,6 +85,8 @@ MENU_TEMPLATE_ITEM MainMenuTemplate[] =
 
         // Edit
         {MNTT_PB, IDS_MENU_EDIT, MNTS_B | MNTS_I | MNTS_A, CML_EDIT, -1, 0, NULL},
+        {MNTT_IT, IDS_MENU_EDIT_UNDO, MNTS_B | MNTS_I | MNTS_A, CM_UNDO, -1, 0, NULL},
+        {MNTT_SP, -1, MNTS_B | MNTS_I | MNTS_A, 0, -1, 0, NULL},
         {MNTT_IT, IDS_MENU_EDIT_CUT, MNTS_B | MNTS_I | MNTS_A, CM_CLIPCUT, IDX_TB_CLIPBOARDCUT, 0, &EnablerFilesOnDisk},
         {MNTT_IT, IDS_MENU_EDIT_COPY, MNTS_B | MNTS_I | MNTS_A, CM_CLIPCOPY, IDX_TB_CLIPBOARDCOPY, 0, &EnablerFilesOnDiskOrArchive},
         {MNTT_IT, IDS_MENU_EDIT_PASTE, MNTS_B | MNTS_I | MNTS_A, CM_CLIPPASTE, IDX_TB_CLIPBOARDPASTE, 0, &EnablerPaste}, // !ATTENTION! !WARNING!, the item is modified in CMainWindow/WM_USER_INITMENUPOPUP (when there is text on the clipboard, "Change Directory" is added)

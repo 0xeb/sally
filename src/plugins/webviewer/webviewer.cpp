@@ -428,6 +428,26 @@ bool CWebView2Host::Create(HWND hwndParent)
                                 settings->put_IsZoomControlEnabled(TRUE);
                             }
 
+                            // A file WebView2 cannot display used to leave a blank white page with no
+                            // reason given; show what it reported instead.
+                            EventRegistrationToken navigationToken = {};
+                            m_webview->add_NavigationCompleted(
+                                Callback<ICoreWebView2NavigationCompletedEventHandler>(
+                                    [this](ICoreWebView2*, ICoreWebView2NavigationCompletedEventArgs* args) -> HRESULT
+                                    {
+                                        BOOL success = TRUE;
+                                        COREWEBVIEW2_WEB_ERROR_STATUS status = COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN;
+                                        args->get_IsSuccess(&success);
+                                        args->get_WebErrorStatus(&status);
+                                        if (m_showingError)
+                                            m_showingError = false; // the error page itself
+                                        else if (!success && status != COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED)
+                                            ShowNavigationError(L"WebView2 error " + std::to_wstring((int)status));
+                                        return S_OK;
+                                    })
+                                    .Get(),
+                                &navigationToken);
+
                             ready = TRUE;
                             return S_OK;
                         })
@@ -530,8 +550,26 @@ void CWebView2Host::Close()
 
 void CWebView2Host::Navigate(const std::wstring& url)
 {
-    if (m_webview)
-        m_webview->Navigate(url.c_str());
+    m_requestedUrl = url;
+    if (!m_webview)
+        return;
+    const HRESULT hr = m_webview->Navigate(url.c_str());
+    if (FAILED(hr))
+    {
+        wchar_t code[16];
+        swprintf_s(code, L"0x%08lX", static_cast<unsigned long>(hr));
+        ShowNavigationError(std::wstring(L"WebView2 Navigate ") + code);
+    }
+}
+
+void CWebView2Host::ShowNavigationError(const std::wstring& detail)
+{
+    if (!m_webview)
+        return;
+    m_showingError = true;
+    const std::wstring html = WebViewerNavigationErrorHtml(
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_NAVIGATIONFAILED), detail, m_requestedUrl);
+    m_webview->NavigateToString(html.c_str());
 }
 
 void CWebView2Host::NavigateToString(const std::string& htmlContent)

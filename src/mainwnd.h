@@ -556,6 +556,10 @@ public:
 
     // returns TRUE if the key was handled
     BOOL HandleCtrlLetter(wchar_t c); // Ctrl+letter hotkeys
+    HWND UndoMenuTarget = nullptr;
+    BOOL UndoInProgress = FALSE;
+    void ExecuteUndo(HWND target);
+    void UpdateUndoMenu(CMenuPopup* popup);
 
     void LayoutWindows();
     BOOL ToggleTopToolBar(BOOL storePos = TRUE);

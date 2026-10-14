@@ -25,6 +25,7 @@
 #include "darkmode.h"
 
 #include <vector>
+#include "path_suggestions.h"
 
 //
 // ****************************************************************************
@@ -464,6 +465,8 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         InstallWordBreakProc(GetDlgItem(HWindow, IDE_PATH)); // install WordBreakProc into the combobox
 
+        if (DirectoryHelper) // a target folder is typed here (not a new name)
+            AttachPathSuggestions(HWindow, IDE_PATH);
         CreateKeyForwarder(HWindow, IDE_PATH); // so that we receive WM_USER_KEYDOWN
         if (DirectoryHelper)
         {
@@ -1005,6 +1008,7 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         MoreButton = new CButton(HWindow, IDC_MORE, BTF_MORE | BTF_CHECKBOX);
         SetOptionsButtonState(TRUE);
 
+        AttachPathSuggestions(HWindow, IDE_PATH); // before the key forwarder subclasses the edit
         CreateKeyForwarder(HWindow, IDE_PATH);                  // so that we receive WM_USER_KEYDOWN
         ChangeToIconButton(HWindow, IDB_BROWSE, IDI_DIRECTORY); // the button will have a folder icon and an arrow to the right
 
@@ -1306,6 +1310,7 @@ CChangeDirDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (SendDirectlyToPlugin == NULL)
             EnableWindow(GetDlgItem(HWindow, IDC_SENDDIRECTTOPLG), FALSE);
         InstallWordBreakProc(GetDlgItem(HWindow, IDE_PATH));    // install WordBreakProc into the combobox
+        AttachPathSuggestions(HWindow, IDE_PATH); // before the key forwarder subclasses the edit
         CreateKeyForwarder(HWindow, IDE_PATH);                  // so that we receive WM_USER_KEYDOWN
         ChangeToIconButton(HWindow, IDB_BROWSE, IDI_DIRECTORY); // the button will have a folder icon and an arrow to the right
 

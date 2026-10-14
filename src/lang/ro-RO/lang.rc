@@ -86,6 +86,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "Pastrez &variabilele de mediu actualizate la valori de sistem",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "S&ugerează nume de dosare la tastarea unei căi (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "Caută actuali&zări:",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2211,6 +2215,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "Comenzi NT&FS"
 
  IDS_MENU_EDIT,              "&Editeaza"
+ IDS_MENU_EDIT_UNDO, "&Anulare\tCtrl+Z"
+ IDS_UNDO_FAILED, "Windows nu a putut anula ultima operație shell."
  IDS_MENU_EDIT_CUT,          "C&ut\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "&Copie\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "C&opie Cale + Nume ca Text\tAlt+Insert"
@@ -4117,5 +4123,12 @@ IDS_OLDPLUGINVERSION2, "Plugin (%s) nu e suportat de aceasta versiune de Sally. 
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "Versiunea romana"
  IDS_EXITING_RUNNING_INFO, "Nu pot iesi din Sally pana cand toate operatiunile cu disk-ul sunt terminate. Va rugam asteptati pana aceste operatiuni sunt terminate sau anulati-le acum. Daca nu doriti sa iesiti din Sally acum, apasati butonul Anuleaza."
+ IDS_UPDATECHECK_NEVER, "Niciodată"
+ IDS_UPDATECHECK_DAY, "În fiecare zi"
+ IDS_UPDATECHECK_WEEK, "În fiecare săptămână"
+ IDS_UPDATECHECK_MONTH, "În fiecare lună"
+ IDS_UPDATECHECK_3MONTHS, "La fiecare trei luni"
+ IDS_UPDATECHECK_6MONTHS, "La fiecare șase luni"
+ IDS_UPDATER_CANNOT_START, "Programul de actualizare Sally nu a putut fi pornit:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "O Parola Master este folosita pentru a proteja informatii sensibile ca parole FTP sau WinSCP prin cifrul puternic AES. Daca creezi o Parola Master ti se va cere sa o introduci o data pe sesiune cand Sally preia informatii protejate."
 }

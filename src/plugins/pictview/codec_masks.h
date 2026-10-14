@@ -26,6 +26,10 @@ std::vector<std::wstring> ExtensionsBeyondMasks(const std::vector<std::wstring>&
 // "*.avif;*.heic" from {"avif", "heic"}.
 std::wstring MasksFromExtensions(const std::vector<std::wstring>& extensions);
 
+// The same masks in pieces of at most 'maxLength' characters each: the core copies a mask list
+// given to AddViewer into a fixed buffer, and a camera RAW codec alone brings dozens of extensions.
+std::vector<std::wstring> MaskChunksFromExtensions(const std::vector<std::wstring>& extensions, size_t maxLength);
+
 // "avif;heic" <-> {"avif", "heic"} (how the offered extensions are stored).
 std::wstring JoinExtensions(const std::vector<std::wstring>& extensions);
 std::vector<std::wstring> SplitExtensions(const std::wstring& joined);

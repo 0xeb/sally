@@ -86,6 +86,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     CutToClipChanged = FALSE; // forget cut-to-clip flags by this operation
 
     FocusFirstNewItem = FALSE;
+    RenameFirstNewItem = FALSE;
     UseSystemIcons = FALSE;
     UseThumbnails = FALSE;
     Files->DestroyMembers();

@@ -391,6 +391,7 @@ struct SnapshotAdsLossContext
     CActionType Type;
     CBuildScriptState* BsState;
     HWND Parent;
+    bool* CancelledByUser; // set on Cancel, so no "error building script" box follows
 };
 
 struct SnapshotLinkContentContext
@@ -649,8 +650,76 @@ CBuildAdsLossPromptResult SnapshotAdsLossPrompt(const wchar_t* name,
     case IDB_SKIP:
         return CBuildAdsLossPromptResult::Skip;
     default:
+        if (ctx->CancelledByUser != nullptr)
+            *ctx->CancelledByUser = true;
         return CBuildAdsLossPromptResult::Reject; // Cancel: abort the build
     }
+}
+
+// The questions a copy or move asks while its script is built: streams the target
+// cannot hold, unreadable directories, files too big for FAT32, links, a cancel
+// request. F5, a drag & drop (or paste) and the unpack-and-move step all wire the
+// same set here, so they ask the same questions. The drop path once had none of
+// them, and a file carrying a stream (the "downloaded from the internet" mark, say)
+// dropped on a target without streams was refused without a word.
+// The contexts live in this object, which must outlive BuildScriptFromSnapshot.
+struct SnapshotCopyMovePrompts
+{
+    HWND Parent = NULL;
+    bool CancelledByUser = false;
+    SnapshotAdsLossContext AdsLoss{};
+    SnapshotLinkContentContext LinkContent{};
+    SnapshotLinkTargetSizeContext LinkSize{};
+};
+
+void WireSnapshotCopyMovePrompts(CBuildConfig& config, SnapshotCopyMovePrompts& prompts,
+                                 HWND parent, CActionType type, CBuildScriptState* bsState)
+{
+    prompts.Parent = parent;
+    prompts.CancelledByUser = false;
+    config.ADSProbeErrorCallback = SnapshotADSProbeErrorPrompt;
+    config.ADSProbeErrorContext = &prompts.Parent;
+    prompts.LinkSize = {parent, FALSE};
+    config.LinkTargetSizeCallback = SnapshotLinkTargetSizePrompt;
+    config.LinkTargetSizeContext = &prompts.LinkSize;
+    config.ListDirErrorCallback = SnapshotListDirErrorPrompt;
+    config.ListDirErrorContext = &prompts.CancelledByUser;
+    config.CancelPollCallback = SnapshotCancelPoll;
+    config.CancelPollContext = &prompts.CancelledByUser;
+    config.Fat32TooBigCallback = SnapshotFat32TooBigPrompt;
+    config.Fat32TooBigContext = &prompts.CancelledByUser;
+    prompts.AdsLoss = {type, bsState, parent, &prompts.CancelledByUser};
+    config.AdsLossPromptCallback = SnapshotAdsLossPrompt;
+    config.AdsLossPromptContext = &prompts.AdsLoss;
+    prompts.LinkContent = {parent, &prompts.CancelledByUser};
+    config.LinkContentPromptCallback = SnapshotLinkContentPrompt;
+    config.LinkContentPromptContext = &prompts.LinkContent;
+}
+
+// Never fail in silence. A source and target naming the same object gets the
+// message legacy gave it (nothing failed, the request was empty); a user cancel
+// already explained itself and stays quiet; anything else says the build failed.
+void ReportSnapshotBuildFailure(const CBuildScriptState& bsState, bool cancelledByUser)
+{
+    int selfOpMsgId = 0;
+    switch (bsState.SelfOpReject)
+    {
+    case CBuildScriptState::ESelfOpReject::CopyFileToItself:
+        selfOpMsgId = IDS_CANNOTCOPYFILETOITSELF;
+        break;
+    case CBuildScriptState::ESelfOpReject::MoveFileToItself:
+        selfOpMsgId = IDS_CANNOTMOVEFILETOITSELF;
+        break;
+    case CBuildScriptState::ESelfOpReject::MoveDirToItself:
+        selfOpMsgId = IDS_CANNOTMOVEDIRTOITSELF;
+        break;
+    case CBuildScriptState::ESelfOpReject::None:
+        break;
+    }
+    if (selfOpMsgId != 0)
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(selfOpMsgId));
+    else if (!cancelledByUser)
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ERRORBUILDINGSCRIPT));
 }
 
 } // namespace
@@ -952,12 +1021,9 @@ BOOL CanBuildMain2FromSnapshot(BOOL isDiskPanel,
                                    targetPathState == tpsEncryptedNotExisting;
     config.EnableADS = sourceSupADS && targetSupADS;
     config.ADSProbe = BuildScriptLegacyADSProbe;
-    config.ADSProbeErrorCallback = SnapshotADSProbeErrorPrompt;
     config.SourcePathIsNetwork = script != NULL ? script->SourcePathIsNetwork : FALSE;
-    static SnapshotLinkTargetSizeContext mainLinkSizeCtx;
-    mainLinkSizeCtx = {MainWindow != NULL ? MainWindow->HWindow : NULL, FALSE};
-    config.LinkTargetSizeCallback = SnapshotLinkTargetSizePrompt;
-    config.LinkTargetSizeContext = &mainLinkSizeCtx;
+    // The questions the build may ask are wired by the caller
+    // (WireSnapshotCopyMovePrompts), which owns their window and their lifetime.
     config.EnableExplicitTargetNames = data->MakeCopyOfName != FALSE;
     config.EnableRecursiveDirectories = TRUE;
     config.ClearReadOnly = script->ClearReadonlyMask == ~(FILE_ATTRIBUTE_READONLY);
@@ -1440,17 +1506,9 @@ BOOL CFilesWindow::MoveFiles(const wchar_t* source, const wchar_t* target, const
                                                targetPathState == tpsEncryptedNotExisting;
                 config.EnableADS = sourceSupADS && targetSupADS;
                 config.ADSProbe = BuildScriptLegacyADSProbe;
-                config.ADSProbeErrorCallback = SnapshotADSProbeErrorPrompt;
-                config.ADSProbeErrorContext = &HWindow;
-                static SnapshotLinkTargetSizeContext linkSizeCtx;
-                linkSizeCtx = {HWindow, FALSE};
-                config.LinkTargetSizeCallback = SnapshotLinkTargetSizePrompt;
-                config.LinkTargetSizeContext = &linkSizeCtx;
                 config.SourcePathIsNetwork = script->SourcePathIsNetwork;
-                config.AdsLossPromptCallback = SnapshotAdsLossPrompt;
-                static SnapshotAdsLossContext adsCtx;
-                adsCtx = {atMove, &bsState, HWindow};
-                config.AdsLossPromptContext = &adsCtx;
+                SnapshotCopyMovePrompts prompts;
+                WireSnapshotCopyMovePrompts(config, prompts, HWindow, atMove, &bsState);
 
                 scriptOK = BuildScriptFromSnapshot(snapshot, config, bsState, script);
             }
@@ -1629,13 +1687,18 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, const wchar_
 
     CSelectionSnapshot snapshot;
     CBuildConfig buildConfig;
+    SnapshotCopyMovePrompts prompts;
     if (CanBuildMain2FromSnapshot(Is(ptDisk), copy, targetDir,
                                   targetPathWithSlash,
                                   targetSupADS, targetIsFAT32,
                                   data, snapshot, buildConfig, script))
     {
-        const BOOL built = BuildScriptFromSnapshot(snapshot, buildConfig,
-                                                  GetActiveBuildScriptState(), script);
+        CBuildScriptState& bsState = GetActiveBuildScriptState();
+        WireSnapshotCopyMovePrompts(buildConfig, prompts, HWindow, copy ? atCopy : atMove, &bsState);
+        buildConfig.EnableReparseCopyMove = TRUE; // asks: the link itself, or what it points at
+        const BOOL built = BuildScriptFromSnapshot(snapshot, buildConfig, bsState, script);
+        if (!built)
+            ReportSnapshotBuildFailure(bsState, prompts.CancelledByUser);
         SetCurrentDirectoryToSystem();
         return built;
     }
@@ -2036,11 +2099,8 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             }
             buildConfig.EnableADS = sourceSupADS && targetSupADS;
             buildConfig.ADSProbe = BuildScriptLegacyADSProbe;
-            buildConfig.ADSProbeErrorCallback = SnapshotADSProbeErrorPrompt;
-            buildConfig.ADSProbeErrorContext = &HWindow;
-            SnapshotLinkTargetSizeContext linkSizeContext = {HWindow, FALSE};
-            buildConfig.LinkTargetSizeCallback = SnapshotLinkTargetSizePrompt;
-            buildConfig.LinkTargetSizeContext = &linkSizeContext;
+            SnapshotCopyMovePrompts prompts;
+            WireSnapshotCopyMovePrompts(buildConfig, prompts, HWindow, type, &bsState);
             buildConfig.SourcePathIsNetwork = script->SourcePathIsNetwork;
             buildConfig.IgnoreADS = snapshot.IgnoreADS;
             buildConfig.EnableExplicitTargetNames = !IsSnapshotBuilderDefaultMask(mask);
@@ -2054,25 +2114,10 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             buildConfig.CountCompressedSizes = type == atCountSize && !onlySize;
             buildConfig.CountSizeErrorCallback = SnapshotCountSizeErrorPrompt;
             buildConfig.CountSizeErrorContext = script;
-            // An unreadable directory must not kill the whole operation in
-            // silence: ask, and keep building on Skip (legacy parity).
-            bool buildCancelledByUser = false;
-            buildConfig.ListDirErrorCallback = SnapshotListDirErrorPrompt;
-            buildConfig.ListDirErrorContext = &buildCancelledByUser;
-            buildConfig.CancelPollCallback = SnapshotCancelPoll;
-            buildConfig.CancelPollContext = &buildCancelledByUser;
-            buildConfig.Fat32TooBigCallback = SnapshotFat32TooBigPrompt;
-            buildConfig.Fat32TooBigContext = &buildCancelledByUser;
             buildConfig.EnableFastDirMove = TRUE;
             buildConfig.EnableReparseDelete = TRUE;
             buildConfig.EnableReparseCopyMove = TRUE; // copy-the-link
             buildConfig.DeletePromptCallback = SnapshotDeletePrompt;
-            SnapshotAdsLossContext adsLossContext = {type, &bsState, HWindow};
-            buildConfig.AdsLossPromptCallback = SnapshotAdsLossPrompt;
-            buildConfig.AdsLossPromptContext = &adsLossContext;
-            SnapshotLinkContentContext linkContentContext = {HWindow, &buildCancelledByUser};
-            buildConfig.LinkContentPromptCallback = SnapshotLinkContentPrompt;
-            buildConfig.LinkContentPromptContext = &linkContentContext;
             if (type == atChangeAttrs && attrsData != NULL)
             {
                 buildConfig.EnableChangeAttrs = TRUE;
@@ -2100,39 +2145,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
 
             if (!BuildScriptFromSnapshot(snapshot, buildConfig, bsState, script))
             {
-                // Never fail in silence. This used to be a bare
-                // `return FALSE`, so one unreadable directory aborted the whole
-                // operation with no message at all — Ctrl+Q simply did nothing.
-                // A user cancel already explained itself, so it stays quiet.
-                //
-                // A source and target naming the same object gets the message
-                // legacy gave it. Blaming the script builder for that is both
-                // unhelpful and untrue: nothing failed, the request was empty.
-                int selfOpMsgId = 0;
-                switch (bsState.SelfOpReject)
-                {
-                case CBuildScriptState::ESelfOpReject::CopyFileToItself:
-                    selfOpMsgId = IDS_CANNOTCOPYFILETOITSELF;
-                    break;
-                case CBuildScriptState::ESelfOpReject::MoveFileToItself:
-                    selfOpMsgId = IDS_CANNOTMOVEFILETOITSELF;
-                    break;
-                case CBuildScriptState::ESelfOpReject::MoveDirToItself:
-                    selfOpMsgId = IDS_CANNOTMOVEDIRTOITSELF;
-                    break;
-                case CBuildScriptState::ESelfOpReject::None:
-                    break;
-                }
-                if (selfOpMsgId != 0)
-                {
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
-                                         LoadStrW(selfOpMsgId));
-                }
-                else if (!buildCancelledByUser)
-                {
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
-                                         LoadStrW(IDS_ERRORBUILDINGSCRIPT));
-                }
+                ReportSnapshotBuildFailure(bsState, prompts.CancelledByUser);
                 SetCurrentDirectoryToSystem();
                 return FALSE;
             }

@@ -86,6 +86,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "U&mgebungsvariablen den Systemwerten automatisch anpassen",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+    CONTROL         "B&eim Eingeben eines Pfades Ordnernamen vorschlagen (F5, F6, Umschalt+F7)",IDC_SUGGESTPATHNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+    LTEXT           "Nach U&pdates suchen:",IDC_UPDATECHECK_LABEL,1,178,120,8
+    COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2211,6 +2215,8 @@ STRINGTABLE
  IDS_MENU_FILES_NTFS,        "NT&FS-Befehl"
 
  IDS_MENU_EDIT,              "&Bearbeiten"
+ IDS_MENU_EDIT_UNDO, "&Rückgängig\tCtrl+Z"
+ IDS_UNDO_FAILED, "Windows konnte den letzten Shell-Vorgang nicht rückgängig machen."
  IDS_MENU_EDIT_CUT,          "Ausschnei&den\tStrg+X"
  IDS_MENU_EDIT_COPY,         "&Kopieren\tStrg+C"
  IDS_MENU_EDIT_COPYFULLNAME, "Pfad + Name als Text k&opieren\tAlt+Einfg"
@@ -4117,5 +4123,12 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "Deutsche Version"
  IDS_EXITING_RUNNING_INFO, "Sally kann nicht beendet werden solange nicht alle Datenträger- operationen abgeschlossen wurden. Warten Sie bitte bis die Prozesse beendet wurden oder brechen Sie sie ab. Wenn Sie den Sally jetzt nicht beenden möchten, drücken Sie die Schaltfläche 'Abbrechen'."
+ IDS_UPDATECHECK_NEVER, "Niemals"
+ IDS_UPDATECHECK_DAY, "Jeden Tag"
+ IDS_UPDATECHECK_WEEK, "Jede Woche"
+ IDS_UPDATECHECK_MONTH, "Jeden Monat"
+ IDS_UPDATECHECK_3MONTHS, "Alle drei Monate"
+ IDS_UPDATECHECK_6MONTHS, "Alle sechs Monate"
+ IDS_UPDATER_CANNOT_START, "Das Aktualisierungsprogramm von Sally konnte nicht gestartet werden:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Ein Master-Passwort wird verwendet um vertrauliche Informationen wie FTP oder WinSCP Passwörter durch den starken AES Cipher zu schützen. Wenn Sie ein Master-Passwort erstellen, werden Sie einmal pro Sitzung danach gefragt, sobald Sally geschützte Informationen abrufen muss."
 }
