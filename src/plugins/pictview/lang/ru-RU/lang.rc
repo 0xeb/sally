@@ -42,7 +42,7 @@ BEGIN
     LTEXT           "GitHub:",IDC_STATIC_6,46,81,30,8
     LTEXT           "github.com/0xeb/sally/issues",IDC_ABOUT_SUPPORT,86,81,150,8,WS_TABSTOP
     LTEXT           "Сайт:",IDC_STATIC_7,46,92,22,8
-    LTEXT           "sally-filemanager.app",IDC_ABOUT_WWW,86,92,122,8,WS_TABSTOP
+    LTEXT           "get-sally.app",IDC_ABOUT_WWW,86,92,122,8,WS_TABSTOP
     CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,2,108,365,1
 END
 

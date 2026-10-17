@@ -199,6 +199,7 @@ BEGIN
     POPUP "An&sicht"
     BEGIN
         MENUITEM "&Leerraumzeichen anzeigen\tStrg+W",   CM_SHOWWHITESPACE
+          MENUITEM "Zeilen&umbruch", CM_WORDWRAP
         MENUITEM "Nur Unterschie&de anzeigen\tStrg+D", CM_ONLYDIFFERENCES
         MENUITEM "D&etaillierte Unterschiede\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

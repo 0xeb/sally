@@ -25,4 +25,9 @@ STRINGTABLE
  IDS_UNABLETOOPENIE, "Web-Betrachter konnte nicht geöffnet werden.\nBitte stellen Sie sicher, dass die Microsoft Edge WebView2 Runtime installiert ist."
  IDS_ERRORTITLE, "Fehler"
  IDS_NAVIGATIONFAILED, "Der Web-Betrachter konnte diese Datei nicht anzeigen."
+ IDS_VIEW, "&Ansicht"
+ IDS_SVG_BACKGROUND, "&Hintergrund"
+ IDS_SVG_CHECKERBOARD, "&Schachbrett"
+ IDS_SVG_LIGHT, "&Hell"
+ IDS_SVG_DARK, "&Dunkel"
 }

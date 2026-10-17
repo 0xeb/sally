@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include "mmviewer.rh"
 #include "mmviewer.rh2"
@@ -311,7 +312,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"MMVIEWER");
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     return &PluginInterface;
 }

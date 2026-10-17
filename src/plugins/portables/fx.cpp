@@ -13,6 +13,7 @@
 */
 
 #include "precomp.h"
+#include "SallyUrls.h"
 #include "fx.h"
 #include "fxfs.h"
 #include "fx.rh"
@@ -407,7 +408,7 @@ namespace Fx
 
     void WINAPI CFxPluginInterface::GetPluginHomePageUrl(CFxString& url) const
     {
-        url = L"https://sally-filemanager.app/";
+        url = Sally::Urls::Website;
     }
 
     bool WINAPI CFxPluginInterface::NeedsWinLib() const

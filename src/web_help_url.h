@@ -8,7 +8,7 @@
 #include <cwctype>
 #include <string>
 
-// Sally's manual is published at https://sally-filemanager.app/manual/. Help requests (F1, What's
+// Sally's manual is published at https://get-sally.app/manual/. Help requests (F1, What's
 // This?, Help buttons, Help menu) open the matching page there.
 
 struct WebHelpTopic

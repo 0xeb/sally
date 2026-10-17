@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include <shlobj.h>
 #include <shellapi.h>
@@ -323,7 +324,7 @@ HINSTANCE LoadSLG(const wchar_t* slgName)
     if (hSLG == NULL)
         // wide: English-only diagnostic, no LoadStr involved - same shape as
         // salmoncl.cpp's fix (194) in this same module family.
-        MessageBoxW(NULL, L"Internal error: cannot load the language resources from sally.exe. Please report at github.com/0xeb/sally/issues.", L"Sally Bug Reporter", MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+        MessageBoxW(NULL, (std::wstring(L"Internal error: cannot load the language resources from sally.exe. Please report at ") + (Sally::Urls::Issues + 8) + L".").c_str(), L"Sally Bug Reporter", MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
     return hSLG;
 }
 

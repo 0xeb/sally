@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
 // Generated from the Sally manual's topic maps; do not edit by hand.
-// Each entry: { manual, help context ID, page } -> https://sally-filemanager.app/manual/<manual>/<page>.html;
+// Each entry: { manual, help context ID, page } -> https://get-sally.app/manual/<manual>/<page>.html;
 // a page written <other>/<page> is in another manual: /manual/<other>/<page>.html
 
 {L"7zip", 1200u, L"dlgboxes_config"}, // IDD_CONFIGURATION

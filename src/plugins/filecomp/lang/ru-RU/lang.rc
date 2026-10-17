@@ -199,6 +199,7 @@ BEGIN
     POPUP "&Вид"
     BEGIN
         MENUITEM "Пок&азывать пробелы\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "Перенос с&трок", CM_WORDWRAP
         MENUITEM "Показывать только &различия\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "Показывать различия подро&бно\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

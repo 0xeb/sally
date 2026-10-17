@@ -25,4 +25,9 @@ STRINGTABLE
  IDS_UNABLETOOPENIE, "Nelze otevřít Webový prohlížeč.\nZkontrolujte prosím, že je nainstalováno prostředí Microsoft Edge WebView2 Runtime."
  IDS_ERRORTITLE, "Chyba"
  IDS_NAVIGATIONFAILED, "Webový prohlížeč nemohl tento soubor zobrazit."
+ IDS_VIEW, "&Zobrazení"
+ IDS_SVG_BACKGROUND, "&Pozadí"
+ IDS_SVG_CHECKERBOARD, "Š&achovnice"
+ IDS_SVG_LIGHT, "&Světlé"
+ IDS_SVG_DARK, "&Tmavé"
 }

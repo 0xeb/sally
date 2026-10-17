@@ -3,6 +3,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include "SallyUrls.h"
 #include <commdlg.h>
 #include <commctrl.h>
 #include <tchar.h>
@@ -1010,6 +1011,6 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    VERSINFO_COPYRIGHT,
                                    LoadPluginString(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"PictView" /* do not translate! */);
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
     return &PluginInterface;
 }

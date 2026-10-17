@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 #include "reg_sz_narrow_bridge.h"
 #include "common/LegacyLogFontImport.h" // ImportLegacyLogFont
 
@@ -126,7 +127,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    SPLLoadStrOwned(SG, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"File Comparator" /* do not translate! */);
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     // must be after salamander->SetBasicPluginData because worker threads use the plugin
     // version at startup and salamander->SetBasicPluginData updates that value (it used to
@@ -217,6 +218,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     ::Configuration.ShowWhiteSpace = FALSE;
     ::Configuration.DetailedDifferences = TRUE;
     ::Configuration.HorizontalView = FALSE;
+    ::Configuration.WordWrap = TRUE;
     SG->GetConfigParameter(SALCFG_AUTOCOPYSELTOCLIPBOARD, &::Configuration.AutoCopy,
                            sizeof(::Configuration.AutoCopy), NULL);
 
@@ -236,6 +238,9 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 
     if (regKey != NULL) // load from the registry
     {
+        DWORD wrap = TRUE;
+        if (registry->GetValue(regKey, L"WordWrap", REG_DWORD, &wrap, sizeof(wrap)))
+            ::Configuration.WordWrap = wrap != 0;
         DWORD configVersion = 0;
         registry->GetValue(regKey, CONFIG_VERSION, REG_DWORD, &configVersion, sizeof(DWORD));
         if ((configVersion == CURRENT_CONFIG_VERSION) || (configVersion == CURRENT_CONFIG_VERSION_NARROWLOGFONT) || (configVersion == CURRENT_CONFIG_VERSION_NORECOMPAREBUTTON) || (configVersion == CURRENT_CONFIG_VERSION_PRESEPARATEOPTIONS))
@@ -455,6 +460,8 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_VIEW_HORIZONTAL, REG_DWORD, &dw, sizeof(DWORD));
     dw = ::Configuration.AutoCopy;
     registry->SetValue(regKey, CONFIG_AUTO_COPY, REG_DWORD, &dw, sizeof(DWORD));
+    dw = ::Configuration.WordWrap != FALSE;
+    registry->SetValue(regKey, L"WordWrap", REG_DWORD, &dw, sizeof(dw));
 }
 
 void CPluginInterface::Configuration(HWND parent)

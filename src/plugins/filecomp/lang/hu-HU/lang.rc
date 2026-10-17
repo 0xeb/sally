@@ -199,6 +199,7 @@ BEGIN
     POPUP "&Nézet"
     BEGIN
         MENUITEM "Ü&res helyek mutatása\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "S&ortördelés", CM_WORDWRAP
         MENUITEM "&Csak a különbségek mutatása\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "Részl&etes különbségek\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

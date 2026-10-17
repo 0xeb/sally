@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
+#include "supporter/Win32SupporterUi.h"
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -321,7 +323,7 @@ HWND GetSplashScreenHandle()
 CAboutDialog::CAboutDialog(HWND parent)
     : CCommonDialog(HLanguage, IDD_ABOUT, parent)
 {
-    HGradientBkBrush = HANDLES(CreateSolidBrush(RGB(221, 151, 4))); // must be the yellow from res\logoline.png
+    HGradientBkBrush = HANDLES(CreateSolidBrush(RGB(198, 47, 47))); // match the red left edge of res\gradabt.svg
     BackgroundBitmap = NULL;
 }
 
@@ -406,6 +408,37 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE4("CAboutDialog::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
 
+    auto refreshSupporter = [&]()
+    {
+        const auto state = Sally::Supporter::ReadSupporterState(SALAMANDER_ROOT_REG, *gRegistry);
+        const auto certificate = Sally::Supporter::VerifyCertificate(state.Token, Sally::Supporter::NowUtc(), Sally::Supporter::BuiltinPublicKeys());
+        SetDlgItemTextW(HWindow, 62043, Sally::Supporter::SupporterSummary(certificate, LanguageID).c_str());
+        SetDlgItemTextW(HWindow, 62044, Sally::Supporter::SupporterText(IDS_SUP_SUPPORT, LanguageID).c_str());
+        SetDlgItemTextW(HWindow, 62045, Sally::Supporter::SupporterText(certificate.Authentic() ? IDS_SUP_DETAILS : IDS_SUP_ENTER, LanguageID).c_str());
+        const bool offer = certificate.State != Sally::Supporter::Status::Active && certificate.State != Sally::Supporter::Status::NotYetValid;
+        ShowWindow(GetDlgItem(HWindow, 62044), offer ? SW_SHOWNA : SW_HIDE);
+        RECT client{}, close{}; GetClientRect(HWindow, &client); GetWindowRect(GetDlgItem(HWindow, IDOK), &close);
+        MapWindowPoints(nullptr, HWindow, reinterpret_cast<POINT*>(&close), 2);
+        HDC dc = GetDC(HWindow); const int dpi = GetDeviceCaps(dc, LOGPIXELSX);
+        auto px = [dpi](int n) { return MulDiv(n, dpi, 96); };
+        int right = client.right - px(12);
+        const int buttons[] = {IDOK, 62045, 62044};
+        for (int id : buttons)
+        {
+            if (id == 62044 && !offer) continue;
+            HWND button = GetDlgItem(HWindow, id);
+            std::wstring text(static_cast<size_t>(GetWindowTextLengthW(button)) + 1, L'\0');
+            text.resize(static_cast<size_t>(GetWindowTextW(button, text.data(), static_cast<int>(text.size()))));
+            auto oldFont = SelectObject(dc, reinterpret_cast<HFONT>(SendMessageW(button, WM_GETFONT, 0, 0)));
+            SIZE size{}; GetTextExtentPoint32W(dc, text.c_str(), static_cast<int>(text.size()), &size); SelectObject(dc, oldFont);
+            const int width = (std::max)(px(76), static_cast<int>(size.cx) + px(24));
+            SetWindowPos(button, nullptr, right - width, close.top, width, close.bottom - close.top, SWP_NOZORDER | SWP_NOACTIVATE);
+            right -= width + px(8);
+        }
+        ReleaseDC(HWindow, dc);
+        InvalidateRect(HWindow, nullptr, TRUE);
+    };
+
     switch (uMsg)
     {
     case WM_INITDIALOG:
@@ -424,22 +457,33 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         hl = new CHyperLink(HWindow, IDC_ABOUT_WEBSITE);
         if (hl != NULL)
         {
-            const wchar_t* url = L"https://sally-filemanager.app/";
-            SetDlgItemTextW(HWindow, IDC_ABOUT_WEBSITE, L"sally-filemanager.app");
+            const wchar_t* url = Sally::Urls::Website;
+            SetDlgItemTextW(HWindow, IDC_ABOUT_WEBSITE, Sally::Urls::WebsiteHost);
             hl->SetActionOpen(url);
         }
 
         hl = new CHyperLink(HWindow, IDC_ABOUT_WWW);
         if (hl != NULL)
         {
-            const wchar_t* url = L"https://github.com/0xeb/sally";
+            const wchar_t* url = Sally::Urls::Repository;
             SetDlgItemTextW(HWindow, IDC_ABOUT_WWW, url + 8); // skip "https://"
             hl->SetActionOpen(url);
         }
 
+        refreshSupporter();
         BackgroundBitmap = AboutAndEvalDlgCreateBkgnd(HWindow);
         break;
     }
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == 62044) { Sally::Supporter::OpenSupportPage(HWindow); return TRUE; }
+        if (LOWORD(wParam) == 62045)
+        {
+            Sally::Supporter::ShowSupporterDialog(HWindow, LanguageID, SALAMANDER_ROOT_REG, *gRegistry);
+            refreshSupporter();
+            return TRUE;
+        }
+        break;
 
     case WM_DESTROY:
     {
@@ -488,6 +532,11 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_NCHITTEST:
     {
+        POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        ScreenToClient(HWindow, &point);
+        HWND child = ChildWindowFromPointEx(HWindow, point, CWP_SKIPINVISIBLE | CWP_SKIPDISABLED);
+        if (child != HWindow && child != nullptr && (GetWindowLongPtrW(child, GWL_STYLE) & WS_TABSTOP))
+        { SetWindowLongPtr(HWindow, DWLP_MSGRESULT, HTCLIENT); return HTCLIENT; }
         SetWindowLongPtr(HWindow, DWLP_MSGRESULT, HTCAPTION);
         return HTCAPTION;
     }

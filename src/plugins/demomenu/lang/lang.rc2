@@ -24,6 +24,6 @@ STRINGTABLE
  IDS_PLUGINNAME,             "DemoMenu"
  IDS_ABOUT,                  "About Plugin"
  IDS_PLUGIN_DESCRIPTION,     "This plugin should help you to make your own menu extension plugin."
- IDS_PLUGIN_HOME,            "https://sally-filemanager.app/"
+ IDS_PLUGIN_HOME,            "https://get-sally.app/"
  IDS_TESTCMD,                "&Test Command"
 }

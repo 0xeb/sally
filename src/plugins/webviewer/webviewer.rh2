@@ -23,4 +23,10 @@
 // shown in the viewer instead of a blank page when a file cannot be displayed
 #define IDS_NAVIGATIONFAILED       10106
 
+#define IDS_VIEW                   10107
+#define IDS_SVG_BACKGROUND         10108
+#define IDS_SVG_CHECKERBOARD       10109
+#define IDS_SVG_LIGHT              10110
+#define IDS_SVG_DARK               10111
+
 #endif // __WEBVIEWER_RH2

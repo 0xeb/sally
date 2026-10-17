@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include <new>
 #include <vector>
@@ -143,7 +144,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"UnCAB" /* neprekladat! */, L"cab");
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     return &PluginInterface;
 }

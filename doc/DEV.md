@@ -23,9 +23,19 @@
 \translations-draft  Unfinished translations (not built)
 ```
 
-The user manual is published at https://sally-filemanager.app/manual/. Help commands (F1, What's
+The user manual is published at https://get-sally.app/manual/. Help commands (F1, What's
 This?, dialog Help buttons, the Help menu, plugin help) open the matching page there:
 `src/web_help_url.h` builds the address and `src/help_topics.inc` maps help context IDs to pages.
+
+## Build-time Generated Content
+
+Install the [build prerequisites](../README.md#prerequisites), including Python 3.10 or newer.
+CMake automatically runs `tools/generate-public-keys.py` to embed the public
+verification keys from `src/common/supporter/public-keys.json`, and
+`tools/generate-release-metadata.py` to compile the localized notes and notices in
+`doc/releases/` into the runtime release metadata. Both scripts use only Python's
+standard library and write their output into the build directory. Building Sally
+does not require private signing keys or the supporter issuer.
 
 ## Missing Plugins
 

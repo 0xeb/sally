@@ -35,7 +35,8 @@ class CExtractCallbackImp : public IArchiveExtractCallback,
                             public CMyUnknownImp
 {
 public:
-    MY_UNKNOWN_IMP1(ICryptoGetTextPassword)
+    Z7_COM_UNKNOWN_IMP_1(ICryptoGetTextPassword)
+public:
 
     // IProgress
     STDMETHOD(SetTotal)

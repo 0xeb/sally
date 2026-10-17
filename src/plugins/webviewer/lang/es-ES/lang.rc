@@ -25,4 +25,9 @@ STRINGTABLE
  IDS_UNABLETOOPENIE, "No se puede abrir el Visor Web.\nPor favor, asegúrese de que Microsoft Edge WebView2 Runtime está instalado."
  IDS_ERRORTITLE, "Error"
  IDS_NAVIGATIONFAILED, "El visor web no pudo mostrar este archivo."
+ IDS_VIEW, "&Ver"
+ IDS_SVG_BACKGROUND, "&Fondo"
+ IDS_SVG_CHECKERBOARD, "&Tablero"
+ IDS_SVG_LIGHT, "&Claro"
+ IDS_SVG_DARK, "&Oscuro"
 }

@@ -1,0 +1,62 @@
+{
+  "announcements": [
+    {
+      "id": "project-support",
+      "source_sha256": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+      "target_release": "*",
+      "titles": {
+        "cs-CZ": "Další vývoj Sally",
+        "de-DE": "Sally weiterentwickeln",
+        "en-US": "Keeping Sally going",
+        "es-ES": "Mantener Sally en marcha",
+        "fr-FR": "Faire vivre Sally",
+        "hu-HU": "A Sally fejlesztésének támogatása",
+        "nl-NL": "Sally verder ontwikkelen",
+        "ro-RO": "Continuăm dezvoltarea Sally",
+        "ru-RU": "Продолжение работы над Sally",
+        "sk-SK": "Ďalší vývoj Sally",
+        "zh-CN": "让 Sally 继续前进"
+      },
+      "translation_source_sha256": {
+        "cs-CZ": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+        "de-DE": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+        "es-ES": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+        "fr-FR": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+        "hu-HU": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+        "nl-NL": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+        "ro-RO": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+        "ru-RU": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+        "sk-SK": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b",
+        "zh-CN": "0aaa369a05d5c23a917982798b72ea334439bbad881567c7ed2ed82878a38c7b"
+      }
+    }
+  ],
+  "notes_source_sha256": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+  "notes_titles": {
+    "cs-CZ": "Novinky",
+    "de-DE": "Was ist neu?",
+    "en-US": "What's new",
+    "es-ES": "Novedades",
+    "fr-FR": "Nouveautés",
+    "hu-HU": "Újdonságok",
+    "nl-NL": "Wat is er nieuw?",
+    "ro-RO": "Noutăți",
+    "ru-RU": "Что нового",
+    "sk-SK": "Novinky",
+    "zh-CN": "更新内容"
+  },
+  "notes_translation_source_sha256": {
+    "cs-CZ": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+    "de-DE": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+    "es-ES": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+    "fr-FR": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+    "hu-HU": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+    "nl-NL": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+    "ro-RO": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+    "ru-RU": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+    "sk-SK": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c",
+    "zh-CN": "b5a7ae539b10a278ca2c939f0a0cdd5ff349ac052ea1efb50e06e2ada363e42c"
+  },
+  "release_version": "1.0.39",
+  "schema_version": 1
+}

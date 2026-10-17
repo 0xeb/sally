@@ -386,6 +386,24 @@ void OnStarted()
         HANDLES(CloseHandle(thread));
 }
 
+void ShowWhatsNew(HWND parent)
+{
+    DWORD error = 0;
+    UpdaterCommand command = CheckCommand(false);
+    command.Mode = UpdaterMode::WhatsNew;
+    command.FeedUrl.clear();
+    HPROCESS process = StartUpdater(command, error);
+    if (process == INVALID_HPROCESS)
+    {
+        const std::wstring message = FormatStrW(LoadStrW(IDS_UPDATER_CANNOT_START), UpdaterPath().c_str(), GetErrorTextOwned(error).c_str());
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), message.c_str());
+        return;
+    }
+    AllowSetForegroundWindow(gProcess->GetProcessId(process));
+    gProcess->CloseProcess(process);
+    (void)parent;
+}
+
 void CheckNow(HWND parent)
 {
     CALL_STACK_MESSAGE1("UpdateCheck::CheckNow()");

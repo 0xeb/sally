@@ -18,6 +18,7 @@
 #include "common/BuiltinLanguages.h"
 #include "registry_names.h"
 #include "salupdate.h"
+#include "supporter/SupporterState.h"
 #include "salupdate.rh"
 #include "ui_style.h"
 #include "Win32TextCodec.h"
@@ -153,24 +154,13 @@ void ChooseLanguage()
 {
     std::wstring configuredName;
     // The configuration of the Sally that started us (a -profile has its own), else the usual one.
-    std::wstring root(SAL_REG_ROOT_SALLY_1_0_W);
-    wchar_t started[512] = {};
-    const DWORD length = GetEnvironmentVariableW(SAL_ENV_CONFIG_ROOT_W, started, _countof(started));
-    if (length > 0 && length < _countof(started))
-        root = started;
-    HKEY key = NULL;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, (root + L"\\Configuration").c_str(), 0, KEY_QUERY_VALUE, &key) ==
-        ERROR_SUCCESS)
+    const std::wstring root = Sally::Supporter::ResolveProfileRoot();
+    IRegistry& registry = *GetWin32Registry();
+    HKEY key = nullptr;
+    if (registry.OpenKeyRead(HKEY_CURRENT_USER, (root + L"\\Configuration").c_str(), key).success)
     {
-        wchar_t name[64] = {};
-        DWORD size = sizeof(name) - sizeof(wchar_t);
-        DWORD type = 0;
-        if (RegQueryValueExW(key, L"Language", NULL, &type, reinterpret_cast<BYTE*>(name), &size) == ERROR_SUCCESS &&
-            type == REG_SZ)
-        {
-            configuredName = name;
-        }
-        RegCloseKey(key);
+        registry.GetString(key, L"Language", configuredName);
+        registry.CloseKey(key);
     }
     std::vector<LANGID> available;
     for (const sally::languages::BuiltinLanguage& language : sally::languages::kBuiltinLanguages)
@@ -328,6 +318,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     {
     case UpdaterMode::Manual:
         return Manual(command);
+    case UpdaterMode::WhatsNew:
     case UpdaterMode::Check:
         return CheckForUpdates(command);
     case UpdaterMode::Report:

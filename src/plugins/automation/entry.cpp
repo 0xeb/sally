@@ -13,6 +13,7 @@
 */
 
 #include "precomp.h"
+#include "SallyUrls.h"
 #include "automationplug.h"
 #include "automation.rh2"
 #include "lang\lang.rh"
@@ -127,7 +128,7 @@ CPluginInterfaceAbstract*
         NULL);
 
     // Setup plugin home page.
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     return &g_oAutomationPlugin;
 }

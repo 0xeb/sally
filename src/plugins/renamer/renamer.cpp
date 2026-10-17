@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 #include "../../registry_names.h"
 
 // enables dumping of blocks that remain allocated on the heap after the plugin finishes
@@ -232,7 +233,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_DESCRIPTION).c_str(),
                                    L"Renamer" /* do not translate! */);
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     return &PluginInterface;
 }

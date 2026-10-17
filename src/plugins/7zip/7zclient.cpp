@@ -90,7 +90,7 @@ BOOL C7zClient::CreateObject(const GUID* interfaceID, void** object)
     if (!Load(dllPath.c_str()))
         return Error(IDS_CANT_LOAD_LIBRARY);
 
-    TCreateObjectFunc createObjectFunc = (TCreateObjectFunc)GetProc("CreateObject");
+    TCreateObjectFunc createObjectFunc = (TCreateObjectFunc)::GetProcAddress(Get_HMODULE(), "CreateObject");
     if (createObjectFunc == 0)
         return Error(IDS_CANT_GET_CRATEOBJECT);
 
@@ -1003,7 +1003,7 @@ C7zClient::SetCompressionParams(IOutArchive* outArchive, CCompressParams* compre
 
                 // set word size
                 names.Add(L"0fb");
-                prop = compressParams->WordSize;
+                prop = static_cast<UInt32>(compressParams->WordSize);
                 values.push_back(prop);
                 break;
 
@@ -1019,7 +1019,7 @@ C7zClient::SetCompressionParams(IOutArchive* outArchive, CCompressParams* compre
 
                 // set word size
                 names.Add(L"0fb");
-                prop = compressParams->WordSize;
+                prop = static_cast<UInt32>(compressParams->WordSize);
                 values.push_back(prop);
                 break;
 
@@ -1035,13 +1035,13 @@ C7zClient::SetCompressionParams(IOutArchive* outArchive, CCompressParams* compre
 
                 // set word size
                 names.Add(L"0o");
-                prop = compressParams->WordSize;
+                prop = static_cast<UInt32>(compressParams->WordSize);
                 values.push_back(prop);
                 break;
             } // switch
         }
 
-        RINOK(setProperties->SetProperties(&names.Front(), &values.front(), names.Size()));
+        RINOK(setProperties->SetProperties(names.ConstData(), &values.front(), names.Size()));
     }
 
     return S_OK;

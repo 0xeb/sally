@@ -652,3 +652,7 @@
 //#define CM_TEXTS_MAX               18000
 
 #endif // __RESOURCE_RH2
+
+#define CM_HELP_WHATSNEW 62040
+#define CM_HELP_SUPPORTER 62041
+#define CM_HELP_SUPPORT 62042

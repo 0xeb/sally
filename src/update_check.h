@@ -29,5 +29,6 @@ void OnStarted();
 
 // Help > Check for Updates.
 void CheckNow(HWND parent);
+void ShowWhatsNew(HWND parent);
 
 } // namespace UpdateCheck

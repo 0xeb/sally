@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include <algorithm>
 #include <cmath>
@@ -544,11 +545,11 @@ protected:
                 DialogGui->AttachStaticText(HWindow, IDC_ABOUT_PVW32, STF_BOLD);
                 CGUIHyperLinkAbstract* link = DialogGui->AttachHyperLink(HWindow, IDC_ABOUT_WWW, STF_UNDERLINE | STF_HYPERLINK_COLOR);
                 if (link != nullptr)
-                    link->SetActionOpen(L"https://sally-filemanager.app/");
+                    link->SetActionOpen(Sally::Urls::Website);
                 // Support is Sally's issue tracker; the closed engine's e-mail address went with it.
                 link = DialogGui->AttachHyperLink(HWindow, IDC_ABOUT_SUPPORT, STF_UNDERLINE | STF_HYPERLINK_COLOR);
                 if (link != nullptr)
-                    link->SetActionOpen(L"https://github.com/0xeb/sally/issues");
+                    link->SetActionOpen(Sally::Urls::Issues);
             }
         }
         return CPictViewDialog::DialogProc(message, wParam, lParam);

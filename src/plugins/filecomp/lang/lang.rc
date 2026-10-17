@@ -73,6 +73,7 @@ BEGIN
     POPUP "&View"
     BEGIN
         MENUITEM "Show &White Space\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "Word W&rap", CM_WORDWRAP
         MENUITEM "Show Only &Differences\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "D&etailed Differences\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

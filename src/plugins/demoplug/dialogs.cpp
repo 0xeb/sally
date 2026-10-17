@@ -11,6 +11,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
@@ -403,7 +404,7 @@ BOOL CCtrlExampleDialog::CreateChilds()
     hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_CE_HLOPEN, STF_UNDERLINE | STF_HYPERLINK_COLOR);
     if (hl == NULL)
         return FALSE;
-    hl->SetActionOpen(L"https://github.com/0xeb/sally");
+    hl->SetActionOpen(Sally::Urls::Repository);
 
     hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_CE_HLCOMMAND, STF_UNDERLINE | STF_HYPERLINK_COLOR);
     if (hl == NULL)

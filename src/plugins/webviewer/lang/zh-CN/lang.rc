@@ -25,4 +25,9 @@ STRINGTABLE
  IDS_UNABLETOOPENIE, "无法打开 Web 查看器。\n请确认已安装 Microsoft Edge WebView2 Runtime。"
  IDS_ERRORTITLE, "错误"
  IDS_NAVIGATIONFAILED, "Web 查看器无法显示此文件。"
+ IDS_VIEW, "查看(&V)"
+ IDS_SVG_BACKGROUND, "背景(&B)"
+ IDS_SVG_CHECKERBOARD, "棋盘格(&C)"
+ IDS_SVG_LIGHT, "浅色(&L)"
+ IDS_SVG_DARK, "深色(&D)"
 }

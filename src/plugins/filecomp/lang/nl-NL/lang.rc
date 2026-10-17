@@ -199,6 +199,7 @@ BEGIN
     POPUP "B&eeld"
     BEGIN
         MENUITEM "&Witruimte weergeven\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "Regelterugloo&p", CM_WORDWRAP
         MENUITEM "Alleen ve&rschillen weergeven\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "Gede&taileerde verschillen\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

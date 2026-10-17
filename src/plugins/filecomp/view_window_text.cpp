@@ -54,7 +54,7 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             Siblink->RemoveSelection(TRUE);
         if (DataValid)
         {
-            int line = FirstVisibleLine + HIWORD(lParam) / FontHeight;
+            int line = HitTestLine(HIWORD(lParam));
             if (line < int(Script[ViewMode].size()))
             {
                 // on the next WM_LBUTTONUP we focus the difference
@@ -68,7 +68,7 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (Script[ViewMode][line].IsBlank())
                         TrackingCharBegin = 0;
                     else
-                        TrackingCharBegin = TransformXOrg(LOWORD(lParam), line);
+                        TrackingCharBegin = HitTestChar(LOWORD(lParam), line);
 
                     //            CMainWindow * parent = (CMainWindow *) WindowsManager.GetWindowPtr(GetParent(HWindow));
                     if (MainWindow /*parent*/)
@@ -89,7 +89,7 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (DataValid)
         {
-            int line = FirstVisibleLine + HIWORD(lParam) / FontHeight;
+            int line = HitTestLine(HIWORD(lParam));
             if (line < int(Script[ViewMode].size()))
             {
                 int start, end;
@@ -145,7 +145,7 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         return 0; // nothing to select
 
                     int l = Script[ViewMode][line].GetLine();
-                    start = end = TransformXOrg(LOWORD(lParam), line);
+                    start = end = HitTestChar(LOWORD(lParam), line);
                     SelectWord(l, start, end);
 
                     if (start == end)
@@ -225,13 +225,18 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             UINT msg = WM_VSCROLL;
             int oldXPos = CaretXPos, oldYPos = CaretYPos;
             int updateSelection = shiftPressed ? USF_EXPAND : USF_REMOVE;
-            BOOL caretOnScreen = CaretYPos >= FirstVisibleLine && CaretYPos <= FirstVisibleLine + Height / FontHeight - 1;
+            BOOL caretOnScreen = CaretVisualRow() >= FirstVisibleLine && CaretVisualRow() <= FirstVisibleLine + Height / FontHeight - 1;
 
             switch (wParam)
             {
             // vertical scrolling
             case 'K':
             case VK_UP:
+                if (WordWrap && !ctrlPressed && !altPressed)
+                {
+                    MoveWrappedCaret(-1, ViewMode == fvmOnlyDifferences && shiftPressed);
+                    break;
+                }
                 if (!ctrlPressed && !altPressed)
                 {
                     if (!shiftPressed && IsSelected())
@@ -255,6 +260,12 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case 'B':
             case VK_PRIOR:
+                if (WordWrap && !ctrlPressed && !altPressed)
+                {
+                    MoveWrappedCaret(-__max(1L, Height / FontHeight - 1), ViewMode == fvmOnlyDifferences && shiftPressed);
+                    if (caretOnScreen) wScrollNotify = SB_PAGEUP;
+                    break;
+                }
                 if (!ctrlPressed && !altPressed)
                 {
                     if (ViewMode == fvmOnlyDifferences && shiftPressed)
@@ -282,6 +293,12 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case 'F':
             case VK_NEXT:
+                if (WordWrap && !ctrlPressed && !altPressed)
+                {
+                    MoveWrappedCaret(__max(1L, Height / FontHeight - 1), ViewMode == fvmOnlyDifferences && shiftPressed);
+                    if (caretOnScreen) wScrollNotify = SB_PAGEDOWN;
+                    break;
+                }
                 if (!ctrlPressed && !altPressed)
                 {
                     if (ViewMode == fvmOnlyDifferences && shiftPressed)
@@ -309,6 +326,11 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case 'J':
             case VK_DOWN:
+                if (WordWrap && !ctrlPressed && !altPressed)
+                {
+                    MoveWrappedCaret(1, ViewMode == fvmOnlyDifferences && shiftPressed);
+                    break;
+                }
                 if (!ctrlPressed && !altPressed)
                 {
                     if (!shiftPressed && IsSelected())
@@ -344,6 +366,12 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 break;
 
             case VK_HOME:
+                if (WordWrap && !ctrlPressed && !altPressed)
+                {
+                    const auto* span = VisualSpan(CaretVisualRow());
+                    SetCaretPos(span ? span->begin : 0, CaretYPos);
+                    break;
+                }
                 if (!ctrlPressed && !altPressed)
                     SetCaretPos(0, CaretYPos);
                 if (ctrlPressed && !altPressed)
@@ -366,6 +394,13 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 break;
 
             case VK_END:
+                if (WordWrap && !ctrlPressed && !altPressed)
+                {
+                    CaretVisualHint = CaretVisualRow();
+                    const auto* span = VisualSpan(CaretVisualHint);
+                    SetCaretPos(span ? span->end : INT_MAX, CaretYPos);
+                    break;
+                }
                 if (!ctrlPressed && !altPressed)
                     SetCaretPos(INT_MAX, CaretYPos);
                 if (ctrlPressed && !altPressed)
@@ -595,16 +630,17 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     SendMessage(Siblink->HWindow, msg, MAKELONG(wScrollNotify, TRUE), 0);
             }
 
-            if (CaretYPos < FirstVisibleLine)
+            const int caretVisual = CaretVisualRow();
+            if (caretVisual < FirstVisibleLine)
             {
-                SendMessage(HWindow, WM_USER_VSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), CaretYPos);
-                SendMessage(Siblink->HWindow, WM_USER_VSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), CaretYPos);
+                SendMessage(HWindow, WM_USER_VSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), caretVisual);
+                SendMessage(Siblink->HWindow, WM_USER_VSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), caretVisual);
             }
 
-            if (CaretYPos > FirstVisibleLine + Height / FontHeight - 1)
+            if (caretVisual > FirstVisibleLine + Height / FontHeight - 1)
             {
-                SendMessage(HWindow, WM_USER_VSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), CaretYPos - Height / FontHeight + 1);
-                SendMessage(Siblink->HWindow, WM_USER_VSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), CaretYPos - Height / FontHeight + 1);
+                SendMessage(HWindow, WM_USER_VSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), caretVisual - Height / FontHeight + 1);
+                SendMessage(Siblink->HWindow, WM_USER_VSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), caretVisual - Height / FontHeight + 1);
             }
 
             int width = Width - LineNumWidth;
@@ -617,13 +653,13 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 x = MeasureLine(l, CaretXPos);
             }
 
-            if (x < FirstVisibleChar)
+            if (!WordWrap && x < FirstVisibleChar)
             {
                 SendMessage(HWindow, WM_USER_HSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), __max(x - FAST_LEFTRIGHT, 0));
                 SendMessage(Siblink->HWindow, WM_USER_HSCROLL, MAKELONG(SB_THUMBTRACK, TRUE), __max(x - FAST_LEFTRIGHT, 0));
             }
 
-            if (x > FirstVisibleChar + width / FontWidth - 1)
+            if (!WordWrap && x > FirstVisibleChar + width / FontWidth - 1)
             {
                 int page = __max(width / FontWidth, 0);
                 int maxPos = __max(MaxWidth - page, 0);
@@ -714,7 +750,7 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         int pos = FirstVisibleLine;
         int page = Height / FontHeight;
-        int maxPos = int(Script[ViewMode].size()) > page ? int(Script[ViewMode].size()) - page : 0;
+        int maxPos = VisualRowCount() > page ? VisualRowCount() - page : 0;
         switch (LOWORD(wParam))
         {
         case SB_BOTTOM:
@@ -789,6 +825,7 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     }
 
     case WM_HSCROLL:
+        if (WordWrap) return 0;
         // prevent SB_FASTLEFT and SB_FASTRIGHT from conflicting
         // with the standard parameters
         if (!TestHScrollWParam(wParam))
@@ -807,6 +844,7 @@ CTextFileViewWindowBase::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_HSCROLL:
     {
+        if (WordWrap) return 0;
         int pos = GetScrollPos(HWindow, SB_HORZ);
         LONG width = __min(Width, SiblinkWidth) - LineNumWidth;
         int page = width / FontWidth;

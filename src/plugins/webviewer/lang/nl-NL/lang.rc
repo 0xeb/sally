@@ -25,4 +25,9 @@ STRINGTABLE
  IDS_UNABLETOOPENIE, "Kan Web Viewer niet openen.\nControleer a.u.b. of de Microsoft Edge WebView2 Runtime is geïnstalleerd."
  IDS_ERRORTITLE, "Fout"
  IDS_NAVIGATIONFAILED, "De webviewer kon dit bestand niet weergeven."
+ IDS_VIEW, "&Beeld"
+ IDS_SVG_BACKGROUND, "&Achtergrond"
+ IDS_SVG_CHECKERBOARD, "&Schaakbord"
+ IDS_SVG_LIGHT, "&Licht"
+ IDS_SVG_DARK, "&Donker"
 }

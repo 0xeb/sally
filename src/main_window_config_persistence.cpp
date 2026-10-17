@@ -2528,13 +2528,13 @@ void CMainWindow::SaveConfig(HWND parent)
             if (CreateKey(salamander, SALAMANDER_COLORS_REG, actKey))
             {
                 DWORD scheme = 4; // custom
-                if (CurrentColors == SalamanderColors)
+                if (CurrentColorScheme == SalamanderColors)
                     scheme = 0;
-                else if (CurrentColors == ExplorerColors)
+                else if (CurrentColorScheme == ExplorerColors)
                     scheme = 1;
-                else if (CurrentColors == NortonColors)
+                else if (CurrentColorScheme == NortonColors)
                     scheme = 2;
-                else if (CurrentColors == NavigatorColors)
+                else if (CurrentColorScheme == NavigatorColors)
                     scheme = 3;
                 SetValueW(actKey, SALAMANDER_CLRSCHEME_REG_W, REG_DWORD, &scheme, sizeof(DWORD));
 
@@ -2863,7 +2863,7 @@ BOOL CMainWindow::LoadConfig(
         if (OpenKey(salamander, SALAMANDER_COLORS_REG, actKey))
         {
             DWORD scheme;
-            CurrentColors = UserColors;
+            CurrentColorScheme = UserColors;
             if (GetValueW(actKey, SALAMANDER_CLRSCHEME_REG_W, REG_DWORD, &scheme, sizeof(DWORD)))
             {
                 // we added a new scheme (DOS Navigator) at position 3
@@ -2871,13 +2871,13 @@ BOOL CMainWindow::LoadConfig(
                     scheme = 4;
 
                 if (scheme == 0)
-                    CurrentColors = SalamanderColors;
+                    CurrentColorScheme = SalamanderColors;
                 else if (scheme == 1)
-                    CurrentColors = ExplorerColors;
+                    CurrentColorScheme = ExplorerColors;
                 else if (scheme == 2)
-                    CurrentColors = NortonColors;
+                    CurrentColorScheme = NortonColors;
                 else if (scheme == 3)
-                    CurrentColors = NavigatorColors;
+                    CurrentColorScheme = NavigatorColors;
             }
 
             LoadRGBF(actKey, SALAMANDER_CLR_ITEM_FG_NORMAL_REG, UserColors[ITEM_FG_NORMAL]);

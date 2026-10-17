@@ -15,7 +15,7 @@
 #include "7zclient.h"
 
 #include "Common/StringConvert.h"
-#include "Windows/Defs.h"
+#include "Windows/WinDefs.h"
 #include "Windows/PropVariant.h"
 #include "Windows/PropVariantConv.h"
 #include "7zip/IPassword.h"

@@ -7,6 +7,7 @@
 #include <string>
 #include <wrl.h>
 #include <WebView2.h>
+#include "svg_background.h"
 
 using Microsoft::WRL::ComPtr;
 using Microsoft::WRL::Callback;
@@ -86,6 +87,8 @@ class CWebView2Host
     std::wstring m_requestedUrl;     // the file the viewer was asked to show
     bool m_showingError = false;      // the error page is up; its own navigation is not checked
     std::string m_lastHtml;
+    bool m_svgFile = false;
+    SvgBackground m_svgBackground = SvgBackground::Checkerboard;
 
 public:
     // Synchronously creates WebView2 (pumps messages until ready).
@@ -119,6 +122,10 @@ public:
     ICoreWebView2Controller* GetController() const { return m_controller.Get(); }
 
     bool IsReady() const { return m_webview != nullptr; }
+    void SetSvgFile(bool value) { m_svgFile = value; }
+    bool IsSvg() const { return m_svgFile; }
+    SvgBackground GetSvgBackground() const { return m_svgBackground; }
+    void SetSvgBackground(SvgBackground value);
 };
 
 //

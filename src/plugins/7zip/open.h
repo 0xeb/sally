@@ -16,7 +16,8 @@ class CArchiveOpenCallbackImp : public IArchiveOpenCallback,
                                 public CMyUnknownImp
 {
 public:
-    MY_UNKNOWN_IMP1(ICryptoGetTextPassword)
+    Z7_COM_UNKNOWN_IMP_1(ICryptoGetTextPassword)
+public:
 
     // IArchiveOpenCallback
     STDMETHOD(SetTotal)

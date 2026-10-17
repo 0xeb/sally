@@ -199,6 +199,7 @@ BEGIN
     POPUP "&Visualiser"
     BEGIN
         MENUITEM "Montrer les espaces &vides\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "&Retour à la ligne", CM_WORDWRAP
         MENUITEM "M&ontrer seulement les différences\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "&Différences détaillées\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

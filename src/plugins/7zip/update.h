@@ -39,7 +39,8 @@ class CUpdateCallbackImp:
   public CMyUnknownImp
 {
 public:
-  MY_UNKNOWN_IMP1(ICryptoGetTextPassword2)
+  Z7_COM_UNKNOWN_IMP_1(ICryptoGetTextPassword2)
+public:
 
   // IProgress
   STDMETHOD(SetTotal)(UINT64 size);
@@ -107,8 +108,9 @@ class CArchiveUpdateCallback : public IArchiveUpdateCallback2,
                                public CMyUnknownImp
 {
 public:
-    MY_UNKNOWN_IMP2(IArchiveUpdateCallback2,
+    Z7_COM_UNKNOWN_IMP_2(IArchiveUpdateCallback2,
                     ICryptoGetTextPassword2)
+public:
 
     // IProgress
     STDMETHOD(SetTotal)

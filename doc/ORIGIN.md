@@ -18,5 +18,5 @@ We would like to thank [Fine company](https://www.finesoftware.eu/) for making t
 ## Resources
 
 - [Open Salamander on GitHub](https://github.com/OpenSalamander/salamander)
-- [Sally Website](https://sally-filemanager.app/)
+- [Sally Website](https://get-sally.app/)
 - [Wikipedia](https://en.wikipedia.org/wiki/Altap_Salamander)

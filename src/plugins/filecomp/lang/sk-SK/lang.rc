@@ -199,6 +199,7 @@ BEGIN
     POPUP "&Zobrazenie"
     BEGIN
         MENUITEM "Zobraziť prázdne &miesto\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "Zalamovať ria&dky", CM_WORDWRAP
         MENUITEM "&Zobraziť len rozdiely\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "D&etailné rozdiely\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

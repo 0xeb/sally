@@ -199,6 +199,7 @@ BEGIN
     POPUP "&Ver"
     BEGIN
         MENUITEM "Ver &espacio en blanco\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "A&juste de línea", CM_WORDWRAP
         MENUITEM "Sólo ver &diferencias\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "D&iferencias detalladas\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

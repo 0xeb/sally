@@ -643,6 +643,9 @@ void CMainWindow::UpdateToolbarButtons(DWORD flags)
                 EnableMenuItem(menu, CM_ONLYDIFFERENCES, MF_BYCOMMAND | MF_ENABLED);
                 CheckMenuItem(menu, CM_SHOWWHITESPACE, MF_BYCOMMAND | (ShowWhiteSpace ? MF_CHECKED : MF_UNCHECKED));
                 EnableMenuItem(menu, CM_SHOWWHITESPACE, MF_BYCOMMAND | MF_ENABLED);
+                const BOOL wrapping = FileView[fviLeft] ? ((CTextFileViewWindowBase*)FileView[fviLeft])->IsWordWrap() : Configuration.WordWrap;
+                CheckMenuItem(menu, CM_WORDWRAP, MF_BYCOMMAND | (wrapping ? MF_CHECKED : MF_UNCHECKED));
+                EnableMenuItem(menu, CM_WORDWRAP, MF_BYCOMMAND | MF_ENABLED);
                 CheckMenuItem(menu, CM_DETAILDIFF, MF_BYCOMMAND | (DetailedDifferences ? MF_CHECKED : MF_UNCHECKED));
                 EnableMenuItem(menu, CM_DETAILDIFF, MF_BYCOMMAND | MF_ENABLED);
                 CheckMenuItem(menu, CM_SHOWCARET, MF_BYCOMMAND | (ShowCaret ? MF_CHECKED : MF_UNCHECKED));
@@ -654,6 +657,8 @@ void CMainWindow::UpdateToolbarButtons(DWORD flags)
                 EnableMenuItem(menu, CM_ONLYDIFFERENCES, MF_BYCOMMAND | MF_GRAYED);
                 CheckMenuItem(menu, CM_SHOWWHITESPACE, MF_BYCOMMAND | MF_UNCHECKED);
                 EnableMenuItem(menu, CM_SHOWWHITESPACE, MF_BYCOMMAND | MF_GRAYED);
+                CheckMenuItem(menu, CM_WORDWRAP, MF_BYCOMMAND | MF_UNCHECKED);
+                EnableMenuItem(menu, CM_WORDWRAP, MF_BYCOMMAND | MF_GRAYED);
                 CheckMenuItem(menu, CM_DETAILDIFF, MF_BYCOMMAND | MF_UNCHECKED);
                 EnableMenuItem(menu, CM_DETAILDIFF, MF_BYCOMMAND | MF_GRAYED);
                 CheckMenuItem(menu, CM_SHOWCARET, MF_BYCOMMAND | MF_UNCHECKED);
@@ -688,6 +693,7 @@ void CMainWindow::UpdateToolbarButtons(DWORD flags)
             EnableMenuItem(menu, CM_ONLYDIFFERENCES, MF_BYCOMMAND | MF_GRAYED);
             CheckMenuItem(menu, CM_SHOWWHITESPACE, MF_BYCOMMAND | MF_UNCHECKED);
             EnableMenuItem(menu, CM_SHOWWHITESPACE, MF_BYCOMMAND | MF_GRAYED);
+            EnableMenuItem(menu, CM_WORDWRAP, MF_BYCOMMAND | MF_GRAYED);
             CheckMenuItem(menu, CM_SHOWCARET, MF_BYCOMMAND | MF_UNCHECKED);
             EnableMenuItem(menu, CM_SHOWCARET, MF_BYCOMMAND | MF_GRAYED);
             CheckMenuItem(menu, CM_SHOWCARET, MF_BYCOMMAND | MF_UNCHECKED);
@@ -1365,6 +1371,16 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         case CM_SHOWWHITESPACE:
+        case CM_WORDWRAP:
+            if (LOWORD(wParam) == CM_WORDWRAP)
+            {
+                if (!DataValid || !FileView[fviLeft]->Is(fvtText)) return 0;
+                Configuration.WordWrap = !((CTextFileViewWindowBase*)FileView[fviLeft])->IsWordWrap();
+                ((CTextFileViewWindowBase*)FileView[fviLeft])->SetWordWrap(Configuration.WordWrap);
+                ((CTextFileViewWindowBase*)FileView[fviRight])->SetWordWrap(Configuration.WordWrap);
+                CheckMenuItem(GetMenu(HWindow), CM_WORDWRAP, MF_BYCOMMAND | (Configuration.WordWrap ? MF_CHECKED : MF_UNCHECKED));
+                return 0;
+            }
         {
             ::Configuration.ShowWhiteSpace = ShowWhiteSpace = !ShowWhiteSpace;
             CheckMenuItem(GetMenu(HWindow), CM_SHOWWHITESPACE, MF_BYCOMMAND | (ShowWhiteSpace ? MF_CHECKED : MF_UNCHECKED));
@@ -2288,6 +2304,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             FileView[fviLeft]->ReloadConfiguration(DWORD(wParam), TRUE);
             FileView[fviRight]->ReloadConfiguration(DWORD(wParam), TRUE);
+            if (wParam & CC_FONT)
+                LayoutChilds(); // rebuild paired visual rows after BOTH font metrics changed
         }
         return 0;
     }

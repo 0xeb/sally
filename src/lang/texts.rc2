@@ -1271,7 +1271,7 @@ STRINGTABLE
 
  IDS_DROPMOVE, "&Move Here"
  IDS_DROPCOPY, "&Copy Here"
- IDS_DROPLINK, "&Other..."
+ IDS_DROPLINK, "Create &Shortcut Here"
  IDS_DROPUNKNOWN, "&Finish Operation"
  IDS_DROPCANCEL, "Cancel"
 

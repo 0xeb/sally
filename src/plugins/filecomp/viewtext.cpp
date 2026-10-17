@@ -211,6 +211,23 @@ BOOL TTextFileViewWindow<CChar>::ReallocLineBuffer()
 }
 
 template <class CChar>
+std::vector<FileCompWrap::Span> TTextFileViewWindow<CChar>::WrapRow(int logical, int width)
+{
+    if (logical < 0 || logical >= static_cast<int>(Script[ViewMode].size()) || Script[ViewMode][logical].IsBlank())
+        return {FileCompWrap::Span{}};
+    const int source = Script[ViewMode][logical].GetLine();
+    return FileCompWrap::Split(std::basic_string_view<CChar>(Lines[source], LineLength(source)), width, TabSize);
+}
+
+template <class CChar>
+int TTextFileViewWindow<CChar>::SnapSource(int logical, int offset, bool forward)
+{
+    if (Script[ViewMode][logical].IsBlank()) return 0;
+    const int source = Script[ViewMode][logical].GetLine();
+    return FileCompWrap::Snap(std::basic_string_view<CChar>(Lines[source], LineLength(source)), offset, forward);
+}
+
+template <class CChar>
 int TTextFileViewWindow<CChar>::TransformXOrg(int x, int line)
 {
     CALL_STACK_MESSAGE3("CTextFileViewWindowBase::TransformXOrg(%d, %d)", x, line);
@@ -537,10 +554,10 @@ void TTextFileViewWindow<CChar>::Paint()
         clipLastRow = clipRect.bottom / FontHeight + 1;
     }
 
-    if (size_t(FirstVisibleLine + clipLastRow) >= Script[ViewMode].size())
+    if (FirstVisibleLine + clipLastRow >= VisualRowCount())
     {
         // clamp to the last valid line in the script
-        clipLastRow = int(Script[ViewMode].size() - FirstVisibleLine);
+        clipLastRow = VisualRowCount() - FirstVisibleLine;
     }
 
     RECT r1; // line-number column
@@ -560,11 +577,25 @@ void TTextFileViewWindow<CChar>::Paint()
 
     for (i = clipFirstRow; i < clipLastRow; i++)
     {
+        const int savedDc = SaveDC(dc);
+        const int savedChar = FirstVisibleChar;
+        const int visual = FirstVisibleLine + i;
+        const auto* wrap = VisualSpan(visual);
+        r2.right = Width;
         text_y = r1.top = r2.top = i * FontHeight;
         r1.bottom = r2.bottom = r1.top + FontHeight;
-        line = FirstVisibleLine + i;
+        line = LogicalRow(visual);
+        if (WordWrap)
+        {
+            FirstVisibleChar = wrap ? wrap->columnBegin : 0;
+            SetBkColor(dc, LineColors[line >= SelectDiffBegin && line <= SelectDiffEnd ? LC_FOCUS :
+                                      Script[ViewMode][line].GetClass() == CLineSpec::lcCommon ? LC_NORMAL : LC_CHANGE].BkColor);
+            FileCompFillRect(dc, &r2);
+            if (wrap && !Script[ViewMode][line].IsBlank())
+                r2.right = min(Width, LineNumWidth + (wrap->columnEnd - wrap->columnBegin) * FontWidth);
+        }
 
-        switch (type = Script[ViewMode][line].GetClass())
+        switch (type = WordWrap && !wrap ? CLineSpec::lcBlank : Script[ViewMode][line].GetClass())
         {
         case CLineSpec::lcSeparator:
         {
@@ -605,7 +636,7 @@ void TTextFileViewWindow<CChar>::Paint()
 
         LDRAWBLANK:
 
-            if (line == SelectDiffBegin || line > 0 && line - 1 == SelectDiffEnd)
+            if ((!WordWrap || visual == VisualRow(line)) && (line == SelectDiffBegin || line > 0 && line - 1 == SelectDiffEnd))
             {
                 // draw the top edge of the active difference highlight
                 // edge within the line-number column
@@ -657,7 +688,7 @@ void TTextFileViewWindow<CChar>::Paint()
 
         LDRAWLINE:
 
-            if (line == SelectDiffBegin || line > 0 && line - 1 == SelectDiffEnd)
+            if ((!WordWrap || visual == VisualRow(line)) && (line == SelectDiffBegin || line > 0 && line - 1 == SelectDiffEnd))
             {
                 // draw the top edge of the active difference highlight
                 // edge within the line-number column
@@ -675,7 +706,10 @@ void TTextFileViewWindow<CChar>::Paint()
             // draw the line number together with its background
             int l = Script[ViewMode][line].GetLine();
             wchar_t num[numeric_limits<int>::digits10 + 3];
-            _snwprintf_s(num, _countof(num), _TRUNCATE, L"%*d", LineNumDigits, l + 1);
+            if (WordWrap && visual != VisualRow(line))
+                _snwprintf_s(num, _countof(num), _TRUNCATE, L"%*s", LineNumDigits, L"");
+            else
+                _snwprintf_s(num, _countof(num), _TRUNCATE, L"%*d", LineNumDigits, l + 1);
             SetTextColor(dc, LineColors[colorScheme].LineNumFgColor);
             SetBkColor(dc, LineColors[colorScheme].LineNumBkColor);
             DrawFileCompText(dc, BORDER_WIDTH, text_y, ETO_OPAQUE | ETO_CLIPPED, &r1,
@@ -1003,8 +1037,11 @@ void TTextFileViewWindow<CChar>::Paint()
             break;
         }
         }
+        FirstVisibleChar = savedChar;
+        RestoreDC(dc, savedDc);
     }
 
+    r2.right = Width;
     if (r1.bottom < clipRect.bottom)
     {
         // also paint the empty area from the last valid script line to the bottom of the window
@@ -1012,7 +1049,7 @@ void TTextFileViewWindow<CChar>::Paint()
         r1.top = r2.top = r1.bottom;
         r1.bottom = r2.bottom = clipRect.bottom;
 
-        if (FirstVisibleLine + i - 1 == SelectDiffEnd)
+        if (LogicalRow(FirstVisibleLine + i - 1) == SelectDiffEnd)
         {
             // draw the top edge of the active difference highlight
             hOldPen = (HPEN)SelectObject(dc, LineColors[LC_FOCUS].LineNumBorderPen);

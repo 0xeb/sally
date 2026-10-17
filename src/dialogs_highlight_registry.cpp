@@ -3330,13 +3330,13 @@ void CCfgPageColors::Transfer(CTransferInfo& ti)
             SetDlgItemTextW(HWindow, CConfigurationPage7Masks[i], LoadStrW(labels[i]));
 
         int index = 4; // custom
-        if (CurrentColors == SalamanderColors)
+        if (CurrentColorScheme == SalamanderColors)
             index = 0;
-        else if (CurrentColors == ExplorerColors)
+        else if (CurrentColorScheme == ExplorerColors)
             index = 1;
-        else if (CurrentColors == NortonColors)
+        else if (CurrentColorScheme == NortonColors)
             index = 2;
-        else if (CurrentColors == NavigatorColors)
+        else if (CurrentColorScheme == NavigatorColors)
             index = 3;
         SendMessageW(HScheme, CB_SETCURSEL, index, 0);
         SendMessageW(HItem, CB_SETCURSEL, 0, 0);
@@ -3356,16 +3356,16 @@ void CCfgPageColors::Transfer(CTransferInfo& ti)
     {
         int index = (int)SendMessageW(HScheme, CB_GETCURSEL, 0, 0);
         if (index == 0)
-            CurrentColors = SalamanderColors;
+            CurrentColorScheme = SalamanderColors;
         else if (index == 1)
-            CurrentColors = ExplorerColors;
+            CurrentColorScheme = ExplorerColors;
         else if (index == 2)
-            CurrentColors = NortonColors;
+            CurrentColorScheme = NortonColors;
         else if (index == 3)
-            CurrentColors = NavigatorColors;
+            CurrentColorScheme = NavigatorColors;
         else
         {
-            CurrentColors = UserColors;
+            CurrentColorScheme = UserColors;
             int i;
             for (i = 0; i < NUMBER_OF_COLORS; i++)
                 UserColors[i] = TmpColors[i];
@@ -3399,7 +3399,7 @@ void CCfgPageColors::LoadColors()
         tmpColors = TmpColors;
 
     // let default values be retrieved
-    UpdateDefaultColors(tmpColors, &HighlightMasks, TRUE, TRUE);
+    UpdateDefaultColors(tmpColors, &HighlightMasks, TRUE, TRUE, tmpColors == TmpColors);
 
     index = (int)SendMessageW(HItem, CB_GETCURSEL, 0, 0);
     CConfigurationPage7Data* data = &Page7Data[index];
@@ -3420,8 +3420,8 @@ void CCfgPageColors::LoadColors()
             // what the panel actually shows in dark mode (these indices are stored flag-0 and
             // are no longer dark-mutated in UpdateDefaultColors). Read-only. #81 follow-up.
             BOOL swatchDark = DarkMode_ShouldUseDark();
-            COLORREF sfg = ResolveDarkBaseColor(subData->ColorFg, GetCOLORREF(tmpColors[subData->ColorFg]), swatchDark);
-            COLORREF sbk = ResolveDarkBaseColor(subData->ColorBk, GetCOLORREF(tmpColors[subData->ColorBk]), swatchDark);
+            COLORREF sfg = ResolvePanelColor(subData->ColorFg, tmpColors[subData->ColorFg], swatchDark, tmpColors == TmpColors);
+            COLORREF sbk = ResolvePanelColor(subData->ColorBk, tmpColors[subData->ColorBk], swatchDark, tmpColors == TmpColors);
             if (subData->Flags & CFG7F_SINGLECOLOR)
                 Items[i]->SetColor(sfg, sfg);
             else
@@ -3457,15 +3457,10 @@ void CCfgPageColors::LoadColors()
         {
             COLORREF fg = GetCOLORREF(maskSwatches[m].fg);
             COLORREF bk = GetCOLORREF(maskSwatches[m].bk);
-            if (isDark)
-            {
-                BYTE fgGray = GetGrayscaleFromRGB(GetRValue(fg), GetGValue(fg), GetBValue(fg));
-                if (fgGray < 96)
-                    fg = ResolveDarkBaseColor(maskSwatches[m].panelFg, GetCOLORREF(tmpColors[maskSwatches[m].panelFg]), TRUE);
-                BYTE bkGray = GetGrayscaleFromRGB(GetRValue(bk), GetGValue(bk), GetBValue(bk));
-                if (bkGray > 160)
-                    bk = ResolveDarkBaseColor(maskSwatches[m].panelBk, GetCOLORREF(tmpColors[maskSwatches[m].panelBk]), TRUE);
-            }
+            if (GetFValue(maskSwatches[m].fg) & SCF_DEFAULT)
+                fg = ResolvePanelColor(maskSwatches[m].panelFg, tmpColors[maskSwatches[m].panelFg], isDark, tmpColors == TmpColors);
+            if (GetFValue(maskSwatches[m].bk) & SCF_DEFAULT)
+                bk = ResolvePanelColor(maskSwatches[m].panelBk, tmpColors[maskSwatches[m].panelBk], isDark, tmpColors == TmpColors);
             Masks[m]->SetColor(fg, bk);
         }
     }

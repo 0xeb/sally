@@ -199,6 +199,7 @@ BEGIN
     POPUP "&Zobrazení"
     BEGIN
         MENUITEM "Zobrazit prázdné &místo\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "Zalamovat řá&dky", CM_WORDWRAP
         MENUITEM "Zobrazit jen &rozdíly\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "D&etailní rozdíly\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

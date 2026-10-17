@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 #include <tchar.h>
 #include <crtdbg.h>
 #include <ostream>
@@ -359,7 +360,7 @@ BOOL CZipPack::LoadDefaults()
             // depends on how any compiler decides to read this file.
             lstrcpyA(Options.SfxSettings.Vendor,
                      ZipLegacyFormatBytes(L"Self-Extractor \u00A9 2000-2023 Open Salamander Authors").c_str());
-            lstrcpyA(Options.SfxSettings.WWW, "https://github.com/0xeb/sally");
+            lstrcpyA(Options.SfxSettings.WWW, Sally::Urls::RepositoryUtf8);
         }
         else
         {

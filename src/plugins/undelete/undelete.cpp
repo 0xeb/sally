@@ -37,6 +37,7 @@
 //
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include "undelete.rh"
 #include "undelete.rh2"
@@ -265,7 +266,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    String<wchar_t>::LangStr(IDS_DESCRIPTION).c_str(),
                                    L"UNDELETE" /* DO NOT TRANSLATE! */, NULL, L"del");
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     // get our FS-name (it could be different than "del", Salamander could change it)
     AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);

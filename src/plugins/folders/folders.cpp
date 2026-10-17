@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include "dialogs.h"
 #include "folders.h"
@@ -109,7 +110,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"FOLDERS" /* neprekladat! */, NULL, L"fld");
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     // obtain our FS name (it may not be "fld", Salamander can adjust it)
     AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);

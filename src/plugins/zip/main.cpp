@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 #include "reg_sz_narrow_bridge.h"
 #include <tchar.h>
 #include <crtdbg.h>
@@ -182,7 +183,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    L"ZIP" /* neprekladat! */, L"zip;pk3;pk4;jar");
 
     // register the plugin home page URL
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
 #undef ZIP_WIDEN
 #undef ZIP_WIDEN2

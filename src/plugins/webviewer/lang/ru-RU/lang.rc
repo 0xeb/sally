@@ -25,4 +25,9 @@ STRINGTABLE
  IDS_UNABLETOOPENIE, "Не удалось открыть средство просмотра Web.\nПожалуйста, убедитесь, что установлена среда Microsoft Edge WebView2 Runtime."
  IDS_ERRORTITLE, "Ошибка"
  IDS_NAVIGATIONFAILED, "Веб-просмотрщику не удалось показать этот файл."
+ IDS_VIEW, "&Вид"
+ IDS_SVG_BACKGROUND, "&Фон"
+ IDS_SVG_CHECKERBOARD, "&Шахматная доска"
+ IDS_SVG_LIGHT, "&Светлый"
+ IDS_SVG_DARK, "&Тёмный"
 }

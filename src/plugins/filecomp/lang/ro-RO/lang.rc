@@ -199,6 +199,7 @@ BEGIN
     POPUP "&Vizualizeaza"
     BEGIN
         MENUITEM "Arata &Spatiu Alb\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "În&cadrare rânduri", CM_WORDWRAP
         MENUITEM "Arata Doar &Diferentele\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "Difere&ntele Detaliate\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

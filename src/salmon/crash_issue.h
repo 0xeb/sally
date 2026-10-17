@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include "SallyUrls.h"
 #include <string>
 #include <string_view>
 #include <vector>
@@ -30,7 +31,7 @@ struct CrashSummary
 CrashSummary SummarizeBugReport(std::string_view report);
 
 // Address of a new issue in Sally's public tracker.
-inline constexpr std::string_view kNewIssueAddress = "https://github.com/0xeb/sally/issues/new";
+inline constexpr std::string_view kNewIssueAddress = Sally::Urls::NewIssueUtf8;
 
 // Longest address handed to the shell: longer ones are not opened reliably.
 inline constexpr size_t kMaxIssueAddressLength = 2000;

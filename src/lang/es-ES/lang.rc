@@ -585,22 +585,25 @@ BEGIN
     PUSHBUTTON      "Ayuda",IDHELP,126,181,50,14
 END
 
-IDD_ABOUT DIALOGEX 58, 50, 299, 184
+IDD_ABOUT DIALOGEX 58, 50, 299, 244
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_BORDER
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "",IDC_ABOUT_OPENSAL,10,9,143,40
     LTEXT           "",IDC_ABOUT_LOGO,174,1,123,104
-    DEFPUSHBUTTON   "Cerrar",IDOK,124,162,50,14,WS_GROUP
     LTEXT           "Versión",IDS_ABOUT_SALAMANDER,10,86,201,8
     LTEXT           "Copyright © 1997-2023 Open Salamander Authors",IDC_STATIC_1,10,97,196,8
     LTEXT           "Sitio web:",IDC_STATIC_6,10,108,40,8
-    LTEXT           "sally-filemanager.app",IDC_ABOUT_WEBSITE,52,108,148,8,WS_TABSTOP
+    LTEXT           "get-sally.app",IDC_ABOUT_WEBSITE,52,108,148,8,WS_TABSTOP
     LTEXT           "GitHub:",IDC_STATIC_3,10,119,40,8
     LTEXT           "github.com/0xeb/sally",IDC_ABOUT_WWW,52,119,148,8,WS_TABSTOP
     LTEXT           "Sally modifications © 2025-2026 Elias Bachaalany",IDC_STATIC_4,10,130,280,8
     LTEXT           "Licenciado bajo la Licencia Pública General de GNU versión 2 o posterior",IDC_STATIC_5,10,141,280,8
-    CONTROL         "",IDC_ABOUT_BOTTOM,"Static",SS_ETCHEDHORZ | WS_GROUP,2,154,294,1
+    CONTROL         "",IDC_ABOUT_BOTTOM,"Static",SS_ETCHEDHORZ | WS_GROUP,2,216,294,1
+    LTEXT "",62043,10,160,280,38,SS_NOPREFIX
+    PUSHBUTTON "",62044,10,222,84,14,WS_TABSTOP | WS_GROUP
+    PUSHBUTTON "",62045,100,222,132,14,WS_TABSTOP
+    DEFPUSHBUTTON   "Cerrar",IDOK,238,222,50,14,WS_TABSTOP
 END
 
 IDD_DRIVEINFO DIALOGEX 16, 28, 337, 290
@@ -3434,7 +3437,7 @@ STRINGTABLE
 
  IDS_DROPMOVE, "&Trasladar aquí"
  IDS_DROPCOPY, "&Copiar aquí"
- IDS_DROPLINK, "&Otro..."
+ IDS_DROPLINK, "Crear acceso &directo aquí"
  IDS_DROPUNKNOWN, "&Finalizar operación"
  IDS_DROPCANCEL, "Cancelar"
 

@@ -4,6 +4,8 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "SallyUrls.h"
+#include "sal_colors.h"
 #include <time.h>
 //#ifdef MSVC_RUNTIME_CHECKS
 #include <rtcapi.h>
@@ -214,7 +216,7 @@ void X64StressTestAlloc()
     // verify success
     void* testNew = new char; // new goes through alloc, but let's verify anyway
     if (testNew <= (LPVOID)(UINT_PTR)0x00000000ffffffff)
-        MessageBoxW(NULL, L"new address <= 0x00000000ffffffff!\nPlease open an issue at https://github.com/0xeb/sally/issues with this information.", L"X64_STRESS_TEST", MB_OK | MB_ICONEXCLAMATION);
+        MessageBoxW(NULL, (std::wstring(L"new address <= 0x00000000ffffffff!\nPlease open an issue at ") + Sally::Urls::Issues + L" with this information.").c_str(), L"X64_STRESS_TEST", MB_OK | MB_ICONEXCLAMATION);
     delete testNew;
 }
 
@@ -561,7 +563,9 @@ DWORD EnablerItemsContextMenu = FALSE;
 DWORD EnablerOpenActiveFolder = FALSE;
 DWORD EnablerPermissions = FALSE;
 
-COLORREF* CurrentColors = SalamanderColors;
+COLORREF* CurrentColorScheme = SalamanderColors;
+static SALCOLOR ResolvedPanelColors[NUMBER_OF_COLORS];
+COLORREF* CurrentColors = ResolvedPanelColors;
 
 COLORREF UserColors[NUMBER_OF_COLORS];
 
@@ -1487,7 +1491,7 @@ COLORREF GetFullRowHighlight(COLORREF bkHighlightColor) // returns "heuristic" h
     return ColorHLSToRGB(h, l, s);
 }
 
-void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL processColors, BOOL processMasks)
+void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL processColors, BOOL processMasks, BOOL customScheme)
 {
     BOOL darkDefaults = DarkMode_ShouldUseDark();
 
@@ -1599,50 +1603,12 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
             SetRGBPart(&colors[HOT_INACTIVE], clr);
         }
 
-        if (darkDefaults)
-        {
-            // Force a coherent dark palette for panel/client rendering in V2.
-            // Keeping these synchronized avoids icon background artifacts when
-            // image-list background follows ITEM_BK_NORMAL.
-            //
-            // NOTE: the "base" selection/focus colors that are stored flag-0 in the color
-            // schemes (their RGB is the source of truth, not SCF_DEFAULT-derived) must NOT
-            // be overwritten here. Writing dark values in place corrupts their light RGB and
-            // leaves selection colors dark after a dark->light switch (#81 follow-up). Those
-            // indices — FOCUS_FG_INACTIVE_NORMAL/SELECTED, ITEM_FG_SELECTED/FOCSEL,
-            // ITEM_BK_FOCUSED/FOCSEL, ICON_BLEND_FOCUSED/FOCSEL — are resolved to their dark
-            // value at render time via ResolveDarkBaseColor() (see sal_colors.cpp), mirroring
-            // how the highlight-mask dark contrast is already handled in files_window_paint.cpp.
-            SetRGBPart(&colors[FOCUS_ACTIVE_NORMAL], RGB(145, 145, 145));
-            SetRGBPart(&colors[FOCUS_ACTIVE_SELECTED], RGB(220, 220, 220));
-            SetRGBPart(&colors[FOCUS_BK_INACTIVE_NORMAL], RGB(30, 30, 30));
-            SetRGBPart(&colors[FOCUS_BK_INACTIVE_SELECTED], RGB(30, 30, 30));
-
-            SetRGBPart(&colors[ITEM_FG_NORMAL], RGB(232, 232, 232));
-            SetRGBPart(&colors[ITEM_FG_FOCUSED], RGB(255, 255, 255));
-            SetRGBPart(&colors[ITEM_FG_HIGHLIGHT], RGB(255, 255, 255));
-
-            SetRGBPart(&colors[ITEM_BK_NORMAL], RGB(30, 30, 30));
-            SetRGBPart(&colors[ITEM_BK_SELECTED], RGB(30, 30, 30));
-            SetRGBPart(&colors[ITEM_BK_HIGHLIGHT], RGB(45, 45, 48));
-
-            SetRGBPart(&colors[ICON_BLEND_SELECTED], RGB(120, 170, 255));
-
-            SetRGBPart(&colors[PROGRESS_FG_NORMAL], RGB(232, 232, 232));
-            SetRGBPart(&colors[PROGRESS_FG_SELECTED], RGB(255, 255, 255));
-            SetRGBPart(&colors[PROGRESS_BK_NORMAL], RGB(30, 30, 30));
-            SetRGBPart(&colors[PROGRESS_BK_SELECTED], RGB(62, 125, 231));
-
-            SetRGBPart(&colors[HOT_PANEL], RGB(120, 170, 255));
-            SetRGBPart(&colors[HOT_ACTIVE], RGB(170, 200, 255));
-            SetRGBPart(&colors[HOT_INACTIVE], RGB(140, 170, 220));
-
-            SetRGBPart(&colors[ACTIVE_CAPTION_FG], RGB(235, 235, 235));
-            SetRGBPart(&colors[ACTIVE_CAPTION_BK], RGB(45, 45, 48));
-            SetRGBPart(&colors[INACTIVE_CAPTION_FG], RGB(180, 180, 180));
-            SetRGBPart(&colors[INACTIVE_CAPTION_BK], RGB(37, 37, 38));
-        }
     }
+
+    SALCOLOR effective[NUMBER_OF_COLORS];
+    ResolvePanelPalette(colors, effective, darkDefaults, customScheme || colors == UserColors);
+    if (colors == CurrentColorScheme)
+        memcpy(ResolvedPanelColors, effective, sizeof(effective));
 
     if (processMasks)
     {
@@ -1652,21 +1618,21 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
         {
             CHighlightMasksItem* item = highlightMasks->At(i);
             if (GetFValue(item->NormalFg) & SCF_DEFAULT)
-                SetRGBPart(&item->NormalFg, GetCOLORREF(colors[ITEM_FG_NORMAL]));
+                SetRGBPart(&item->NormalFg, GetCOLORREF(effective[ITEM_FG_NORMAL]));
             if (GetFValue(item->NormalBk) & SCF_DEFAULT)
-                SetRGBPart(&item->NormalBk, GetCOLORREF(colors[ITEM_BK_NORMAL]));
+                SetRGBPart(&item->NormalBk, GetCOLORREF(effective[ITEM_BK_NORMAL]));
             if (GetFValue(item->FocusedFg) & SCF_DEFAULT)
-                SetRGBPart(&item->FocusedFg, GetCOLORREF(colors[ITEM_FG_FOCUSED]));
+                SetRGBPart(&item->FocusedFg, GetCOLORREF(effective[ITEM_FG_FOCUSED]));
             if (GetFValue(item->FocusedBk) & SCF_DEFAULT)
-                SetRGBPart(&item->FocusedBk, GetCOLORREF(colors[ITEM_BK_FOCUSED]));
+                SetRGBPart(&item->FocusedBk, GetCOLORREF(effective[ITEM_BK_FOCUSED]));
             if (GetFValue(item->SelectedFg) & SCF_DEFAULT)
-                SetRGBPart(&item->SelectedFg, GetCOLORREF(colors[ITEM_FG_SELECTED]));
+                SetRGBPart(&item->SelectedFg, GetCOLORREF(effective[ITEM_FG_SELECTED]));
             if (GetFValue(item->SelectedBk) & SCF_DEFAULT)
-                SetRGBPart(&item->SelectedBk, GetCOLORREF(colors[ITEM_BK_SELECTED]));
+                SetRGBPart(&item->SelectedBk, GetCOLORREF(effective[ITEM_BK_SELECTED]));
             if (GetFValue(item->FocSelFg) & SCF_DEFAULT)
-                SetRGBPart(&item->FocSelFg, GetCOLORREF(colors[ITEM_FG_FOCSEL]));
+                SetRGBPart(&item->FocSelFg, GetCOLORREF(effective[ITEM_FG_FOCSEL]));
             if (GetFValue(item->FocSelBk) & SCF_DEFAULT)
-                SetRGBPart(&item->FocSelBk, GetCOLORREF(colors[ITEM_BK_FOCSEL]));
+                SetRGBPart(&item->FocSelBk, GetCOLORREF(effective[ITEM_BK_FOCSEL]));
             if (GetFValue(item->HighlightFg) & SCF_DEFAULT)
                 SetRGBPart(&item->HighlightFg, GetCOLORREF(item->NormalFg));
             if (GetFValue(item->HighlightBk) & SCF_DEFAULT) // FULL ROW HIGHLIGHT based on _NORMAL
@@ -2261,7 +2227,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
 
     HDC dc = HANDLES(GetDC(NULL));
     CHighlightMasks* masks = MainWindow != NULL ? MainWindow->HighlightMasks : NULL;
-    UpdateDefaultColors(CurrentColors, masks, TRUE, masks != NULL);
+    UpdateDefaultColors(CurrentColorScheme, masks, TRUE, masks != NULL);
     if (!colorsOnly)
     {
         // Load shell32.dll first - always available (including under Wine)
@@ -4274,7 +4240,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
                 if (!MainWindow->LoadConfig(currentCfgDoesNotExist, !importCfgFromFileWasSkipped ? &cmdLineParams : NULL))
                 {
                     setActivePanelAndPanelPaths = TRUE;
-                    UpdateDefaultColors(CurrentColors, MainWindow->HighlightMasks, FALSE, TRUE);
+                    UpdateDefaultColors(CurrentColorScheme, MainWindow->HighlightMasks, FALSE, TRUE);
                     Plugins.CheckData();
                     MainWindow->InsertMenuBand();
                     if (Configuration.TopToolBarVisible)

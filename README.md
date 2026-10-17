@@ -15,20 +15,20 @@ Sally is a fast, keyboard-first dual-panel file manager for Windows power users.
 </p>
 
 <p align="center">
-  <a href="https://sally-filemanager.app/">Website</a> ·
-  <a href="https://sally-filemanager.app/manual/">Manual</a> ·
-  <a href="https://sally-filemanager.app/manual/sally/shortcuts_keyboard.html">Keyboard shortcuts</a> ·
-  <a href="https://sally-filemanager.app/changelog/">Changelog</a> ·
-  <a href="https://sally-filemanager.app/get-involved/">Ways to help</a>
+  <a href="https://get-sally.app/">Website</a> ·
+  <a href="https://get-sally.app/manual/">Manual</a> ·
+  <a href="https://get-sally.app/manual/sally/shortcuts_keyboard.html">Keyboard shortcuts</a> ·
+  <a href="https://get-sally.app/changelog/">Changelog</a> ·
+  <a href="https://get-sally.app/get-involved/">Ways to help</a>
 </p>
 
 <p align="center">
-  <img src="doc/images/sally-dark-panels.png" alt="Sally 1.0.38 in dark mode with two panels and Greek and Cyrillic folder names" width="900">
+  <img src="doc/images/sally-dark-panels.png" alt="Sally 1.0.39 in dark mode with two panels and Greek and Cyrillic folder names" width="900">
   <br>
-  <em>Sally 1.0.38 on Windows, captured from the x64 review candidate.</em>
+  <em>Sally 1.0.39 on Windows, captured from the x64 review candidate.</em>
 </p>
 
-See the [screenshot gallery](https://sally-filemanager.app/screenshots/) for light mode,
+See the [screenshot gallery](https://get-sally.app/screenshots/) for light mode,
 archive browsing, viewers, Find and plugin dialogs.
 
 ## Why Sally
@@ -56,9 +56,9 @@ Sally's biggest modernization effort is path correctness. A file manager is only
 - Ongoing hardening covers ADS streams, reparse points, recursive delete prompts, same-volume moves, and Unicode worker error reporting.
 
 <p align="center">
-  <img src="doc/images/sally-dark-unicode-long-path.png" alt="Sally 1.0.38 browsing a path longer than 260 characters alongside Greek and Cyrillic folder names" width="900">
+  <img src="doc/images/sally-dark-unicode-long-path.png" alt="Sally 1.0.39 browsing a path longer than 260 characters alongside Greek and Cyrillic folder names" width="900">
   <br>
-  <em>Sally 1.0.38 browsing a folder beyond the old 260-character path limit.</em>
+  <em>Sally 1.0.39 browsing a folder beyond the old 260-character path limit.</em>
 </p>
 
 ### Fast Find And Safer Results
@@ -108,7 +108,7 @@ A panel path can name a file, so a shortcut can open a picture immediately:
 sally.exe -profile preview -l "C:\Pictures\beach.jpg" -p 1 -do view
 ```
 
-See [Starting Sally with Parameters](https://sally-filemanager.app/manual/sally/othertask_param.html)
+See [Starting Sally with Parameters](https://get-sally.app/manual/sally/othertask_param.html)
 for the full syntax and single-instance limitations.
 
 ### Bundled Plugins
@@ -166,12 +166,14 @@ it is an earlier-release compatibility illustration.
 
 Grab an x64 runtime zip from the [Releases](https://github.com/0xeb/sally/releases)
 page and launch it with `wine sally.exe`. Sally needs no .NET or Wine Mono/Gecko.
-See [Linux and Wine](https://sally-filemanager.app/download/#wine) on the website and the [Wine guide](doc/WINE.md) for install steps, a download/run walkthrough,
+See [Linux and Wine](https://get-sally.app/download/#wine) on the website and the [Wine guide](doc/WINE.md) for install steps, a download/run walkthrough,
 a launcher wrapper, and troubleshooting.
 
 ## Support Sally
 
 Sally is free, with no ads, no telemetry and no paid edition. If it saves you time, a donation pays for the next fix, and a star helps a small Windows project get found.
+
+An optional supporter key acknowledges your contribution locally. Import or paste it through **Help → Enter supporter key**; verification works offline. Your name and support dates are available in About, with an optional title-bar acknowledgement. Every feature and update remains free when the support term ends. See [Support Sally](https://get-sally.app/support-sally/) for contribution and key-delivery details.
 
 <p>
   <a href="https://paypal.me/EliasBachaalany"><img alt="Donate with PayPal" src="https://img.shields.io/badge/Donate-PayPal-0070e0?style=for-the-badge&logo=paypal&logoColor=white"></a>
@@ -189,6 +191,7 @@ Bug reports, focused testing, translation help, and careful feature requests are
 
 - [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/) with the **Desktop development with C++** workload
 - [Windows 11 SDK](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/) (10.0.26100 or newer)
+- Python 3.10 or newer available on `PATH` for build-time public-key and release-metadata generation (standard library only)
 
 ### Build Commands
 
@@ -225,7 +228,7 @@ English originals are the `lang.rc` files one level up.
 
 The [Developer Guide](doc/DEV.md#translations) has the details.
 
-Spotted a mistake in the [manual](https://sally-filemanager.app/manual/)? Open an issue with the
+Spotted a mistake in the [manual](https://get-sally.app/manual/)? Open an issue with the
 page address and the correction.
 
 Good issue reports include the Sally version, architecture, exact path or filename shape when relevant, steps to reproduce, and whether the bug happens with the latest release.
@@ -247,4 +250,4 @@ Individual components and libraries have separate but compatible licenses, and s
 
 ## Resources
 
-[Sally Website](https://sally-filemanager.app/) | [Releases](https://github.com/0xeb/sally/releases) | [Discussions](https://github.com/0xeb/sally/discussions) | [Issues](https://github.com/0xeb/sally/issues) | [Upstream Repository](https://github.com/OpenSalamander/salamander) | [Wikipedia](https://en.wikipedia.org/wiki/Altap_Salamander)
+[Sally Website](https://get-sally.app/) | [Releases](https://github.com/0xeb/sally/releases) | [Discussions](https://github.com/0xeb/sally/discussions) | [Issues](https://github.com/0xeb/sally/issues) | [Upstream Repository](https://github.com/OpenSalamander/salamander) | [Wikipedia](https://en.wikipedia.org/wiki/Altap_Salamander)

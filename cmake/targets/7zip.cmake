@@ -10,54 +10,8 @@ set(SEVENZIP_7ZA "${SEVENZIP_DIR}/7za")
 # 7za.dll - 7-Zip compression library
 # =============================================================================
 
-# Load exact source list extracted from vcxproj
-include("${CMAKE_CURRENT_LIST_DIR}/7za_sources.cmake")
-
-add_library(7za SHARED ${7ZA_SOURCES})
-
-target_include_directories(7za PRIVATE
-  "${SEVENZIP_7ZA}/cpp"
-  "${SEVENZIP_7ZA}/c"
-)
-
-target_compile_definitions(7za PRIVATE
-  WIN32
-  _WINDOWS
-  _USRDLL
-  BZIP2_EXTRACT_ONLY
-  _7ZIP_LARGE_PAGES
-  ${SAL_COMMON_DEFINES}
-)
-
-target_link_libraries(7za PRIVATE
-  mpr
-  comctl32
-  oleaut32
-  ole32
-  user32
-)
-
-if(MSVC)
-  target_compile_options(7za PRIVATE
-    /MP
-    /wd4005  # Macro redefinition
-    /wd4456 /wd4457 /wd4458  # Shadowing warnings
-    /wd4267  # Size conversion
-    /wd5043  # Exception specification mismatch (third-party code)
-    /Gz  # __stdcall
-  )
-  target_link_options(7za PRIVATE
-    /DEF:"${SEVENZIP_7ZA}/spl/7za.def"
-    /MANIFEST:NO
-  )
-endif()
-
-# C files don't use PCH - filter from 7ZA_SOURCES
-foreach(src ${7ZA_SOURCES})
-  if(src MATCHES "\\.c$")
-    set_source_files_properties("${src}" PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
-  endif()
-endforeach()
+include("${CMAKE_CURRENT_LIST_DIR}/7za_library.cmake")
+sal_add_sevenzip_codec(7za)
 
 set_target_properties(7za PROPERTIES
   OUTPUT_NAME "7za"
@@ -87,6 +41,7 @@ add_library(7zwrapper SHARED
   "${SEVENZIP_7ZA}/cpp/Windows/FileName.cpp"
   "${SEVENZIP_7ZA}/cpp/Windows/PropVariant.cpp"
   "${SEVENZIP_7ZA}/cpp/Windows/PropVariantConv.cpp"
+  "${SEVENZIP_7ZA}/cpp/Windows/TimeUtils.cpp"
 )
 
 target_include_directories(7zwrapper PRIVATE
@@ -97,7 +52,6 @@ target_compile_definitions(7zwrapper PRIVATE
   WIN32
   _WINDOWS
   _USRDLL
-  USE_UNICODE_FSTRING
   ${SAL_COMMON_DEFINES}
 )
 
@@ -133,8 +87,12 @@ sal_add_plugin(NAME 7zip
     "${SEVENZIP_7ZA}/cpp/Common/StringConvert.cpp"
     "${SEVENZIP_7ZA}/cpp/Windows/DLL.cpp"
     "${SEVENZIP_7ZA}/cpp/Windows/FileIO.cpp"
+    "${SEVENZIP_7ZA}/cpp/Windows/FileDir.cpp"
+    "${SEVENZIP_7ZA}/cpp/Windows/FileFind.cpp"
+    "${SEVENZIP_7ZA}/cpp/Windows/FileName.cpp"
     "${SEVENZIP_7ZA}/cpp/Windows/PropVariant.cpp"
     "${SEVENZIP_7ZA}/cpp/Windows/PropVariantConv.cpp"
+    "${SEVENZIP_7ZA}/cpp/Windows/TimeUtils.cpp"
     # Plugin sources
     "${SEVENZIP_DIR}/7zclient.cpp"
     "${SEVENZIP_DIR}/7zip.cpp"
@@ -149,8 +107,6 @@ sal_add_plugin(NAME 7zip
   DEF "${SEVENZIP_DIR}/7zip.def"
   INCLUDES
     "${SEVENZIP_7ZA}/cpp"
-  DEFINES
-    USE_UNICODE_FSTRING
 )
 
 # Rename to sal7zip.dll to avoid clash with 7-Zip library DLLs

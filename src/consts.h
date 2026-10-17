@@ -1291,6 +1291,7 @@ inline void SetRGBPart(SALCOLOR* salColor, COLORREF rgb)
 }
 
 extern SALCOLOR* CurrentColors;               // current colors
+extern SALCOLOR* CurrentColorScheme;          // stored scheme; CurrentColors is its resolved palette
 extern SALCOLOR UserColors[NUMBER_OF_COLORS]; // modified colors
 
 extern SALCOLOR SalamanderColors[NUMBER_OF_COLORS]; // standard colors
@@ -1868,7 +1869,7 @@ BOOL ImportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL ignoreIfNo
                           BOOL autoImportConfig, BOOL* importCfgFromFileWasSkipped);
 
 class CHighlightMasks;
-void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL processColors, BOOL processMasks);
+void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL processColors, BOOL processMasks, BOOL customScheme = FALSE);
 
 extern BOOL ImageDragging;                                                // image is currently being dragged
 extern BOOL ImageDraggingVisible;                                         // is image currently displayed?

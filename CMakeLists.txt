@@ -92,6 +92,7 @@ set(CMAKE_C_STANDARD 11)
 
 # Load common settings
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sal_common.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sal_supporter.cmake)
 
 # yyjson 0.12.0 is shared by the core settings reader and the updater (salupdate.exe).
 add_library(yyjson STATIC "${SAL_SRC}/common/dep/yyjson/yyjson.c")
@@ -112,6 +113,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sal_nuget.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/sally_sources.cmake)
 
 add_executable(sally WIN32)
+target_sources(sally PRIVATE "${SALLY_PUBLIC_RESOURCE}")
 
 target_include_directories(sally PRIVATE
   "${SALLY_GENERATED_INCLUDE_DIR}"
@@ -127,6 +129,7 @@ target_compile_definitions(sally PRIVATE
 )
 
 target_link_libraries(sally PRIVATE
+  sally_supporter_md
   comctl32 mpr ws2_32 netapi32 msimg32 shlwapi
   yyjson
   ${SAL_COMMON_LIBS}
@@ -312,11 +315,15 @@ set_target_properties(salspawn PROPERTIES
 # ==============================================================================
 
 add_executable(salupdate WIN32
+  "${SALLY_PUBLIC_RESOURCE}"
   "${SAL_SRC}/salupdate/salupdate.cpp"
   "${SAL_SRC}/salupdate/install.cpp"
   "${SAL_SRC}/salupdate/update_window.cpp"
   "${SAL_SRC}/salupdate/salupdate.rc"
   "${SAL_SRC}/common/Win32HttpsClient.cpp"
+  "${SAL_SRC}/common/Win32OptionalHttpsClient.cpp"
+  "${SAL_SRC}/common/Win32DisplayContent.cpp"
+  "${SAL_SRC}/common/Win32Registry.cpp"
   "${SAL_SRC}/common/update/GitHubRelease.cpp"
   "${SAL_SRC}/common/update/ReleaseDownload.cpp"
   "${SAL_SRC}/common/update/ReleaseChecksums.cpp"
@@ -346,11 +353,14 @@ target_compile_definitions(salupdate PRIVATE
 )
 
 target_link_libraries(salupdate PRIVATE
-  shell32 ole32 bcrypt version wininet
+  comctl32
+  sally_supporter_mt
+  shell32 ole32 bcrypt version wininet winhttp shlwapi
 )
 
 if(MSVC)
   target_link_options(salupdate PRIVATE /SUBSYSTEM:WINDOWS /MANIFEST:NO)
+  target_compile_options(salupdate PRIVATE /utf-8)
 elseif(MINGW)
   target_link_options(salupdate PRIVATE -Wl,--subsystem,windows -municode)
 endif()
@@ -587,3 +597,22 @@ message(STATUS "Output: ${SAL_OUTPUT_BASE}/<Config>_${SAL_PLATFORM}")
 message(STATUS "SAL_UNDER_CI: ${SAL_UNDER_CI}")
 message(STATUS "SAL_BUILD_DEMOPLUG: ${SAL_BUILD_DEMOPLUG}")
 message(STATUS "")
+
+# Deterministic source-authored release content, identical for every platform.
+file(GLOB_RECURSE _release_inputs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/doc/releases/*")
+set(_release_metadata "${CMAKE_CURRENT_BINARY_DIR}/release-metadata.json")
+set(_metadata_strict)
+if(SAL_UNDER_CI)
+  set(_metadata_strict --publication-check)
+endif()
+add_custom_target(sally_release_metadata ALL
+  COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate-release-metadata.py"
+    --sally-root "${CMAKE_CURRENT_SOURCE_DIR}" --output "${_release_metadata}" ${_metadata_strict}
+  BYPRODUCTS "${_release_metadata}"
+  DEPENDS ${_release_inputs} "${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/shared/spl_vers.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/common/BuiltinLanguages.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate-release-metadata.py" VERBATIM)
+add_dependencies(populate sally_release_metadata)
+install(FILES "${_release_metadata}" DESTINATION doc)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/doc/third_party.txt" DESTINATION doc)
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/doc/license/" DESTINATION doc/license)

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "supporter/Win32SupporterUi.h"
 #include "ui/UnicodeHistoryUtils.h" // ShouldUseWidePair
 #include "common/IRegistry.h" // wide hot-path persistence
 
@@ -1990,6 +1991,11 @@ void CMainWindow::SetWindowTitle(const wchar_t* text)
 
     if (useDefaultTitle)
     {
+        // WM_ACTIVATE can arrive while the first-run window is being created,
+        // before a configuration root has been selected. Never construct a
+        // std::wstring from that not-yet-initialized profile pointer.
+        if (SALAMANDER_ROOT_REG != NULL && gRegistry != NULL)
+            textW += Sally::Supporter::SupporterTitleSuffix(SALAMANDER_ROOT_REG, *gRegistry, LanguageID);
         ::SetWindowTextW(HWindow, textW.c_str());
         if (Configuration.StatusArea)
             SetTrayIconTextW(textW.c_str());

@@ -201,6 +201,7 @@ struct CConfiguration
     // Not part of CRegBLOBConfiguration:
     BOOL HorizontalView;
     BOOL AutoCopy; // AutoCopy Selection to Clipboard
+    BOOL WordWrap; // separate registry value; never extend the legacy binary blob
 };
 
 extern CCompareOptions DefCompareOptions;

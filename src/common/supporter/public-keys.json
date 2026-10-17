@@ -1,0 +1,17 @@
+{
+  "keys": [
+    {
+      "algorithm": "ed25519",
+      "key_id": "content-2026-01",
+      "public_key_base64url": "4ZtcbTQIEzbulfV-KYoWICU4XNo4BrAlN4Bx8OCA8Ag",
+      "purpose": "content"
+    },
+    {
+      "algorithm": "ed25519",
+      "key_id": "supporter-2026-01",
+      "public_key_base64url": "gO9NpCTEeIwtVLeOvMAh0jk0U7Y1GiWKh3bs4Ve4-ns",
+      "purpose": "supporter"
+    }
+  ],
+  "schema_version": 1
+}

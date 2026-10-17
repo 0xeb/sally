@@ -4,6 +4,8 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "SallyUrls.h"
+#include "supporter/Win32SupporterUi.h"
 
 #include "common/IShell.h"
 #include "common/ShellUndoPolicy.h"
@@ -507,7 +509,7 @@ BOOL OpenHtmlHelp(const wchar_t* helpFileName, HWND parent, CHtmlHelpCommand com
         return FALSE;
     }
 
-    const std::wstring url = BuildWebHelpUrl(L"https://sally-filemanager.app", manual, request, page);
+    const std::wstring url = BuildWebHelpUrl(Sally::Urls::Website, manual, request, page);
     if ((INT_PTR)ShellExecuteW(parent, L"open", url.c_str(), NULL, NULL, SW_SHOWNORMAL) > 32)
         return TRUE;
     if (!quiet)
@@ -2829,16 +2831,26 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_WEBSITE:
         {
-            ShellExecuteW(HWindow, L"open", L"https://sally-filemanager.app/", NULL, NULL, SW_SHOWNORMAL);
+            ShellExecuteW(HWindow, L"open", Sally::Urls::Website, NULL, NULL, SW_SHOWNORMAL);
             return 0;
         }
 
         case CM_FORUM:
         {
-            ShellExecuteW(HWindow, L"open", L"https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
+            ShellExecuteW(HWindow, L"open", Sally::Urls::Discussions, NULL, NULL, SW_SHOWNORMAL);
             return 0;
         }
 
+        case CM_HELP_WHATSNEW:
+            UpdateCheck::ShowWhatsNew(HWindow);
+            return 0;
+        case CM_HELP_SUPPORTER:
+            Sally::Supporter::ShowSupporterDialog(HWindow, LanguageID, SALAMANDER_ROOT_REG, *gRegistry, true);
+            SetWindowTitle();
+            return 0;
+        case CM_HELP_SUPPORT:
+            Sally::Supporter::OpenSupportPage(HWindow);
+            return 0;
         case CM_HELP_CHECKNEWVERSION:
         {
             // utils\salupdate.exe looks for a newer release and shows it in its window.
@@ -4995,7 +5007,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 mii.String = LoadStrW(IDS_MENU_HELP_CHECKNEWVERSION);
                 mii.ID = CM_HELP_CHECKNEWVERSION;
 
-                int aboutPos = popup->FindItemPosition(CM_HELP_ABOUT);
+                int aboutPos = popup->FindItemPosition(CM_HELP_WHATSNEW);
+                if (aboutPos == -1) aboutPos = popup->FindItemPosition(CM_HELP_ABOUT);
                 popup->InsertItem(aboutPos != -1 ? aboutPos : 0xFFFFFFFF, TRUE, &mii);
             }
             break;
@@ -5848,6 +5861,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         if (active == WA_ACTIVE || active == WA_CLICKACTIVE)
         {
+            SetWindowTitle(); // refresh an acknowledgement changed in the standalone helper
             if (!EditMode)
             {
                 if (GetActivePanel() != NULL)
@@ -5880,7 +5894,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 if (lParam == 1)
                     data->ShouldRebuildMenu = TRUE; // set the flag to rebuild the plugin menu
                 else
-                    data->Commands.Add(LOWORD(lParam - 2)); // add salCmd/menuCmd
+                    data->Commands.Add(static_cast<DWORD>(lParam - 2)); // add full salCmd/menuCmd (plugin IDs may exceed 16 bits)
             }
             ExecCmdsOrUnloadMarkedPlugins = TRUE; // inform Salamander to scan all plugin data
         }

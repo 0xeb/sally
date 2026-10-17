@@ -5,6 +5,7 @@
 // vim: et:sw=2:ts=2
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include "peviewer.h"
 #include "peviewer.rh"
@@ -127,7 +128,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"PEVIEWER");
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     // Default configuration.
     BuildDefaultDumperChain();

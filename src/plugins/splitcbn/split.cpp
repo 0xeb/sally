@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 #include "common/ByteFormat.h"
 #include "splitcbn.h"
 #include "splitcbn.rh"
@@ -312,14 +313,14 @@ static BOOL SplitFile(const wchar_t* fileName, const wchar_t* targetDir, CQuadWo
             escapedOriginalName.c_str());
         std::string batfile = sally::bytes::Format(
                 "@echo off\r\n"
-                "rem %s, https://github.com/0xeb/sally\r\n"
+                "rem %s, %s\r\n"
                 "rem name=%s\r\n"
                 "rem crc32=%X\r\n"
                 "rem time=%d-%d-%d %d:%02d:%02d\r\n"
                 "echo %s\r\n"
                 "echo %s\r\n"
                 "pause\r\n",
-                generatedBy.c_str(), origName.c_str(), Crc,
+                generatedBy.c_str(), Sally::Urls::RepositoryUtf8, origName.c_str(), Crc,
                 (int)st.wYear, (int)st.wMonth, (int)st.wDay, (int)st.wHour, (int)st.wMinute, (int)st.wSecond,
                 description.c_str(), quitHint.c_str());
 

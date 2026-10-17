@@ -88,6 +88,8 @@ struct ReleaseCheckResult
     unsigned long long PrimaryAssetSize = 0;
     std::string PrimaryAssetDigest; // "sha256:<hex>" or empty
     std::string ChecksumsUrl;       // the release's SHA256SUMS file, or empty
+    std::string MetadataUrl;        // optional display content, independent of CanInstall
+    std::string MetadataSignatureUrl;
     // A newer release whose package and checksum file can be fetched over HTTPS, so the
     // updater can install it.
     bool CanInstall = false;

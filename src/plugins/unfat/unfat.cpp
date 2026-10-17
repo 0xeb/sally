@@ -11,6 +11,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include "unfat.h"
 #include "fat.h"
@@ -128,7 +129,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"UnFAT" /* do not translate! */, L"ima");
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     return &PluginInterface;
 }

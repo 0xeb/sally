@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include <algorithm>
 
@@ -2116,9 +2117,9 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             const char* url =
 #ifndef THIS_IS_EAP_VERSION
-                "https://github.com/0xeb/sally/releases";
+                Sally::Urls::ReleasesUtf8;
 #else  // THIS_IS_EAP_VERSION
-                "https://github.com/0xeb/sally/releases";
+                Sally::Urls::ReleasesUtf8;
 #endif // THIS_IS_EAP_VERSION
 
             SetDlgItemText(HWindow, IDC_BETAEXPIREDURL, url + 8);

@@ -160,7 +160,7 @@ bool ParseUpdaterCommand(const std::vector<std::wstring>& args, UpdaterCommand& 
             command.Mode = UpdaterMode::Manual;
             command.Package = name;
         }
-        else if (name == L"--prepare" || name == L"--apply" || name == L"--check" || name == L"--report")
+        else if (name == L"--prepare" || name == L"--apply" || name == L"--check" || name == L"--report" || name == L"--whats-new")
         {
             if (command.Mode != UpdaterMode::None)
             {
@@ -170,7 +170,7 @@ bool ParseUpdaterCommand(const std::vector<std::wstring>& args, UpdaterCommand& 
             command.Mode = name == L"--prepare" ? UpdaterMode::Prepare
                            : name == L"--apply" ? UpdaterMode::Apply
                            : name == L"--check" ? UpdaterMode::Check
-                                                : UpdaterMode::Report;
+                           : name == L"--whats-new" ? UpdaterMode::WhatsNew : UpdaterMode::Report;
         }
         else if (name == L"--auto")
         {
@@ -275,6 +275,12 @@ bool ParseUpdaterCommand(const std::vector<std::wstring>& args, UpdaterCommand& 
     };
     switch (command.Mode)
     {
+    case UpdaterMode::WhatsNew:
+        if (command.Auto || !command.FeedUrl.empty() || !command.Package.empty() || !command.Sha256.empty() || !command.Staging.empty() ||
+            !command.Version.empty() || !command.Arch.empty() || !command.WaitPids.empty() || !command.FromVersion.empty() || !command.ToVersion.empty() ||
+            !command.ResultFile.empty() || !command.Relaunch || command.Elevated || command.Notify || command.Yes)
+        { error = L"--whats-new accepts only --install"; return false; }
+        return require(command.InstallRoot, L"--install");
     case UpdaterMode::Prepare:
         return require(command.Package, L"--package") && require(command.Sha256, L"--sha256") &&
                require(command.Staging, L"--staging") && require(command.Version, L"--version") &&
@@ -326,6 +332,8 @@ std::wstring FormatUpdaterCommand(const UpdaterCommand& command)
         flag(L"--check");
     else if (command.Mode == UpdaterMode::Report)
         flag(L"--report");
+    else if (command.Mode == UpdaterMode::WhatsNew)
+        flag(L"--whats-new");
     if (command.Auto)
         flag(L"--auto");
     add(L"--feed", command.FeedUrl);

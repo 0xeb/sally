@@ -41,6 +41,7 @@ enum class UpdaterMode
     Manual,
     Check,
     Report,
+    WhatsNew,
 };
 
 struct UpdaterCommand

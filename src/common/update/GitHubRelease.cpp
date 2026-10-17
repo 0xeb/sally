@@ -372,6 +372,16 @@ bool BuildReleaseCheckResult(const char* payload, size_t payloadSize,
     }
     if (checksums != nullptr)
         result.ChecksumsUrl = checksums->DownloadUrl;
+    std::string displayVersion = result.LatestVersion;
+    if (!displayVersion.empty() && (displayVersion.front() == 'v' || displayVersion.front() == 'V')) displayVersion.erase(0, 1);
+    const std::string displayName = "Sally-v" + displayVersion + "-metadata.json";
+    unsigned metadataCount = 0, signatureCount = 0;
+    for (const auto& asset : release.Assets)
+    {
+        if (asset.Name == displayName) { ++metadataCount; if (asset.DownloadUrl.compare(0, 8, "https://") == 0) result.MetadataUrl = asset.DownloadUrl; }
+        if (asset.Name == displayName + ".sig") { ++signatureCount; if (asset.DownloadUrl.compare(0, 8, "https://") == 0) result.MetadataSignatureUrl = asset.DownloadUrl; }
+    }
+    if (metadataCount != 1 || signatureCount != 1 || result.MetadataUrl.empty() || result.MetadataSignatureUrl.empty()) { result.MetadataUrl.clear(); result.MetadataSignatureUrl.clear(); }
     auto isHttps = [](const std::string& url) { return url.compare(0, 8, "https://") == 0; };
     result.CanInstall = result.UpdateAvailable && !release.Prerelease && package != nullptr &&
                         checksums != nullptr && isHttps(package->DownloadUrl) &&

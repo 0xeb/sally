@@ -550,6 +550,7 @@ CTextFileViewWindowBase::CTextFileViewWindowBase(CFileViewID id, BOOL showWhiteS
     CaretYPos = 0;
 
     ShowWhiteSpace = showWhiteSpace;
+    WordWrap = Configuration.WordWrap;
 
     DetailedDifferences = FALSE;
 
@@ -573,6 +574,8 @@ void CTextFileViewWindowBase::DestroyData()
     DataValid = FALSE;
     Script[0].clear();
     Script[1].clear();
+    WrapLines.clear();
+    WrapStarts.clear();
 }
 
 BOOL CTextFileViewWindowBase::RebuildScript(
@@ -789,6 +792,7 @@ BOOL CTextFileViewWindowBase::SetMaxWidth(int maxWidth)
         si.nPage = 0;
     si.nPos = 0;
     SetScrollInfo(HWindow, SB_HORZ, &si, TRUE);
+    if (WordWrap) UpdateScrollBars();
     return TRUE;
 }
 
@@ -822,6 +826,7 @@ void CTextFileViewWindowBase::ReloadConfiguration(DWORD flags, BOOL updateWindow
     CALL_STACK_MESSAGE3("CTextFileViewWindowBase::ReloadConfiguration(0x%X, %d)",
                         flags, updateWindow);
     CFileViewWindow::ReloadConfiguration(flags, updateWindow);
+    if (WordWrap && DataValid) UpdateScrollBars(FALSE);
     if (GetFocus() == HWindow && DisplayCaret)
     {
         DestroyCaret();
@@ -832,6 +837,23 @@ void CTextFileViewWindowBase::ReloadConfiguration(DWORD flags, BOOL updateWindow
 void CTextFileViewWindowBase::UpdateScrollBars(BOOL repaint)
 {
     CALL_STACK_MESSAGE1("CTextFileViewWindowBase::UpdateScrollBars()");
+    if (WordWrap)
+    {
+        RebuildWrapLayout();
+        FirstVisibleChar = 0;
+        ShowScrollBar(HWindow, SB_HORZ, FALSE);
+        const int page = max(1L, Height / max(1L, FontHeight));
+        FirstVisibleLine = max(0, min(FirstVisibleLine, VisualRowCount() - page));
+        SCROLLINFO si = {sizeof(si), SIF_RANGE | SIF_PAGE | SIF_POS | SIF_DISABLENOSCROLL};
+        si.nMin = 0;
+        si.nMax = max(0, VisualRowCount() - 1);
+        si.nPage = page;
+        si.nPos = FirstVisibleLine;
+        SetScrollInfo(HWindow, SB_VERT, &si, repaint);
+        if (repaint) InvalidateRect(HWindow, NULL, FALSE);
+        return;
+    }
+    ShowScrollBar(HWindow, SB_HORZ, TRUE);
     if (Siblink)
     {
         RECT r;
@@ -919,7 +941,11 @@ void CTextFileViewWindowBase::UpdateScrollBars(BOOL repaint)
     si.fMask = SIF_DISABLENOSCROLL | SIF_PAGE | SIF_POS;
     si.nPage = pageHeight;
     si.nPos = FirstVisibleLine;
+    si.fMask |= SIF_RANGE;
+    si.nMin = 0;
+    si.nMax = max(0, static_cast<int>(Script[ViewMode].size()) - 1);
     SetScrollInfo(HWindow, SB_VERT, &si, TRUE);
+    si.nMax = max(0, MaxWidth - 1);
     si.nPage = pageWidth;
     si.nPos = hPos;
     SetScrollInfo(HWindow, SB_HORZ, &si, TRUE);
@@ -928,6 +954,22 @@ void CTextFileViewWindowBase::UpdateScrollBars(BOOL repaint)
 void CTextFileViewWindowBase::SelectDifference(int line, int count, BOOL center)
 {
     CALL_STACK_MESSAGE3("CTextFileViewWindowBase::SelectDifference(%d, %d)", line, count);
+    if (WordWrap)
+    {
+        SelectDiffBegin = line;
+        SelectDiffEnd = line + count - 1;
+        const int begin = VisualRow(line), end = VisualRow(line + count);
+        const int page = max(1L, Height / max(1L, FontHeight));
+        if (center && (begin < FirstVisibleLine || end > FirstVisibleLine + page))
+        {
+            FirstVisibleLine = max(0, min(begin - max(0, page - (end - begin)) / 2, VisualRowCount() - page));
+            SetScrollPos(HWindow, SB_VERT, FirstVisibleLine, TRUE);
+        }
+        InvalidateRect(HWindow, NULL, FALSE);
+        UpdateWindow(HWindow);
+        UpdateCaretPos(FALSE);
+        return;
+    }
     int page = Height / FontHeight;
 
     if (center &&
@@ -1013,13 +1055,13 @@ void CTextFileViewWindowBase::UpdateSelection(int x, int y)
 
     //x += FontWidth/2;
 
-    int line = FirstVisibleLine + y / FontHeight;
+    int line = HitTestLine(y);
+    if (Script[ViewMode].empty()) return;
     if (line >= int(Script[ViewMode].size()))
         line = int(Script[ViewMode].size() - 1);
 
-    int l = Script[ViewMode][line].GetLine();
-    int len = LineLength(l);
     int end;
+    const int len = Script[ViewMode][line].IsBlank() ? 0 : LineLength(Script[ViewMode][line].GetLine());
 
     if (Script[ViewMode][line].IsBlank())
         end = 0;
@@ -1027,7 +1069,7 @@ void CTextFileViewWindowBase::UpdateSelection(int x, int y)
     {
         //end = FirstVisibleChar + (x - LineNumWidth)/FontWidth;
         //if (len < end) end = len;
-        end = TransformXOrg(x, line);
+        end = HitTestChar(x, line);
     }
 
     if (TrackingLineBegin != line || TrackingCharBegin != end)
@@ -1134,6 +1176,12 @@ void CTextFileViewWindowBase::RepaintSelection(int oldLineBegin, int oldLineEnd,
 {
     CALL_STACK_MESSAGE5("CTextFileViewWindowBase::RepaintSelection(%d, %d, %d, %d)",
                         oldLineBegin, oldLineEnd, oldCharBegin, oldCharEnd);
+    if (WordWrap)
+    {
+        InvalidateRect(HWindow, NULL, FALSE);
+        UpdateWindow(HWindow);
+        return;
+    }
     // ensure only the affected areas are repainted
     RECT r;
     r.left = LineNumWidth;
@@ -1273,18 +1321,23 @@ void CTextFileViewWindowBase::SetCaretPos(int xPos, int yPos)
             xPos = len;
     }
 
+    if (WordWrap && !Script[ViewMode][yPos].IsBlank())
+        xPos = SnapSource(yPos, xPos, yPos != CaretYPos || xPos > CaretXPos);
     CaretXPos = xPos;
     CaretYPos = yPos;
 
     if (GetFocus() == HWindow && DisplayCaret)
     {
-        int x, y = (CaretYPos - FirstVisibleLine) * FontHeight;
+        int x, y = (CaretVisualRow() - FirstVisibleLine) * FontHeight;
         if (Script[ViewMode][CaretYPos].IsBlank())
             x = LineNumWidth - FirstVisibleChar * FontWidth;
         else
         {
             int l = Script[ViewMode][CaretYPos].GetLine();
             x = LineNumWidth + (MeasureLine(l, CaretXPos) - FirstVisibleChar) * FontWidth;
+            const auto* span = VisualSpan(CaretVisualRow());
+            if (span) x -= span->columnBegin * FontWidth;
+            else if (WordWrap) x = LineNumWidth;
         }
         if (x < LineNumWidth)
             x = -1; // small trick to hide the caret just past the corner
@@ -1335,6 +1388,17 @@ void CTextFileViewWindowBase::UpdateCaretPos(BOOL enablePosChange)
     CALL_STACK_MESSAGE2("CTextFileViewWindowBase::UpdateCaretPos(%d)", enablePosChange);
     if (GetFocus() != HWindow || !DisplayCaret || !DataValid)
         return;
+    if (WordWrap)
+    {
+        if (enablePosChange)
+        {
+            const int visual = CaretVisualRow();
+            const int clamped = max(FirstVisibleLine, min(visual, FirstVisibleLine + max(1, static_cast<int>(Height / FontHeight)) - 1));
+            if (visual != clamped) MoveWrappedCaret(clamped - visual, FALSE);
+        }
+        SetCaretPos(CaretXPos, CaretYPos);
+        return;
+    }
 
     int yPos = CaretYPos;
     if (enablePosChange)
@@ -1371,6 +1435,12 @@ void CTextFileViewWindowBase::ShowCaret()
         return;
 
     CreateCaret(HWindow, NULL, CaretWidth, FontHeight);
+    if (WordWrap)
+    {
+        UpdateCaretPos(TRUE);
+        ::ShowCaret(HWindow);
+        return;
+    }
 
     int yPos = CaretYPos;
     if (CaretYPos < FirstVisibleLine)

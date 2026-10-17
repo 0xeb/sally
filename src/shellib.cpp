@@ -19,6 +19,7 @@
 
 #include "shellib.h"
 #include "drop_effect_policy.h"
+#include "folder_drop_menu.h"
 #include "dragdrop_diag.h"
 #include "cfgdlg.h"
 #include "plugins.h"
@@ -784,6 +785,8 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         EnterLeaveDrop(FALSE, EnterLeaveDropParam);
 
     DWORD defEffect = -1;
+    BOOL confirmedFolderDrop = FALSE;
+    BOOL folderDropTarget = FALSE;
     if (RButton || ConfirmDropEnable != NULL && *ConfirmDropEnable)
     {
         if (GetCurDir != NULL) // we need to let pdwEffect be limited when dragging within panel
@@ -793,6 +796,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
             const wchar_t* tgtPathWide = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
                                                    grfKeyState, tgtType, OldDataObjectSrcType);
             SetDirectory(tgtPathWide, grfKeyState, pt, pdwEffect, OldDataObject, tgtFile, tgtType);
+            folderDropTarget = !tgtFile;
             if (TgtType != idtttWindows && TgtType != idtttFullPluginFSPath)
             { // if selection is not from one path (risk likely only with Find), we can't copy/move to archive or FS
                 if (OldDataObjectIsSimple == -1)
@@ -885,7 +889,45 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                 defEffect = 0;
         }
 
-        if (ConfirmDrop != NULL && !ConfirmDrop(*pdwEffect, defEffect, grfKeyState))
+        if (RButton && TgtType == idtttWindows && folderDropTarget && !OldDataObjectIsFake && !CurDir.empty())
+        {
+            const std::wstring move = LoadStrW(IDS_DROPMOVE), copy = LoadStrW(IDS_DROPCOPY);
+            const std::wstring link = LoadStrW(IDS_DROPLINK), cancel = LoadStrW(IDS_DROPCANCEL);
+            DWORD allowed = *pdwEffect;
+            if (CurDirDropTarget == NULL) allowed &= ~DROPEFFECT_LINK;
+            const FolderDropResult choice = ShowFolderDropMenu(GetAncestor(OwnerWindow, GA_ROOT), CurDir.c_str(), pDataObject,
+                                                              allowed, defEffect, {move.c_str(), copy.c_str(), link.c_str(), cancel.c_str()});
+            if (choice.choice == FolderDropChoice::Cancel)
+            {
+                *pdwEffect = DROPEFFECT_NONE;
+                return DragLeave();
+            }
+            if (choice.choice == FolderDropChoice::Extension)
+            {
+                if (OldDataObject) { OldDataObject->Release(); OldDataObject = NULL; }
+                OldDataObjectIsFake = FALSE;
+                OldDataObjectIsSimple = -1;
+                OldDataObjectSrcType = 0;
+                OldDataObjectSrcFSPath.clear();
+                if (CurDirDropTarget)
+                {
+                    CurDirDropTarget->DragLeave();
+                    CurDirDropTarget->Release();
+                    CurDirDropTarget = NULL;
+                }
+                RButton = FALSE;
+                *pdwEffect = DROPEFFECT_NONE; // extension owns the operation, including failure/cancellation
+                if (DropEnd) DropEnd(SUCCEEDED(choice.result), FALSE, DropEndParam, TRUE, FALSE, TgtType);
+                TgtType = idtttWindows;
+                return choice.result;
+            }
+            const auto action = NativeFolderDropAction(choice.choice);
+            defEffect = action.effect;
+            grfKeyState = action.keys;
+            confirmedFolderDrop = TRUE;
+            RButton = FALSE;
+        }
+        else if (ConfirmDrop != NULL && !ConfirmDrop(*pdwEffect, defEffect, grfKeyState))
         {
             *pdwEffect = DROPEFFECT_NONE;
             return DragLeave();
@@ -1052,6 +1094,15 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         // we can't handle it ourselves, let the system do it
         if (!operationDone && CurDirDropTarget != NULL)
         {
+            if (confirmedFolderDrop)
+            {
+                // Discard the shell's remembered right drag. A chosen native verb is
+                // a fresh left drag with explicit modifiers, never a second menu.
+                CurDirDropTarget->DragLeave();
+                DWORD selectedEffect = *pdwEffect;
+                CurDirDropTarget->DragEnter(pDataObject, grfKeyState | MK_LBUTTON, pt, &selectedEffect);
+                *pdwEffect = selectedEffect;
+            }
             ret = CurDirDropTarget->Drop(pDataObject, grfKeyState, pt, pdwEffect);
             CurDirDropTarget->Release();
             CurDirDropTarget = NULL;

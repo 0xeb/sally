@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/supporter/Supporter.rh"
 
 #include "menu.h"
 
@@ -264,6 +265,9 @@ MENU_TEMPLATE_ITEM MainMenuTemplate[] =
         {MNTT_SP, -1, MNTS_B | MNTS_I | MNTS_A, 0, -1, 0, NULL},
         {MNTT_PB, IDS_MENU_HELP_ABOUTPLUGINS, MNTS_B | MNTS_I | MNTS_A, CML_HELP_ABOUTPLUGINS, -1, 0, NULL},
         {MNTT_PE},
+        {MNTT_IT, IDS_SUP_WHATS_NEW, MNTS_B | MNTS_I | MNTS_A, CM_HELP_WHATSNEW, -1, 0, NULL},
+        {MNTT_IT, IDS_SUP_ENTER, MNTS_B | MNTS_I | MNTS_A, CM_HELP_SUPPORTER, -1, 0, NULL},
+        {MNTT_IT, IDS_SUP_SUPPORT, MNTS_B | MNTS_I | MNTS_A, CM_HELP_SUPPORT, -1, 0, NULL},
         {MNTT_IT, IDS_MENU_HELP_ABOUT, MNTS_B | MNTS_I | MNTS_A, CM_HELP_ABOUT, -1, 0, NULL},
         {MNTT_PE},
         {MNTT_PE}, // terminator

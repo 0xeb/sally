@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "update/ReleaseDownload.h"
+#include "SallyUrls.h"
 
 #include "Win32TextCodec.h"
 #include "update/ReleaseChecksums.h"
@@ -11,7 +12,7 @@
 namespace Sally::Update
 {
 
-const wchar_t* const kDefaultReleaseFeedUrl = L"https://api.github.com/repos/0xeb/sally/releases/latest";
+const wchar_t* const kDefaultReleaseFeedUrl = Sally::Urls::LatestReleaseFeed;
 const unsigned long long kMaxReleaseFeedBytes = 1024 * 1024;
 const unsigned long long kMaxChecksumsBytes = 64 * 1024;
 const unsigned long long kMaxPackageBytes = 300ull * 1024 * 1024;

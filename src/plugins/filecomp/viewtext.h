@@ -40,6 +40,8 @@ public:
     void SetData(CChar* text, CLineBuffer& lines, CLineScript& script);
     virtual BOOL ReallocLineBuffer();
     virtual int TransformXOrg(int x, int line);
+    virtual std::vector<FileCompWrap::Span> WrapRow(int logical, int width);
+    virtual int SnapSource(int logical, int offset, bool forward);
     virtual BOOL CopySelection();
     virtual void MoveCaret(int yPos);
     virtual int GetLeftmostVisibleChar(int line);

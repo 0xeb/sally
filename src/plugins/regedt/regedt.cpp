@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 // enable dumping blocks left allocated on the heap when the plug-in ends
 // #define DUMP_MEM
@@ -304,7 +305,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    NULL,
                                    L"reg");
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
 #undef REGEDT_WIDEN
 #undef REGEDT_WIDEN2

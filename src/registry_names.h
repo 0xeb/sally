@@ -3,6 +3,12 @@
 
 #pragma once
 
+#define SAL_REG_SUPPORTER_W L"Supporter"
+#define SAL_REG_SUPPORTER_CERTIFICATE_W L"Certificate"
+#define SAL_REG_SUPPORTER_TITLE_W L"ShowNameInTitle"
+#define SAL_REG_SUPPORTER_INVITATIONS_W L"InvitationsEnabled"
+#define SAL_REG_SUPPORTER_DISMISSED_W L"DismissedRelease"
+
 // Shared registry paths, subkeys, and value names used across Sally.
 //
 // Every _A literal has a _W twin so call sites migrate to the wide

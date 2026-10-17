@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #define WMOBILE_WIDEN2(x) L##x
 #define WMOBILE_WIDEN(x) WMOBILE_WIDEN2(x)
@@ -199,7 +200,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"WMOBILE" /* do not translate! */, NULL, L"CE");
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     // obtain our FS name (it may not be "cefs"; Salamander can adjust it)
     AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
+#include "wrap_layout.h"
 
 class CMainWindow;
 
@@ -177,6 +178,11 @@ protected:
     BOOL DetailedDifferences;
     int TabSize;
     CMainWindow* MainWindow;
+    BOOL WordWrap = TRUE;
+    std::vector<std::vector<FileCompWrap::Span>> WrapLines;
+    std::vector<int> WrapStarts;
+    int HitVisualRow = 0;
+    int CaretVisualHint = -1;
 
 public:
     CTextFileViewWindowBase(CFileViewID id, BOOL showWhiteSpace, CMainWindow* mainWindow);
@@ -213,6 +219,19 @@ public:
     void SetCaret(BOOL displayCaret);
     void ShowCaret();
     void SetShowWhiteSpace(BOOL show) { ShowWhiteSpace = show; }
+    void SetWordWrap(BOOL value);
+    BOOL IsWordWrap() const { return WordWrap; }
+    void RebuildWrapLayout();
+    int VisualRowCount() const;
+    int LogicalRow(int visual) const;
+    int VisualRow(int logical) const;
+    int CaretVisualRow() const;
+    const FileCompWrap::Span* VisualSpan(int visual) const;
+    int HitTestLine(int y);
+    int HitTestChar(int x, int logical);
+    void MoveWrappedCaret(int delta, BOOL constrainDifference);
+    virtual std::vector<FileCompWrap::Span> WrapRow(int logical, int width) = 0;
+    virtual int SnapSource(int logical, int offset, bool forward) = 0;
     void SetDetailedDifferences(BOOL newValue)
     {
         DetailedDifferences = newValue;

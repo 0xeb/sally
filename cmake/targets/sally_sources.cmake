@@ -195,6 +195,7 @@ set(SALLY_SOURCES
   "${SAL_SRC}/salzlib.cpp"
   "${SAL_SRC}/shares.cpp"
   "${SAL_SRC}/shellib.cpp"
+  "${SAL_SRC}/common/Win32FolderDropMenu.cpp"
   "${SAL_SRC}/shellsup.cpp"
   "${SAL_SRC}/shellsup_diag.cpp"
   "${SAL_SRC}/shexreg.c"

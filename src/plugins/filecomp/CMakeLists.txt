@@ -34,6 +34,7 @@ sal_add_plugin(NAME filecomp
     "${SAL_PLUGINS}/filecomp/textio.cpp"
     "${SAL_PLUGINS}/filecomp/viewtext.cpp"
     "${SAL_PLUGINS}/filecomp/viewwnd.cpp"
+    "${SAL_PLUGINS}/filecomp/view_wrap.cpp"
     "${SAL_PLUGINS}/filecomp/view_window_text.cpp"
     "${SAL_PLUGINS}/filecomp/view_window_hex.cpp"
     "${SAL_PLUGINS}/filecomp/worker.cpp"

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "SallyUrls.h"
 
 #include "webviewer.h"
 #include "webviewer.rh"
@@ -15,6 +16,7 @@
 
 #include <shlobj.h>
 #include <stdarg.h>
+#include <atomic>
 
 // plugin interface object, its methods are called from Salamander
 CPluginInterface PluginInterface;
@@ -32,6 +34,10 @@ HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent re
 int ConfigVersion = 0;           // 0 - default, 1 - SS 1.6 beta 3, 2 - SS 1.6 beta 4, 3 - SS 2.5 beta 1, 4 - AS 3.1 beta 1, 5 - Sally (PNG/SVG), 6 - PNG back to PictView
 #define CURRENT_CONFIG_VERSION 6 // Sally: PNG belongs to PictView again
 const wchar_t* CONFIG_VERSION = L"Version";
+static std::atomic<unsigned> SvgBackgroundPreference{0};
+static constexpr UINT CM_SVG_CHECKERBOARD = 40001;
+static constexpr UINT CM_SVG_LIGHT = 40002;
+static constexpr UINT CM_SVG_DARK = 40003;
 
 // Salamander general interface - valid from startup until the plugin shuts down
 CSalamanderGeneralAbstract* SalamanderGeneral = NULL;
@@ -110,7 +116,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
                                    L"WEBVIEWER");
 
-    salamander->SetPluginHomePageURL(L"https://sally-filemanager.app/");
+    salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
     return &PluginInterface;
 }
@@ -153,6 +159,10 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
 void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
     CALL_STACK_MESSAGE1("CPluginInterface::LoadConfiguration(, ,)");
+    DWORD background = 0;
+    if (regKey != NULL)
+        registry->GetValue(regKey, L"SvgBackground", REG_DWORD, &background, sizeof(background));
+    SvgBackgroundPreference.store(static_cast<unsigned>(ValidateSvgBackground(background)));
     if (regKey != NULL) // load from the registry
     {
         if (!registry->GetValue(regKey, CONFIG_VERSION, REG_DWORD, &ConfigVersion, sizeof(DWORD)))
@@ -170,6 +180,8 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 {
     DWORD v = CURRENT_CONFIG_VERSION;
     registry->SetValue(regKey, CONFIG_VERSION, REG_DWORD, &v, sizeof(DWORD));
+    DWORD background = SvgBackgroundPreference.load();
+    registry->SetValue(regKey, L"SvgBackground", REG_DWORD, &background, sizeof(background));
 }
 
 const wchar_t* MARKDOWN_EXTENSIONS = L"*.md;*.mdown;*.markdown";
@@ -453,6 +465,8 @@ bool CWebView2Host::Create(HWND hwndParent)
                                             m_showingError = false; // the error page itself
                                         else if (!success && status != COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED)
                                             ShowNavigationError(L"WebView2 error " + std::to_wstring((int)status));
+                                        else if (success && m_svgFile)
+                                            SetSvgBackground(m_svgBackground);
                                         return S_OK;
                                     })
                                     .Get(),
@@ -512,6 +526,13 @@ bool CWebView2Host::Create(HWND hwndParent)
 
                 UINT key;
                 args->get_VirtualKey(&key);
+
+                if (m_svgFile && (key == VK_F10 || key == VK_MENU))
+                {
+                    args->put_Handled(TRUE);
+                    PostMessageW(m_hwndParent, WM_SYSCOMMAND, SC_KEYMENU, 0);
+                    return S_OK;
+                }
 
                 if (key == VK_ESCAPE)
                 {
@@ -649,6 +670,16 @@ void CWebView2Host::NavigateToString(const std::string& htmlContent)
     }
 }
 
+void CWebView2Host::SetSvgBackground(SvgBackground value)
+{
+    m_svgBackground = value;
+    if (m_svgFile && !m_showingError && m_webview)
+    {
+        const std::wstring script = SvgBackgroundScript(value);
+        m_webview->ExecuteScript(script.c_str(), nullptr);
+    }
+}
+
 void CWebView2Host::Resize(int width, int height)
 {
     if (m_failureView != nullptr)
@@ -714,6 +745,8 @@ unsigned WINAPI ThreadViewerMessageLoop(void* param)
     CViewerMainWindow* window = new CViewerMainWindow;
     if (window != NULL)
     {
+        window->m_viewer.SetSvgFile(IsSvgFile(data->Name));
+        window->m_viewer.SetSvgBackground(ValidateSvgBackground(SvgBackgroundPreference.load()));
         if (data->ReturnLock)
         {
             *data->Lock = window->GetLock();
@@ -1053,8 +1086,36 @@ CViewerMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (!m_viewer.Create(HWindow))
             return -1;
+        if (m_viewer.IsSvg())
+        {
+            HMENU menu = CreateMenu();
+            HMENU view = CreatePopupMenu();
+            HMENU background = CreatePopupMenu();
+            AppendMenuW(background, MF_STRING, CM_SVG_CHECKERBOARD, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SVG_CHECKERBOARD).c_str());
+            AppendMenuW(background, MF_STRING, CM_SVG_LIGHT, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SVG_LIGHT).c_str());
+            AppendMenuW(background, MF_STRING, CM_SVG_DARK, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SVG_DARK).c_str());
+            AppendMenuW(view, MF_POPUP, (UINT_PTR)background, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SVG_BACKGROUND).c_str());
+            AppendMenuW(menu, MF_POPUP, (UINT_PTR)view, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_VIEW).c_str());
+            SetMenu(HWindow, menu);
+        }
         return 0;
     }
+
+    case WM_INITMENUPOPUP:
+        if (m_viewer.IsSvg())
+            CheckMenuRadioItem((HMENU)wParam, CM_SVG_CHECKERBOARD, CM_SVG_DARK,
+                               CM_SVG_CHECKERBOARD + static_cast<unsigned>(m_viewer.GetSvgBackground()), MF_BYCOMMAND);
+        break;
+
+    case WM_COMMAND:
+        if (m_viewer.IsSvg() && LOWORD(wParam) >= CM_SVG_CHECKERBOARD && LOWORD(wParam) <= CM_SVG_DARK)
+        {
+            const unsigned background = LOWORD(wParam) - CM_SVG_CHECKERBOARD;
+            SvgBackgroundPreference.store(background);
+            m_viewer.SetSvgBackground(ValidateSvgBackground(background));
+            return 0;
+        }
+        break;
 
     case WM_DESTROY:
     {

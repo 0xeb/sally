@@ -199,6 +199,7 @@ BEGIN
     POPUP "查看(&V)"
     BEGIN
         MENUITEM "显示空白(&W)\tCtrl+W",   CM_SHOWWHITESPACE
+          MENUITEM "自动换行(&R)", CM_WORDWRAP
         MENUITEM "只显示差异(&D)\tCtrl+D", CM_ONLYDIFFERENCES
         MENUITEM "详细差异(&E)\tF4",   CM_DETAILDIFF
         MENUITEM SEPARATOR

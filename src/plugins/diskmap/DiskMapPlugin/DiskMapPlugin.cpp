@@ -6,6 +6,7 @@
 //
 
 #include "precomp.h"
+#include "SallyUrls.h"
 #include "DiskMapPlugin.h"
 
 #include "../DiskMap/GUI.MainWindow.h"
@@ -34,7 +35,7 @@ const wchar_t* CONFIG_PATHFORMAT = L"Tooltip Path Format";
 
 std::wstring LangStr(int resID);
 
-const wchar_t szPluginWebsite[] = L"https://sally-filemanager.app/"; // original domain not running: http://salamander.diskmap.net
+const wchar_t* const szPluginWebsite = Sally::Urls::Website; // original domain not running: http://salamander.diskmap.net
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle to the module with language-dependent resources (this DLL)

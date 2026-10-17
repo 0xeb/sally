@@ -67,7 +67,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     }
 }
 
-CRetryableOutFileStream::CRetryableOutFileStream(HWND _hParentWnd) : hParentWnd(_hParentWnd)
+CRetryableOutFileStream::CRetryableOutFileStream(HWND _hParentWnd) : FileStream(new COutFileStream), Stream(FileStream), hParentWnd(_hParentWnd)
 {
 }
 
@@ -78,7 +78,7 @@ STDMETHODIMP CRetryableOutFileStream::Write(const void* data, UInt32 size, UInt3
 
     if (processedSize)
         *processedSize = 0;
-    while ((S_OK != (ret = COutFileStream::Write(data, size, &written))) /*|| (size != written)*/)
+    while ((S_OK != (ret = Stream->Write(data, size, &written))) /*|| (size != written)*/)
     {
         // NOTE: COutFileStream::Write writes at most kChunkSizeMax bytes (4MB) at once
         data = (char*)data + written;
@@ -97,7 +97,7 @@ STDMETHODIMP CRetryableOutFileStream::Write(const void* data, UInt32 size, UInt3
     return ret;
 }
 
-CRetryableInFileStream::CRetryableInFileStream(HWND _hParentWnd) : hParentWnd(_hParentWnd)
+CRetryableInFileStream::CRetryableInFileStream(HWND _hParentWnd) : FileStream(new CInFileStream), Stream(FileStream), hParentWnd(_hParentWnd)
 {
 }
 
@@ -108,7 +108,7 @@ STDMETHODIMP CRetryableInFileStream::Read(void* data, UInt32 size, UInt32* proce
 
     if (processedSize)
         *processedSize = 0;
-    while (S_OK != (ret = CInFileStream::Read(data, size, &read)))
+    while (S_OK != (ret = Stream->Read(data, size, &read)))
     {
         data = (char*)data + read;
         size -= read;
