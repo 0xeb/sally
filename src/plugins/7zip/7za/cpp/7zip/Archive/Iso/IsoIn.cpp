@@ -47,17 +47,13 @@ bool CBootInitialEntry::Parse(const Byte *p)
 
 AString CBootInitialEntry::GetName() const
 {
-  AString s = (Bootable ? "Boot" : "NotBoot");
-  s += '-';
+  AString s (Bootable ? "Boot" : "NotBoot");
+  s.Add_Minus();
   
-  if (BootMediaType < ARRAY_SIZE(kMediaTypes))
+  if (BootMediaType < Z7_ARRAY_SIZE(kMediaTypes))
     s += kMediaTypes[BootMediaType];
   else
-  {
-    char name[16];
-    ConvertUInt32ToString(BootMediaType, name);
-    s += name;
-  }
+    s.Add_UInt32(BootMediaType);
   
   if (VendorSpec[0] == 1)
   {
@@ -69,10 +65,10 @@ AString CBootInitialEntry::GetName() const
         break;
     if (i == sizeof(VendorSpec))
     {
-      s += '-';
+      s.Add_Minus();
       for (i = 1; i < sizeof(VendorSpec); i++)
       {
-        char c = VendorSpec[i];
+        char c = (char)VendorSpec[i];
         if (c == 0)
           break;
         if (c == '\\' || c == '/')
@@ -98,7 +94,8 @@ Byte CInArchive::ReadByte()
       throw CSystemException(res);
     if (processed != kBlockSize)
       throw CUnexpectedEndException();
-    UInt64 end = _position + processed;
+    _processedBytes += processed;
+    const UInt64 end = _position + processed;
     if (PhySize < end)
       PhySize = end;
   }
@@ -138,7 +135,7 @@ UInt16 CInArchive::ReadUInt16()
   {
     if (b[i] != b[3 - i])
       IncorrectBigEndian = true;
-    val |= ((UInt16)(b[i]) << (8 * i));
+    val |= ((UInt32)(b[i]) << (8 * i));
   }
   return (UInt16)val;
 }
@@ -176,22 +173,30 @@ UInt32 CInArchive::ReadUInt32()
   return val;
 }
 
-UInt32 CInArchive::ReadDigits(int numDigits)
+unsigned CInArchive::ReadDigits(unsigned numDigits)
 {
-  UInt32 res = 0;
-  for (int i = 0; i < numDigits; i++)
+  unsigned res = 0;
+  unsigned mode = 0;
+  for (unsigned i = 0; i < numDigits; i++)
   {
-    Byte b = ReadByte();
-    if (b < '0' || b > '9')
+    const Byte b = ReadByte();
+    if (mode == 2)
+      continue;
+    const unsigned d = (unsigned)b - (unsigned)'0';
+    if (d > 9)
     {
-      if (b == 0) // it's bug in some CD's
-        b = '0';
-      else
+      // what exact cases are possible here?
+      if (b != 0 && b != ' ')
         throw CHeaderErrorException();
+      if (mode == 1)
+        mode = 2;
     }
-    UInt32 d = (UInt32)(b - '0');
-    res *= 10;
-    res += d;
+    else
+    {
+      mode = 1;
+      res *= 10;
+      res += d;
+    }
   }
   return res;
 }
@@ -226,7 +231,7 @@ void CInArchive::ReadRecordingDateTime(CRecordingDateTime &t)
   t.GmtOffset = (signed char)ReadByte();
 }
 
-void CInArchive::ReadDirRecord2(CDirRecord &r, Byte len)
+void CInArchive::ReadDirRecord(CDirRecord &r, unsigned len, bool isJolietDescriptor)
 {
   r.ExtendedAttributeRecordLen = ReadByte();
   if (r.ExtendedAttributeRecordLen != 0)
@@ -238,29 +243,28 @@ void CInArchive::ReadDirRecord2(CDirRecord &r, Byte len)
   r.FileUnitSize = ReadByte();
   r.InterleaveGapSize = ReadByte();
   r.VolSequenceNumber = ReadUInt16();
-  Byte idLen = ReadByte();
+  unsigned idLen = ReadByte();
+  /* for Descriptor Root Directory Record:
+      idLen == 1 : by ISO Specification
+      idLen == 1 : for some Joliet archives
+      idLen == 2 : for some Joliet archives for UCS-2 (UTF-16BE).
+        but (len == 34) is fixed for Descriptor Root Directory Record
+        so we ignore idLen == 2 value in Joliet Descriptor.
+  */
+  if (isJolietDescriptor && idLen == 2) // v26.03 : we support Joliet cases
+    idLen = 0;
   r.FileId.Alloc(idLen);
   ReadBytes((Byte *)r.FileId, idLen);
-  unsigned padSize = 1 - (idLen & 1);
-  
+  idLen += 33;
+  const unsigned padSize = idLen & 1;
   // SkipZeros(padSize);
   Skip(padSize); // it's bug in some cd's. Must be zeros
-
-  unsigned curPos = 33 + idLen + padSize;
-  if (curPos > len)
+  idLen += padSize;
+  if (len < idLen)
     throw CHeaderErrorException();
-  unsigned rem = len - curPos;
-  r.SystemUse.Alloc(rem);
-  ReadBytes((Byte *)r.SystemUse, rem);
-}
-
-void CInArchive::ReadDirRecord(CDirRecord &r)
-{
-  Byte len = ReadByte();
-  // Some CDs can have incorrect value len = 48 ('0') in VolumeDescriptor.
-  // But maybe we must use real "len" for other records.
-  len = 34;
-  ReadDirRecord2(r, len);
+  len -= idLen;
+  r.SystemUse.Alloc(len);
+  ReadBytes((Byte *)r.SystemUse, len);
 }
 
 void CInArchive::ReadVolumeDescriptor(CVolumeDescriptor &d)
@@ -279,7 +283,16 @@ void CInArchive::ReadVolumeDescriptor(CVolumeDescriptor &d)
   d.LOptionalPathTableLocation = ReadUInt32Le();
   d.MPathTableLocation = ReadUInt32Be();
   d.MOptionalPathTableLocation = ReadUInt32Be();
-  ReadDirRecord(d.RootDirRecord);
+  {
+    unsigned len;
+    /* len = */ ReadByte();
+    // len == 34 is expected by ISO specification
+    // len == 36 is possible for some Joliet archives
+    // len == 48 is possible for Rock Ridge?
+    len = 34; // we ignore (len) value from header because
+              // next field (VolumeSetId) always starts after 34 bytes
+    ReadDirRecord(d.RootDirRecord, len, d.IsJoliet());
+  }
   ReadBytes(d.VolumeSetId, sizeof(d.VolumeSetId));
   ReadBytes(d.PublisherId, sizeof(d.PublisherId));
   ReadBytes(d.DataPreparerId, sizeof(d.DataPreparerId));
@@ -291,11 +304,17 @@ void CInArchive::ReadVolumeDescriptor(CVolumeDescriptor &d)
   ReadDateTime(d.MTime);
   ReadDateTime(d.ExpirationTime);
   ReadDateTime(d.EffectiveTime);
-  d.FileStructureVersion = ReadByte(); // = 1
-  SkipZeros(1);
+  const Byte fileStructureVersion = ReadByte();
+  // d.FileStructureVersion = fileStructureVersion;
+  if (fileStructureVersion != 1 &&  // ECMA-119
+      fileStructureVersion != 2)    // some ISO files have fileStructureVersion == 2.
+  {
+    // v24.05: we ignore that field, because we don't know what exact values are allowed there
+    // throw CHeaderErrorException();
+  }
+  SkipZeros(1); // (Reserved for future standardization)
   ReadBytes(d.ApplicationUse, sizeof(d.ApplicationUse));
-
-  // Most ISO contains zeros in the following field (reserved for future standardization).
+  // Most ISO contain zeros in the following field (reserved for future standardization).
   // But some ISO programs write some data to that area.
   // So we disable check for zeros.
   Skip(653); // SkipZeros(653);
@@ -303,10 +322,12 @@ void CInArchive::ReadVolumeDescriptor(CVolumeDescriptor &d)
 
 static const Byte kSig_CD001[5] = { 'C', 'D', '0', '0', '1' };
 
+/*
 static const Byte kSig_NSR02[5] = { 'N', 'S', 'R', '0', '2' };
 static const Byte kSig_NSR03[5] = { 'N', 'S', 'R', '0', '3' };
 static const Byte kSig_BEA01[5] = { 'B', 'E', 'A', '0', '1' };
 static const Byte kSig_TEA01[5] = { 'T', 'E', 'A', '0', '1' };
+*/
 
 static inline bool CheckSignature(const Byte *sig, const Byte *data)
 {
@@ -318,22 +339,24 @@ static inline bool CheckSignature(const Byte *sig, const Byte *data)
 
 void CInArchive::SeekToBlock(UInt32 blockIndex)
 {
-  HRESULT res = _stream->Seek((UInt64)blockIndex * VolDescs[MainVolDescIndex].LogicalBlockSize, STREAM_SEEK_SET, &_position);
+  const HRESULT res = _stream->Seek(
+      (Int64)((UInt64)blockIndex * VolDescs[MainVolDescIndex].LogicalBlockSize),
+      STREAM_SEEK_SET, &_position);
   if (res != S_OK)
     throw CSystemException(res);
   m_BufferPos = 0;
 }
 
-static const int kNumLevelsMax = 256;
+static const unsigned kNumLevelsMax = 256;
 
-void CInArchive::ReadDir(CDir &d, int level)
+HRESULT CInArchive::ReadDir(CDir &d, const unsigned level)
 {
   if (!d.IsDir())
-    return;
+    return S_OK;
   if (level > kNumLevelsMax)
   {
     TooDeepDirs = true;
-    return;
+    return S_OK;
   }
 
   {
@@ -341,37 +364,83 @@ void CInArchive::ReadDir(CDir &d, int level)
       if (UniqStartLocations[i] == d.ExtentLocation)
       {
         SelfLinkedDirs = true;
-        return;
+        return S_OK;
       }
     UniqStartLocations.Add(d.ExtentLocation);
   }
 
   SeekToBlock(d.ExtentLocation);
-  UInt64 startPos = _position;
-
+  const UInt64 startPos = _position;
   bool firstItem = true;
   for (;;)
   {
-    UInt64 offset = _position - startPos;
-    if (offset >= d.Size)
+    if (_openCallback && _processedBytes - _processedBytes_prev >= (1 << 24))
+    {
+      _processedBytes_prev = _processedBytes;
+      RINOK(_openCallback->SetCompleted(&_numFiles, &_processedBytes))
+    }
+    if (_processedBytes > _fileSize + (1 << 24))
+    {
+      TooBigMetadata = true;
+      return S_FALSE;
+    }
+
+    const UInt64 recordPos = _position;
+    const UInt64 posInDir = recordPos - startPos;
+    if (d.Size < posInDir)
+      return E_FAIL; // error in code
+    const UInt64 rem = d.Size - posInDir;
+    if (rem == 0)
       break;
-    Byte len = ReadByte();
+    /* (VolDescs[MainVolDescIndex].LogicalBlockSize == kBlockSize)
+       so we use kBlockSize in code below */
+    const unsigned len = ReadByte();
     if (len == 0)
+    {
+      // it must have zero padding to end of block:
+      while ((unsigned)_position & (kBlockSize - 1))
+      {
+        if (_position - startPos >= d.Size)
+          break;
+        if (ReadByte())
+        {
+          HeadersError = true;
+          return S_FALSE;
+        }
+      }
       continue;
+    }
+    // record can't cross block range
+    if (len > rem || (((unsigned)recordPos & (kBlockSize - 1)) + len) > kBlockSize)
+    {
+      HeadersError = true;
+      return S_FALSE;
+    }
+
     CDir subItem;
-    ReadDirRecord2(subItem, len);
+    ReadDirRecord(subItem, len);
     if (firstItem && level == 0)
       IsSusp = subItem.CheckSusp(SuspSkipSize);
       
     if (!subItem.IsSystemItem())
+    {
+      if (_numFiles >= (1u << 30))
+      {
+        TooBigMetadata = true; // Too many files
+        return S_FALSE;
+      }
       d._subItems.Add(subItem);
-
+      _numFiles++;
+    }
     firstItem = false;
   }
   FOR_VECTOR (i, d._subItems)
-    ReadDir(d._subItems[i], level + 1);
+  {
+    RINOK(ReadDir(d._subItems[i], level + 1))
+  }
 
   UniqStartLocations.DeleteBack();
+  return S_OK;
 }
 
 void CInArchive::CreateRefs(CDir &d)
@@ -508,10 +577,10 @@ void CInArchive::ReadBootInfo()
 HRESULT CInArchive::Open2()
 {
   _position = 0;
-  RINOK(_stream->Seek(0, STREAM_SEEK_END, &_fileSize));
+  RINOK(InStream_GetSize_SeekToEnd(_stream, _fileSize))
   if (_fileSize < kStartPos)
     return S_FALSE;
-  RINOK(_stream->Seek(kStartPos, STREAM_SEEK_SET, &_position));
+  RINOK(_stream->Seek(kStartPos, STREAM_SEEK_SET, &_position))
 
   PhySize = _position;
   m_BufferPos = 0;
@@ -586,18 +655,29 @@ HRESULT CInArchive::Open2()
   
   if (VolDescs.IsEmpty())
     return S_FALSE;
-  for (MainVolDescIndex = VolDescs.Size() - 1; MainVolDescIndex > 0; MainVolDescIndex--)
+  for (MainVolDescIndex = (int)VolDescs.Size() - 1; MainVolDescIndex > 0; MainVolDescIndex--)
     if (VolDescs[MainVolDescIndex].IsJoliet())
       break;
+  /* FIXME: some volume can contain Rock Ridge, that is better than
+     Joliet volume. So we need some way to detect such case */
   // MainVolDescIndex = 0; // to read primary volume
   const CVolumeDescriptor &vd = VolDescs[MainVolDescIndex];
   if (vd.LogicalBlockSize != kBlockSize)
     return S_FALSE;
-  
+
+  {
+    FOR_VECTOR (i, VolDescs)
+    {
+      const CVolumeDescriptor &vd2 = VolDescs[i];
+      UpdatePhySize(0, vd2.Get_VolumeSpaceSize_inBytes());
+    }
+  }
+
+ 
   IsArc = true;
 
   (CDirRecord &)_rootDir = vd.RootDirRecord;
-  ReadDir(_rootDir, 0);
+  RINOK(ReadDir(_rootDir, 0))
   CreateRefs(_rootDir);
   ReadBootInfo();
 
@@ -613,6 +693,21 @@ HRESULT CInArchive::Open2()
       }
     }
   }
+
+  {
+    // find boot item for expand:
+    // UEFI Specification : 13.3.2.1. ISO-9660 and El Torito
+    _expand_BootEntries_index = -1;
+    FOR_VECTOR (i, BootEntries)
+    {
+      const CBootInitialEntry &be = BootEntries[i];
+      if (be.SectorCount <= 1 && be.BootMediaType == NBootMediaType::kNoEmulation)
+        if (_expand_BootEntries_index == -1
+          || be.LoadRBA >= BootEntries[_expand_BootEntries_index].LoadRBA)
+        _expand_BootEntries_index = (int)i;
+    }
+  }
+
   {
     FOR_VECTOR (i, BootEntries)
     {
@@ -627,10 +722,10 @@ HRESULT CInArchive::Open2()
     const UInt64 kRemMax = 1 << 21;
     if (rem <= kRemMax)
     {
-      RINOK(_stream->Seek(PhySize, STREAM_SEEK_SET, NULL));
+      RINOK(InStream_SeekSet(_stream, PhySize))
       bool areThereNonZeros = false;
       UInt64 numZeros = 0;
-      RINOK(ReadZeroTail(_stream, areThereNonZeros, numZeros, kRemMax));
+      RINOK(ReadZeroTail(_stream, areThereNonZeros, numZeros, kRemMax))
       if (!areThereNonZeros)
         PhySize += numZeros;
     }
@@ -639,10 +734,12 @@ HRESULT CInArchive::Open2()
   return S_OK;
 }
 
-HRESULT CInArchive::Open(IInStream *inStream)
+HRESULT CInArchive::Open(IInStream *inStream, IArchiveOpenCallback *openCallback)
 {
   Clear();
   _stream = inStream;
+  _openCallback = openCallback;
+  _numFiles = _processedBytes = _processedBytes_prev = 0;
   try { return Open2(); }
   catch(const CSystemException &e) { return e.ErrorCode; }
   catch(CUnexpectedEndException &) { UnexpectedEnd = true; return S_FALSE; }
@@ -657,6 +754,7 @@ void CInArchive::Clear()
   HeadersError = false;
   IncorrectBigEndian = false;
   TooDeepDirs = false;
+  TooBigMetadata = false;
   SelfLinkedDirs = false;
 
   UniqStartLocations.Clear();
@@ -668,6 +766,36 @@ void CInArchive::Clear()
   BootEntries.Clear();
   SuspSkipSize = 0;
   IsSusp = false;
+
+  _expand_BootEntries_index = -1;
+}
+
+
+UInt64 CInArchive::GetBootItemSize(unsigned index) const
+{
+  const CBootInitialEntry &be = BootEntries[index];
+  UInt64 size = be.GetSize();
+       if (be.BootMediaType == NBootMediaType::k1d2Floppy)  size = 1200 << 10;
+  else if (be.BootMediaType == NBootMediaType::k1d44Floppy) size = 1440 << 10;
+  else if (be.BootMediaType == NBootMediaType::k2d88Floppy) size = 2880 << 10;
+  const UInt64 startPos = (UInt64)be.LoadRBA * kBlockSize;
+  if (startPos < _fileSize)
+  {
+    const UInt64 rem = _fileSize - startPos;
+    /*
+       UEFI modification to ISO specification:
+       because SectorCount is 16-bit, size is limited by (32 MB).
+       UEFI Specification :
+        13.3.2.1. ISO-9660 and El Torito
+        If the value of Sector Count is set to 0 or 1,
+        EFI will assume the system partition consumes the space
+        from the beginning of the "no emulation" image to the end of the CD-ROM.
+    */
+    //
+    if ((int)index == _expand_BootEntries_index || rem < size)
+      size = rem;
+  }
+  return size;
 }
 
 }}

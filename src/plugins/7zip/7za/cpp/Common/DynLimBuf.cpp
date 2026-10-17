@@ -7,7 +7,7 @@
 
 CDynLimBuf::CDynLimBuf(size_t limit) throw()
 {
-  _chars = 0;
+  _chars = NULL;
   _pos = 0;
   _size = 0;
   _sizeLimit = limit;
@@ -51,7 +51,7 @@ CDynLimBuf & CDynLimBuf::operator+=(char c) throw()
     _chars = newBuf;
     _size = n;
   }
-  _chars[_pos++] = c;
+  _chars[_pos++] = (Byte)c;
   return *this;
 }
 

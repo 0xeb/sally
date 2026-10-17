@@ -9,7 +9,7 @@
 #include "../Common/StringConvert.h"
 
 #include "Clipboard.h"
-#include "Defs.h"
+#include "WinDefs.h"
 #include "MemoryGlobal.h"
 #include "Shell.h"
 
@@ -117,7 +117,7 @@ bool ClipboardSetText(HWND owner, const UString &s)
   bool res;
   res = ClipboardSetData(CF_UNICODETEXT, (const wchar_t *)s, (s.Len() + 1) * sizeof(wchar_t));
   #ifndef _UNICODE
-  AString a = UnicodeStringToMultiByte(s, CP_ACP);
+  AString a (UnicodeStringToMultiByte(s, CP_ACP));
   if (ClipboardSetData(CF_TEXT, (const char *)a, (a.Len() + 1) * sizeof(char)))
     res = true;
   a = UnicodeStringToMultiByte(s, CP_OEMCP);

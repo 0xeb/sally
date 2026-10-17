@@ -1,7 +1,7 @@
 // Windows/MemoryGlobal.h
 
-#ifndef __WINDOWS_MEMORY_GLOBAL_H
-#define __WINDOWS_MEMORY_GLOBAL_H
+#ifndef ZIP7_INC_WINDOWS_MEMORY_GLOBAL_H
+#define ZIP7_INC_WINDOWS_MEMORY_GLOBAL_H
 
 #include "../Common/MyWindows.h"
 
@@ -12,7 +12,7 @@ class CGlobal
 {
   HGLOBAL _global;
 public:
-  CGlobal(): _global(NULL){};
+  CGlobal(): _global(NULL) {}
   ~CGlobal() { Free(); }
   operator HGLOBAL() const { return _global; }
   void Attach(HGLOBAL hGlobal)
@@ -22,7 +22,7 @@ public:
   }
   HGLOBAL Detach()
   {
-    HGLOBAL h = _global;
+    const HGLOBAL h = _global;
     _global = NULL;
     return h;
   }
@@ -39,13 +39,13 @@ class CGlobalLock
   LPVOID _ptr;
 public:
   LPVOID GetPointer() const { return _ptr; }
-  CGlobalLock(HGLOBAL hGlobal): _global(hGlobal)
+  CGlobalLock(HGLOBAL hGlobal Z7_lifetimebound): _global(hGlobal)
   {
     _ptr = GlobalLock(hGlobal);
-  };
+  }
   ~CGlobalLock()
   {
-    if (_ptr != NULL)
+    if (_ptr)
       GlobalUnlock(_global);
   }
 };

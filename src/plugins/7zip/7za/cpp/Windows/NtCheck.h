@@ -1,7 +1,7 @@
 // Windows/NtCheck.h
 
-#ifndef __WINDOWS_NT_CHECK_H
-#define __WINDOWS_NT_CHECK_H
+#ifndef ZIP7_INC_WINDOWS_NT_CHECK_H
+#define ZIP7_INC_WINDOWS_NT_CHECK_H
 
 #ifdef _WIN32
 
@@ -9,44 +9,26 @@
 
 #if !defined(_WIN64) && !defined(UNDER_CE)
 
-// OPENSAL_7ZIP_PATCH BEGIN
-// ****************************************************************************
-// SalIsWindowsVersionOrGreater
-//
-// Based on SDK 8.1 VersionHelpers.h
-// Indicates if the current OS version matches, or is greater than, the provided 
-// version information. This function is useful in confirming a version of Windows 
-// Server that doesn't share a version number with a client release.
-// http://msdn.microsoft.com/en-us/library/windows/desktop/dn424964%28v=vs.85%29.aspx
-// 
-
-static inline bool SalIsWindowsVersionOrGreater(WORD wMajorVersion, WORD wMinorVersion, WORD wServicePackMajor)
-{
-  OSVERSIONINFOEXW osvi;
-  DWORDLONG const dwlConditionMask = VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,
-    VER_MAJORVERSION, VER_GREATER_EQUAL),
-    VER_MINORVERSION, VER_GREATER_EQUAL),
-    VER_SERVICEPACKMAJOR, VER_GREATER_EQUAL);
-
-  SecureZeroMemory(&osvi, sizeof(osvi));     // replacement for memset (does not require the RTL)
-  osvi.dwOSVersionInfoSize = sizeof(osvi);
-  osvi.dwMajorVersion = wMajorVersion;
-  osvi.dwMinorVersion = wMinorVersion;
-  osvi.wServicePackMajor = wServicePackMajor;
-  return VerifyVersionInfoW(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_SERVICEPACKMAJOR, dwlConditionMask) != FALSE;
-}
-
+#if defined(_MSC_VER) && _MSC_VER >= 1900
+#pragma warning(push)
+// GetVersionExW was declared deprecated
+#pragma warning(disable : 4996)
+#endif
 static inline bool IsItWindowsNT()
 {
-//  OSVERSIONINFO vi;
-//  vi.dwOSVersionInfoSize = sizeof(vi);
-//  return (::GetVersionEx(&vi) && vi.dwPlatformId == VER_PLATFORM_WIN32_NT);
-  return SalIsWindowsVersionOrGreater(5, 0, 0);   // Petr: is this at least Windows 2000?
+  OSVERSIONINFO vi;
+  vi.dwOSVersionInfoSize = sizeof(vi);
+  return (::GetVersionEx(&vi) && vi.dwPlatformId == VER_PLATFORM_WIN32_NT);
 }
-// OPENSAL_7ZIP_PATCH END
+#if defined(_MSC_VER) && _MSC_VER >= 1900
+#pragma warning(pop)
+#endif
+
 #endif
 
 #ifndef _UNICODE
+    extern
+    bool g_IsNT;
   #if defined(_WIN64) || defined(UNDER_CE)
     bool g_IsNT = true;
     #define SET_IS_NT

@@ -2,7 +2,10 @@
 
 === Igor Pavlov and Brian Gladman === 
 The 7-ZIP plugin utilizes 7-Zip file archiver library.
-7-Zip Copyright (C) 1999-2019 Igor Pavlov
+7-Zip 26.04 Copyright (C) 1999-2026 Igor Pavlov
+The bundled upstream license notices are in src/plugins/7zip/7za/doc/license.txt
+and src/plugins/7zip/7za/doc/unRarLicense.txt. Some files are in the public domain;
+the remaining files use the upstream LGPL/BSD/unRAR terms as identified there.
 
 === Jean-loup Gailly and Mark Adler ===
 Portions of ZIP plugin utilizes zlib library.

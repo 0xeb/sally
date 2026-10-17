@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 
-<?define VerMajor = "16" ?>
+<?define VerMajor = "26" ?>
 <?define VerMinor = "04" ?>
 <?define VerBuild = "00" ?>
 <?define MmVer = "$(var.VerMajor).$(var.VerMinor)" ?>
@@ -103,6 +103,8 @@
     </Upgrade>
 
     <Media Id="1" Cabinet="product.cab" EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="MSIRMSHUTDOWN" Value="2"/>
 
     <Property Id="INSTALLDIR">
       <RegistrySearch Id="My7zipPathLM"  Type="raw" Root="HKLM" Key="Software\7-Zip" Name="Path" />
@@ -294,6 +296,7 @@
               <File Id="ja.txt" Name="ja.txt" />
               <File Id="ka.txt" Name="ka.txt" />
               <File Id="kaa.txt" Name="kaa.txt" />
+              <File Id="kab.txt" Name="kab.txt" />
               <File Id="kk.txt" Name="kk.txt" />
               <File Id="ko.txt" Name="ko.txt" />
               <File Id="ku.txt" Name="ku.txt" />
@@ -327,13 +330,17 @@
               <File Id="sr_spl.txt" Name="sr-spl.txt" />
               <File Id="sr_spc.txt" Name="sr-spc.txt" />
               <File Id="sv.txt" Name="sv.txt" />
+              <File Id="sw.txt" Name="sw.txt" />
               <File Id="ta.txt" Name="ta.txt" />
+              <File Id="tg.txt" Name="tg.txt" />
               <File Id="th.txt" Name="th.txt" />
+              <File Id="tk.txt" Name="tk.txt" />
               <File Id="tr.txt" Name="tr.txt" />
               <File Id="tt.txt" Name="tt.txt" />
               <File Id="ug.txt" Name="ug.txt" />
               <File Id="uk.txt" Name="uk.txt" />
               <File Id="uz.txt" Name="uz.txt" />
+              <File Id="uz_cyrl.txt" Name="uz-cyrl.txt" />
               <File Id="va.txt" Name="va.txt" />
               <File Id="vi.txt" Name="vi.txt" />
               <File Id="yo.txt" Name="yo.txt" />

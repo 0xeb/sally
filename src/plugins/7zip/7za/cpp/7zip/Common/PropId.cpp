@@ -3,10 +3,8 @@
 #include "StdAfx.h"
 
 #include "../../Common/MyWindows.h"
-
 #include "../PropID.h"
 
-// VARTYPE
 const Byte k7z_PROPID_To_VARTYPE[kpid_NUM_DEFINED] =
 {
   VT_EMPTY,
@@ -84,7 +82,7 @@ const Byte k7z_PROPID_To_VARTYPE[kpid_NUM_DEFINED] =
   VT_UI4,
   VT_BSTR,
   VT_UI8,
-  VT_UI8,
+  VT_UI4, // kpidNumAltStreams
   VT_UI8,
   VT_UI8,
   VT_UI8,
@@ -104,5 +102,14 @@ const Byte k7z_PROPID_To_VARTYPE[kpid_NUM_DEFINED] =
   VT_UI8,
   VT_BOOL,
   VT_BSTR,
-  VT_BSTR
+  VT_BSTR,
+  VT_BSTR,
+  VT_BOOL,
+  VT_FILETIME, // kpidChangeTime
+  VT_UI4,
+  VT_UI4,
+  VT_UI4,
+  VT_UI4,
+  VT_UI4,
+  VT_UI4  // kpidDevMinor
 };

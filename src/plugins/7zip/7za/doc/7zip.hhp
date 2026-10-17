@@ -58,6 +58,7 @@ cmdline\switches\shared.htm
 cmdline\switches\sni.htm
 cmdline\switches\sns.htm
 cmdline\switches\spf.htm
+cmdline\switches\spm.htm
 cmdline\switches\ssc.htm
 cmdline\switches\stdin.htm
 cmdline\switches\stdout.htm
@@ -70,6 +71,7 @@ cmdline\switches\working_dir.htm
 cmdline\switches\exclude.htm
 fm\options.htm
 fm\benchmark.htm
+fm\temp.htm
 fm\index.htm
 fm\menu.htm
 fm\about.htm
