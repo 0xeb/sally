@@ -106,3 +106,9 @@ Sally uses yyjson 0.12.0 (commit 8b4a38dc994a110abaec8a400615567bd996105f)
 to parse JSON settings and GitHub release metadata.
 Copyright (c) 2020 YaoYuan <ibireme@gmail.com>
 Licensed under the MIT License. See doc/license/license_yyjson.txt.
+
+=== libsodium ===
+Sally and SalUpdate use libsodium 1.0.22 to verify offline supporter keys and
+signed display content. Copyright (c) 2013-2026 Frank Denis <j at pureftpd dot org>.
+Licensed under the ISC License. The complete upstream notice is included in
+doc/license/license_libsodium.txt; source provenance is retained with the library.
