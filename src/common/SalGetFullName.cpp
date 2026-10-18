@@ -77,6 +77,15 @@ BOOL SalRemovePointsFromPath(WCHAR* afterRoot)
     return TRUE;
 }
 
+BOOL IsNetworkNamespacePathW(const std::wstring& path)
+{
+    std::wstring resolved = path;
+    int error = 0;
+    BOOL callNethood = FALSE;
+    return !SalGetFullNameW(resolved, &error, NULL, NULL, &callNethood) && callNethood &&
+           (error == IDS_SERVERNAMEMISSING || error == IDS_SHARENAMEMISSING);
+}
+
 // Wide version of SalGetFullName
 BOOL SalGetFullNameW(std::wstring& name, int* errTextID, const wchar_t* curDir,
                      std::wstring* nextFocus, BOOL* callNethood,

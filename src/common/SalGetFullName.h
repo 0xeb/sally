@@ -20,6 +20,9 @@ BOOL SalGetFullNameW(std::wstring& name, int* errTextID = NULL, const wchar_t* c
                      std::wstring* nextFocus = NULL, BOOL* callNethood = NULL,
                      BOOL allowRelPathWithSpaces = FALSE);
 
+// Network root/server destinations are namespace locations, not disk shares.
+BOOL IsNetworkNamespacePathW(const std::wstring& path);
+
 // HOST SEAM: returns the remembered default directory for drive
 // 'a'..'z' (lower-case letter). Production implements this over the
 // DefaultDir table (sally_path_utils.cpp); tests provide a stub

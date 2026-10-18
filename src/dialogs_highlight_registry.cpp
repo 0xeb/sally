@@ -7,6 +7,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/BuiltinLanguages.h"
+#include "common/update/UpdateSchedule.h"
 #include "mainwnd.h"
 #include "usermenu.h"
 #include "edtlbwnd.h"
@@ -847,7 +848,8 @@ void CCfgPageGeneral::Transfer(CTransferInfo& ti)
     if (ti.Type == ttDataToWindow)
     {
         const int names[] = {IDS_UPDATECHECK_NEVER, IDS_UPDATECHECK_DAY, IDS_UPDATECHECK_WEEK,
-                             IDS_UPDATECHECK_MONTH, IDS_UPDATECHECK_3MONTHS, IDS_UPDATECHECK_6MONTHS};
+                             IDS_UPDATECHECK_MONTH, IDS_UPDATECHECK_3MONTHS, IDS_UPDATECHECK_6MONTHS,
+                             IDS_UPDATECHECK_STARTUP};
         SendDlgItemMessage(HWindow, IDC_UPDATECHECK, CB_RESETCONTENT, 0, 0);
         for (int name : names)
             SendDlgItemMessageW(HWindow, IDC_UPDATECHECK, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(name).c_str());
@@ -856,7 +858,7 @@ void CCfgPageGeneral::Transfer(CTransferInfo& ti)
     else
     {
         const int mode = (int)SendDlgItemMessage(HWindow, IDC_UPDATECHECK, CB_GETCURSEL, 0, 0);
-        if (mode >= 0 && mode <= 5)
+        if (mode >= 0 && Sally::Update::IsKnownUpdateCheckMode(static_cast<DWORD>(mode)))
             Configuration.UpdateCheckMode = mode;
     }
     if (ti.Type == ttDataFromWindow && Configuration.ReloadEnvVariables && oldReloadEnvVariables != Configuration.ReloadEnvVariables)

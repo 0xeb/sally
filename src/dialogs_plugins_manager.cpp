@@ -2662,13 +2662,6 @@ CMainWindowIconItem MainWindowIcons[MAINWINDOWICONS_COUNT] =
 CCfgPageMainWindow::CCfgPageMainWindow()
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_MAINWINDOW, IDD_CFGPAGE_MAINWINDOW, PSP_USETITLE, NULL)
 {
-    HIconsList = NULL;
-}
-
-CCfgPageMainWindow::~CCfgPageMainWindow()
-{
-    if (HIconsList != NULL)
-        ImageList_Destroy(HIconsList);
 }
 
 void CCfgPageMainWindow::LoadControls()
@@ -2719,15 +2712,6 @@ void CCfgPageMainWindow::Transfer(CTransferInfo& ti)
         }
     }
 
-    int oldMainWindowIconIndex = Configuration.MainWindowIconIndex;
-    if (ti.Type == ttDataToWindow)
-        SendDlgItemMessage(HWindow, IDC_TITLEBAR_ICON_INDEX, CB_SETCURSEL, Configuration.MainWindowIconIndex, 0);
-    else
-    {
-        Configuration.MainWindowIconIndex = (int)SendDlgItemMessage(HWindow, IDC_TITLEBAR_ICON_INDEX, CB_GETCURSEL, 0, 0);
-        if (Configuration.MainWindowIconIndex != oldMainWindowIconIndex)
-            Configuration.MainWindowIconIndexForced = -1; // a change occurred, clear any command line option
-    }
 
     if (ti.Type == ttDataToWindow)
     {
@@ -2739,7 +2723,7 @@ void CCfgPageMainWindow::Validate(CTransferInfo& ti)
 {
 }
 
-BOOL CCfgPageMainWindow::InitIconCombobox()
+BOOL CCfgPageAppearance::InitIconCombobox()
 {
     HWND hCombo = GetDlgItem(HWindow, IDC_TITLEBAR_ICON_INDEX);
 
@@ -2798,14 +2782,6 @@ CCfgPageMainWindow::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
-    case WM_INITDIALOG:
-    {
-        // replace the existing combobox for icon color selection with its EX version
-        InitIconCombobox();
-
-        break;
-    }
-
     case WM_COMMAND:
     {
         if (HIWORD(wParam) == BN_CLICKED)
@@ -2826,6 +2802,7 @@ CCfgPageMainWindow::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CCfgPageAppearance::CCfgPageAppearance()
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_APPEARANCE, IDD_CFGPAGE_APPEARANCE, PSP_USETITLE, NULL)
 {
+    HIconsList = NULL;
     HPanelFont = NULL;
     LocalUseCustomPanelFont = UseCustomPanelFont;
     memcpy(&LocalPanelLogFont, &LogFont, sizeof(LocalPanelLogFont));
@@ -2834,6 +2811,8 @@ CCfgPageAppearance::CCfgPageAppearance()
 
 CCfgPageAppearance::~CCfgPageAppearance()
 {
+    if (HIconsList != NULL)
+        ImageList_Destroy(HIconsList);
     if (HPanelFont != NULL)
         HANDLES(DeleteObject(HPanelFont));
 }
@@ -2909,6 +2888,16 @@ void CCfgPageAppearance::Transfer(CTransferInfo& ti)
     else
         SendDlgItemMessage(HWindow, IDC_THUMBNAILSIZE, EM_LIMITTEXT, 4, 0);
 
+    int oldMainWindowIconIndex = Configuration.MainWindowIconIndex;
+    if (ti.Type == ttDataToWindow)
+        SendDlgItemMessage(HWindow, IDC_TITLEBAR_ICON_INDEX, CB_SETCURSEL, Configuration.MainWindowIconIndex, 0);
+    else
+    {
+        Configuration.MainWindowIconIndex = (int)SendDlgItemMessage(HWindow, IDC_TITLEBAR_ICON_INDEX, CB_GETCURSEL, 0, 0);
+        if (Configuration.MainWindowIconIndex != oldMainWindowIconIndex)
+            Configuration.MainWindowIconIndexForced = -1; // a change occurred, clear any command line option
+    }
+
     if (ti.Type == ttDataToWindow)
     {
         EnableControls();
@@ -2946,6 +2935,7 @@ CCfgPageAppearance::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        InitIconCombobox();
         ChangeToArrowButton(HWindow, IDC_INFOLINEBROWSE);
         new CButton(HWindow, IDB_PANELFONT, BTF_RIGHTARROW);
 

@@ -17,6 +17,7 @@
 #include "common/clipboard/ClipboardTextPayload.h"
 #include "common/clipboard/HDropSelection.h"
 #include "common/fsutil.h"
+#include "common/SalGetFullName.h"
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 #include "salshlib.h"
@@ -2112,7 +2113,10 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             if (FilesWindow->Is(ptDisk))
                             {
                                 std::wstring pathW = TextW.substr(0, HotItem->Chars);
-                                if (FilesWindow->ChangePathToDisk(FilesWindow->HWindow, pathW.c_str(), -1, NULL, NULL, TRUE))
+                                const BOOL changed = IsNetworkNamespacePathW(pathW)
+                                                         ? FilesWindow->ChangeDir(pathW.c_str(), -1, NULL, 2, NULL, FALSE)
+                                                         : FilesWindow->ChangePathToDisk(FilesWindow->HWindow, pathW.c_str(), -1, NULL, NULL, TRUE);
+                                if (changed)
                                 {
                                     FilesWindow->DirectoryLine->InvalidateAndUpdate(TRUE);
                                     UpdateWindow(MainWindow->HWindow);

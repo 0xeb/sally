@@ -13,6 +13,7 @@
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
 #include "common/IRegistry.h"
+#include "common/update/UpdateSchedule.h"
 #include "common/fsutil.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise, collision with CSalamanderGeneral::PathIsPrefix
@@ -3678,8 +3679,8 @@ BOOL CMainWindow::LoadConfig(
                      &Configuration.SuggestPathNames, sizeof(DWORD));
             GetValueW(actKey, CONFIG_UPDATECHECKMODE_REG_W, REG_DWORD,
                      &Configuration.UpdateCheckMode, sizeof(DWORD));
-            if (Configuration.UpdateCheckMode < 0 || Configuration.UpdateCheckMode > 5)
-                Configuration.UpdateCheckMode = 2;
+            if (!Sally::Update::IsKnownUpdateCheckMode(static_cast<DWORD>(Configuration.UpdateCheckMode)))
+                Configuration.UpdateCheckMode = Sally::Update::kDefaultUpdateCheckMode;
             GetValueW(actKey, CONFIG_SHIFTFORHOTPATHS_REG_W, REG_DWORD,
                      &Configuration.ShiftForHotPaths, sizeof(DWORD));
             // CONFIG_LANGUAGE_REG is read at startup, before the language is applied

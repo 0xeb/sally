@@ -39,7 +39,6 @@ const wchar_t* const kNotBeforeValue = L"Update Check Not Before";
 const wchar_t* const kFeedValue = L"Update Feed Url";
 
 const wchar_t* const kCheckVerDll = L"checkver\\checkver.dll";
-const DWORD kScheduledCheckDelayMs = 20 * 1000;
 HANDLE ScheduledStop = NULL;
 HANDLE ScheduledThread = NULL;
 
@@ -202,25 +201,29 @@ UpdaterCommand CheckCommand(bool automatic)
     return command;
 }
 
-unsigned ScheduledCheckBody(void*)
+unsigned ScheduledCheckBody(void* param)
 {
     CALL_STACK_MESSAGE1("ScheduledCheckBody()");
     SetThreadNameInVCAndTrace(L"UpdateCheck");
+    const DWORD mode = static_cast<DWORD>(reinterpret_cast<UINT_PTR>(param));
+    const bool onStartup = mode == kCheckOnStartup;
     // Shutdown must wake the initial delay and join this worker before services die.
-    if (WaitForSingleObject(ScheduledStop, kScheduledCheckDelayMs) != WAIT_TIMEOUT)
+    if (WaitForSingleObject(ScheduledStop, AutomaticCheckDelayMs(mode)) != WAIT_TIMEOUT)
         return 0;
 
     const ULONGLONG started = NowUtc();
-    if (!IsCheckDue(Configuration.UpdateCheckMode, ReadTime(kLastCheckValue), ReadTime(kNotBeforeValue), started))
+    if (!IsCheckDue(mode, ReadTime(kLastCheckValue), ReadTime(kNotBeforeValue), started))
         return 0;
     // Another Sally starting now does not check too.
-    WriteTime(kNotBeforeValue, started + kFileTimeHour);
+    if (!onStartup)
+        WriteTime(kNotBeforeValue, started + kFileTimeHour);
     DWORD error = 0;
     HPROCESS process = StartUpdater(CheckCommand(true), error);
     if (process == INVALID_HPROCESS)
     {
         TRACE_I("ScheduledCheck: cannot start the updater, error " << error);
-        WriteTime(kNotBeforeValue, started + kFileTimeDay);
+        if (!onStartup)
+            WriteTime(kNotBeforeValue, started + kFileTimeDay);
         return 0;
     }
     // The updater ends at once unless it shows a newer release; then when its window closes.
@@ -242,7 +245,7 @@ unsigned ScheduledCheckBody(void*)
         WriteTime(kLastCheckValue, started);
         WriteTime(kNotBeforeValue, 0);
     }
-    else
+    else if (!onStartup)
     {
         TRACE_I("ScheduledCheck: GitHub could not be reached (" << exitCode << "), trying again tomorrow");
         WriteTime(kNotBeforeValue, NowUtc() + kFileTimeDay);
@@ -396,7 +399,8 @@ void OnStarted()
         TRACE_I("UpdateCheck::OnStarted(): cannot start the updater for the report, error " << error);
     }
 
-    if (CheckInterval(Configuration.UpdateCheckMode) == 0)
+    const DWORD mode = Configuration.UpdateCheckMode;
+    if (!IsAutomaticCheckEnabled(mode))
         return;
     if (ScheduledThread != NULL)
         return;
@@ -404,7 +408,7 @@ void OnStarted()
     if (ScheduledStop == NULL)
         return;
     DWORD id = 0;
-    ScheduledThread = HANDLES(CreateThread(NULL, 0, ScheduledCheck, NULL, 0, &id));
+    ScheduledThread = HANDLES(CreateThread(NULL, 0, ScheduledCheck, reinterpret_cast<void*>(static_cast<UINT_PTR>(mode)), 0, &id));
     if (ScheduledThread == NULL)
     {
         HANDLES(CloseHandle(ScheduledStop));

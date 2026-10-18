@@ -2731,6 +2731,7 @@
 #define IDS_UPDATECHECK_3MONTHS         14236
 #define IDS_UPDATECHECK_6MONTHS         14237
 #define IDS_UPDATER_CANNOT_START        14238
+#define IDS_UPDATECHECK_STARTUP         14239
 
 // About this translation, shown when choosing a language. They have a 16-string bundle of their
 // own (14240-14255): Sally lists its built-in languages by the language copies of this bundle.

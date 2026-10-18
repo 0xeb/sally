@@ -1089,13 +1089,9 @@ BEGIN
     CONTROL         "&Vlastná textová predpona v titulku hlavného okna:",IDC_TITLEBAR_PREFIX,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
-    GROUPBOX        " Ikona aplikácie ",IDC_STATIC_1,1,70,294,56
-    LTEXT           "Farba ik&ony:",IDC_STATIC_2,8,85,43,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,57,83,97,15,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Na zmenu farby ikony zástupcu na ploche alebo v ponuke Štart,\nkliknite pravým tlačidlom na zástupcu > Vlastnosti > Zmeniť ikonu.",IDC_STATIC_3,8,102,258,16
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 231
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 275
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Vzhľad"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1122,9 +1118,12 @@ BEGIN
     LTEXT           "Veľkosť:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "bodov",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " Mo&tív ",IDC_STATIC_7,1,192,295,30
-    LTEXT           "Režim:",IDC_STATIC_8,8,206,45,8
-    COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
+    GROUPBOX        " Vzhľad aplikácie ",IDC_STATIC_7,1,192,295,74
+    LTEXT           "Mo&tív:",IDC_STATIC_8,8,206,62,8
+    COMBOBOX        IDC_THEME_MODE,78,203,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Farba ikony:",IDC_STATIC_9,8,225,62,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,78,223,150,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Na zmenu farby ikony zástupcu na ploche alebo v ponuke Štart,\nkliknite pravým tlačidlom na zástupcu > Vlastnosti > Zmeniť ikonu.",IDC_STATIC_10,8,244,278,16
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -4133,6 +4132,7 @@ IDS_OLDPLUGINVERSION2, "Tento plugin (%s) nie je podporovaný v tejto verzii Sal
  IDS_UPDATECHECK_MONTH, "Každý mesiac"
  IDS_UPDATECHECK_3MONTHS, "Každé tri mesiace"
  IDS_UPDATECHECK_6MONTHS, "Každých šesť mesiacov"
+ IDS_UPDATECHECK_STARTUP, "Pri každom spustení"
  IDS_UPDATER_CANNOT_START, "Aktualizačný program Sally nemožno spustiť:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Hlavné heslo sa používa na zabezpečenie citlivých informácií, ako FTP alebo WinSCP hesiel silnou AES šifrou. Ak vytvoríte hlavné heslo, budete požiadaní o jeho zadanie jedenkrát za reláciu, keď Sally pristupuje k zabezpečeným informáciám."
 }

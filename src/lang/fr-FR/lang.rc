@@ -1089,13 +1089,9 @@ BEGIN
     CONTROL         "&Personnaliser le préfixe dans le titre de la fenêtre principale:",IDC_TITLEBAR_PREFIX,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
-    GROUPBOX        " Icône de l’application ",IDC_STATIC_1,1,70,294,56
-    LTEXT           "C&ouleur de l'icône:",IDC_STATIC_2,8,85,43,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,57,83,97,15,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Pour changer la couleur de l'icône de raccourci sur le bureau ou dans le menu Démarrer:\nClic droit > Propriétés > Changer l'icône.",IDC_STATIC_3,8,102,258,16
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 231
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 275
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Apparence"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1122,9 +1118,12 @@ BEGIN
     LTEXT           "Taille:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "éléments d'images (pixels)",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " &Thème ",IDC_STATIC_7,1,192,295,30
-    LTEXT           "Mode:",IDC_STATIC_8,8,206,45,8
-    COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
+    GROUPBOX        " Apparence de l’application ",IDC_STATIC_7,1,192,295,74
+    LTEXT           "&Thème :",IDC_STATIC_8,8,206,62,8
+    COMBOBOX        IDC_THEME_MODE,78,203,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Co&uleur de l'icône:",IDC_STATIC_9,8,225,62,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,78,223,150,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Pour changer la couleur de l'icône de raccourci sur le bureau ou dans le menu Démarrer:\nClic droit > Propriétés > Changer l'icône.",IDC_STATIC_10,8,244,278,16
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -4133,6 +4132,7 @@ IDS_OLDPLUGINVERSION2, "Le module (%s) n'est pas pris en charge par cette versio
  IDS_UPDATECHECK_MONTH, "Chaque mois"
  IDS_UPDATECHECK_3MONTHS, "Tous les trois mois"
  IDS_UPDATECHECK_6MONTHS, "Tous les six mois"
+ IDS_UPDATECHECK_STARTUP, "À chaque démarrage"
  IDS_UPDATER_CANNOT_START, "Le programme de mise à jour de Sally n'a pas pu être lancé :\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "On utilise un mot de passe principal et un chiffre AES robuste pour protéger des données confidentielles comme des mots de passe FTP ou WinSCP. Si vous utilisez un mot de passe principal, il vous sera demandé à chaque fois qu'Sally devra aller chercher des données protégées."
 }

@@ -1089,13 +1089,9 @@ BEGIN
     CONTROL         "Benutzerdefinierter &Präfix in der Titelleiste:",IDC_TITLEBAR_PREFIX,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
-    GROUPBOX        " Anwendungssymbol ",IDC_STATIC_1,1,70,294,56
-    LTEXT           "&Symbolfarbe:",IDC_STATIC_2,8,85,43,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,57,83,97,15,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Ändern der Farbe des Verknüpfungssymbols auf dem Desktop oder im Startmenü:\nRechtsklick auf die Verknüpfung -> Eigenschaften -> Anderes Symbol.",IDC_STATIC_3,8,102,258,16
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 231
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 275
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Darstellung"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1122,9 +1118,12 @@ BEGIN
     LTEXT           "Größe:",IDC_STATIC_5,8,168,19,8
     EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
     LTEXT           "Pixel",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " &Design ",IDC_STATIC_7,1,192,295,30
-    LTEXT           "Modus:",IDC_STATIC_8,8,206,45,8
-    COMBOBOX        IDC_THEME_MODE,57,203,105,45,CBS_DROPDOWNLIST | WS_TABSTOP
+    GROUPBOX        " Anwendungsdarstellung ",IDC_STATIC_7,1,192,295,74
+    LTEXT           "&Design:",IDC_STATIC_8,8,206,62,8
+    COMBOBOX        IDC_THEME_MODE,78,203,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "S&ymbolfarbe:",IDC_STATIC_9,8,225,62,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,78,223,150,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Ändern der Farbe des Verknüpfungssymbols auf dem Desktop oder im Startmenü:\nRechtsklick auf die Verknüpfung -> Eigenschaften -> Anderes Symbol.",IDC_STATIC_10,8,244,278,16
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -4133,6 +4132,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_UPDATECHECK_MONTH, "Jeden Monat"
  IDS_UPDATECHECK_3MONTHS, "Alle drei Monate"
  IDS_UPDATECHECK_6MONTHS, "Alle sechs Monate"
+ IDS_UPDATECHECK_STARTUP, "Bei jedem Start"
  IDS_UPDATER_CANNOT_START, "Das Aktualisierungsprogramm von Sally konnte nicht gestartet werden:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Ein Master-Passwort wird verwendet um vertrauliche Informationen wie FTP oder WinSCP Passwörter durch den starken AES Cipher zu schützen. Wenn Sie ein Master-Passwort erstellen, werden Sie einmal pro Sitzung danach gefragt, sobald Sally geschützte Informationen abrufen muss."
 }

@@ -4,7 +4,7 @@
 // When Sally looks for a newer release by itself, and what it takes over from the CheckVer
 // plugin, which did this up to 1.0.36. Times are UTC FILETIME values (100 ns units).
 //
-// Sally keeps the time of the last check that reached GitHub, and a time before which it does not
+// Interval modes keep the time of the last check that reached GitHub, and a time before which they do not
 // try again: an hour while a check is under way (so that two Sallys starting together do not
 // both check), a day after GitHub could not be reached.
 
@@ -18,7 +18,7 @@ namespace Sally::Update
 {
 
 // The values of Configuration > General > Check for updates; the same as CheckVer's
-// AutoCheckMode, which they replace.
+// AutoCheckMode, which they replace; new modes are appended.
 enum UpdateCheckMode : DWORD
 {
     kCheckNever = 0,
@@ -27,6 +27,7 @@ enum UpdateCheckMode : DWORD
     kCheckMonthly = 3,
     kCheckQuarterly = 4,
     kCheckHalfYearly = 5,
+    kCheckOnStartup = 6,
 };
 
 constexpr DWORD kDefaultUpdateCheckMode = kCheckWeekly;
@@ -53,8 +54,27 @@ inline ULONGLONG CheckInterval(DWORD mode)
     }
 }
 
+inline bool IsKnownUpdateCheckMode(DWORD mode)
+{
+    return mode <= kCheckOnStartup;
+}
+
+inline bool IsAutomaticCheckEnabled(DWORD mode)
+{
+    return mode == kCheckOnStartup || CheckInterval(mode) != 0;
+}
+
+inline DWORD AutomaticCheckDelayMs(DWORD mode)
+{
+    return mode == kCheckOnStartup ? 0 : 20 * 1000;
+}
+
 inline bool IsCheckDue(DWORD mode, ULONGLONG lastCheck, ULONGLONG notBefore, ULONGLONG now)
 {
+    // The updater's per-install/profile mutex suppresses overlapping checks.
+    // Every-start mode deliberately ignores interval reservations and failure backoff.
+    if (mode == kCheckOnStartup)
+        return true;
     const ULONGLONG interval = CheckInterval(mode);
     if (interval == 0)
         return false;

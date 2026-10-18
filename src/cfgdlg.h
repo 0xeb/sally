@@ -1068,6 +1068,7 @@ class CCfgPageShellExt: public CCommonPropSheetPage
 class CCfgPageAppearance : public CCommonPropSheetPage
 {
 protected:
+    HIMAGELIST HIconsList;
     HFONT HPanelFont;
     BOOL LocalUseCustomPanelFont;
     LOGFONT LocalPanelLogFont;
@@ -1085,6 +1086,7 @@ public:
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+    BOOL InitIconCombobox();
 };
 
 //
@@ -1092,12 +1094,8 @@ protected:
 
 class CCfgPageMainWindow : public CCommonPropSheetPage
 {
-protected:
-    HIMAGELIST HIconsList;
-
 public:
     CCfgPageMainWindow();
-    ~CCfgPageMainWindow();
 
     virtual void Transfer(CTransferInfo& ti);
     virtual void Validate(CTransferInfo& ti);
@@ -1108,7 +1106,6 @@ public:
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    BOOL InitIconCombobox();
 };
 
 //

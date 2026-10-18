@@ -1967,6 +1967,7 @@ IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Sall
  IDS_UPDATECHECK_MONTH, "Every month"
  IDS_UPDATECHECK_3MONTHS, "Every three months"
  IDS_UPDATECHECK_6MONTHS, "Every six months"
+ IDS_UPDATECHECK_STARTUP, "On every startup"
  IDS_UPDATER_CANNOT_START, "Sally's updater could not be started:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "A Master Password is used to protect sensitive information like FTP or WinSCP passwords by strong AES cipher. If you create a Master Password you will be asked to enter it once per session when Sally retrieves protected information."
 }

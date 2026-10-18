@@ -23,9 +23,9 @@ Sally is a fast, keyboard-first dual-panel file manager for Windows power users.
 </p>
 
 <p align="center">
-  <img src="doc/images/sally-dark-panels.png" alt="Sally 1.0.39 in dark mode with two panels and Greek and Cyrillic folder names" width="900">
+  <img src="doc/images/sally-dark-panels.png" alt="Sally in dark mode with two panels and Greek and Cyrillic folder names" width="900">
   <br>
-  <em>Sally 1.0.39 on Windows, captured from the x64 review candidate.</em>
+  <em>Sally in dark mode on Windows, with two file panels.</em>
 </p>
 
 See the [screenshot gallery](https://get-sally.app/screenshots/) for light mode,
@@ -56,9 +56,9 @@ Sally's biggest modernization effort is path correctness. A file manager is only
 - Ongoing hardening covers ADS streams, reparse points, recursive delete prompts, same-volume moves, and Unicode worker error reporting.
 
 <p align="center">
-  <img src="doc/images/sally-dark-unicode-long-path.png" alt="Sally 1.0.39 browsing a path longer than 260 characters alongside Greek and Cyrillic folder names" width="900">
+  <img src="doc/images/sally-dark-unicode-long-path.png" alt="Sally browsing a path longer than 260 characters alongside Greek and Cyrillic folder names" width="900">
   <br>
-  <em>Sally 1.0.39 browsing a folder beyond the old 260-character path limit.</em>
+  <em>Sally browsing a folder beyond the old 260-character path limit.</em>
 </p>
 
 ### Fast Find And Safer Results
