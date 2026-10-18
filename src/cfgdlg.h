@@ -175,7 +175,7 @@ typedef struct
     int IconResID;
     int TextResID;
 } CMainWindowIconItem;
-#define MAINWINDOWICONS_COUNT 4
+#define MAINWINDOWICONS_COUNT 5
 extern CMainWindowIconItem MainWindowIcons[MAINWINDOWICONS_COUNT];
 
 struct CConfiguration

@@ -1128,7 +1128,7 @@ BEGIN
     CONTROL         "&Custom text prefix in main window title:",IDC_TITLEBAR_PREFIX,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
-    GROUPBOX        " Main Window Icon ",IDC_STATIC_1,1,70,294,56
+    GROUPBOX        " Application Icon ",IDC_STATIC_1,1,70,294,56
     LTEXT           "Ic&on color:",IDC_STATIC_2,8,85,43,8
     COMBOBOX        IDC_TITLEBAR_ICON_INDEX,57,83,97,15,CBS_DROPDOWNLIST | WS_TABSTOP
     LTEXT           "To change the color of shortcut icon on your Desktop or in Start menu,\nRight-click shortcut > Properties > Change Icon.",IDC_STATIC_3,8,102,258,16

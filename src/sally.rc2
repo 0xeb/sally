@@ -34,6 +34,7 @@ IDI_VIEWER ICON "res\\viewer.ico"
 IDI_GOOGLEDRIVE ICON "res\\googledr.ico"
 IDI_DROPBOX ICON "res\\dropbox.ico"
 IDI_ONEDRIVE ICON "res\\onedrive.ico"
+IDI_APPLICATION_BLUE ICON "res\\sal_b.ico"
 
 IDB_TOOLBAR_16 BITMAP "res\\toolbar.bmp"
 IDB_TOOLBAR_256 RCDATA "res\\toolbar2.png"

@@ -108,7 +108,7 @@ BOOL CMainWindow::Init()
     PrevSplitProp = SplitProp = 0.5;
     HeaderHeight = EnvFontHeight + 4;
 
-    TBBUTTON buttons[7] = {};
+    TBBUTTON buttons[10] = {};
     int i;
     for (i = 0; i < SizeOf(buttons); i++)
     {
@@ -123,6 +123,19 @@ BOOL CMainWindow::Init()
         case 1:
             buttons[i].iBitmap = 0;
             buttons[i].idCommand = CM_COPY;
+            break;
+        case 7:
+            buttons[i].fsStyle = TBSTYLE_SEP;
+            break;
+        case 8:
+            buttons[i].iBitmap = 6;
+            buttons[i].idCommand = CM_WORDWRAP;
+            buttons[i].fsStyle = TBSTYLE_CHECK;
+            break;
+        case 9:
+            buttons[i].iBitmap = 7;
+            buttons[i].idCommand = CM_VIEW_HORIZONTAL;
+            buttons[i].fsStyle = TBSTYLE_CHECK;
             break;
         case 2:
             buttons[i].iBitmap = 2;
@@ -145,7 +158,7 @@ BOOL CMainWindow::Init()
     ToolbarImages = filecomp::CreateToolbarImages(bitmap, iconSize);
     if (bitmap != NULL)
         DeleteObject(bitmap);
-    if (ToolbarImages == NULL)
+    if (ToolbarImages == NULL || !filecomp::AppendToggleImages(ToolbarImages, iconSize))
         return FALSE;
     HToolbar = CreateWindowExW(0, TOOLBARCLASSNAMEW, L"",
                                WS_VISIBLE | WS_CHILD |
@@ -714,6 +727,31 @@ void CMainWindow::UpdateToolbarButtons(DWORD flags)
         EnableMenuItem(menu, CM_HELPKEYBOARD, enable);
         EnableMenuItem(menu, CM_ABOUT, enable);
     }
+    if (flags & UTB_MENU)
+    {
+        const bool enabled = InputEnabled && !(flags & UTB_FORCEDISABLE);
+        const bool text = enabled && DataValid && FileView[fviLeft] != NULL && FileView[fviLeft]->Is(fvtText);
+        EnableToolbarButton(CM_WORDWRAP, text);
+        EnableToolbarButton(CM_VIEW_HORIZONTAL, enabled);
+        SendMessageW(HToolbar, TB_CHECKBUTTON, CM_WORDWRAP,
+                     MAKELONG(text && ((CTextFileViewWindowBase*)FileView[fviLeft])->IsWordWrap(), 0));
+        SendMessageW(HToolbar, TB_CHECKBUTTON, CM_VIEW_HORIZONTAL,
+                     MAKELONG(SplitBar != NULL && SplitBar->GetType() == sbHorizontal, 0));
+    }
+
+}
+
+void CMainWindow::ApplyHorizontalView(BOOL horizontal)
+{
+    if (SplitBar == NULL) return;
+    SplitBar->SetType(horizontal ? sbHorizontal : sbVertical);
+    HMENU menu = GetMenu(HWindow);
+    ModifyMenuW(menu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING,
+                CM_MAXLEFTVIEW, LangStr(horizontal ? IDS_MAXTOPVIEW : IDS_MAXLEFTVIEW).c_str());
+    ModifyMenuW(menu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING,
+                CM_MAXRIGHTVIEW, LangStr(horizontal ? IDS_MAXBOTTOMVIEW : IDS_MAXRIGHTVIEW).c_str());
+    LayoutChilds();
+    UpdateToolbarButtons(UTB_MENU);
 }
 
 BOOL CMainWindow::RebuildFileViewScripts(BOOL& cancel)
@@ -1188,14 +1226,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_VIEW_HORIZONTAL:
         {
-            bool bHoriz = SplitBar->GetType() != sbHorizontal;
-            HMENU hMenu = GetMenu(HWindow);
-
-            SplitBar->SetType(bHoriz ? sbHorizontal : sbVertical);
-            CheckMenuItem(hMenu, CM_VIEW_HORIZONTAL, MF_BYCOMMAND | (bHoriz ? MF_CHECKED : MF_UNCHECKED));
-            ModifyMenuW(hMenu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXLEFTVIEW, LangStr(bHoriz ? IDS_MAXTOPVIEW : IDS_MAXLEFTVIEW).c_str());
-            ModifyMenuW(hMenu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXRIGHTVIEW, LangStr(bHoriz ? IDS_MAXBOTTOMVIEW : IDS_MAXRIGHTVIEW).c_str());
-            LayoutChilds();
+            ApplyHorizontalView(SplitBar->GetType() != sbHorizontal);
             return 0;
         }
 
@@ -1378,7 +1409,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 Configuration.WordWrap = !((CTextFileViewWindowBase*)FileView[fviLeft])->IsWordWrap();
                 ((CTextFileViewWindowBase*)FileView[fviLeft])->SetWordWrap(Configuration.WordWrap);
                 ((CTextFileViewWindowBase*)FileView[fviRight])->SetWordWrap(Configuration.WordWrap);
-                CheckMenuItem(GetMenu(HWindow), CM_WORDWRAP, MF_BYCOMMAND | (Configuration.WordWrap ? MF_CHECKED : MF_UNCHECKED));
+                UpdateToolbarButtons(UTB_MENU);
                 return 0;
             }
         {
@@ -1762,6 +1793,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case CM_PREVDIFF:
         case CM_NEXTDIFF:
         case CM_LASTDIFF:
+        case CM_WORDWRAP:
+        case CM_VIEW_HORIZONTAL:
         {
             switch (pnmh->code)
             {
@@ -1769,6 +1802,18 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 LPNMTTDISPINFO lpnmtdi = (LPNMTTDISPINFO)lParam;
 
+                if (wParam == CM_WORDWRAP || wParam == CM_VIEW_HORIZONTAL)
+                {
+                    const int needed = GetMenuStringW(GetMenu(HWindow), static_cast<UINT>(wParam), NULL, 0, MF_BYCOMMAND);
+                    std::wstring label(static_cast<size_t>(needed) + 1, L'\0');
+                    const int copied = GetMenuStringW(GetMenu(HWindow), static_cast<UINT>(wParam), label.data(), needed + 1, MF_BYCOMMAND);
+                    label.resize(copied > 0 ? static_cast<size_t>(copied) : 0);
+                    const size_t tab = label.find(L'\t');
+                    if (tab != std::wstring::npos) label.resize(tab);
+                    label.erase(std::remove(label.begin(), label.end(), L'&'), label.end());
+                    lpnmtdi->lpszText = HoldTooltipText(label.c_str());
+                    return 0;
+                }
                 switch (wParam)
                 {
                 case CM_COPY:
@@ -2235,6 +2280,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_CFGCHNG:
     {
+        if (wParam & CC_LAYOUT)
+            ApplyHorizontalView(Configuration.HorizontalView);
         if (wParam & CC_COLORS)
         {
             UpdateDefaultColors(Colors, Palette);

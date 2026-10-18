@@ -14,6 +14,7 @@
 #endif
 
 #include <string>
+#include <limits>
 
 #include "common/PathDisplayUtils.h"
 
@@ -67,233 +68,96 @@ BOOL PathContainsValidComponents(const wchar_t* path)
     return TRUE;
 }
 
-// Wide version of AlterFileName - returns formatted filename as std::wstring
-// format values:
-//   0 - no change
-//   1 - capitalize (mixed case: first letter of each word capitalized)
-//   2 - lowercase
-//   3 - uppercase
-//   5 - explorer style (8.3 uppercase names to proper case)
-//   6 - VC style (3 for dirs, 2 for files)
-//   7 - name mixed case, extension lowercase
-// change values:
-//   0 - change both name and extension
-//   1 - change only name
-//   2 - change only extension
+namespace
+{
+// Map complete UTF-16 strings, independent of the CRT/process locale. Windows
+// owns the Unicode tables; query output length before allocating writable space.
+std::wstring MapDisplayCase(const std::wstring& input, DWORD mode)
+{
+    if (input.empty() || input.size() > static_cast<size_t>((std::numeric_limits<int>::max)()))
+        return input;
+    const int length = static_cast<int>(input.size());
+    const int needed = LCMapStringW(LOCALE_INVARIANT, mode, input.data(), length, nullptr, 0);
+    if (needed <= 0)
+        return input;
+    std::wstring result(static_cast<size_t>(needed), L'\0');
+    if (LCMapStringW(LOCALE_INVARIANT, mode, input.data(), length, result.data(), needed) != needed)
+        return input;
+    return result;
+}
+
+std::wstring CapitalizeDisplayWords(const std::wstring& input, bool dotSeparates)
+{
+    std::wstring result;
+    size_t position = 0;
+    while (position < input.size())
+    {
+        if (input[position] == L' ' || (dotSeparates && input[position] == L'.'))
+        {
+            result += input[position++];
+            continue;
+        }
+        const size_t end = input.find_first_of(dotSeparates ? L" ." : L" ", position);
+        const size_t count = (end == std::wstring::npos ? input.size() : end) - position;
+        std::wstring word = MapDisplayCase(input.substr(position, count), LCMAP_LOWERCASE);
+        size_t first = 1;
+        if (word.size() > 1 && word[0] >= 0xd800 && word[0] <= 0xdbff &&
+            word[1] >= 0xdc00 && word[1] <= 0xdfff)
+            first = 2;
+        result += MapDisplayCase(word.substr(0, first), LCMAP_UPPERCASE);
+        result += word.substr(first);
+        position += count;
+    }
+    return result;
+}
+
+std::wstring FormatDisplayPart(const std::wstring& input, int format)
+{
+    if (format == 1)
+        return CapitalizeDisplayWords(input, true);
+    if (format == 2 || format == 3)
+        return MapDisplayCase(input, format == 2 ? LCMAP_LOWERCASE : LCMAP_UPPERCASE);
+    return input;
+}
+} // namespace
+
+// Formats display text and explicit change-case operation names. The caller
+// decides whether to display the result or use it in a requested file operation.
 std::wstring AlterFileNameW(const wchar_t* filename, int format, int change, bool isDir)
 {
     CALL_STACK_MESSAGE_NONE
-
+    const std::wstring input = filename != nullptr ? filename : L"";
     if (format == 6)
-        format = isDir ? 3 : 2; // VC display style
+        format = isDir ? 3 : 2;
     if (format == 7 && change != 0)
-        format = (change == 1) ? 1 : 2; // convert to mixed/lower case
-
-    std::wstring result;
-    std::wstring input = filename;
-
-    // Find extension (last dot)
-    size_t extPos = std::wstring::npos;
+        format = change == 1 ? 1 : 2;
+    const size_t extension = input.rfind(L'.');
     if (change != 0 && format != 5 && format != 7)
     {
-        extPos = input.rfind(L'.');
-        if (extPos != std::wstring::npos)
+        if (extension != std::wstring::npos)
         {
-            if (change == 1) // change only name
-            {
-                // Process name part only, then append original extension
-                std::wstring namePart = input.substr(0, extPos);
-                std::wstring extPart = input.substr(extPos);
-
-                switch (format)
-                {
-                case 1: // capitalize
-                {
-                    bool capital = true;
-                    for (wchar_t c : namePart)
-                    {
-                        if (!capital)
-                        {
-                            result += (wchar_t)towlower(c);
-                            if (c == L' ' || c == L'.')
-                                capital = true;
-                        }
-                        else
-                        {
-                            result += (wchar_t)towupper(c);
-                            if (c != L' ' && c != L'.')
-                                capital = false;
-                        }
-                    }
-                    break;
-                }
-                case 2: // lowercase
-                    for (wchar_t c : namePart)
-                        result += (wchar_t)towlower(c);
-                    break;
-                case 3: // uppercase
-                    for (wchar_t c : namePart)
-                        result += (wchar_t)towupper(c);
-                    break;
-                default:
-                    result = namePart;
-                    break;
-                }
-                result += extPart;
-                return result;
-            }
-            else // change == 2, change only extension
-            {
-                // Copy name+dot, then process extension
-                result = input.substr(0, extPos + 1);
-                std::wstring extPart = input.substr(extPos + 1);
-
-                switch (format)
-                {
-                case 1: // capitalize
-                {
-                    bool capital = true;
-                    for (wchar_t c : extPart)
-                    {
-                        if (!capital)
-                        {
-                            result += (wchar_t)towlower(c);
-                            if (c == L' ' || c == L'.')
-                                capital = true;
-                        }
-                        else
-                        {
-                            result += (wchar_t)towupper(c);
-                            if (c != L' ' && c != L'.')
-                                capital = false;
-                        }
-                    }
-                    break;
-                }
-                case 2: // lowercase
-                    for (wchar_t c : extPart)
-                        result += (wchar_t)towlower(c);
-                    break;
-                case 3: // uppercase
-                    for (wchar_t c : extPart)
-                        result += (wchar_t)towupper(c);
-                    break;
-                default:
-                    result += extPart;
-                    break;
-                }
-                return result;
-            }
+            if (change == 1)
+                return FormatDisplayPart(input.substr(0, extension), format) + input.substr(extension);
+            return input.substr(0, extension + 1) + FormatDisplayPart(input.substr(extension + 1), format);
         }
-        else if (change == 2) // no extension, nothing to change
-        {
+        if (change == 2)
             return input;
-        }
     }
-
-    // Process entire filename
-    switch (format)
+    if (format == 5)
     {
-    case 5: // explorer style
+        const size_t dot = input.find(L'.');
+        const size_t nameLength = dot == std::wstring::npos ? input.size() : dot;
+        if (nameLength > 8 || (dot != std::wstring::npos &&
+            (input.size() - dot - 1 > 3 || input.find(L'.', dot + 1) != std::wstring::npos)) ||
+            MapDisplayCase(input, LCMAP_UPPERCASE) != input)
+            return input;
+        return CapitalizeDisplayWords(input, false);
+    }
+    if (format == 7)
     {
-        // Check if it's 8.3 uppercase format
-        const wchar_t* s = filename;
-        int c = 8;
-        while (c-- && *s != 0 && *s == towupper(*s) && *s != L'.')
-            s++;
-        if (*s == L'.')
-            s++;
-        else if (*s != 0)
-            return input; // not 8.3 format, return as-is
-        c = 3;
-        while (c-- && *s != 0 && *s != L'.' && *s == towupper(*s))
-            s++;
-        if (*s != 0)
-            return input; // not 8.3 format, return as-is
-
-        // Convert to proper case
-        bool capital = true;
-        for (wchar_t ch : input)
-        {
-            if (!capital)
-            {
-                result += (wchar_t)towlower(ch);
-                if (ch == L' ')
-                    capital = true;
-            }
-            else
-            {
-                result += (wchar_t)towupper(ch);
-                if (ch != L' ')
-                    capital = false;
-            }
-        }
-        break;
+        const size_t nameEnd = extension == std::wstring::npos ? input.size() : extension;
+        return CapitalizeDisplayWords(input.substr(0, nameEnd), false) +
+               MapDisplayCase(input.substr(nameEnd), LCMAP_LOWERCASE);
     }
-
-    case 1: // capitalize
-    {
-        bool capital = true;
-        for (wchar_t c : input)
-        {
-            if (!capital)
-            {
-                result += (wchar_t)towlower(c);
-                if (c == L' ' || c == L'.')
-                    capital = true;
-            }
-            else
-            {
-                result += (wchar_t)towupper(c);
-                if (c != L' ' && c != L'.')
-                    capital = false;
-            }
-        }
-        break;
-    }
-
-    case 2: // lowercase
-        for (wchar_t c : input)
-            result += (wchar_t)towlower(c);
-        break;
-
-    case 3: // uppercase
-        for (wchar_t c : input)
-            result += (wchar_t)towupper(c);
-        break;
-
-    case 7: // name mixed case, extension lowercase
-    {
-        extPos = input.rfind(L'.');
-        size_t nameEnd = (extPos != std::wstring::npos) ? extPos : input.length();
-
-        // Name: mixed case
-        bool capital = true;
-        for (size_t i = 0; i < nameEnd; i++)
-        {
-            wchar_t c = input[i];
-            if (!capital)
-            {
-                result += (wchar_t)towlower(c);
-                if (c == L' ')
-                    capital = true;
-            }
-            else
-            {
-                result += (wchar_t)towupper(c);
-                if (c != L' ')
-                    capital = false;
-            }
-        }
-        // Extension: lowercase
-        for (size_t i = nameEnd; i < input.length(); i++)
-            result += (wchar_t)towlower(input[i]);
-        break;
-    }
-
-    default:
-        return input;
-    }
-
-    return result;
+    return FormatDisplayPart(input, format);
 }

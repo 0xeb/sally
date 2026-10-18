@@ -28,6 +28,7 @@
 #include <windows.h>
 
 #include <string>
+#include <cstdint>
 #include <vector>
 
 namespace Sally::Update
@@ -62,6 +63,7 @@ struct UpdaterCommand
     bool Notify = false;
     bool Yes = false;  // manual: accept every question
     bool Auto = false; // check: Sally's scheduled check, silent unless there is a newer release
+    uint64_t AppearanceOwner = 0; // private HWND identity; no plugin/activation ABI change
     std::wstring FeedUrl; // check: another release feed (a mirror), HTTPS only
 };
 

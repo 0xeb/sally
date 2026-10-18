@@ -105,6 +105,7 @@ public:
     BOOL Init();
     void EnableInput(BOOL enable);
     void LayoutChilds();
+    void ApplyHorizontalView(BOOL horizontal);
     void SelectDifference(int i, int cmd = 0, BOOL setSel = TRUE, BOOL center = TRUE);
     void SelectDifferenceByLine(int line, BOOL center);
     BOOL GetDifferenceRange(int line, int* start, int* end);

@@ -3700,7 +3700,7 @@ BOOL CMainWindow::LoadConfig(
             GetStringValueW(actKey, CONFIG_TITLEBARPREFIXTEXT_REG, Configuration.TitleBarPrefix);
             GetValueW(actKey, CONFIG_MAINWINDOWICONINDEX_REG_W, REG_DWORD,
                      &Configuration.MainWindowIconIndex, sizeof(DWORD));
-            if (Configuration.MainWindowIconIndex < 0 || Configuration.MainWindowIconIndex > MAINWINDOWICONS_COUNT)
+            if (Configuration.MainWindowIconIndex < 0 || Configuration.MainWindowIconIndex >= MAINWINDOWICONS_COUNT)
                 Configuration.MainWindowIconIndex = 0;
             GetValueW(actKey, CONFIG_CLICKQUICKRENAME_REG_W, REG_DWORD,
                      &Configuration.ClickQuickRename, sizeof(DWORD));

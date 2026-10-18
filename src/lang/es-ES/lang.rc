@@ -1089,7 +1089,7 @@ BEGIN
     CONTROL         "Prefijo de &texto personalizado en el título:",IDC_TITLEBAR_PREFIX,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
-    GROUPBOX        " Icono de la ventana principal ",IDC_STATIC_1,1,70,294,56
+    GROUPBOX        " Icono de aplicación ",IDC_STATIC_1,1,70,294,56
     LTEXT           "Color del ic&ono:",IDC_STATIC_2,8,85,43,8
     COMBOBOX        IDC_TITLEBAR_ICON_INDEX,57,83,97,15,CBS_DROPDOWNLIST | WS_TABSTOP
     LTEXT           "Para cambiar el color del icono del atajo en su escritorio o en el menú inicio,\nhaga click derecho en el atajo > Propiedades > Cambiar icono.",IDC_STATIC_3,8,102,258,16
@@ -3973,7 +3973,8 @@ IDS_OLDPLUGINVERSION2, "El plugin (%s) no está soportado en esta versión de Sa
  IDS_SALAMANDERICON_DEFAULT, "Por omisión"
  IDS_SALAMANDERICON_RED, "Rojo"
  IDS_SALAMANDERICON_GREEN, "Verde"
- IDS_SALAMANDERICON_BLUE, "Azul"
+ IDS_SALAMANDERICON_BLUE, "Clásico (naranja)"
+ IDS_APPLICATIONICON_BLUE, "Azul"
  
  IDS_PROGDLGHOURS, "%d h"
  IDS_PROGDLGMINUTES, "%d min"

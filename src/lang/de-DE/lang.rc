@@ -1089,7 +1089,7 @@ BEGIN
     CONTROL         "Benutzerdefinierter &Präfix in der Titelleiste:",IDC_TITLEBAR_PREFIX,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
-    GROUPBOX        " Symbol des Hauptfensters ",IDC_STATIC_1,1,70,294,56
+    GROUPBOX        " Anwendungssymbol ",IDC_STATIC_1,1,70,294,56
     LTEXT           "&Symbolfarbe:",IDC_STATIC_2,8,85,43,8
     COMBOBOX        IDC_TITLEBAR_ICON_INDEX,57,83,97,15,CBS_DROPDOWNLIST | WS_TABSTOP
     LTEXT           "Ändern der Farbe des Verknüpfungssymbols auf dem Desktop oder im Startmenü:\nRechtsklick auf die Verknüpfung -> Eigenschaften -> Anderes Symbol.",IDC_STATIC_3,8,102,258,16
@@ -3973,7 +3973,8 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_SALAMANDERICON_DEFAULT, "Standard"
  IDS_SALAMANDERICON_RED, "Rot"
  IDS_SALAMANDERICON_GREEN, "Grün"
- IDS_SALAMANDERICON_BLUE, "Blau"
+ IDS_SALAMANDERICON_BLUE, "Klassisch (orange)"
+ IDS_APPLICATIONICON_BLUE, "Blau"
  
  IDS_PROGDLGHOURS, "%d Std"
  IDS_PROGDLGMINUTES, "%d Min"

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/ApplicationAppearance.h"
 #include "supporter/Win32SupporterUi.h"
 #include "ui/UnicodeHistoryUtils.h" // ShouldUseWidePair
 #include "common/IRegistry.h" // wide hot-path persistence
@@ -2010,10 +2011,7 @@ void CMainWindow::SetWindowTitle(const wchar_t* text)
 
 void CMainWindow::SetWindowIcon()
 {
-    int resID = MainWindowIcons[Configuration.GetMainWindowIconIndex()].IconResID;
-    // assign the icon to the window
-    SendMessage(HWindow, WM_SETICON, ICON_BIG,
-                (LPARAM)HANDLES(LoadIcon(HInstance, MAKEINTRESOURCE(resID))));
+    Sally::Appearance::SetWindowIcon(HWindow, HInstance, Configuration.GetMainWindowIconIndex());
 
     if (Configuration.StatusArea)
         AddTrayIcon(TRUE);

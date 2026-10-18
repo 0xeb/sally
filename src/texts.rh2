@@ -2435,6 +2435,7 @@
 #define IDS_SALAMANDERICON_RED          13777
 #define IDS_SALAMANDERICON_GREEN        13778
 #define IDS_SALAMANDERICON_BLUE         13779
+#define IDS_APPLICATIONICON_BLUE         13780
 
 // Copy/Move progress dialog: number of hours in "time left": %d hr
 #define IDS_PROGDLGHOURS                13800

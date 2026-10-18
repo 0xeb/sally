@@ -353,6 +353,7 @@
 #define IDI_GOOGLEDRIVE     981
 #define IDI_DROPBOX         982
 #define IDI_ONEDRIVE        983
+#define IDI_APPLICATION_BLUE 984
 
 // bitmaps
 #define IDB_LOCK            990

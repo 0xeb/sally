@@ -4,8 +4,11 @@
 #include "precomp.h"
 
 #include "update_check.h"
+#include "common/ApplicationAppearance.h"
+#include "common/supporter/SupporterState.h"
 
 #include "cfgdlg.h"
+#include "mainwnd.h"
 #include "plugins.h"
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
@@ -37,6 +40,8 @@ const wchar_t* const kFeedValue = L"Update Feed Url";
 
 const wchar_t* const kCheckVerDll = L"checkver\\checkver.dll";
 const DWORD kScheduledCheckDelayMs = 20 * 1000;
+HANDLE ScheduledStop = NULL;
+HANDLE ScheduledThread = NULL;
 
 // What RetireCheckVer took over, written once the configuration has its final place.
 bool HavePendingSettings = false;
@@ -177,7 +182,9 @@ HPROCESS StartUpdater(const UpdaterCommand& command, DWORD& error)
     }
     ProcessStartInfo start;
     start.applicationName = updater;
-    start.commandLine = QuoteCommandLineArgument(updater) + L" " + FormatUpdaterCommand(command);
+    auto launch = command;
+    if (MainWindow) launch.AppearanceOwner = reinterpret_cast<UINT_PTR>(MainWindow->HWindow);
+    start.commandLine = QuoteCommandLineArgument(updater) + L" " + FormatUpdaterCommand(launch);
     start.workingDirectory = updater.substr(0, updater.find_last_of(L'\\'));
     HPROCESS process = gProcess->CreateProcess(start);
     if (process == INVALID_HPROCESS)
@@ -199,7 +206,9 @@ unsigned ScheduledCheckBody(void*)
 {
     CALL_STACK_MESSAGE1("ScheduledCheckBody()");
     SetThreadNameInVCAndTrace(L"UpdateCheck");
-    Sleep(kScheduledCheckDelayMs); // after the start, when the user's first steps are done
+    // Shutdown must wake the initial delay and join this worker before services die.
+    if (WaitForSingleObject(ScheduledStop, kScheduledCheckDelayMs) != WAIT_TIMEOUT)
+        return 0;
 
     const ULONGLONG started = NowUtc();
     if (!IsCheckDue(Configuration.UpdateCheckMode, ReadTime(kLastCheckValue), ReadTime(kNotBeforeValue), started))
@@ -215,7 +224,16 @@ unsigned ScheduledCheckBody(void*)
         return 0;
     }
     // The updater ends at once unless it shows a newer release; then when its window closes.
-    gProcess->WaitForProcess(process, INFINITE);
+    WaitResult waited;
+    do
+    {
+        if (WaitForSingleObject(ScheduledStop, 0) == WAIT_OBJECT_0)
+        {
+            gProcess->CloseProcess(process); // leave an already-open updater independent
+            return 0;
+        }
+        waited = gProcess->WaitForProcess(process, 100);
+    } while (waited == WaitResult::Timeout);
     DWORD exitCode = 2;
     gProcess->GetExitCode(process, exitCode);
     gProcess->CloseProcess(process);
@@ -380,10 +398,34 @@ void OnStarted()
 
     if (CheckInterval(Configuration.UpdateCheckMode) == 0)
         return;
+    if (ScheduledThread != NULL)
+        return;
+    ScheduledStop = HANDLES(CreateEventW(NULL, TRUE, FALSE, NULL));
+    if (ScheduledStop == NULL)
+        return;
     DWORD id = 0;
-    HANDLE thread = HANDLES(CreateThread(NULL, 0, ScheduledCheck, NULL, 0, &id));
-    if (thread != NULL)
-        HANDLES(CloseHandle(thread));
+    ScheduledThread = HANDLES(CreateThread(NULL, 0, ScheduledCheck, NULL, 0, &id));
+    if (ScheduledThread == NULL)
+    {
+        HANDLES(CloseHandle(ScheduledStop));
+        ScheduledStop = NULL;
+    }
+}
+
+void OnStopping()
+{
+    if (ScheduledThread != NULL)
+    {
+        SetEvent(ScheduledStop);
+        WaitForSingleObject(ScheduledThread, INFINITE);
+        HANDLES(CloseHandle(ScheduledThread));
+        ScheduledThread = NULL;
+    }
+    if (ScheduledStop != NULL)
+    {
+        HANDLES(CloseHandle(ScheduledStop));
+        ScheduledStop = NULL;
+    }
 }
 
 void ShowWhatsNew(HWND parent)
@@ -424,4 +466,22 @@ void CheckNow(HWND parent)
     (void)parent;
 }
 
+} // namespace UpdateCheck
+
+namespace UpdateCheck
+{
+static Sally::Appearance::Snapshot CurrentAppearance()
+{
+    auto value = Sally::Appearance::Read(Sally::Supporter::ResolveProfileRoot(), InstallFolder(), *gRegistry);
+    value.Icon = Configuration.GetMainWindowIconIndex();
+    value.CustomFont = UseCustomPanelFont != FALSE;
+    value.Font = LogFont;
+    return value;
+}
+void AppearanceChanged(HWND parent) { Sally::Appearance::Broadcast(parent, CurrentAppearance()); }
+LRESULT HandleAppearanceRequest(HWND parent, WPARAM receiver)
+{
+    Sally::Appearance::Send(parent, reinterpret_cast<HWND>(receiver), CurrentAppearance());
+    return TRUE;
+}
 } // namespace UpdateCheck

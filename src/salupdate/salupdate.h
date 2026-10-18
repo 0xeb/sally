@@ -15,12 +15,14 @@
 #include <vector>
 
 #include "update/UpdaterCommand.h"
+#include "ApplicationAppearance.h"
 
 namespace salupdate
 {
 
 // --- salupdate.cpp ------------------------------------------------------------------------------
 
+Sally::Appearance::Snapshot CurrentApplicationAppearance();
 extern std::wstring LogPath; // empty: no log
 void Log(const std::wstring& text);
 

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/ApplicationAppearance.h"
 #include "SallyUrls.h"
 
 #include <algorithm>
@@ -549,9 +550,7 @@ void CProgressDialog::SetWindowIcon()
         // from XP the taskbar shows the application icon even for windows without an assigned icon
         // because we do not control which icon the OS shows (it probably uses the default EXE icon),
         // set the correct icon for the dialog to avoid this problem
-        int resID = MainWindowIcons[Configuration.GetMainWindowIconIndex()].IconResID;
-        SendMessage(HWindow, WM_SETICON, ICON_BIG,
-                    (LPARAM)HANDLES(LoadIcon(HInstance, MAKEINTRESOURCE(resID))));
+        Sally::Appearance::SetWindowIcon(HWindow, HInstance, Configuration.GetMainWindowIconIndex());
     }
 }
 

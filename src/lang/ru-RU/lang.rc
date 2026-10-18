@@ -1089,7 +1089,7 @@ BEGIN
     CONTROL         "&Текст в заголовке главного окна:",IDC_TITLEBAR_PREFIX,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
-    GROUPBOX        " Значок в заголовке главного окна ",IDC_STATIC_1,1,70,294,56
+    GROUPBOX        " Значок приложения ",IDC_STATIC_1,1,70,294,56
     LTEXT           "&Цвет значка:",IDC_STATIC_2,8,85,43,8
     COMBOBOX        IDC_TITLEBAR_ICON_INDEX,57,83,97,15,CBS_DROPDOWNLIST | WS_TABSTOP
     LTEXT           "Для смены цвета ярлыка на рабочем столе и в меню ""Пуск"", щелкните правой кнопкой мыши\nпо ярлыку, выберите в контекстном меню пункт  ""Свойства"", нажмите ""Сменить значок"".",IDC_STATIC_3,8,102,258,16
@@ -3973,7 +3973,8 @@ IDS_OLDPLUGINVERSION2, "Модуль (%s) не поддерживается те
  IDS_SALAMANDERICON_DEFAULT, "По умолчанию"
  IDS_SALAMANDERICON_RED, "Красный"
  IDS_SALAMANDERICON_GREEN, "Зеленый"
- IDS_SALAMANDERICON_BLUE, "Синий"
+ IDS_SALAMANDERICON_BLUE, "Классический (оранжевый)"
+ IDS_APPLICATIONICON_BLUE, "Синий"
  
  IDS_PROGDLGHOURS, "%d час"
  IDS_PROGDLGMINUTES, "%d мин"

@@ -1089,7 +1089,7 @@ BEGIN
     CONTROL         "&Personnaliser le préfixe dans le titre de la fenêtre principale:",IDC_TITLEBAR_PREFIX,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
-    GROUPBOX        " Icône de la fenêtre principale ",IDC_STATIC_1,1,70,294,56
+    GROUPBOX        " Icône de l’application ",IDC_STATIC_1,1,70,294,56
     LTEXT           "C&ouleur de l'icône:",IDC_STATIC_2,8,85,43,8
     COMBOBOX        IDC_TITLEBAR_ICON_INDEX,57,83,97,15,CBS_DROPDOWNLIST | WS_TABSTOP
     LTEXT           "Pour changer la couleur de l'icône de raccourci sur le bureau ou dans le menu Démarrer:\nClic droit > Propriétés > Changer l'icône.",IDC_STATIC_3,8,102,258,16
@@ -3973,7 +3973,8 @@ IDS_OLDPLUGINVERSION2, "Le module (%s) n'est pas pris en charge par cette versio
  IDS_SALAMANDERICON_DEFAULT, "Défaut"
  IDS_SALAMANDERICON_RED, "Rouge"
  IDS_SALAMANDERICON_GREEN, "Vert"
- IDS_SALAMANDERICON_BLUE, "Bleu"
+ IDS_SALAMANDERICON_BLUE, "Classique (orange)"
+ IDS_APPLICATIONICON_BLUE, "Bleu"
  
  IDS_PROGDLGHOURS, "%d h"
  IDS_PROGDLGMINUTES, "%d min"

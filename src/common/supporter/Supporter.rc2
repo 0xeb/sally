@@ -44,6 +44,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "Your name is shown locally on this computer."
  IDS_SUP_SUPPORT_STARTS "Support starts"
  IDS_SUP_SUPPORTED_THROUGH "Supported through"
+ IDS_SUP_INVITATION "All features and updates are free. You can support Sally's development."
 END
 
 // cs-CZ
@@ -87,6 +88,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "Vaše jméno se zobrazuje místně na tomto počítači."
  IDS_SUP_SUPPORT_STARTS "Začátek podpory"
  IDS_SUP_SUPPORTED_THROUGH "Podpora do"
+ IDS_SUP_INVITATION "Všechny funkce a aktualizace jsou zdarma. Můžete podpořit vývoj Sally."
 END
 
 // sk-SK
@@ -130,6 +132,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "Vaše meno sa zobrazuje lokálne na tomto počítači."
  IDS_SUP_SUPPORT_STARTS "Začiatok podpory"
  IDS_SUP_SUPPORTED_THROUGH "Podpora do"
+ IDS_SUP_INVITATION "Všetky funkcie a aktualizácie sú zadarmo. Môžete podporiť vývoj Sally."
 END
 
 // de-DE
@@ -173,6 +176,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "Ihr Name wird lokal auf diesem Computer angezeigt."
  IDS_SUP_SUPPORT_STARTS "Unterstützung ab"
  IDS_SUP_SUPPORTED_THROUGH "Unterstützung bis"
+ IDS_SUP_INVITATION "Alle Funktionen und Updates sind kostenlos. Sie können die Entwicklung von Sally unterstützen."
 END
 
 // fr-FR
@@ -216,6 +220,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "Votre nom est affiché localement sur cet ordinateur."
  IDS_SUP_SUPPORT_STARTS "Début du soutien"
  IDS_SUP_SUPPORTED_THROUGH "Soutien jusqu’au"
+ IDS_SUP_INVITATION "Toutes les fonctions et mises à jour sont gratuites. Vous pouvez soutenir le développement de Sally."
 END
 
 // es-ES
@@ -259,6 +264,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "Su nombre se muestra localmente en este equipo."
  IDS_SUP_SUPPORT_STARTS "Inicio del apoyo"
  IDS_SUP_SUPPORTED_THROUGH "Apoyo hasta"
+ IDS_SUP_INVITATION "Todas las funciones y actualizaciones son gratuitas. Puede apoyar el desarrollo de Sally."
 END
 
 // nl-NL
@@ -302,6 +308,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "Uw naam wordt lokaal op deze computer weergegeven."
  IDS_SUP_SUPPORT_STARTS "Ondersteuning vanaf"
  IDS_SUP_SUPPORTED_THROUGH "Ondersteuning tot"
+ IDS_SUP_INVITATION "Alle functies en updates zijn gratis. U kunt de ontwikkeling van Sally steunen."
 END
 
 // hu-HU
@@ -345,6 +352,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "A neve helyben, ezen a számítógépen jelenik meg."
  IDS_SUP_SUPPORT_STARTS "Támogatás kezdete"
  IDS_SUP_SUPPORTED_THROUGH "Támogatás vége"
+ IDS_SUP_INVITATION "Minden funkció és frissítés ingyenes. Támogathatja a Sally fejlesztését."
 END
 
 // ro-RO
@@ -388,6 +396,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "Numele este afișat local pe acest computer."
  IDS_SUP_SUPPORT_STARTS "Începutul susținerii"
  IDS_SUP_SUPPORTED_THROUGH "Susținere până la"
+ IDS_SUP_INVITATION "Toate funcțiile și actualizările sunt gratuite. Puteți sprijini dezvoltarea Sally."
 END
 
 // ru-RU
@@ -431,6 +440,7 @@ BEGIN
  IDS_SUP_LOCAL_NAME "Ваше имя отображается локально на этом компьютере."
  IDS_SUP_SUPPORT_STARTS "Начало поддержки"
  IDS_SUP_SUPPORTED_THROUGH "Поддержка до"
+ IDS_SUP_INVITATION "Все функции и обновления бесплатны. Вы можете поддержать разработку Sally."
 END
 
 // zh-CN
@@ -474,4 +484,5 @@ BEGIN
  IDS_SUP_LOCAL_NAME "您的姓名仅在此计算机上本地显示。"
  IDS_SUP_SUPPORT_STARTS "支持开始日期"
  IDS_SUP_SUPPORTED_THROUGH "支持截止日期"
+ IDS_SUP_INVITATION "所有功能和更新均免费。您可以支持 Sally 的开发。"
 END

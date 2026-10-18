@@ -1089,7 +1089,7 @@ BEGIN
     CONTROL         "&Gebruikers specifieke prefix in titel:",IDC_TITLEBAR_PREFIX,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
-    GROUPBOX        " Hoofdscherm pictogram ",IDC_STATIC_1,1,70,294,56
+    GROUPBOX        " Toepassingspictogram ",IDC_STATIC_1,1,70,294,56
     LTEXT           "Pict&ogram kleur:",IDC_STATIC_2,8,85,43,8
     COMBOBOX        IDC_TITLEBAR_ICON_INDEX,57,83,97,15,CBS_DROPDOWNLIST | WS_TABSTOP
     LTEXT           "Rechts klikken en afkortingen > eigenschappen > pictogram veranderen om de\nkleur van het pictogram op de desktop of start menu te veranderen.",IDC_STATIC_3,8,102,258,16
@@ -3973,7 +3973,8 @@ IDS_OLDPLUGINVERSION2, "De plugin (%s) wordt niet door deze versie van Sally ond
  IDS_SALAMANDERICON_DEFAULT, "Standaard"
  IDS_SALAMANDERICON_RED, "Rood"
  IDS_SALAMANDERICON_GREEN, "Groen"
- IDS_SALAMANDERICON_BLUE, "Blauw"
+ IDS_SALAMANDERICON_BLUE, "Klassiek (oranje)"
+ IDS_APPLICATIONICON_BLUE, "Blauw"
  
  IDS_PROGDLGHOURS, "%d uur"
  IDS_PROGDLGMINUTES, "%d min"

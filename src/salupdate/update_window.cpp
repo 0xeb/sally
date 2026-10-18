@@ -26,6 +26,7 @@
 #include "salupdate.h"
 #include "salupdate.rh"
 #include "ui_style.h"
+#include "ApplicationAppearance.h"
 #include "Win32HttpsClient.h"
 #include "Win32TextCodec.h"
 #include "update/GitHubRelease.h"
@@ -61,7 +62,7 @@ enum ControlId
     kIdNotes = 204, // One reading surface; retired separate headings/panel IDs stay unused.
     kIdStatus,
     kIdSupport = 211, kIdSupporter,
-    kIdCheckUpdates = 214,
+    kIdCheckUpdates = 214, kIdInvitation,
 };
 
 enum : UINT
@@ -69,6 +70,7 @@ enum : UINT
     WM_APP_CHECKED = WM_APP + 1, // wParam: TRUE when the feed answered with a release
     WM_APP_PROGRESS,             // wParam: Stage, lParam: percent or -1
     WM_APP_CONTENT_READY,
+    WM_APP_APPEARANCE,
     WM_APP_PREPARED,             // wParam: TRUE when the release is downloaded, verified and unpacked
 };
 
@@ -94,6 +96,9 @@ struct Session
     std::wstring InstalledVersion; // "1.0.37"
     std::wstring FeedUrl;
     bool Automatic = false;
+    bool SuccessfulReport = false;
+    HWND AppearanceOwner = nullptr;
+    Sally::Appearance::Snapshot Appearance;
     bool Offline = false, HasBundle = false, SupportActions = true;
     bool LayingOut = false;
     uint64_t NextContentTime = 0;
@@ -427,20 +432,23 @@ void Layout()
     s.LayingOut = true;
     const bool release = (s.Current == View::Newer || s.Current == View::UpToDate) && !s.Installing && !s.InstallStopped;
     const bool readingVisible = release && s.Reading.Content.Visible;
-    const int kind = release ? (readingVisible ? 2 : 1) : 0;
-    const bool contentSizeChanged = !s.Placed || s.LayoutKind != kind;
+    const int kind = s.SuccessfulReport && s.Current == View::Report ? 3 : release ? (readingVisible ? 2 : 1) : 0;
+    const bool firstPlacement = !s.Placed;
+    const bool contentSizeChanged = firstPlacement || s.LayoutKind != kind;
     if (contentSizeChanged)
     {
-        s.MinimumHeight = kind == 2 ? 480 : 220;
+        s.MinimumHeight = kind == 2 ? 480 : kind == 3 ? 80 : 220;
         POINT cursor{}; GetCursorPos(&cursor);
         MONITORINFO monitor = {sizeof(monitor)};
         GetMonitorInfoW(MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY), &monitor);
         const RECT& area = monitor.rcWork;
-        int width = (std::min)(Px(720), static_cast<int>(area.right - area.left) - Px(12));
-        int height = (std::min)(Px(kind == 2 ? 600 : 260), static_cast<int>(area.bottom - area.top) - Px(20));
+        int width = (std::min)(Px(kind == 3 ? 560 : 720), static_cast<int>(area.right - area.left) - Px(12));
+        int height = (std::min)(Px(kind == 2 ? 600 : kind == 3 ? 180 : 260), static_cast<int>(area.bottom - area.top) - Px(20));
         s.LayoutKind = kind;
-        SetWindowPos(s.Window, nullptr, area.left + (area.right - area.left - width) / 2,
-            area.top + (area.bottom - area.top - height) / 3, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+        RECT previous{}; GetWindowRect(s.Window, &previous);
+        SetWindowPos(s.Window, nullptr, firstPlacement ? area.left + (area.right - area.left - width) / 2 : previous.left,
+            firstPlacement ? area.top + (area.bottom - area.top - height) / 3 : previous.top,
+            firstPlacement ? width : previous.right - previous.left, height, SWP_NOZORDER | SWP_NOACTIVATE);
         s.Placed = true;
     }
     RECT client{}; GetClientRect(s.Window, &client);
@@ -453,7 +461,8 @@ void Layout()
     Place(kIdLatest, release && !s.Offline, margin, y, width, line); if (release && !s.Offline) y += line + Px(6);
     bool status = !GetText(Control(kIdStatus)).empty();
     int statusHeight = status ? TextHeight(s.Font, GetText(Control(kIdStatus)), width) + Px(4) : 0;
-    const bool support = release && s.SupportActions;
+    const bool support = (release || (s.Current == View::Report && s.SuccessfulReport)) && s.SupportActions;
+    const int invitationHeight = support ? TextHeight(s.Font, T(IDS_SUP_INVITATION), width) + Px(8) : 0;
     const bool supportFits = ButtonWidth(kIdSupport) + ButtonWidth(kIdSupporter) + Px(8) <= width;
     const int supportRows = support ? (supportFits ? 1 : 2) : 0;
     const bool install = s.Current == View::Newer && !s.Offline;
@@ -467,36 +476,38 @@ void Layout()
     for (int id : footer) footerWidth += ButtonWidth(id);
     const bool footerFits = footerWidth <= width;
     const int footerRows = footerFits ? 1 : static_cast<int>(footer.size());
-    int reserved = statusHeight + (supportRows + footerRows) * (buttonHeight + Px(6)) + margin;
+    int reserved = invitationHeight + statusHeight + (supportRows + footerRows) * (buttonHeight + Px(6)) + margin;
     int reading = readingVisible ? (std::max)(0, static_cast<int>(client.bottom) - y - reserved - Px(6)) : 0;
     Place(kIdNotes, readingVisible, margin, y, width, reading);
     if (readingVisible) y += reading + Px(6);
     Place(kIdStatus, status, margin, y, width, statusHeight); y += statusHeight;
-    const int supportWidth = ButtonWidth(kIdSupport) + (width - Px(8) - ButtonWidth(kIdSupport) - ButtonWidth(kIdSupporter)) / 2;
+    Place(kIdInvitation, support, margin, y, width, invitationHeight > 0 ? invitationHeight - Px(8) : 0);
+    y += invitationHeight;
+    const int supportWidth = ButtonWidth(kIdSupport);
     Place(kIdSupport, support, margin, y, supportFits ? supportWidth : width, buttonHeight);
     Place(kIdSupporter, support, supportFits ? margin + supportWidth + Px(8) : margin,
-        supportFits ? y : y + buttonHeight + Px(6), supportFits ? width - supportWidth - Px(8) : width, buttonHeight);
+        supportFits ? y : y + buttonHeight + Px(6), supportFits ? ButtonWidth(kIdSupporter) : width, buttonHeight);
     y += supportRows * (buttonHeight + Px(6));
     const int footerIds[] = {kIdInstall, kIdReleasePage, kIdCheckUpdates, IDCANCEL};
     for (int id : footerIds)
         if (std::find(footer.begin(), footer.end(), id) == footer.end()) ShowWindow(Control(id), SW_HIDE);
     const int columns = static_cast<int>(footer.size());
-    int footerX = margin;
+    int footerX = footerFits ? margin + width - footerWidth : margin;
     for (int i = 0; i < columns; ++i)
     {
-        const int buttonWidth = footerFits ? ButtonWidth(footer[i]) + (width - footerWidth) / columns : width;
+        const int buttonWidth = footerFits ? ButtonWidth(footer[i]) : width;
         Place(footer[i], true, footerFits ? footerX : margin,
             footerFits ? y : y + i * (buttonHeight + Px(6)), buttonWidth, buttonHeight);
         footerX += buttonWidth + Px(8);
     }
-    if (contentSizeChanged && kind == 1)
+    if (contentSizeChanged && (kind == 1 || kind == 3))
     {
         RECT outer{}; GetWindowRect(s.Window, &outer);
         MONITORINFO monitor = {sizeof(monitor)};
         GetMonitorInfoW(MonitorFromWindow(s.Window, MONITOR_DEFAULTTONEAREST), &monitor);
         const int chrome = static_cast<int>(outer.bottom - outer.top - client.bottom);
         const int needed = y + footerRows * (buttonHeight + Px(6)) + margin + chrome;
-        const int height = (std::min)((std::max)(Px(220), needed), static_cast<int>(monitor.rcWork.bottom - monitor.rcWork.top) - Px(20));
+        const int height = (std::min)((std::max)(Px(kind == 3 ? 80 : 220), needed), static_cast<int>(monitor.rcWork.bottom - monitor.rcWork.top) - Px(20));
         s.MinimumHeight = MulDiv(height, 96, s.Dpi);
         SetWindowPos(s.Window, nullptr, 0, 0, outer.right - outer.left, height,
                      SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -524,9 +535,10 @@ void Render(const ReadingDisplay& previous, const ReadingDisplay& current)
     SETTEXTEX set = {ST_DEFAULT, 1200};
     SendMessageW(control, EM_SETTEXTEX, reinterpret_cast<WPARAM>(&set), reinterpret_cast<LPARAM>(display.Text.c_str()));
     CHARFORMAT2W format{}; format.cbSize = sizeof(format);
-    format.dwMask = CFM_BOLD | CFM_ITALIC | CFM_LINK | CFM_COLOR | CFM_FACE;
+    format.dwMask = CFM_BOLD | CFM_ITALIC | CFM_LINK | CFM_COLOR | CFM_FACE | CFM_SIZE;
     format.crTextColor = GetSysColor(COLOR_WINDOWTEXT);
     LOGFONTW font{}; GetObjectW(TheSession.Font, sizeof(font), &font);
+    format.yHeight = MulDiv(font.lfHeight < 0 ? -font.lfHeight : font.lfHeight, 1440, TheSession.Dpi);
     wcscpy_s(format.szFaceName, font.lfFaceName);
     SendMessageW(control, EM_SETSEL, 0, -1);
     SendMessageW(control, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&format));
@@ -550,6 +562,19 @@ void Render(const ReadingDisplay& previous, const ReadingDisplay& current)
     scroll.y = (std::max)(0L, scroll.y + newAnchor.y - oldAnchor.y);
     SendMessageW(control, EM_SETSCROLLPOS, 0, reinterpret_cast<LPARAM>(&scroll));
     SendMessageW(control, WM_SETREDRAW, TRUE, 0); InvalidateRect(control, nullptr, TRUE);
+}
+
+void RefreshSupportState()
+{
+    Session& s = TheSession;
+    const uint64_t now = Sally::Supporter::NowUtc();
+    auto preferences = Sally::Supporter::ReadSupporterState(s.Profile, *GetWin32Registry());
+    auto certificate = Sally::Supporter::VerifyCertificate(preferences.Token, now, Sally::Supporter::BuiltinPublicKeys());
+    s.SupportActions = certificate.State != Sally::Supporter::Status::Active && certificate.State != Sally::Supporter::Status::NotYetValid;
+    SetText(kIdSupporter, T(IDS_SUP_ENTER));
+    s.NextContentTime = 0;
+    auto boundary = [&](uint64_t value) { if (value > now && (!s.NextContentTime || value < s.NextContentTime)) s.NextContentTime = value; };
+    boundary(certificate.ValidFrom); boundary(certificate.ValidUntil);
 }
 
 void RefreshContent()
@@ -591,13 +616,8 @@ void RefreshContent()
     auto reading = BuildReadingDisplay(s.NotesDisplay, Text(IDS_UPDATER_NOTES_LABEL), s.MaintainerDisplay, T(IDS_SUP_MAINTAINER));
     Render(s.Reading, reading);
     s.Reading = std::move(reading);
-    auto preferences = Sally::Supporter::ReadSupporterState(s.Profile, *GetWin32Registry());
-    auto certificate = Sally::Supporter::VerifyCertificate(preferences.Token, now, Sally::Supporter::BuiltinPublicKeys());
-    s.SupportActions = certificate.State != Sally::Supporter::Status::Active && certificate.State != Sally::Supporter::Status::NotYetValid;
-    SetText(kIdSupporter, T(IDS_SUP_ENTER));
-    s.NextContentTime = 0;
+    RefreshSupportState();
     auto boundary = [&](uint64_t value) { if (value > now && (!s.NextContentTime || value < s.NextContentTime)) s.NextContentTime = value; };
-    boundary(certificate.ValidFrom); boundary(certificate.ValidUntil);
     if (hasLive) boundary(live.Until);
     for (const auto* model : {&release, &live}) for (const auto& notice : model->Notices) { boundary(notice.From); boundary(notice.Until); }
     std::wstring status;
@@ -761,11 +781,56 @@ void FinishInstall(bool prepared)
     DestroyWindow(s.Window);
 }
 
+void ApplyAppearance(const Sally::Appearance::Snapshot& value)
+{
+    Session& s = TheSession;
+    s.Appearance = value;
+    Sally::Appearance::SetWindowIcon(s.Window, GetModuleHandleW(nullptr), value.Icon);
+    LOGFONTW font = Sally::Appearance::FontForDpi(value, s.Dpi);
+    HFONT normal = CreateFontIndirectW(&font);
+    font.lfWeight = FW_BOLD;
+    HFONT bold = CreateFontIndirectW(&font);
+    if (!normal || !bold) { if (normal) DeleteObject(normal); if (bold) DeleteObject(bold); return; }
+    HFONT old = s.Font, oldBold = s.Bold;
+    s.Font = normal; s.Bold = bold;
+    EnumChildWindows(s.Window, [](HWND child, LPARAM) -> BOOL
+    {
+        SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(
+            GetDlgCtrlID(child) == kIdHeadline ? TheSession.Bold : TheSession.Font), TRUE);
+        return TRUE;
+    }, 0);
+    // Render preserves reading selection/scroll and reapplies rich-text font runs.
+    Render(s.Reading, s.Reading);
+    if (old) DeleteObject(old);
+    if (oldBold) DeleteObject(oldBold);
+    s.LayoutKind = -1;
+    Layout();
+}
+
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
     Session& s = TheSession;
     switch (message)
     {
+    case WM_APP_APPEARANCE:
+        Sally::Appearance::Request(window, s.AppearanceOwner);
+        return 0;
+    case WM_COPYDATA:
+    {
+        const auto* data = reinterpret_cast<const COPYDATASTRUCT*>(lParam);
+        if (data && data->dwData == Sally::Appearance::CopyDataId)
+        {
+            Sally::Appearance::Snapshot value;
+            if (!Sally::Appearance::Decode(data->lpData, data->cbData, value))
+            { Log(L"appearance snapshot rejected: invalid payload"); return FALSE; }
+            if (!Sally::Appearance::Matches(value, s.Profile, s.InstallRoot))
+            { Log(L"appearance snapshot rejected: different profile or installation"); return FALSE; }
+            Log(L"appearance snapshot icon " + std::to_wstring(value.Icon));
+            ApplyAppearance(value);
+            return TRUE;
+        }
+        break;
+    }
     case WM_SIZE:
         if (s.Placed) Layout();
         return 0;
@@ -774,9 +839,12 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         auto info = reinterpret_cast<MINMAXINFO*>(lParam); info->ptMinTrackSize = {Px(420), Px(s.MinimumHeight)}; return 0;
     }
     case WM_TIMER:
-        if (!s.Installing && !s.InstallStopped && s.NextContentTime && Sally::Supporter::NowUtc() >= s.NextContentTime) RefreshContent();
+        if (!s.Installing && !s.InstallStopped && s.NextContentTime && Sally::Supporter::NowUtc() >= s.NextContentTime)
+        { if (s.Current == View::Report) { RefreshSupportState(); s.LayoutKind = -1; Layout(); } else RefreshContent(); }
         return 0;
     case WM_ACTIVATE:
+        if (LOWORD(wParam) != WA_INACTIVE && s.Current == View::Report && s.SuccessfulReport)
+        { RefreshSupportState(); s.LayoutKind = -1; Layout(); }
         if (LOWORD(wParam) != WA_INACTIVE && !s.Installing && !s.InstallStopped && (s.Current == View::Newer || s.Current == View::UpToDate)) RefreshContent();
         break;
     case WM_APP_CONTENT_READY:
@@ -804,7 +872,9 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         {
         case kIdSupport: Sally::Supporter::OpenSupportPage(window); return 0;
         case kIdSupporter:
-            Sally::Supporter::ShowSupporterDialog(window, Language, s.Profile, *GetWin32Registry(), true); RefreshContent(); return 0;
+            Sally::Supporter::ShowSupporterDialog(window, Language, s.Profile, *GetWin32Registry(), true);
+            if (s.Current == View::Report) { RefreshSupportState(); s.LayoutKind = -1; Layout(); } else RefreshContent();
+            return 0;
         case kIdCheckUpdates:
         {
             UpdaterCommand command; command.Mode = UpdaterMode::Check; command.InstallRoot = s.InstallRoot;
@@ -901,7 +971,9 @@ bool CreateUpdateWindow()
     HDC screen = GetDC(NULL);
     s.Dpi = GetDeviceCaps(screen, LOGPIXELSY);
     ReleaseDC(NULL, screen);
-    LOGFONTW font = DialogFontForDpi(s.Dpi);
+    if (s.Profile.empty()) s.Profile = Sally::Supporter::ResolveProfileRoot();
+    s.Appearance = Sally::Appearance::Read(s.Profile, s.InstallRoot, *GetWin32Registry());
+    LOGFONTW font = Sally::Appearance::FontForDpi(s.Appearance, s.Dpi);
     s.Font = CreateFontIndirectW(&font);
     LOGFONTW bold = font;
     bold.lfWeight = FW_BOLD;
@@ -912,8 +984,7 @@ bool CreateUpdateWindow()
                                Px(600), Px(400), NULL, NULL, GetModuleHandleW(NULL), NULL);
     if (s.Window == NULL)
         return false;
-    SendMessageW(s.Window, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(windowClass.hIcon));
-    SendMessageW(s.Window, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(windowClass.hIconSm));
+    Sally::Appearance::SetWindowIcon(s.Window, GetModuleHandleW(nullptr), s.Appearance.Icon);
     const DWORD label = SS_LEFT | SS_NOPREFIX;
     AddControl(L"STATIC", kIdHeadline, label, 0, std::wstring(), s.Bold);
     AddControl(L"STATIC", kIdInstalled, label, 0, std::wstring(), s.Font);
@@ -926,6 +997,7 @@ bool CreateUpdateWindow()
     SendMessageW(Control(kIdNotes), EM_AUTOURLDETECT, FALSE, 0);
     SendMessageW(Control(kIdNotes), EM_SETLIMITTEXT, ReadingTextLimit, 0);
     if (!SetWindowSubclass(Control(kIdNotes), ContentWindowProc, 1, 0)) return false;
+    AddControl(L"STATIC", kIdInvitation, label, 0, T(IDS_SUP_INVITATION), s.Font);
     AddControl(L"BUTTON", kIdSupport, WS_TABSTOP, 0, T(IDS_SUP_SUPPORT), s.Font);
     AddControl(L"BUTTON", kIdSupporter, WS_TABSTOP, 0, T(IDS_SUP_ENTER), s.Font);
     AddControl(L"BUTTON", kIdCheckUpdates, WS_TABSTOP, 0, T(IDS_SUP_CHECK_UPDATES), s.Font);
@@ -936,6 +1008,8 @@ bool CreateUpdateWindow()
     AddControl(L"BUTTON", IDCANCEL, WS_TABSTOP | BS_PUSHBUTTON, 0, Text(IDS_UPDATER_CLOSE_BUTTON), s.Font);
     // Date boundaries apply equally to offline bundled and online content.
     SetTimer(s.Window, 1, 1000, nullptr);
+    // Request after initialization, when the normal message loop can receive the reply.
+    PostMessageW(s.Window, WM_APP_APPEARANCE, 0, 0);
     return true;
 }
 
@@ -1008,6 +1082,7 @@ int CheckForUpdates(const UpdaterCommand& command)
 {
     Session& s = TheSession;
     s.Automatic = command.Auto;
+    s.AppearanceOwner = reinterpret_cast<HWND>(static_cast<UINT_PTR>(command.AppearanceOwner));
     s.Offline = command.Mode == UpdaterMode::WhatsNew;
     s.Profile = Sally::Supporter::ResolveProfileRoot();
     for (const auto& language : sally::languages::kBuiltinLanguages) if (language.LangId == Language) s.Tag = Narrow(language.Tag);
@@ -1089,6 +1164,7 @@ int CheckForUpdates(const UpdaterCommand& command)
 int ReportUpdate(const UpdaterCommand& command)
 {
     Session& s = TheSession;
+    s.AppearanceOwner = reinterpret_cast<HWND>(static_cast<UINT_PTR>(command.AppearanceOwner));
     const std::wstring work = ParentFolder(command.ResultFile);
     LogPath = work + L"\\salupdate.log";
     const std::wstring claimed = work + L"\\result." + std::to_wstring(GetCurrentProcessId()) + L".shown";
@@ -1106,6 +1182,8 @@ int ReportUpdate(const UpdaterCommand& command)
     }
     if (read && result.Status != UpdateStatus::Prepared)
     {
+        s.InstallRoot = result.InstallRoot;
+        s.SuccessfulReport = result.Status == UpdateStatus::Updated;
         std::wstring detail = result.Message;
         if (!result.FailedPath.empty())
             detail += L"\n" + result.FailedPath;
@@ -1131,6 +1209,7 @@ int ReportUpdate(const UpdaterCommand& command)
         {
             s.Current = View::Report;
             SetText(kIdHeadline, s.ReportText);
+            RefreshSupportState();
             Layout();
             ShowUpdateWindow(true);
             RunMessageLoop();
@@ -1139,6 +1218,13 @@ int ReportUpdate(const UpdaterCommand& command)
     DeleteFileW(Sally::ToExtendedLengthPath(claimed).c_str());
     RemoveStagingFolders(work);
     return 0;
+}
+
+Sally::Appearance::Snapshot CurrentApplicationAppearance()
+{
+    if (!TheSession.Appearance.Profile.empty()) return TheSession.Appearance;
+    return Sally::Appearance::Read(Sally::Supporter::ResolveProfileRoot(),
+        Sally::Appearance::InstallIdentity(true), *GetWin32Registry());
 }
 
 } // namespace salupdate

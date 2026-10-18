@@ -4672,6 +4672,8 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     else
         TRACE_E("Unable to register main window class.");
 
+    UpdateCheck::OnStopping(); // also covers startup/message-loop failure paths
+
     // in case of error, try to close the dialog
     SplashScreenCloseIfExist();
 

@@ -172,6 +172,22 @@ bool ParseUpdaterCommand(const std::vector<std::wstring>& args, UpdaterCommand& 
                            : name == L"--check" ? UpdaterMode::Check
                            : name == L"--whats-new" ? UpdaterMode::WhatsNew : UpdaterMode::Report;
         }
+        else if (name == L"--appearance-owner")
+        {
+            std::wstring text;
+            if (!value(text) || text.size() > 20 || text.find_first_not_of(L"0123456789") != std::wstring::npos)
+            { error = L"invalid appearance owner"; return false; }
+            uint64_t owner = 0;
+            for (wchar_t digit : text)
+            {
+                if (owner > (UINT64_MAX - (digit - L'0')) / 10)
+                { error = L"appearance owner overflow"; return false; }
+                owner = owner * 10 + (digit - L'0');
+            }
+            if (owner == 0 || owner > UINTPTR_MAX)
+            { error = L"invalid appearance owner"; return false; }
+            command.AppearanceOwner = owner;
+        }
         else if (name == L"--auto")
         {
             command.Auto = true;
@@ -337,6 +353,7 @@ std::wstring FormatUpdaterCommand(const UpdaterCommand& command)
     if (command.Auto)
         flag(L"--auto");
     add(L"--feed", command.FeedUrl);
+    if (command.AppearanceOwner) add(L"--appearance-owner", std::to_wstring(command.AppearanceOwner));
     add(L"--package", command.Package);
     add(L"--sha256", command.Sha256);
     add(L"--staging", command.Staging);

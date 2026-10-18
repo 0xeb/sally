@@ -86,6 +86,8 @@ void CPropPageGeneral::Transfer(CTransferInfo& ti)
             *ChangeFlag |= CC_FONT;
         }
         Configuration->WhiteSpace = (unsigned char)SendMessage(whiteSpace, CB_GETCURSEL, 0, 0) + 1;
+        if (oldCfg.HorizontalView != Configuration->HorizontalView)
+            *ChangeFlag |= CC_LAYOUT;
         if (oldCfg.Context != Configuration->Context)
             *ChangeFlag |= CC_CONTEXT;
         if (oldCfg.TabSize != Configuration->TabSize)

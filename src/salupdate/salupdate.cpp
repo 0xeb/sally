@@ -21,6 +21,7 @@
 #include "supporter/SupporterState.h"
 #include "salupdate.rh"
 #include "ui_style.h"
+#include "ApplicationAppearance.h"
 #include "Win32TextCodec.h"
 #include "update/UpdateProcesses.h"
 #include "update/UpdaterCommand.h"
@@ -189,10 +190,16 @@ void ChooseLanguage()
 namespace
 {
 thread_local HFONT MessageFont = NULL;
+thread_local double MessageScaleX = 1, MessageScaleY = 1;
 
 BOOL CALLBACK StyleMessageControl(HWND control, LPARAM)
 {
+    RECT rect{}; GetWindowRect(control, &rect);
+    MapWindowPoints(nullptr, GetParent(control), reinterpret_cast<POINT*>(&rect), 2);
     SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(MessageFont), TRUE);
+    SetWindowPos(control, nullptr, static_cast<int>(rect.left * MessageScaleX), static_cast<int>(rect.top * MessageScaleY),
+        static_cast<int>((rect.right - rect.left) * MessageScaleX), static_cast<int>((rect.bottom - rect.top) * MessageScaleY),
+        SWP_NOZORDER | SWP_NOACTIVATE);
     const int id = GetDlgCtrlID(control);
     const UINT text = id == IDYES ? IDS_UPDATER_YES : id == IDNO ? IDS_UPDATER_NO
                                                    : id == IDOK ? IDS_UPDATER_OK : 0;
@@ -210,11 +217,25 @@ LRESULT CALLBACK StyleMessageBox(int code, WPARAM wParam, LPARAM lParam)
         GetClassNameW(window, className, _countof(className));
         if (lstrcmpW(className, L"#32770") != 0)
             return CallNextHookEx(NULL, code, wParam, lParam);
-        HICON icon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(IDI_UPDATER));
-        SendMessageW(window, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon));
-        SendMessageW(window, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(icon));
+        const auto appearance = CurrentApplicationAppearance();
+        Sally::Appearance::SetWindowIcon(window, GetModuleHandleW(nullptr), appearance.Icon);
         if (MessageFont != NULL)
+        {
+            HDC dc = GetDC(window);
+            HGDIOBJ previous = SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT));
+            TEXTMETRICW oldMetrics{}, newMetrics{};
+            GetTextMetricsW(dc, &oldMetrics);
+            SelectObject(dc, MessageFont); GetTextMetricsW(dc, &newMetrics);
+            SelectObject(dc, previous); ReleaseDC(window, dc);
+            MessageScaleX = (std::max)(1.0, static_cast<double>(newMetrics.tmAveCharWidth) / (std::max)(1L, oldMetrics.tmAveCharWidth));
+            MessageScaleY = (std::max)(1.0, static_cast<double>(newMetrics.tmHeight) / (std::max)(1L, oldMetrics.tmHeight));
+            RECT client{}, outer{}; GetClientRect(window, &client); GetWindowRect(window, &outer);
             EnumChildWindows(window, StyleMessageControl, 0);
+            const int width = static_cast<int>(client.right * MessageScaleX) + outer.right - outer.left - client.right;
+            const int height = static_cast<int>(client.bottom * MessageScaleY) + outer.bottom - outer.top - client.bottom;
+            SetWindowPos(window, nullptr, outer.left - (width - outer.right + outer.left) / 2,
+                outer.top - (height - outer.bottom + outer.top) / 2, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
     }
     return CallNextHookEx(NULL, code, wParam, lParam);
 }
@@ -232,7 +253,7 @@ public:
         const unsigned dpi = screen != NULL ? GetDeviceCaps(screen, LOGPIXELSY) : 96;
         if (screen != NULL)
             ReleaseDC(NULL, screen);
-        LOGFONTW font = DialogFontForDpi(dpi);
+        LOGFONTW font = Sally::Appearance::FontForDpi(CurrentApplicationAppearance(), dpi);
         Font = CreateFontIndirectW(&font);
         MessageFont = Font;
         Hook = SetWindowsHookExW(WH_CBT, StyleMessageBox, NULL, GetCurrentThreadId());

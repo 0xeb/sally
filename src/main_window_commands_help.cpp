@@ -4,6 +4,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/ApplicationAppearance.h"
 #include "SallyUrls.h"
 #include "supporter/Win32SupporterUi.h"
 
@@ -1229,10 +1230,13 @@ LRESULT
 CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CMainWindow::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
+    if (uMsg == Sally::Appearance::RequestMessage())
+        return UpdateCheck::HandleAppearanceRequest(HWindow, wParam);
     switch (uMsg)
     {
     case WM_CREATE:
     {
+        Sally::Appearance::SetWindowIcon(HWindow, HInstance, Configuration.GetMainWindowIconIndex());
         SHChangeNotifyInitialize(); // request receiving Shell Notifications
 
         SetTimer(HWindow, IDT_ADDNEWMODULES, 15000, NULL); // timer after 15 seconds for AddNewlyLoadedModulesToGlobalModulesStore()
@@ -2214,6 +2218,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             SetWindowIcon();
             // icon in progress windows
             ProgressDlgArray.PostIconChange();
+            UpdateCheck::AppearanceChanged(HWindow);
 
             // tell both panels they need to refresh
             LeftPanel->RefreshForConfig();
@@ -7184,6 +7189,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             while (1)
                 Sleep(1000);
         }
+
+        UpdateCheck::OnStopping();
 
         // notify the task list that we are exiting
         TaskList.SetProcessState(PROCESS_STATE_ENDING, NULL);

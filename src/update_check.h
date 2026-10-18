@@ -26,9 +26,13 @@ BOOL RetireCheckVer(HWND parent, BOOL canDeletePluginKey);
 // Once the configuration is saved where it belongs, just before the message loop: reports the
 // update Sally was just restarted by, or else starts the scheduled check a little later.
 void OnStarted();
+// Cancel and join scheduled work before the main window/services are destroyed.
+void OnStopping();
 
 // Help > Check for Updates.
 void CheckNow(HWND parent);
 void ShowWhatsNew(HWND parent);
+void AppearanceChanged(HWND parent);
+LRESULT HandleAppearanceRequest(HWND parent, WPARAM receiver);
 
 } // namespace UpdateCheck
