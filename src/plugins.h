@@ -3179,7 +3179,7 @@ public:
 
     // invokes PasswordManagerEvent method for all plugins using the Password Manager.
     // See CSalamanderGeneralAbstract::SetPluginUsesPasswordManager (loads unloaded plug-ins if necessary)
-    void PasswordManagerEvent(HWND parent, int event);
+    BOOL PasswordManagerEvent(HWND parent, int event);
 
     // releases and clears each plugin's 'PluginDynMenuIcons'
     void ReleasePluginDynMenuIcons();

@@ -13,6 +13,8 @@
 #include "plugins/shared/spl_vers.h"
 #include "menu.h"
 #include "cfgdlg.h"
+#include "pwdmngr.h"
+#include "common/configuration/RegistryWriteMonitor.h"
 #include "plugins.h"
 #include "plugin_sdk_version.h"
 #include "fileswnd.h"
@@ -2881,6 +2883,11 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
 void CPluginData::Save(HWND parent, HKEY regKeyConfig)
 {
     CALL_STACK_MESSAGE5("CPluginData::Save(0x%p, 0x%p) (%ls v. %ls)", parent, regKeyConfig, DLLName.c_str(), Version.c_str());
+    if (PluginUsesPasswordManager && !PasswordManager.CheckCredentialRevision())
+    {
+        sally::configuration::RegistryWriteMonitor::Record(RegistryResult::Error(GetLastError()));
+        return;
+    }
     if (SupportLoadSave && InitDLL(parent))
     {
         HKEY regKey;
@@ -2996,6 +3003,13 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
         if (SupportLoadSave) // otherwise there is nowhere to save
         {
             LoadSaveToRegistryMutex.Enter();
+            if (PluginUsesPasswordManager && !PasswordManager.CheckCredentialRevision())
+            {
+                const DWORD error = GetLastError();
+                LoadSaveToRegistryMutex.Leave();
+                gPrompter->ShowError(LoadStrW(IDS_ERRORSAVECONFIG), GetErrorTextOwned(error).c_str());
+                return;
+            }
             HKEY salamander;
             IRegistry* registry = GetPluginsRegistry();
             if (SALAMANDER_ROOT_REG != NULL &&
@@ -3067,6 +3081,13 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
                 if (!ask || gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
                     LoadSaveToRegistryMutex.Enter();
+                    if (PluginUsesPasswordManager && !PasswordManager.CheckCredentialRevision())
+                    {
+                        const DWORD error = GetLastError();
+                        LoadSaveToRegistryMutex.Leave();
+                        if (ask) gPrompter->ShowError(LoadStrW(IDS_ERRORSAVECONFIG), GetErrorTextOwned(error).c_str());
+                        return FALSE;
+                    }
                     BOOL salKeyDoesNotExist = FALSE;
                     HKEY salamander;
                     IRegistry* registry = GetPluginsRegistry();

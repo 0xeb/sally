@@ -4,6 +4,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 // MIME header decoders normalize attachment names into the active Windows code-page byte
 // domain. Project those bytes exactly once before publishing or using filesystem names.
@@ -13,3 +14,6 @@ bool EqualUnmimeNameBytesAndWide(const std::string& bytes, const wchar_t* name);
 // MIME charset/code-page identifiers are ASCII protocol tokens, not locale text.
 bool DecodeUnmimeAsciiToken(const std::string& bytes, std::wstring& token);
 bool EncodeUnmimeAsciiToken(const std::wstring& token, std::string& bytes);
+
+// Host mask lists separate entries with ';' and escape a literal ';' as ';;'.
+std::vector<std::wstring> SplitUnmimeMasks(const wchar_t* masks);

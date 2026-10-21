@@ -132,7 +132,7 @@ STRINGTABLE
   IDS_ERROR, "Fehler"
   IDS_NOTFOUND, "Datei nicht gefunden"
   IDS_BADDLL, "Falsche Version von unrar.dll. Bitte UnRAR-Plugin neu installieren."
-  IDS_SELECTFIRST, "Es scheint sich um ein mehrteiliges Archiv zu handeln. Bitte wählen Sie in diesem Fall das erste Teilarchiv und drücken Sie 'OK'.\n\nSollte kein mehrteiliges Archiv vorliegen, drücken Sie 'Abbrechen'."
+  IDS_SELECTFIRST, "Wählen Sie zum Fortfahren den ersten Archivteil. Mit Abbrechen beenden Sie den Vorgang."
   IDS_SELECTFIRSTTITLE, "Wählen Sie das erste Teilarchiv"
   IDS_FILENOTFOUND "Die Datei wurde in dem Archiv nicht gefunden."
   IDS_LISTINFO_PAKEDSIZE      "Gepackt"

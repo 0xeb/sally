@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "ftp_text_codec.h"
+#include "ftp_log_limit.h"
 
 const char* LogsSeparator = "\r\n=================\r\n\r\n";
 const wchar_t* LogsSeparatorW = L"\r\n=================\r\n\r\n";
@@ -1544,7 +1545,7 @@ void CLogs::ConfigChanged()
 
         if (Config.UseLogMaxSize) // there is a limit for the log size
         {
-            DWORD size = Config.LogMaxSize * 1024; // overflow is handled when the value is entered
+            const DWORD size = sally::ftp::LogLimitBytes(Config.LogMaxSize);
             int i;
             for (i = 0; i < Data.Count; i++)
             {
@@ -1746,7 +1747,7 @@ BOOL CLogs::LogMessage(int uid, const wchar_t* str, int len, BOOL addTimeToLog)
                 ret = d->Text.Append(s, (int)(len - (s - str)));
 
         if (ret && Config.UseLogMaxSize)
-            d->Text.TrimToUtf8Size(Config.LogMaxSize * 1024, &(d->SkippedChars), &(d->SkippedLines));
+            d->Text.TrimToUtf8Size(sally::ftp::LogLimitBytes(Config.LogMaxSize), &(d->SkippedChars), &(d->SkippedLines));
 
         if (LogsDlg != NULL && LogsDlg->HWindow != NULL)
             PostMessage(LogsDlg->HWindow, WM_APP_UPDATELOG, d->UID, 0);
@@ -1772,6 +1773,23 @@ BOOL CLogs::HasLogWithUID(int uid)
     }
     HANDLES(LeaveCriticalSection(&LogCritSect));
     return ret;
+}
+
+BOOL CLogs::CanRemoveLog(int uid)
+{
+    HANDLES(EnterCriticalSection(&LogCritSect));
+    BOOL removable = FALSE;
+    for (int i = 0; i < Data.Count; ++i)
+    {
+        const CLogData* d = Data[i];
+        if ((uid == -1 || d->UID == uid) && d->CtrlCon == NULL && !d->WorkerIsAlive)
+        {
+            removable = TRUE;
+            break;
+        }
+    }
+    HANDLES(LeaveCriticalSection(&LogCritSect));
+    return removable;
 }
 
 void CLogs::SetLogsDlg(CLogsDlg* logsDlg)
@@ -2049,6 +2067,8 @@ void CLogs::ClearLog(HWND parent, const wchar_t* itemName, int uid)
 
 void CLogs::RemoveLog(HWND parent, const wchar_t* itemName, int uid)
 {
+    if (uid == -1 || !CanRemoveLog(uid))
+        return;
     const std::wstring text = SPLFormatStringOwned(LangStr(IDS_REMOVELOGQUESTION).c_str(),
                                                    itemName != NULL ? itemName : L"");
     MSGBOXEX_PARAMS params;
@@ -2065,7 +2085,7 @@ void CLogs::RemoveLog(HWND parent, const wchar_t* itemName, int uid)
         for (i = 0; i < Data.Count; i++)
         {
             CLogData* d = Data[i];
-            if (d->UID == uid)
+            if (d->UID == uid && d->CtrlCon == NULL && !d->WorkerIsAlive)
             {
                 Data.Delete(i);
                 if (!Data.IsGood())
@@ -2137,6 +2157,8 @@ void CLogs::CopyAllLogs(HWND parent)
 
 void CLogs::RemoveAllLogs(HWND parent)
 {
+    if (!CanRemoveLog(-1))
+        return;
     MSGBOXEX_PARAMS params;
     const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE).c_str();
     const std::wstring text = LangStr(IDS_REMOVEALLLOGSQUESTION).c_str();
@@ -2148,9 +2170,16 @@ void CLogs::RemoveAllLogs(HWND parent)
     if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
     {
         HANDLES(EnterCriticalSection(&LogCritSect));
-        Data.DestroyMembers();
-        if (!Data.IsGood())
-            Data.ResetState();
+        for (int i = Data.Count - 1; i >= 0; --i)
+        {
+            const CLogData* d = Data[i];
+            if (d->CtrlCon == NULL && !d->WorkerIsAlive)
+            {
+                Data.Delete(i);
+                if (!Data.IsGood())
+                    Data.ResetState();
+            }
+        }
         if (LogsDlg != NULL && LogsDlg->HWindow != NULL)
             PostMessage(LogsDlg->HWindow, WM_APP_UPDATELISTOFLOGS, 0, 0);
         HANDLES(LeaveCriticalSection(&LogCritSect));

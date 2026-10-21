@@ -13,10 +13,13 @@
 
 #include <algorithm>
 #include <cstring>
+#include <new>
+#include <stdexcept>
 #include <vector>
 
 #include "worker.h"
 #include "common/BuildScript.h"
+#include "common/DirectoryDestinationPolicy.h"
 #include "common/AdsPolicy.h"
 #include "common/IFileEnumerator.h"
 #include "common/IFileSystem.h"
@@ -25,6 +28,60 @@
 #include "common/unicode/helpers.h"
 
 namespace opplan = sally::operation_planner;
+
+// Reject a directory destination before emitting operations. Physical lookup is
+// advisory: a metadata failure must still reach the normal listing/error flow.
+static bool DirectoryDestinationAllowed(EActionType action, const std::wstring& source,
+                                        const std::wstring& target, DWORD attributes,
+                                        CBuildScriptState* state, bool followContent = false)
+{
+    if (action != EActionType::Copy && action != EActionType::Move)
+        return true;
+    try
+    {
+        const std::wstring logicalSource = opplan::NormalizeDirectoryComparisonPath(source);
+        const std::wstring logicalTarget = opplan::NormalizeDirectoryComparisonPath(target);
+        const bool sameLogical = _wcsicmp(logicalSource.c_str(), logicalTarget.c_str()) == 0;
+        // A case-only move renames the entry, including when that entry is a link.
+        if (action == EActionType::Move && sameLogical && logicalSource != logicalTarget)
+            return true;
+        auto reject = [&]()
+        {
+            if (state != nullptr)
+                state->SelfOpReject = action == EActionType::Move && logicalSource == logicalTarget
+                                          ? CBuildScriptState::ESelfOpReject::MoveDirToItself
+                                          : CBuildScriptState::ESelfOpReject::DirectoryTargetInsideSource;
+            return false;
+        };
+        if (opplan::IsSameOrDescendantDirectory(logicalSource, logicalTarget))
+            return reject();
+        // Cloning a link does not copy its target tree. The follow-content arm
+        // checks again after the user chooses to copy the link's contents.
+        if (!followContent && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            return true;
+        IFileSystem* files = gFileSystem != nullptr ? gFileSystem : GetWin32FileSystem();
+        if (files == nullptr)
+            return true;
+        std::wstring resolvedSource, resolvedTarget;
+        const FileResult sourceResult = files->ResolvePathForComparison(source.c_str(), resolvedSource);
+        const FileResult targetResult = files->ResolvePathForComparison(target.c_str(), resolvedTarget);
+        if (sourceResult.errorCode == ERROR_NOT_ENOUGH_MEMORY || targetResult.errorCode == ERROR_NOT_ENOUGH_MEMORY)
+            return false;
+        if (sourceResult.success && targetResult.success &&
+            opplan::IsSameOrDescendantDirectory(opplan::NormalizeDirectoryComparisonPath(resolvedSource),
+                                                opplan::NormalizeDirectoryComparisonPath(resolvedTarget)))
+            return reject();
+        return true;
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
+    catch (const std::length_error&)
+    {
+        return false;
+    }
+}
 
 // Helper: allocate a full path string "dir\name" (malloc'd, caller owns).
 // Returns NULL on failure.
@@ -125,10 +182,10 @@ static bool HasUnsupportedAttributes(DWORD attr)
 // question: legacy had NO reparse special-case for it (copy_move.cpp special
 // cased only atDelete :2520 and copy's skip-content-for-links :2755), and when
 // counting moved into this builder it silently inherited the veto — which is
-// why Ctrl+Q went dead on any tree holding a junction, a WSL symlink or a cloud
-// placeholder. Counting walks a reparse dir like any other directory; an
-// unresolvable tag then simply fails to enumerate and reaches the Skip / Skip
-// All / Cancel prompt, exactly as in the pre-Unicode build.
+// why Ctrl+Q went dead on any tree holding a cloud placeholder. Counting keeps
+// traversing non-name-surrogate reparse directories, but must not enter a link
+// target: a junction back to an ancestor would otherwise repeat the same tree.
+// Metadata failures reach the existing Skip / Skip All / Cancel policy.
 //
 // ChangeAttrs and ChangeCase have no such question either: they act on a link (a
 // junction or directory symlink) itself, changing its attributes or the case of
@@ -150,14 +207,23 @@ static bool ReparseNeedsSpecialHandling(EActionType action, DWORD attr)
 
 // True for a junction or directory symlink (a name-surrogate reparse tag). A tag
 // that cannot be read is treated as a link, so it is never followed.
-static bool IsLinkDirectory(const std::wstring& pathW, DWORD attr)
+static bool IsLinkDirectory(const std::wstring& pathW, DWORD attr, DWORD* metadataError = nullptr)
 {
+    if (metadataError != nullptr)
+        *metadataError = ERROR_SUCCESS;
     if (!HasUnsupportedAttributes(attr))
         return false;
     IFileSystem* fs = gFileSystem != nullptr ? gFileSystem : GetWin32FileSystem();
     std::vector<BYTE> data;
-    if (!fs->GetReparseData(pathW.c_str(), data).success || data.size() < sizeof(DWORD))
+    const FileResult result = fs->GetReparseData(pathW.c_str(), data);
+    if (!result.success || data.size() < sizeof(DWORD))
+    {
+        if (metadataError != nullptr)
+            *metadataError = !result.success
+                ? (result.errorCode != ERROR_SUCCESS ? result.errorCode : ERROR_GEN_FAILURE)
+                : ERROR_INVALID_REPARSE_DATA;
         return true;
+    }
     DWORD tag = 0;
     memcpy(&tag, data.data(), sizeof(tag));
     return IsReparseTagNameSurrogate(tag) != 0;
@@ -382,6 +448,20 @@ static bool ListDirErrorSaysContinue(const std::wstring& dirW, DWORD err,
     return true;
 }
 
+static bool CountDirectoryShouldSkip(EActionType action, const std::wstring& pathW, DWORD attr,
+                                     const CBuildConfig& config, CBuildScriptState* state,
+                                     bool feasibilityOnly, bool& skip)
+{
+    skip = false;
+    if (action != EActionType::CountSize || !HasUnsupportedAttributes(attr))
+        return true;
+    DWORD error = ERROR_SUCCESS;
+    skip = IsLinkDirectory(pathW, attr, &error);
+    if (error != ERROR_SUCCESS)
+        return ListDirErrorSaysContinue(pathW, error, config, state, feasibilityOnly);
+    return true;
+}
+
 // Asks about a file that cannot fit on a FAT32 target. Three outcomes, not two:
 // Proceed (emit the copy as normal and let the write fail at the filesystem —
 // the behavior with no callback wired, documented and intended) is a different
@@ -438,8 +518,11 @@ static bool EnumerateDirectoryEntries(const std::wstring& dirW,
                                       std::vector<DirectoryEntry>& entries,
                                       const CBuildConfig& config,
                                       CBuildScriptState* state,
-                                      bool feasibilityOnly = false)
+                                      bool feasibilityOnly = false,
+                                      bool* incomplete = nullptr)
 {
+    if (incomplete != nullptr)
+        *incomplete = false;
     // Interface-mediated (Axis D): the enumerator adds the "\*" pattern and the
     // \\?\ long-path decoration internally, so this loop stays Win32-free and
     // is drivable by a MockFileEnumerator in tests.
@@ -461,6 +544,8 @@ static bool EnumerateDirectoryEntries(const std::wstring& dirW,
         // return an EMPTY listing so the parent keeps building — that is what
         // legacy did, and it is why the answer is not simply `false`.
         entries.clear();
+        if (incomplete != nullptr)
+            *incomplete = true;
         return ListDirErrorSaysContinue(dirW, err, config, state, feasibilityOnly);
     }
 
@@ -499,7 +584,11 @@ static bool EnumerateDirectoryEntries(const std::wstring& dirW,
                   return _wcsicmp(left.NameW.c_str(), right.NameW.c_str()) < 0;
               });
     if (truncated)
+    {
+        if (incomplete != nullptr)
+            *incomplete = true;
         return ListDirErrorSaysContinue(dirW, truncatedErr, config, state, feasibilityOnly);
+    }
     return true;
 }
 
@@ -815,13 +904,14 @@ static bool AddPlannedFileOperation(const opplan::CPlannedFileOperation& plan,
 static bool AddDirectoryDeleteOperation(const std::wstring& sourceParentW,
                                         const std::wstring& itemNameW,
                                         DWORD attr,
-                                        COperations* script)
+                                        COperations* script, int transferBegin = -1)
 {
     COperation op;
     op.Opcode = ocDeleteDir;
     op.OpFlags = 0;
     op.Size = DELETE_DIR_SIZE;
     op.Attr = attr;
+    op.CopyRangeBegin = transferBegin;
     op.SetSourceNameW(sourceParentW, itemNameW);
     return AddOperation(script, op);
 }
@@ -970,13 +1060,14 @@ static bool IsReparseAbsorbable(EActionType action, DWORD attr, const CBuildConf
 // Emits a single ocDeleteDirLink op removing the junction/symlink itself —
 // matching the legacy builder (copy_move.cpp:2519). NEVER recurses.
 static bool EmitDeleteDirLinkOp(const std::wstring& fullPath, DWORD attr,
-                                COperations* script)
+                                COperations* script, int copyRangeBegin = -1)
 {
     COperation op;
     op.Opcode = ocDeleteDirLink;
     op.OpFlags = 0;
     op.Size = DELETE_DIRLINK_SIZE;
     op.Attr = attr;
+    op.CopyRangeBegin = copyRangeBegin;
     op.SetSourceNameW(fullPath, std::wstring());
     return AddOperation(script, op);
 }
@@ -1043,6 +1134,7 @@ static bool BuildDirectoryTree(EActionType action,
         script->DirsCount++;
     emittedAny = false;
     movedAll = true;
+    bool removeFollowedLink = false;
 
     opplan::CPlannedSnapshotItem dirPlan;
     if (!opplan::TryPlanChildItem(action,
@@ -1053,6 +1145,13 @@ static bool BuildDirectoryTree(EActionType action,
     {
         return false;
     }
+
+    bool skipCountDirectory = false;
+    if (!CountDirectoryShouldSkip(action, dirPlan.SourcePathW, attr, config, state,
+                                  false, skipCountDirectory))
+        return false;
+    if (skipCountDirectory)
+        return true;
 
     if (ActsOnReparseEntryItself(action) && IsLinkDirectory(dirPlan.SourcePathW, attr))
     {
@@ -1141,8 +1240,18 @@ static bool BuildDirectoryTree(EActionType action,
             return true;
         }
 
-        // CopyContent: emit nothing for the link and treat it as an ordinary
-        // directory from here on, so the walk below enumerates through it.
+        if (!DirectoryDestinationAllowed(action, dirPlan.SourcePathW, dirPlan.TargetPathW, attr, state, true))
+            return false;
+
+        // Following a link promises a COPY of its target, including during a
+        // move. Only the link itself may be removed after every copy succeeds.
+        // A case-only rename remains a rename of the link object itself.
+        if (action == EActionType::Move &&
+            _wcsicmp(dirPlan.SourcePathW.c_str(), dirPlan.TargetPathW.c_str()) != 0)
+        {
+            action = EActionType::Copy;
+            removeFollowedLink = true;
+        }
     }
     // A system/hidden-directory prompt is a delete policy. Copy and move must
     // not inherit it merely because they share this recursive builder.
@@ -1238,8 +1347,10 @@ static bool BuildDirectoryTree(EActionType action,
     }
 
     std::vector<DirectoryEntry> entries;
-    if (!EnumerateDirectoryEntries(sourceDirW, entries, config, state))
+    bool incompleteListing = false;
+    if (!EnumerateDirectoryEntries(sourceDirW, entries, config, state, false, &incompleteListing))
         return false;
+    movedAll = !incompleteListing;
 
     // ChangeAttrs / ChangeCase directory. ChangeAttrs applies the dir's own
     // attribute change then (if SubDirs) recurses. ChangeCase renames contents
@@ -1443,7 +1554,7 @@ static bool BuildDirectoryTree(EActionType action,
     if ((action == EActionType::Move || action == EActionType::Delete) && movedAll)
     {
         if (!AddDirectoryDeleteOperation(dirPlan.SourceParentW, dirPlan.ItemNameW,
-                                         attr, script))
+                                         attr, script, action == EActionType::Move ? createDirIndex : -1))
         {
             return false;
         }
@@ -1455,6 +1566,11 @@ static bool BuildDirectoryTree(EActionType action,
             return false;
     }
 
+    if (removeFollowedLink && movedAll && createDirIndex >= 0)
+    {
+        if (!EmitDeleteDirLinkOp(sourceDirW, attr, script, createDirIndex))
+            return false;
+    }
     emittedAny = true;
 
     return true;
@@ -1480,6 +1596,13 @@ static bool ValidateDirectoryTree(EActionType action,
     }
 
     // A link is changed itself and never entered: nothing below it to validate.
+    bool skipCountDirectory = false;
+    if (!CountDirectoryShouldSkip(action, dirPlan.SourcePathW, attr, config, state,
+                                  true, skipCountDirectory))
+        return false;
+    if (skipCountDirectory)
+        return true;
+
     if (ActsOnReparseEntryItself(action) && IsLinkDirectory(dirPlan.SourcePathW, attr))
         return true;
 
@@ -1628,13 +1751,18 @@ static bool ValidateFirstTrancheSnapshot(const CSelectionSnapshot& snapshot,
 
     for (const CSnapshotItem& item : snapshot.Items)
     {
+        // Nonrecursive conversion affects selected files only. Ignored folders
+        // need neither traversal capability nor filesystem access.
         if (item.IsDir && snapshot.Action == EActionType::Convert)
-            return false;
+            continue;
         if (item.IsDir && !config.EnableRecursiveDirectories)
             return false;
 
         opplan::CPlannedSnapshotItem plan;
         if (!opplan::TryPlanSnapshotItem(snapshot, config, item, plan))
+            return false;
+
+        if (plan.IsDir && !DirectoryDestinationAllowed(snapshot.Action, plan.SourcePathW, plan.TargetPathW, item.Attr, state))
             return false;
 
         if (!plan.IsDir)
@@ -1721,6 +1849,8 @@ BOOL BuildScriptFromSnapshot(
     for (size_t i = 0; i < snapshot.Items.size(); i++)
     {
         const CSnapshotItem& item = snapshot.Items[i];
+        if (item.IsDir && snapshot.Action == EActionType::Convert)
+            continue;
         // CountSize: record the per-item TotalSize delta for the
         // caller's panel-row writeback (Size/SizeValid).
         const CQuadWord totalBeforeItem = script->TotalSize;

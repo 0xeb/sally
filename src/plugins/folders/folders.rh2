@@ -22,5 +22,6 @@
 #define IDS_ABOUT                   1001
 #define IDS_PLUGIN_DESCRIPTION      1003
 #define IDS_DRIVEMENUTEXT           1004
+#define IDS_LISTFOLDERERROR          1005
 
 #endif // __FOLDERS_RH2

@@ -49,6 +49,6 @@ STRINGTABLE
  IDS_TBTT_CUT,               "Cut\tCtrl+X"
  IDS_TBTT_COPY,              "Copy\tCtrl+C"
  IDS_TBTT_PASTE,             "Paste\tCtrl+V"
- IDS_TBTT_FILTER,            "Filter\tCtrl+U"
+ IDS_TBTT_FILTER,            "Filter"
  IDS_FILTER,                 "Filter"
 }

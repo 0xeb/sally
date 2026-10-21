@@ -262,7 +262,7 @@ class CProgressDialog : public CDialog
     DWORD Current;
 
 public:
-    CProgressDialog(HWND parent) : CDialog(HLanguage, IDD_PROGRESS, parent) { Cancel = FALSE; }
+    CProgressDialog(HWND parent, CObjectOrigin origin = ooStandard) : CDialog(HLanguage, IDD_PROGRESS, parent, origin) { Cancel = FALSE; }
     virtual ~CProgressDialog() { ; }
 
     BOOL Update(DWORD current, BOOL force = FALSE);

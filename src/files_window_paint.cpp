@@ -11,6 +11,8 @@
 #include "filesbox.h"
 #include "shiconov.h"
 #include "common/PanelTextPainter.h"
+#include "common/Win32LocaleText.h"
+#include <limits>
 #include "common/text/CaseFolding.h"
 #include "common/unicode/NameRenderPolicy.h"
 #include "common/unicode/helpers.h" // FoldCharW
@@ -1671,62 +1673,63 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
 // Draws an item in Tiles mode
 //
 
-void TruncateSringToFitWidthW(HDC hDC, wchar_t* buffer, int* bufferLen, int maxTextWidth, int* widthNeeded)
+namespace
 {
-    if (*bufferLen == 0)
-        return;
-
-    SIZE fnSZ;
-    int fitChars;
-    GetTextExtentExPointW(hDC, buffer, *bufferLen, maxTextWidth,
-                          &fitChars, DrawItemAlpDx, &fnSZ);
-    if (fitChars < *bufferLen)
+    void TruncateTileText(HDC dc, std::wstring& text, int maximum, int& widthNeeded)
     {
-        if (*widthNeeded < maxTextWidth)
-            *widthNeeded = maxTextWidth;
-        // search from the end for the character after which we can copy "..." and it fits in the column
-        while (fitChars > 0 && DrawItemAlpDx[fitChars - 1] + TextEllipsisWidth > maxTextWidth)
-            fitChars--;
-        // copy part of the original string to another buffer
-        if (fitChars > 0)
+        if (text.empty())
+            return;
+        maximum = (std::max)(maximum, 0);
+        const int length = static_cast<int>((std::min)(text.size(), static_cast<size_t>((std::numeric_limits<int>::max)())));
+        int fit = 0;
+        SIZE extent{};
+        // GDI can return a fit count without an input-length partial-width array.
+        if (!GetTextExtentExPointW(dc, text.data(), length, maximum, &fit, nullptr, &extent))
         {
-            // and append "..."
-            wmemmove(buffer + fitChars, L"...", 3);
-            *bufferLen = fitChars + 3;
+            text.clear();
+            return;
         }
-        else
+        if (fit == length && text.size() == static_cast<size_t>(length))
         {
-            buffer[1] = L'.';
-            *bufferLen = 2;
+            widthNeeded = (std::max)(widthNeeded, static_cast<int>(extent.cx));
+            return;
         }
+        widthNeeded = (std::max)(widthNeeded, maximum);
+        std::wstring ellipsis = L"...";
+        SIZE dots{};
+        if (!GetTextExtentPoint32W(dc, ellipsis.data(), 3, &dots))
+        {
+            text.clear();
+            return;
+        }
+        if (dots.cx > maximum)
+        {
+            int dotsFit = 0;
+            if (!GetTextExtentExPointW(dc, ellipsis.data(), 3, maximum, &dotsFit, nullptr, &dots))
+                dotsFit = 0;
+            text.assign(ellipsis, 0, static_cast<size_t>((std::max)(dotsFit, 0)));
+            return;
+        }
+        if (!GetTextExtentExPointW(dc, text.data(), length, maximum - dots.cx, &fit, nullptr, &extent))
+        {
+            text.clear();
+            return;
+        }
+        // Never append the ellipsis between the units of a supplementary character.
+        if (fit > 0 && fit < length && text[fit - 1] >= 0xD800 && text[fit - 1] <= 0xDBFF &&
+            text[fit] >= 0xDC00 && text[fit] <= 0xDFFF)
+            --fit;
+        text.resize(static_cast<size_t>((std::max)(fit, 0)));
+        text += ellipsis;
     }
-    else
-    {
-        if (*widthNeeded < fnSZ.cx)
-            *widthNeeded = fnSZ.cx;
-    }
-}
+} // namespace
 
-void GetTileTexts(CFileData* f, int isDir,
-                  HDC hDC, int maxTextWidth, int* widthNeeded,
-                  wchar_t* out0, int* out0Len,
-                  wchar_t* out1, int* out1Len,
-                  wchar_t* out2, int* out2Len, DWORD validFileData,
-                  CPluginDataInterfaceEncapsulation* pluginData,
-                  BOOL isDisk)
+CTileTexts GetTileTexts(CFileData* f, int isDir, HDC hDC, int maxTextWidth,
+                        DWORD validFileData, CPluginDataInterfaceEncapsulation* pluginData, BOOL isDisk)
 {
-    // format the name to the user-defined form
-    // AlterFileNameW returns a std::wstring and drops both the out-buffer
-    // and filenameLen, so this is a reshape rather than a suffix swap. The copy is unbounded
-    // exactly as the AlterFileName it replaces was - GetTileTexts is never told out0's
-    // capacity - so the pre-existing risk is unchanged, not newly introduced.
-    std::wstring alteredName = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, isDir != 0);
-    // 1st line: NAME
-    *out0Len = (int)alteredName.length();
-    wmemcpy(out0, alteredName.c_str(), *out0Len + 1);
-    // the string may be longer than available space and may need to be shortened with "..."
-    *widthNeeded = 0;
-    TruncateSringToFitWidthW(hDC, out0, out0Len, maxTextWidth, widthNeeded);
+    CTileTexts texts;
+    texts.Name = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, isDir != 0);
+    TruncateTileText(hDC, texts.Name, maxTextWidth, texts.Width);
 
     // 2nd line: SIZE (if known)
     CQuadWord plSize;
@@ -1737,21 +1740,12 @@ void GetTileTexts(CFileData* f, int isDir,
     {
         plSizeValid = TRUE;
     }
-    if (!plSizeValid && ((validFileData & VALID_DATA_SIZE) == 0 || isDir && !f->SizeValid))
-        *out1 = 0;
-    else
-    {
-        const std::wstring sizeText = PrintDiskSize(plSizeValid ? plSize : f->Size, 0);
-        const size_t copyLength = (std::min<size_t>)(sizeText.size(), 511);
-        wmemcpy(out1, sizeText.data(), copyLength);
-        out1[copyLength] = L'\0';
-    }
-    *out1Len = (int)wcslen(out1);
-    // the string may be longer than available space and may need to be shortened with "..."
-    TruncateSringToFitWidthW(hDC, out1, out1Len, maxTextWidth, widthNeeded);
+    if (plSizeValid || ((validFileData & VALID_DATA_SIZE) != 0 && (!isDir || f->SizeValid)))
+        texts.Size = PrintDiskSize(plSizeValid ? plSize : f->Size, 0);
+    TruncateTileText(hDC, texts.Size, maxTextWidth, texts.Width);
 
     // 3rd line DATE TIME (if known)
-    SYSTEMTIME st;
+    SYSTEMTIME st{};
     FILETIME ft;
     BOOL validDate = FALSE;
     BOOL validTime = FALSE;
@@ -1806,39 +1800,34 @@ void GetTileTexts(CFileData* f, int isDir,
         st.wMilliseconds = 0;
     }
 
-    out2[0] = 0;
-    int out2LenA = 0;
-    int out2LenB = 0;
-    if (validDate || invalidDate)
+    if (validDate)
     {
-        if (validDate)
-        {
-            out2LenA = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, out2, 500) - 1;
-            if (out2LenA < 0)
-                out2LenA = _snwprintf_s(out2, 500, _TRUNCATE, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-        }
-        else
-            out2LenA = _snwprintf_s(out2, 500, _TRUNCATE, L"%s", LoadStrW(IDS_INVALID_DATEORTIME));
-        if (validTime || invalidTime)
-        {
-            out2[out2LenA] = L' ';
-            out2LenA++;
-        }
+        texts.DateTime = Win32FormatLocalDateTimePart(st, true);
+        if (texts.DateTime.empty())
+            texts.DateTime = std::to_wstring(st.wDay) + L"." + std::to_wstring(st.wMonth) + L"." + std::to_wstring(st.wYear);
     }
+    else if (invalidDate)
+        texts.DateTime = LoadStrW(IDS_INVALID_DATEORTIME);
     if (validTime || invalidTime)
     {
+        if (!texts.DateTime.empty())
+            texts.DateTime += L" ";
         if (validTime)
         {
-            out2LenB = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, out2 + out2LenA, 500 - out2LenA) - 1;
-            if (out2LenB < 0)
-                out2LenB = _snwprintf_s(out2 + out2LenA, 500 - out2LenA, _TRUNCATE, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+            std::wstring time = Win32FormatLocalDateTimePart(st, false);
+            if (time.empty())
+            {
+                const auto pad = [](WORD value)
+                { return std::wstring(value < 10 ? L"0" : L"") + std::to_wstring(value); };
+                time = std::to_wstring(st.wHour) + L":" + pad(st.wMinute) + L":" + pad(st.wSecond);
+            }
+            texts.DateTime += time;
         }
         else
-            out2LenB = _snwprintf_s(out2 + out2LenA, 500 - out2LenA, _TRUNCATE, L"%s", LoadStrW(IDS_INVALID_DATEORTIME));
+            texts.DateTime += LoadStrW(IDS_INVALID_DATEORTIME);
     }
-    *out2Len = out2LenA + out2LenB;
-    // the string may be longer than available space and may need to be shortened with "..."
-    TruncateSringToFitWidthW(hDC, out2, out2Len, maxTextWidth, widthNeeded);
+    TruncateTileText(hDC, texts.DateTime, maxTextWidth, texts.Width);
+    return texts;
 }
 
 void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD drawFlags,
@@ -1973,21 +1962,15 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
         int maxTextWidth = itemWidth - TILE_LEFT_MARGIN - IconSizes[iconSize] - TILE_LEFT_MARGIN - 4;
         int widthNeeded = 0;
 
-        wchar_t* out0 = TransferBuffer;
-        int out0Len;
-        wchar_t* out1 = DrawItemBuff;
-        int out1Len;
-        wchar_t* out2 = DrawItemBuff + 512;
-        int out2Len;
-
-        // One call. This used to fork on f->UseWideName() and, in the wide
-        // arm, build a SECOND wide copy of the name in out0W before calling GetTileTexts
-        // anyway and discarding its out0. The predicate died with CFileData::NameW, so only
-        // the arm below has ever run - and GetTileTexts now applies AlterFileNameW itself,
-        // so that format fix lives there instead of being duplicated here.
-        GetTileTexts(f, isDir ? (isItemUpDir ? 2 /* UP-DIR */ : 1) : 0, hDC, maxTextWidth, &widthNeeded,
-                     out0, &out0Len, out1, &out1Len, out2, &out2Len,
-                     ValidFileData, &PluginData, Is(ptDisk));
+        const CTileTexts texts = GetTileTexts(f, isDir ? (isItemUpDir ? 2 /* UP-DIR */ : 1) : 0,
+                                             hDC, maxTextWidth, ValidFileData, &PluginData, Is(ptDisk));
+        widthNeeded = texts.Width;
+        const wchar_t* out0 = texts.Name.c_str();
+        int out0Len = static_cast<int>(texts.Name.size());
+        const wchar_t* out1 = texts.Size.c_str();
+        const int out1Len = static_cast<int>(texts.Size.size());
+        const wchar_t* out2 = texts.DateTime.c_str();
+        const int out2Len = static_cast<int>(texts.DateTime.size());
 
         if (isItemUpDir)
         {

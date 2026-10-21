@@ -2727,6 +2727,10 @@ STRINGTABLE
  IDS_CANNOTMOVEFILETOITSELF, "不能移动文件到它自己。"
 
  IDS_CANNOTMOVEDIRTOITSELF, "不能移动目录到它自己。"
+ IDS_DIRECTORYTARGETINSOURCE, "不能将文件夹复制或移动到其自身或其子文件夹中。"
+ IDS_UNPACKERSELECTIONREQUIRED, "请选择一个解压程序。如果列表为空，请在配置中添加一个。"
+ IDS_EXECUTE_SHORTNAMEUNAVAILABLE, "“%s”没有可用的 DOS (8.3) 路径。"
+ IDS_OPERATIONSTARTFAILED, "无法启动文件操作。\n\n%s"
 
  IDS_NOTENOUGHSPACE, "目标驱动器上似乎没有足够的空间。\n你要继续吗？\n\n需要的空间: %s 字节。\n可用空间: %s 字节。"
 
@@ -3231,6 +3235,7 @@ STRINGTABLE
  IDS_PACKERR_NOOUTPUT, "从外部压缩程序得不到输出，请检查你的配置。"
  IDS_PACKERR_UNABLETOREN, "无法重命名临时压缩文件 (%1) 为压缩包名称 (%2)。"
  IDS_PACKERR_INVALIDNAME, "文件名在 Windows 文件系统中无效。外部压缩包管理程序不支持解压到另一个文件名，因此不可能解压此文件。"
+ IDS_PACKERR_EXCLUSIONMASK, "外部解压程序不支持排除掩码 ('|')。请选择内部解压程序或删除排除条件。"
 
  IDS_PACKRET_GENERAL, "退出代码 %d。"
  IDS_PACKRET_WARNING, "遇到警告。"
@@ -3579,6 +3584,9 @@ IDS_OLDPLUGINVERSION2, "这个插件 (%s) 不被 Sally 的这个版本所支持�
  IDS_EMAILFILES_SUBJECT, "发送Email:"
  IDS_EMAILFILES_BODY, "你的文件已被附加并准备和此消息一起发送。"
  IDS_EMAILFILES_MAPIERROR, "无法发送email。没有设置发件发送程序，MAPI32.DLL 未找到。"
+ IDS_EMAILFILES_PATHERROR, "邮件程序无法使用此文件的当前名称添加附件：\n\n%s"
+ IDS_EMAILFILES_SENDERROR, "无法创建电子邮件。\n\n%s"
+ IDS_EMAILFILES_PROVIDERERROR, "邮件程序报告错误 %u。"
 
  IDS_PLUGINSUFFIX, " (插件)"
 
@@ -4135,4 +4143,18 @@ IDS_OLDPLUGINVERSION2, "这个插件 (%s) 不被 Sally 的这个版本所支持�
  IDS_UPDATECHECK_STARTUP, "每次启动时"
  IDS_UPDATER_CANNOT_START, "无法启动 Sally 更新程序：\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "主密码通过强大的 AES 加密算法来保护敏感信息，像 FTP 或 WinSCP 密码。如果你创建一个主密码，当 Sally 检索受保护的信息时，每次会话你将被要求输入一次主密码。"
+ // Configuration navigation
+ IDS_CFG_SEARCH_LABEL, "搜索设置(&S)："
+ IDS_CFG_SEARCH_HINT, "词语、""短语""、AND、OR、NOT"
+ IDS_CFG_SEARCH_INVALID, "搜索无效。请检查引号和括号。"
+ IDS_CFG_SEARCH_EMPTY, "没有匹配的设置。"
+ IDS_CFG_SEARCH_CLEAR, "清除搜索 (Esc)"
+ IDS_CFG_SEARCH_OPEN, "搜索设置"
+ IDS_CFG_SEARCH_CLOSE, "关闭搜索"
+ IDS_CFG_SAVE, "保存(&S)"
+ IDS_CFG_APPLY, "应用(&A)"
+ IDS_CFG_SAVE_FAILED, "无法保存配置。您的更改仍保留在此窗口中。"
+
+ IDS_MASTERPASSWORD_STORE_DAMAGED, "无法读取已保存的主密码设置。Sally 将保留这些设置，并且不会保存配置更改。更改密码前，请恢复完好的配置备份。"
+
 }

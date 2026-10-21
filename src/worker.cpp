@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/IThreadStartup.h"
+#include "common/ByteTextConversion.h"
+#include "common/ConvertedFileReplacement.h"
 
 #include "cfgdlg.h"
 #include "worker.h"
@@ -5520,6 +5523,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 BOOL* setDirTimeAfterMove, CAsyncCopyParams*& asyncPar,
                 BOOL ignInvalidName)
 {
+    op->CopyCompleted = false;
     if (script->CopyAttrs && copyAsEncrypted)
         TRACE_E("DoMoveFile(): unexpected parameter value: copyAsEncrypted is TRUE when script->CopyAttrs is TRUE!");
 
@@ -5591,6 +5595,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
 
             OPERATION_DONE:
 
+                op->CopyCompleted = true;
                 DWORD curAttrs = INVALID_FILE_ATTRIBUTES;
                 if (script->CopyAttrs) // check whether the source file attributes were preserved
                 {
@@ -6048,6 +6053,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     }
                 }
             }
+            op->CopyCompleted = true;
         }
         return notError;
     }
@@ -6643,8 +6649,10 @@ BOOL DoCreateDir(IWorkerObserver& observer, DWORD attr,
 
 BOOL DoDeleteDir(IWorkerObserver& observer, const CQuadWord& size, COperations* script,
                  CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CWorkerState& workerState,
-                 const std::wstring& nameW)
+                 const std::wstring& nameW, bool* completed = nullptr)
 {
+    if (completed != nullptr)
+        *completed = false;
     DWORD err;
     int AutoRetryCounter = 0;
     DWORD startTime = GetTickCount();
@@ -6692,6 +6700,8 @@ BOOL DoDeleteDir(IWorkerObserver& observer, const CQuadWord& size, COperations* 
 
         if (err == ERROR_SUCCESS)
         {
+            if (completed != nullptr)
+                *completed = true;
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
 
             totalDone += size;
@@ -6789,8 +6799,10 @@ BOOL DeleteDirLink(const wchar_t* name, DWORD* err)
 
 BOOL DoDeleteDirLink(IWorkerObserver& observer, const CQuadWord& size, COperations* script,
                      CQuadWord& totalDone, CWorkerState& workerState,
-                     const std::wstring& nameW)
+                     const std::wstring& nameW, bool* completed = nullptr)
 {
+    if (completed != nullptr)
+        *completed = false;
     // The clone half of a move that the user skipped: the link was never made at the
     // target, so deleting it here would simply lose it. Consume the marker and count
     // the operation as done so the progress bar still reaches the end.
@@ -6821,6 +6833,8 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, const CQuadWord& size, COperatio
 
         if (ok)
         {
+            if (completed != nullptr)
+                *completed = true;
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
 
             totalDone += size;
@@ -6870,6 +6884,7 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, const CQuadWord& size, COperatio
 BOOL DoCreateDirLink(IWorkerObserver& observer, COperation* op, COperations* script,
                      CQuadWord& totalDone, CWorkerState& workerState)
 {
+    op->CopyCompleted = false;
     // Link ops come only from the snapshot builder, which always sets explicit
     // wide names - no ANSI fallback here (the ratchet holds the line).
     const std::wstring& sourceW = op->SourceNameW;
@@ -6914,6 +6929,7 @@ BOOL DoCreateDirLink(IWorkerObserver& observer, COperation* op, COperations* scr
 
         if (err == NO_ERROR)
         {
+            op->CopyCompleted = true;
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)op->Size.Value, TRUE, 0, NULL,
                                                      MAX_OP_FILESIZE);
             totalDone += op->Size;
@@ -6987,17 +7003,29 @@ CONVERT_AGAIN:
     {
         // attempt to open the source file
         HANDLE hSource;
+        DWORD sourceError = ERROR_SUCCESS;
+        sally::conversion::FileMetadata metadata;
         if (!invalidName)
         {
             hSource = GetWorkerFileSystem()->CreateFile(effectiveNameW.c_str(), GENERIC_READ,
-                                  FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                  OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                                                        FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                                        OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
             DWORD openErr = GetLastError();
             HANDLES_ADD_EX(__otQuiet, hSource != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hSource, openErr, TRUE);
         }
         else
         {
             hSource = INVALID_HANDLE_VALUE;
+        }
+        if (hSource != INVALID_HANDLE_VALUE)
+        {
+            const auto captured = sally::conversion::CaptureMetadata(*GetWorkerFileSystem(), hSource, effectiveNameW, metadata);
+            if (!captured.success)
+            {
+                sourceError = captured.errorCode;
+                (void)CloseWorkerTrackedFile(hSource);
+                hSource = INVALID_HANDLE_VALUE;
+            }
         }
         if (hSource != INVALID_HANDLE_VALUE)
         {
@@ -7011,7 +7039,6 @@ CONVERT_AGAIN:
                 return FALSE;
             }
             tmpPathW = effectiveNameW.substr(0, lastSlash + 1);
-
 
             // find a name for the temporary file and let the system create it
             std::wstring tmpFileNameW;
@@ -7031,10 +7058,8 @@ CONVERT_AGAIN:
                     // align the temp file attributes with the source file
                     DWORD srcAttrs = GetWorkerFileSystem()->GetFileAttributes(effectiveNameW.c_str());
                     DWORD tgtAttrs = GetWorkerFileSystem()->GetFileAttributes(tmpFileNameW.c_str());
-                    BOOL changeAttrs = FALSE;
                     if (srcAttrs != INVALID_FILE_ATTRIBUTES && tgtAttrs != INVALID_FILE_ATTRIBUTES && srcAttrs != tgtAttrs)
                     {
-                        changeAttrs = TRUE; // SetFileAttributes will be called later...
                         // does the NTFS compression flag differ?
                         if ((srcAttrs & FILE_ATTRIBUTE_COMPRESSED) != (tgtAttrs & FILE_ATTRIBUTE_COMPRESSED) &&
                             (srcAttrs & FILE_ATTRIBUTE_COMPRESSED) == 0)
@@ -7065,7 +7090,7 @@ CONVERT_AGAIN:
 
                     // open the empty temporary file
                     HANDLE hTarget = GetWorkerFileSystem()->CreateFile(tmpFileNameW.c_str(), GENERIC_WRITE, 0, NULL,
-                                                 OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                                                                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                     {
                         DWORD openErr2 = GetLastError();
                         HANDLES_ADD_EX(__otQuiet, hTarget != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hTarget, openErr2, TRUE);
@@ -7073,7 +7098,7 @@ CONVERT_AGAIN:
                     if (hTarget != INVALID_HANDLE_VALUE)
                     {
                         DWORD read;
-                        BOOL crlfBreak = FALSE;
+                        bool crlfBreak = false;
                         FileResult readIoResult = FileResult::Ok();
                         DWORD pendingWriteError = ERROR_SUCCESS;
                         while (1)
@@ -7084,79 +7109,23 @@ CONVERT_AGAIN:
                             {
                                 DWORD written;
                                 if (read == 0)
-                                    break;                                                 // EOF
+                                    break;                  // EOF
                                 observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                 if (observer.IsCancelled())
                                 {
                                 CONVERT_ERROR:
 
                                     if (hSource != NULL)
-                                        (void)GetWorkerFileSystem()->CloseFileHandle(hSource);
+                                        (void)CloseWorkerTrackedFile(hSource);
                                     if (hTarget != NULL)
-                                        (void)GetWorkerFileSystem()->CloseFileHandle(hTarget);
+                                        (void)CloseWorkerTrackedFile(hTarget);
                                     ClearReadOnlyAttr(tmpFileNameW.c_str());
                                     gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                     return FALSE;
                                 }
 
-                                // translate sourceBuffer -> targetBuffer
-                                char* sourceIterator;
-                                char* targetIterator;
-                                sourceIterator = sourceBuffer;
-                                targetIterator = targetBuffer;
-                                while (sourceIterator - sourceBuffer < (int)read)
-                                {
-                                    // lastChar is TRUE when sourceIterator points to the final character in the buffer
-                                    BOOL lastChar = (sourceIterator - sourceBuffer == (int)read - 1);
-
-                                    if (convertData.EOFType != 0)
-                                    {
-                                        if (crlfBreak && sourceIterator == sourceBuffer && *sourceIterator == '\n')
-                                        {
-                                            // we already processed this CRLF, leave the LF as is now
-                                            crlfBreak = FALSE;
-                                        }
-                                        else
-                                        {
-                                            if (*sourceIterator == '\r' || *sourceIterator == '\n')
-                                            {
-                                                switch (convertData.EOFType)
-                                                {
-                                                case 2:
-                                                    *targetIterator++ = convertData.CodeTable['\n'];
-                                                    break;
-                                                case 3:
-                                                    *targetIterator++ = convertData.CodeTable['\r'];
-                                                    break;
-                                                default:
-                                                {
-                                                    *targetIterator++ = convertData.CodeTable['\r'];
-                                                    *targetIterator++ = convertData.CodeTable['\n'];
-                                                    break;
-                                                }
-                                                }
-                                                // capture CRLF which splits across the buffer boundary
-                                                if (lastChar && *sourceIterator == '\r')
-                                                    crlfBreak = TRUE;
-                                                // capture CRLF that is contiguous – skip the LF
-                                                if (!lastChar &&
-                                                    *sourceIterator == '\r' && *(sourceIterator + 1) == '\n')
-                                                    sourceIterator++;
-                                            }
-                                            else
-                                            {
-                                                *targetIterator = convertData.CodeTable[static_cast<BYTE>(*sourceIterator)];
-                                                targetIterator++;
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        *targetIterator = convertData.CodeTable[static_cast<BYTE>(*sourceIterator)];
-                                        targetIterator++;
-                                    }
-                                    sourceIterator++;
-                                }
+                                char* targetIterator = targetBuffer + sally::conversion::ConvertByteChunk(
+                                                                          sourceBuffer, read, convertData.CodeTable, convertData.EOFType, crlfBreak, targetBuffer);
 
                                 // write the data to the temp file
                                 while (1)
@@ -7168,13 +7137,11 @@ CONVERT_AGAIN:
                                     if (writeIoResult.success &&
                                         targetIterator - targetBuffer == (int)written)
                                         break;
-                                    pendingWriteError = writeIoResult.success ?
-                                                            ERROR_DISK_FULL : writeIoResult.errorCode;
+                                    pendingWriteError = writeIoResult.success ? ERROR_DISK_FULL : writeIoResult.errorCode;
 
                                 WRITE_ERROR_CONVERT:
 
-                                    DWORD err = pendingWriteError != ERROR_SUCCESS ?
-                                                    pendingWriteError : GetLastError();
+                                    DWORD err = pendingWriteError != ERROR_SUCCESS ? pendingWriteError : GetLastError();
                                     pendingWriteError = ERROR_SUCCESS;
 
                                     observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -7211,9 +7178,9 @@ CONVERT_AGAIN:
 
                                         totalDone += size;
                                         if (hSource != NULL)
-                                            (void)GetWorkerFileSystem()->CloseFileHandle(hSource);
+                                            (void)CloseWorkerTrackedFile(hSource);
                                         if (hTarget != NULL)
-                                            (void)GetWorkerFileSystem()->CloseFileHandle(hTarget);
+                                            (void)CloseWorkerTrackedFile(hTarget);
                                         ClearReadOnlyAttr(tmpFileNameW.c_str());
                                         gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                         observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
@@ -7230,8 +7197,8 @@ CONVERT_AGAIN:
 
                                 operationDone += CQuadWord(read, 0);
                                 observer.SetProgress(
-                                            CaclProg(operationDone, size),
-                                            CaclProg(totalDone + operationDone, script->TotalSize));
+                                    CaclProg(operationDone, size),
+                                    CaclProg(totalDone + operationDone, script->TotalSize));
                             }
                             else
                             {
@@ -7258,104 +7225,44 @@ CONVERT_AGAIN:
                                 }
                             }
                         }
-                        // close the files and update the global progress
-                        // do not reuse operationDone so the progress stays correct even if the file changes "under our feet"
-                        (void)GetWorkerFileSystem()->CloseFileHandle(hSource);
-                        const FileResult closeTargetResult =
-                            GetWorkerFileSystem()->CloseFileHandle(hTarget);
-                        if (!closeTargetResult.success) // even after a failed call we assume the handle is closed,
+                        // Flush converted bytes and capture times before either
+                        // handle is closed. The original remains untouched on failure.
+                        const auto finalized = sally::conversion::FinalizeContents(*GetWorkerFileSystem(), hTarget, metadata);
+                        const auto sourceClosed = CloseWorkerTrackedFile(hSource);
+                        const auto targetClosed = CloseWorkerTrackedFile(hTarget);
+                        hSource = hTarget = NULL;
+                        if (!finalized.success || !sourceClosed.success || !targetClosed.success)
                         {
-                            pendingWriteError = closeTargetResult.errorCode;
-                            hSource = hTarget = NULL;       // (it states that the target file can be deleted, so the handle was not left open)
+                            pendingWriteError = !finalized.success ? finalized.errorCode : !sourceClosed.success ? sourceClosed.errorCode
+                                                                                                                 : targetClosed.errorCode;
                             goto WRITE_ERROR_CONVERT;
                         }
                         totalDone += size;
-                        // restore attributes (write operations have trouble with read-only)
-                        if (changeAttrs)
-                            GetWorkerFileSystem()->SetFileAttributes(tmpFileNameW.c_str(), srcAttrs);
-                        // overwrite the original file with the temp file
-                        while (1)
-                        {
-                            ClearReadOnlyAttr(effectiveNameW.c_str());
-                            BOOL deleteOk = gFileSystem->DeleteFile(effectiveNameW.c_str()).success;
-                            if (deleteOk)
+                        const auto completed = sally::conversion::CompleteReplacement(
+                            *GetWorkerFileSystem(), effectiveNameW, tmpFileNameW, metadata,
+                            [&](const std::wstring& from, const std::wstring& to, DWORD error, bool recovery)
                             {
-                                while (1)
+                                using sally::conversion::Decision;
+                                observer.WaitIfSuspended();
+                                if (!recovery)
                                 {
-                                    const FileResult moveResult = GetWorkerFileSystem()->MoveFile(
-                                        tmpFileNameW.c_str(), effectiveNameW.c_str());
-                                    if (moveResult.success)
-                                        return TRUE; // success
-                                    else
-                                    {
-                                        DWORD err = moveResult.errorCode;
-
-                                        observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
-                                        if (observer.IsCancelled())
-                                            return FALSE;
-
-                                        if (workerState.SkipAllMoveErrors)
-                                            return TRUE;
-
-                                        int ret = IDCANCEL;
-                                        ret = observer.AskCannotMoveErr(tmpFileNameW.c_str(), nameW.c_str(), err, false);
-                                        switch (ret)
-                                        {
-                                        case IDRETRY:
-                                            break;
-
-                                        case IDB_SKIPALL:
-                                            workerState.SkipAllMoveErrors = TRUE;
-                                        case IDB_SKIP:
-                                            return TRUE;
-
-                                        case IDCANCEL:
-                                            return FALSE;
-                                        }
-                                    }
+                                    if (observer.IsCancelled())
+                                        return Decision::Cancel;
+                                    if (workerState.SkipAllMoveErrors)
+                                        return Decision::Skip;
                                 }
-                            }
-                            else
+                                const int answer = observer.AskCannotMoveErr(from.c_str(), to.c_str(), error, false);
+                                if (answer == IDRETRY)
+                                    return Decision::Retry;
+                                if (answer == IDB_SKIPALL)
+                                    workerState.SkipAllMoveErrors = TRUE;
+                                return answer == IDB_SKIP || answer == IDB_SKIPALL ? Decision::Skip : Decision::Cancel;
+                            },
+                            [&](const std::wstring& retained, DWORD error)
                             {
-                                DWORD err = GetLastError();
-
-                                observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
-                                if (observer.IsCancelled())
-                                {
-                                CANCEL_CONVERT:
-
-                                    ClearReadOnlyAttr(tmpFileNameW.c_str());
-                                    gFileSystem->DeleteFile(tmpFileNameW.c_str());
-                                    return FALSE;
-                                }
-
-                                if (workerState.SkipAllOverwriteErr)
-                                    goto SKIP_OVERWRITE_ERROR;
-
-                                int ret;
-                                ret = IDCANCEL;
-                                ret = observer.AskFileErrorById(IDS_ERROROVERWRITINGFILE, effectiveNameW.c_str(), err);
-                                switch (ret)
-                                {
-                                case IDRETRY:
-                                    break;
-
-                                case IDB_SKIPALL:
-                                    workerState.SkipAllOverwriteErr = TRUE;
-                                case IDB_SKIP:
-                                {
-                                SKIP_OVERWRITE_ERROR:
-
-                                    ClearReadOnlyAttr(tmpFileNameW.c_str());
-                                    gFileSystem->DeleteFile(tmpFileNameW.c_str());
-                                    return TRUE;
-                                }
-
-                                case IDCANCEL:
-                                    goto CANCEL_CONVERT;
-                                }
-                            }
-                        }
+                                observer.NotifyError(LoadStrW(IDS_ERROROVERWRITINGFILE), retained.c_str(), GetErrorTextOwned(error).c_str());
+                            });
+                        return completed.Continue;
                     }
                     else
                         goto TMP_OPEN_ERROR;
@@ -7423,7 +7330,7 @@ CONVERT_AGAIN:
         }
         else
         {
-            DWORD err = GetLastError();
+            DWORD err = sourceError != ERROR_SUCCESS ? sourceError : GetLastError();
             if (invalidName)
                 err = ERROR_INVALID_NAME;
             observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -7546,38 +7453,14 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, const CQuadWord& size, DWORD attrs
             setAttrsResult = GetWorkerFileSystem()->SetFileAttributes(nameSetAttrsW.c_str(), attrs);
         if (error == ERROR_SUCCESS && setAttrsResult.success)
         {
-            BOOL isDir = ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0);
             // if any of the timestamps need to be set
             if (timeModified != NULL || timeCreated != NULL || timeAccessed != NULL)
             {
-                HANDLE file;
-                if (attrs & FILE_ATTRIBUTE_READONLY)
-                    GetWorkerFileSystem()->SetFileAttributes(nameSetAttrsW.c_str(), attrs & (~FILE_ATTRIBUTE_READONLY));
-                file = GetWorkerFileSystem()->CreateFile(nameSetAttrsW.c_str(), GENERIC_READ | GENERIC_WRITE,
-                                   FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                   NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-                if (file != INVALID_HANDLE_VALUE)
+                const auto timeResult = GetWorkerFileSystem()->SetPathFileTime(
+                    nameSetAttrsW.c_str(), timeCreated, timeAccessed, timeModified);
+                if (!timeResult.success)
                 {
-                    FILETIME ftCreated, ftAccessed, ftModified;
-                    (void)GetWorkerFileSystem()->GetHandleFileTime(
-                        file, &ftCreated, &ftAccessed, &ftModified);
-                    if (timeCreated != NULL)
-                        ftCreated = *timeCreated;
-                    if (timeAccessed != NULL)
-                        ftAccessed = *timeAccessed;
-                    if (timeModified != NULL)
-                        ftModified = *timeModified;
-                    (void)GetWorkerFileSystem()->SetHandleFileTime(
-                        file, &ftCreated, &ftAccessed, &ftModified);
-                    (void)CloseWorkerTrackedFile(file);
-                    if (attrs & FILE_ATTRIBUTE_READONLY)
-                        GetWorkerFileSystem()->SetFileAttributes(nameSetAttrsW.c_str(), attrs);
-                }
-                else
-                {
-                    error = GetLastError();
-                    if (attrs & FILE_ATTRIBUTE_READONLY)
-                        GetWorkerFileSystem()->SetFileAttributes(nameSetAttrsW.c_str(), attrs);
+                    error = timeResult.errorCode;
                     goto SHOW_ERROR;
                 }
             }
@@ -7684,6 +7567,7 @@ unsigned ThreadWorkerBody(void* parameter)
         // operation label strings are loaded in workerState.Init()
 
         TRACE_I("Worker: script->Count=" << script->Count << ", IsCancelled=" << observer.IsCancelled());
+        script->ResetCopyCompletion();
         int i;
         for (i = 0; !observer.IsCancelled() && i < script->Count; i++)
         {
@@ -7703,12 +7587,14 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 BOOL lantasticCheck = IsLantasticDriveW(op->TargetNameW.c_str(), lastLantasticCheckRoot, lastIsLantasticPath);
 
+                BOOL copySkipped = FALSE;
                 Error = !DoCopyFile(op, observer, buffer, script, totalDone,
-                                    clearReadonlyMask, NULL, lantasticCheck, mustDeleteFileBeforeOverwrite,
+                                    clearReadonlyMask, &copySkipped, lantasticCheck, mustDeleteFileBeforeOverwrite,
                                     allocWholeFileOnStart, workerState,
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
                                     (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
                                     FALSE, asyncPar);
+                op->CopyCompleted = !Error && !copySkipped;
                 break;
             }
 
@@ -7755,6 +7641,7 @@ unsigned ThreadWorkerBody(void* parameter)
                                      alreadyExisted, crAsEncrypted, ignInvalidName,
                                      op->TargetNameW,
                                  op->SourceNameW);
+                op->CopyCompleted = !Error && !skip;
                 if (!Error)
                 {
                     if (skip) // skip directory creation
@@ -7860,6 +7747,14 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocDeleteDir:
             case ocDeleteDirLink:
             {
+                if ((op->Opcode == ocDeleteDirLink && !script->CanRemoveFollowedLink(i)) ||
+                    (op->Opcode == ocDeleteDir && !script->CanRemoveMovedDirectory(i)))
+                {
+                    totalDone += op->Size;
+                    script->SetProgressSize(totalDone);
+                    observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+                    break;
+                }
                 TRACE_IW(L"Worker: delete op=" << op->Opcode << L" src=" << (op->SourceNameW.empty() ? L"(null)" : op->SourceNameW.c_str()));
                 pd.Operation = workerState.OpStrDeleting;
                 pd.Source = op->SourceNameW.c_str();
@@ -7882,13 +7777,13 @@ unsigned ThreadWorkerBody(void* parameter)
                         Error = !DoDeleteDir(observer, op->Size,
                                              script, totalDone, op->Attr, !op->DeleteDirToRecycleBin,
                                              workerState,
-                                             op->SourceNameW);
+                                             op->SourceNameW, &op->CopyCompleted);
                     }
                     else
                     {
                         Error = !DoDeleteDirLink(observer, op->Size,
                                                  script, totalDone, workerState,
-                                                 op->SourceNameW);
+                                                 op->SourceNameW, &op->CopyCompleted);
                     }
                 }
                 break;
@@ -8064,6 +7959,7 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
     if (convertData != NULL)
         convertDataLocal = *convertData;
 
+    script->ResetCopyCompletion();
     int i;
     for (i = 0; !observer.IsCancelled() && i < script->Count; i++)
     {
@@ -8081,12 +7977,14 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
             BOOL lantasticCheck = IsLantasticDriveW(op->TargetNameW.c_str(), lastLantasticCheckRoot, lastIsLantasticPath);
+            BOOL copySkipped = FALSE;
             Error = !DoCopyFile(op, observer, buffer, script, totalDone,
-                                clearReadonlyMask, NULL, lantasticCheck, mustDeleteFileBeforeOverwrite,
+                                clearReadonlyMask, &copySkipped, lantasticCheck, mustDeleteFileBeforeOverwrite,
                                 allocWholeFileOnStart, workerState,
                                 (op->OpFlags & OPFL_COPY_ADS) != 0,
                                 (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
                                 FALSE, asyncPar);
+            op->CopyCompleted = !Error && !copySkipped;
             break;
         }
         case ocMoveFile:
@@ -8142,6 +8040,7 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
                                  alreadyExisted, crAsEncrypted, ignInvalidName2,
                                  op->TargetNameW,
                                  op->SourceNameW);
+            op->CopyCompleted = !Error && !skip;
             if (!Error)
             {
                 if (skip)
@@ -8179,6 +8078,14 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
         case ocDeleteDir:
         case ocDeleteDirLink:
         {
+            if ((op->Opcode == ocDeleteDirLink && !script->CanRemoveFollowedLink(i)) ||
+                (op->Opcode == ocDeleteDir && !script->CanRemoveMovedDirectory(i)))
+            {
+                totalDone += op->Size;
+                script->SetProgressSize(totalDone);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+                break;
+            }
             pd.Operation = workerState.OpStrDeleting;
             pd.Source = op->SourceNameW.c_str();
             pd.Preposition = L"";
@@ -8191,13 +8098,13 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
                 Error = !DoDeleteDir(observer, op->Size,
                                      script, totalDone, op->Attr, !op->DeleteDirToRecycleBin,
                                      workerState,
-                                     op->SourceNameW);
+                                     op->SourceNameW, &op->CopyCompleted);
             }
             else
             {
                 Error = !DoDeleteDirLink(observer, op->Size,
                                          script, totalDone, workerState,
-                                         op->SourceNameW);
+                                         op->SourceNameW, &op->CopyCompleted);
             }
             break;
         }
@@ -8321,8 +8228,11 @@ DWORD WINAPI ThreadWorker(void* param)
 
 HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
                    CConvertData* convertData, HANDLE wContinue, HANDLE workerNotSuspended,
-                   BOOL* cancelWorker, int* operationProgress, int* summaryProgress)
+                   BOOL* cancelWorker, int* operationProgress, int* summaryProgress,
+                   DWORD* startupError)
 {
+    if (startupError != NULL)
+        *startupError = ERROR_SUCCESS;
     CWorkerData data;
     data.WorkerNotSuspended = workerNotSuspended;
     data.CancelWorker = cancelWorker;
@@ -8341,9 +8251,11 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
     else
     {
         data.BufferIsAllocated = TRUE;
-        data.Buffer = malloc(max(REMOVABLE_DISK_COPY_BUFFER, OPERATION_BUFFER));
+        data.Buffer = gThreadStartup->AllocateBuffer(max(REMOVABLE_DISK_COPY_BUFFER, OPERATION_BUFFER));
         if (data.Buffer == NULL)
         {
+            if (startupError != NULL)
+                *startupError = ERROR_NOT_ENOUGH_MEMORY;
             TRACE_E(LOW_MEMORY);
             return NULL;
         }
@@ -8353,9 +8265,13 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
     *cancelWorker = FALSE;
 
     // if (Worker != NULL) HANDLES(CloseHandle(Worker));  // was probably unnecessary
-    HANDLE worker = HANDLES(CreateThread(NULL, 0, ThreadWorker, &data, 0, &threadID));
+    const StartupHandleResult started = gThreadStartup->StartThread(ThreadWorker, &data, &threadID);
+    HANDLE worker = started.Handle;
+    HANDLES_ADD_EX(__otQuiet, worker != NULL, __htThread, __hoCreateThread, worker, started.Error, TRUE);
     if (worker == NULL)
     {
+        if (startupError != NULL)
+            *startupError = started.Error;
         if (data.BufferIsAllocated)
             free(data.Buffer);
         TRACE_E("Unable to start Worker thread.");

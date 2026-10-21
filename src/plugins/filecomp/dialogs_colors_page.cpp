@@ -367,6 +367,7 @@ CPropPageColors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             Preview2->SetFont(PageGeneral->GetCurrentFont());
             break;
         }
+        break;
     }
 
     case WM_SYSCOLORCHANGE:

@@ -2008,7 +2008,7 @@ BOOL CFilesWindow::ChangeDir(const wchar_t* newDir, int suggestedTopIndex, const
     std::wstring pathW;
     GetGeneralPath(pathW, TRUE);
     path = pathW;
-    CChangeDirDlg dlg(HWindow, pathW, MainWindow->GetActivePanel()->Is(ptPluginFS) ? &sendDirectlyToPlugin : NULL);
+    CChangeDirDlg dlg(HWindow, pathW, Is(ptPluginFS) ? &sendDirectlyToPlugin : NULL);
 
     // refresh DefaultDir
     MainWindow->UpdateDefaultDir(TRUE);
@@ -2215,14 +2215,13 @@ CHANGE_AGAIN:
                 }
                 if (errTextID == IDS_INCOMLETEFILENAME) // relative path on FS
                 {
-                    if (MainWindow->GetActivePanel()->Is(ptPluginFS) &&
-                        MainWindow->GetActivePanel()->GetPluginFS()->NotEmpty())
+                    if (Is(ptPluginFS) && GetPluginFS()->NotEmpty())
                     {
                         BOOL success = TRUE;
                         absFSPath = path;
                         const BOOL haveAbsoluteFSPath =
-                            MainWindow->GetActivePanel()->GetPluginFS()->GetFullFSPathW(
-                                HWindow, MainWindow->GetActivePanel()->GetPluginFS()->GetPluginFSName(),
+                            GetPluginFS()->GetFullFSPathW(
+                                HWindow, GetPluginFS()->GetPluginFSName(),
                                 absFSPath, success);
                         if (!success || haveAbsoluteFSPath)
                         {

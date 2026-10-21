@@ -50,6 +50,8 @@ void CPropPageGeneral::Validate(CTransferInfo& ti)
     CALL_STACK_MESSAGE1("CPropPageGeneral::Validate()");
     int i;
     ti.EditLine(IDE_CONTEXT, i);
+    if (!ti.IsGood())
+        return;
     if (i < 0)
     {
         SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_POSITIVEVALUE).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_ERROR).c_str(), MB_ICONERROR);
@@ -57,6 +59,8 @@ void CPropPageGeneral::Validate(CTransferInfo& ti)
         return;
     }
     ti.EditLine(IDE_TABSIZE, i);
+    if (!ti.IsGood())
+        return;
     if (i <= 0)
     {
         SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_POSITIVEVALUE).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_ERROR).c_str(), MB_ICONERROR);

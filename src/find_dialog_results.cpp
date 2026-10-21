@@ -3082,7 +3082,7 @@ void CFindDialog::StartSearch(WORD command)
                 // Hex mode is the byte-domain escape hatch. Literal hex stays byte-exact;
                 // quoted Unicode text has the explicit, portable UTF-8 representation.
                 std::vector<std::uint8_t> bytes;
-                if (!Sally::Unicode::ParseHexPattern(Data.GrepText.c_str(), bytes))
+                if (!Sally::Unicode::ParseHexPattern(Data.GrepText.c_str(), bytes) || bytes.empty())
                 {
                     // Say so. DestroyMembers/TakeDataForRefine has already run above, so a
                     // bare return left the results list emptied and Find Now looking like a

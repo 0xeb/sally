@@ -210,4 +210,5 @@ STRINGTABLE
   IDS_PARTIALRECOVER, "Urmatorul fisier nu a putu fi recuperat in intregime: %s\n\nDoriti sa recuperati doar o parte din fisier?"
   IDS_PARTIALRECOVER_DONTASK, "Aele acelasi raspuns data viitoare"
   IDS_ERRORRECOVER, "Eroare in recuperarea fisierului %s"
+    IDS_SELECTVOLUME, "Selectați un volum sau o imagine de disc."
 }

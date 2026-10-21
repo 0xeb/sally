@@ -36,6 +36,7 @@ public:
 
     bool IsSame(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen);
     bool IsVerified() { return bVerified; };
+    bool IsGood() const { return bDataValid; }
     LPCWSTR GetHostName() { return Host.c_str(); };
 
 private:
@@ -44,6 +45,7 @@ private:
     LONG nRefCount;
     BYTE *pDERData, *pPKCS7Data;
     int nDERDataLen, nPKCS7DataLen;
+    bool bDataValid; // construction owns a complete leaf and optional chain
     bool bVerified; // false when accepted once, true if verified and valid
     std::wstring Host;
 };

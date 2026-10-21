@@ -492,6 +492,16 @@ CViewTemplates::CViewTemplates()
         ZeroMemory(Items[i].Columns, sizeof(Items[i].Columns));
 }
 
+BOOL CViewTemplates::IsValidIndex(int index) const
+{
+    return index > 0 && index < VIEW_TEMPLATES_COUNT && !Items[index].Name.empty();
+}
+
+int CViewTemplates::NormalizeIndex(int index) const
+{
+    return IsValidIndex(index) ? index : 2; // Detailed is always defined.
+}
+
 void CViewTemplates::Set(DWORD index, const wchar_t* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode)
 {
     Items[index].Name = name != NULL ? name : L"";

@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-#include "common/Win32TextCodec.h"
 
 static bool BuildEncodingDescription(int encoding, int endian, BOOL performInputConversion,
-                                     const char* conversionTableName,
+                                     const std::wstring& conversionTableName,
                                      std::wstring& description) noexcept
 {
     try
@@ -22,14 +21,10 @@ static bool BuildEncodingDescription(int encoding, int endian, BOOL performInput
             staged = L"ASCII-8";
             if (performInputConversion)
             {
-                if (conversionTableName != nullptr && conversionTableName[0] != 0)
+                if (!conversionTableName.empty())
                 {
-                    std::wstring tableName;
-                    if (!DecodeFileCompLegacyText(conversionTableName,
-                                                  strlen(conversionTableName), tableName))
-                        tableName = L"?";
                     staged += L", ";
-                    staged += tableName;
+                    staged += conversionTableName;
                 }
                 else
                     staged += LangStr(IDS_AUTOINPUTENC);
@@ -111,6 +106,7 @@ bool SelectConversion(int x, int y, HWND wnd, CCompareOptions& options, int file
     // add ASCII-8 input conversions to the table
     CGUIMenuPopupAbstract* menuASCII8 = menu->GetSubMenu(idASCII8, FALSE);
 
+    std::map<int, std::wstring> conversionNames;
     int index = 0;
     const wchar_t* name;
     while (SG->EnumConversionTables(wnd, &index, &name, NULL))
@@ -122,6 +118,7 @@ bool SelectConversion(int x, int y, HWND wnd, CCompareOptions& options, int file
             mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STRING;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = idFirstASCII8InputEnc + index - 1;
+            conversionNames.emplace(mii.ID, name);
             mii.String = const_cast<wchar_t*>(name);
             mii.StringLen = (int)wcslen(name);
         }
@@ -157,7 +154,7 @@ bool SelectConversion(int x, int y, HWND wnd, CCompareOptions& options, int file
     case idASCII8AutoInputEnc:
         options.Encoding[file] = CTextFileReader::encASCII8;
         options.PerformASCII8InputEnc[file] = 1;
-        options.ASCII8InputEncTableName[file][0] = 0;
+        options.ASCII8InputEncTableName[file].clear();
         break;
 
     case idUTF8:
@@ -186,24 +183,16 @@ bool SelectConversion(int x, int y, HWND wnd, CCompareOptions& options, int file
 
     default:
     {
+        const auto selected = conversionNames.find(id);
+        if (selected == conversionNames.end())
+        {
+            ret = false;
+            break;
+        }
+        options.ASCII8InputEncTableName[file] = selected->second;
         options.Encoding[file] = CTextFileReader::encASCII8;
         options.PerformASCII8InputEnc[file] = 1;
-        MENU_ITEM_INFO mii;
-        wchar_t selectedName[101];
-        selectedName[0] = 0;
-        mii.Mask = MENU_MASK_STRING;
-        mii.String = selectedName;
-        mii.StringLen = _countof(selectedName);
-        menuASCII8->GetItemInfo(id, FALSE, &mii);
-        std::string encodedName;
-        if (!EncodeFileCompLegacyText(selectedName, wcslen(selectedName), encodedName) ||
-            encodedName.size() >= _countof(options.ASCII8InputEncTableName[file]))
-            options.ASCII8InputEncTableName[file][0] = 0;
-        else
-        {
-            memcpy(options.ASCII8InputEncTableName[file], encodedName.data(), encodedName.size());
-            options.ASCII8InputEncTableName[file][encodedName.size()] = 0;
-        }
+        break;
     }
     }
 
@@ -460,7 +449,7 @@ void CPropPageDefaultOptions::Transfer(CTransferInfo& ti)
             if (select)
                 Options.EolConversion[i] |= CTextFileReader::eolNULL;
         }
-        if (memcmp(&Options, &oldOptions, sizeof(Options)) != 0)
+        if (!(Options == oldOptions))
             *ChangeFlag |= CC_DEFOPTIONS;
     }
 

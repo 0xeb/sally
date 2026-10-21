@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/configuration/RegistryWriteMonitor.h"
 
 #include "mainwnd.h"
 #include "usermenu.h"
@@ -710,12 +711,12 @@ AGAIN:
                             const std::wstring errTextW = GetErrorTextOwned(ERROR_ALREADY_EXISTS);
                             if (noRetryButton)
                             {
-                                CFileErrorDlg dlg(parent, LoadStrW(IDS_ERRORCREATINGDIR), dir, errTextW.c_str(), FALSE, IDD_ERROR3);
+                                CFileErrorDlg dlg(parent, LoadStrW(IDS_ERRORCREATINGDIR), name.c_str(), errTextW.c_str(), FALSE, IDD_ERROR3);
                                 dlg.Execute();
                             }
                             else
                             {
-                                CFileErrorDlg dlg(parent, LoadStrW(IDS_ERRORCREATINGDIR), dir, errTextW.c_str(), TRUE, 0);
+                                CFileErrorDlg dlg(parent, LoadStrW(IDS_ERRORCREATINGDIR), name.c_str(), errTextW.c_str(), TRUE, 0);
                                 if (dlg.Execute() == IDRETRY)
                                     goto AGAIN;
                                 // SalMessageBoxW(parent, buf, LoadStrW(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
@@ -753,14 +754,14 @@ AGAIN:
                         {
                             // See above: CFileErrorDlg does not own its error text.
                             const std::wstring errTextW = GetErrorTextOwned(lastErr);
-                            if (noRetryButton)
+                            if (noRetryButton || invalidName)
                             {
-                                CFileErrorDlg dlg(parent, LoadStrW(IDS_ERRORCREATINGDIR), dir, errTextW.c_str(), FALSE, IDD_ERROR3);
+                                CFileErrorDlg dlg(parent, LoadStrW(IDS_ERRORCREATINGDIR), name.c_str(), errTextW.c_str(), FALSE, IDD_ERROR3);
                                 dlg.Execute();
                             }
                             else
                             {
-                                CFileErrorDlg dlg(parent, LoadStrW(IDS_ERRORCREATINGDIR), dir, errTextW.c_str(), TRUE, 0);
+                                CFileErrorDlg dlg(parent, LoadStrW(IDS_ERRORCREATINGDIR), name.c_str(), errTextW.c_str(), TRUE, 0);
                                 if (dlg.Execute() == IDRETRY)
                                     goto AGAIN2;
                                 //              SalMessageBoxW(parent, buf, LoadStrW(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
@@ -1655,7 +1656,8 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const wchar_t* name, BOOL onlyClear
                 entries.push_back(std::move(entry));
             }
 
-            sally::path::history::WriteEntries(gRegistry, historyKey, entries);
+            sally::configuration::RegistryWriteMonitor::Require(
+                sally::path::history::WriteEntries(gRegistry, historyKey, entries));
         }
         CloseKey(historyKey);
     }
@@ -2249,6 +2251,34 @@ int CUserMenuItems::GetSubmenuEndIndex(int index)
         }
     }
     return -1;
+}
+
+int CUserMenuItems::MoveItem(int index, int direction)
+{
+    if (index < 0 || index >= Count || (direction != -1 && direction != 1))
+        return index;
+    const int end = At(index)->Type == umitSubmenuBegin ? GetSubmenuEndIndex(index) : index;
+    if (end < index || (direction < 0 ? index == 0 : end + 1 >= Count))
+        return index;
+    if (direction < 0)
+    {
+        for (int i = index; i <= end; ++i)
+        {
+            CUserMenuItem* previous = At(i - 1);
+            At(i - 1) = At(i);
+            At(i) = previous;
+        }
+    }
+    else
+    {
+        for (int i = end; i >= index; --i)
+        {
+            CUserMenuItem* next = At(i + 1);
+            At(i + 1) = At(i);
+            At(i) = next;
+        }
+    }
+    return index + direction;
 }
 
 //****************************************************************************

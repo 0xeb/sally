@@ -10,6 +10,8 @@ sal_add_plugin(NAME zip
     "${SAL_SHARED}/plugcore/resedit.cpp"
     # Plugin sources
     "${SAL_PLUGINS}/zip/add.cpp"
+    "${SAL_PLUGINS}/zip/zip_comment.cpp"
+    "${SAL_PLUGINS}/zip/zip_archiver_operations.cpp"
     "${SAL_PLUGINS}/zip/add_del.cpp"
     "${SAL_PLUGINS}/zip/bits.cpp"
     "${SAL_PLUGINS}/zip/chicon.cpp"

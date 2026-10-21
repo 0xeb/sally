@@ -13,6 +13,7 @@
 #include "combine.h"
 #include "dialogs.h"
 #include "splitcbn_text.h"
+#include "split_target_path.h"
 
 // ****************************************************************************
 
@@ -401,32 +402,37 @@ BOOL MakePathAbsolute(std::wstring& path, BOOL pathIsDir,
                       const std::wstring& absRoot, BOOL activePreferred,
                       int errorTitle)
 {
-    int type;
-    size_t secondPartOffset;
-    BOOL isDir;
-
-    SalamanderGeneral->SalUpdateDefaultDir(!configCombineToOther);
-    if (!SPLSalParsePathOwned(SalamanderGeneral,
-                              SalamanderGeneral->GetMsgBoxParent(), path,
-                              type, isDir, secondPartOffset,
-                              LangStr(IDS_PATHERROR).c_str(), TRUE,
-                              absRoot.c_str()))
-        return FALSE;
-
-    if (type != PATH_TYPE_WINDOWS) // only Windows paths are supported
-        return Error(errorTitle, IDS_WINPATH);
-
-    if (isDir)
+    class TargetServices final : public sally::split::ITargetServices
     {
-        const wchar_t* s = path.c_str() + secondPartOffset;
-        if (!pathIsDir)
-            while (*s != 0 && *s != L'\\')
-                s++;
-        if (*s != 0) // contains subdirectories, ask whether to create them
-            if (SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                                 LangStr(IDS_TARGETPATHEXIST).c_str(), LangStr(errorTitle).c_str(), MB_YESNO | MB_ICONQUESTION) == IDNO)
-                return FALSE;
+        int ErrorTitle;
+    public:
+        explicit TargetServices(int title) : ErrorTitle(title) {}
+        void UpdateDefaultDirectories(bool active) override { SalamanderGeneral->SalUpdateDefaultDir(active); }
+        bool Parse(std::wstring& value, const std::wstring& root, sally::split::ParsedTarget& parsed) override
+        {
+            int type;
+            BOOL isDirectory;
+            size_t remaining;
+            if (!SPLSalParsePathOwned(SalamanderGeneral, SalamanderGeneral->GetMsgBoxParent(), value,
+                                      type, isDirectory, remaining, LangStr(IDS_PATHERROR).c_str(), TRUE, root.c_str())) return false;
+            parsed = {type == PATH_TYPE_WINDOWS, isDirectory != FALSE, remaining};
+            return true;
+        }
+        bool ConfirmSubdirectories() override
+        {
+            return SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(), LangStr(IDS_TARGETPATHEXIST).c_str(),
+                                                    LangStr(ErrorTitle).c_str(), MB_YESNO | MB_ICONQUESTION) != IDNO;
+        }
+    } services(errorTitle);
+    switch (sally::split::ResolveTarget(path, pathIsDir != FALSE, absRoot, activePreferred != FALSE, services))
+    {
+    case sally::split::TargetResult::Valid: return TRUE;
+    case sally::split::TargetResult::NotWindows: return Error(errorTitle, IDS_WINPATH);
+    case sally::split::TargetResult::NotFile: return Error(errorTitle, IDS_SPECIFYFILE);
+    case sally::split::TargetResult::InvalidResult:
+        SalamanderGeneral->ShowMessageBox(SPLGetErrorTextOwned(SalamanderGeneral, ERROR_INVALID_DATA).c_str(),
+                                           LangStr(errorTitle).c_str(), MSGBOX_ERROR);
+        return FALSE;
+    default: return FALSE; // parser already reported its error, or user declined
     }
-
-    return TRUE;
 }

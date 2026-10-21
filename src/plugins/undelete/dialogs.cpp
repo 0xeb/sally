@@ -15,6 +15,7 @@
 #include "snapshot.h"
 #include "dialogs.h"
 #include "undelete.h"
+#include "restore.h"
 
 #include "library\volenum.h"
 
@@ -509,14 +510,16 @@ BOOL CConnectDialog::OnDialogOK()
 {
     CALL_STACK_MESSAGE1("CConnectDialog::OnDialogOK()");
 
+    std::wstring candidate;
+
     // check if dealing with volume or image
     if (BST_CHECKED == SendMessage(GetDlgItem(HWindow, IDC_CHECK_IMAGE), BM_GETCHECK, 0, 0))
     {
         // disk image
-        Volume = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_IMAGE);
+        candidate = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_IMAGE);
 
         // reset the volume if the image file does not exist
-        DWORD attr = SalamanderGeneral->SalGetFileAttributes(Volume.c_str());
+        DWORD attr = SalamanderGeneral->SalGetFileAttributes(candidate.c_str());
         if (attr == INVALID_FILE_ATTRIBUTES ||
             attr & FILE_ATTRIBUTE_DIRECTORY)
         {
@@ -531,9 +534,21 @@ BOOL CConnectDialog::OnDialogOK()
         HWND hList2 = GetDlgItem(HWindow, IDC_LIST_VOLUMES);
         const int item = (int)SendMessageW(hList2, LVM_GETNEXTITEM, -1,
                                            LVNI_ALL | LVNI_SELECTED);
-        Volume = GetListViewItemTextOwned(hList2, item, 0);
-        if (Volume.empty())
-            Volume = GetListViewItemTextOwned(hList2, item, 6);
+        if (item < 0)
+        {
+            SalamanderGeneral->SalMessageBox(HWindow, String<wchar_t>::LangStr(IDS_SELECTVOLUME).c_str(),
+                                             String<wchar_t>::LangStr(IDS_UNDELETE).c_str(), MB_OK | MB_ICONEXCLAMATION);
+            return FALSE;
+        }
+        candidate = GetListViewItemTextOwned(hList2, item, 0);
+        if (candidate.empty())
+            candidate = GetListViewItemTextOwned(hList2, item, 6);
+        if (candidate.empty())
+        {
+            SalamanderGeneral->SalMessageBox(HWindow, String<wchar_t>::LangStr(IDS_SELECTVOLUME).c_str(),
+                                             String<wchar_t>::LangStr(IDS_UNDELETE).c_str(), MB_OK | MB_ICONEXCLAMATION);
+            return FALSE;
+        }
 
         // Append the current path if the selected volume owns it.
         int sourcePanelType;
@@ -545,10 +560,11 @@ BOOL CConnectDialog::OnDialogOK()
             // if mount points are supported, check if we are on the correct volume
             std::wstring vol1, vol2;
             if (SPLGetVolumePathNameOwned(sourcePanelPathW.c_str(), vol1) &&
-                SPLGetVolumePathNameOwned(Volume.c_str(), vol2) && vol1 == vol2)
-                Volume = sourcePanelPathW;
+                SPLGetVolumePathNameOwned(candidate.c_str(), vol2) && vol1 == vol2)
+                candidate = sourcePanelPathW;
         }
     }
+    Volume = std::move(candidate);
     return TRUE;
 }
 
@@ -647,6 +663,18 @@ CFileNameDialog::CFileNameDialog(HWND parent, std::wstring& filename)
     AllPressed = FALSE;
 }
 
+void CFileNameDialog::Validate(CTransferInfo& ti)
+{
+    const std::wstring name = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_FILENAME);
+    if (name.empty() || !SalamanderGeneral->SalIsValidFileNameComponent(name.c_str()))
+    {
+        SalamanderGeneral->SalMessageBox(HWindow, SPLGetErrorTextOwned(SalamanderGeneral, ERROR_INVALID_NAME).c_str(),
+                                         String<wchar_t>::LangStr(IDS_UNDELETE).c_str(), MB_OK | MB_ICONEXCLAMATION);
+        AllPressed = FALSE;
+        ti.ErrorOn(IDC_EDIT_FILENAME);
+    }
+}
+
 void CFileNameDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CFileNameDialog::Transfer()");
@@ -676,6 +704,10 @@ INT_PTR CFileNameDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDCANCEL:
             EndDialog(HWindow, FALSE);
             return TRUE;
+
+        case IDOK:
+            AllPressed = FALSE;
+            break;
 
         case IDC_BUTTON_ALL:
             AllPressed = TRUE;
@@ -755,6 +787,19 @@ CRestoreDialog::CRestoreDialog(HWND parent)
 {
 }
 
+void CRestoreDialog::Validate(CTransferInfo& ti)
+{
+    const std::wstring path = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_TARGET);
+    if (!PrepareRestoreDirectory(path.c_str(), HWindow))
+        ti.ErrorOn(IDC_EDIT_TARGET);
+}
+
+void CRestoreDialog::Transfer(CTransferInfo& ti)
+{
+    if (ti.Type == ttDataFromWindow)
+        ti.EditLine(IDC_EDIT_TARGET, TargetPath);
+}
+
 INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE4("CRestoreDialog::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
@@ -826,11 +871,6 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return TRUE;
         }
 
-        case IDOK:
-        {
-            TargetPath = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_TARGET);
-            break;
-        }
         }
         break;
     }

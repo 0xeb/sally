@@ -68,4 +68,5 @@ STRINGTABLE
   IDS_PARTIALRECOVER, "Following file could not be entirely recovered: %s\n\nDo you want to recover only part of the file?"
   IDS_PARTIALRECOVER_DONTASK, "Choose the same answer next time"
   IDS_ERRORRECOVER, "Error recovering file %s"
+    IDS_SELECTVOLUME, "Select a volume or choose a disk image."
 }

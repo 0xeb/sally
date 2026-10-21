@@ -1304,6 +1304,13 @@ BOOL CUnpackerConfig::ExecuteUnpacker(HWND parent, CFilesWindow* panel, const wc
         CUnpackerConfigData* data = Unpackers[PreferedUnpacker];
         if (data->Type == CUSTOMUNPACKER_EXTERNAL)
         {
+            // Custom commands receive include masks, not Sally's exclusion
+            // grammar. Reject it before creating files or starting a process.
+            if (mask != NULL && wcschr(mask, L'|') != NULL)
+            {
+                (*PackErrorHandlerPtr)(parent, IDS_PACKERR_EXCLUSIONMASK);
+                return FALSE;
+            }
             if (delArchiveWhenDone)
                 TRACE_E("CUnpackerConfig::ExecuteUnpacker(): delArchiveWhenDone is TRUE for external archiver (unsupported, ignoring)");
 

@@ -132,7 +132,7 @@ STRINGTABLE
   IDS_ERROR, "Error"
   IDS_NOTFOUND, "Fichero no encontrado"
   IDS_BADDLL, "Versión incorrecta de unrar.dll. Reinstale el plugin UnRAR."
-  IDS_SELECTFIRST, "Parece que este es un archivo multivolumen. Si lo es, seleccione el primer volumen del archivo y pulse Aceptar.\n\nSi no es un archivo multivolumen, pulse Cancelar."
+  IDS_SELECTFIRST, "Seleccione el primer volumen del archivo para continuar. Pulse Cancelar para detener la operación."
   IDS_SELECTFIRSTTITLE, "Seleccione el primer volumen"
   IDS_FILENOTFOUND "Fichero no encontrado en el archivo."
   IDS_LISTINFO_PAKEDSIZE      "Comprimido"

@@ -53,6 +53,7 @@ protected:
 
 private:
     CPluginInterface* FPlugin;
+    bool FRecryptingPasswords;
     bool FConfirmDetach;
     bool FConfirmUpload;
     AnsiString FQueueViewLayout;

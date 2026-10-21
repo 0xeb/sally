@@ -262,6 +262,8 @@ void CRendererWindow::OnGoto()
     if (Viewer->Enablers[vweDBOpened])
     {
         int x, y, count = Database.GetRowCount();
+        if (count <= 0)
+            return;
 
         Selection.GetFocus(&x, &y);
         CGoToDialog dlg(HWindow, &y, count);

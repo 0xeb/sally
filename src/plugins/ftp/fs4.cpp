@@ -804,16 +804,11 @@ BOOL CPluginFSInterface::Delete(const wchar_t* fsName, int mode, HWND parent, in
                 {
                     oper->SetQueue(queue); // assign the queue of its items to the operation
                     queue = NULL;
-                    if (Config.DeleteAddToQueue)
-                        cancelOrError = FALSE; // run the operation later -> for now the operation succeeds
-                    else                       // run the operation within the active "control connection"
-                    {
-                        // open the operation progress window and start the operation
-                        if (RunOperation(SalamanderGeneral->GetMsgBoxParent(), operUID, oper, NULL))
-                            cancelOrError = FALSE; // operation succeeded
-                        else
-                            ok = FALSE;
-                    }
+                    // open the operation progress window and start the operation
+                    if (RunOperation(SalamanderGeneral->GetMsgBoxParent(), operUID, oper, NULL))
+                        cancelOrError = FALSE; // operation succeeded
+                    else
+                        ok = FALSE;
                 }
                 if (!ok)
                     FTPOperationsList.DeleteOperation(operUID, TRUE);
@@ -1231,16 +1226,11 @@ BOOL CPluginFSInterface::CopyOrMoveFromFSOwned(
                         {
                             oper->SetQueue(queue); // assign the queue of its items to the operation
                             queue = NULL;
-                            if (Config.DownloadAddToQueue)
-                                success = TRUE; // run the operation later -> for now the operation succeeds
-                            else                // run the operation within the active "control connection"
-                            {
-                                // open the operation progress window and start the operation
-                                if (RunOperation(SalamanderGeneral->GetMsgBoxParent(), operUID, oper, dropTarget))
-                                    success = TRUE; // operation succeeded
-                                else
-                                    ok = FALSE;
-                            }
+                            // open the operation progress window and start the operation
+                            if (RunOperation(SalamanderGeneral->GetMsgBoxParent(), operUID, oper, dropTarget))
+                                success = TRUE; // operation succeeded
+                            else
+                                ok = FALSE;
                         }
                         if (!ok)
                             FTPOperationsList.DeleteOperation(operUID, TRUE);

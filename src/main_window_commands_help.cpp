@@ -2136,18 +2136,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         BOOL oldUseCustomPanelFont = UseCustomPanelFont;
         LOGFONT oldLogFont = LogFont;
         CConfigurationDlg dlg(HWindow, UserMenuItems, (int)wParam, (int)lParam);
-        // wide: CTreePropDialog::Execute embeds these into a DLGTEMPLATE, whose
-        // control-text fields are always UTF-16 regardless of ANSI/Unicode entry point.
-        int res = dlg.Execute(LoadStrW(IDS_BUTTON_OK), LoadStrW(IDS_BUTTON_CANCEL),
-                              LoadStrW(IDS_BUTTON_HELP));
-        if (readingUMIcons)
-            UserMenuIconBkgndReader.EndUserMenuIconsInUse();
-
-        // dialog closed - the user could have changed the clipboard, check it
-        IdleRefreshStates = TRUE;  // force status variable check on next Idle
-        IdleCheckClipboard = TRUE; // also check the clipboard
-
-        if (res == IDOK) // values changed -> refresh everything possible
+        dlg.SetApplyHandler([&]()
         {
             if (dlg.PageView.IsDirty())
             {
@@ -2232,7 +2221,24 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
             // distribute this news among plugins as well
             Plugins.Event(PLUGINEVENT_CONFIGURATIONCHANGED, 0);
-        }
+            oldStatusArea = Configuration.StatusArea;
+            oldPanelCaption = Configuration.ShowPanelCaption;
+            oldPanelZoom = Configuration.ShowPanelZoom;
+            oldThemeMode = Configuration.ThemeMode;
+            oldUseCustomPanelFont = UseCustomPanelFont;
+            oldLogFont = LogFont;
+        });
+        // wide: CTreePropDialog::Execute embeds these into a DLGTEMPLATE, whose
+        // control-text fields are always UTF-16 regardless of ANSI/Unicode entry point.
+        dlg.Execute(LoadStrW(IDS_CFG_SAVE), LoadStrW(IDS_BUTTON_CANCEL),
+                              LoadStrW(IDS_BUTTON_HELP));
+        if (readingUMIcons)
+            UserMenuIconBkgndReader.EndUserMenuIconsInUse();
+
+        // dialog closed - the user could have changed the clipboard, check it
+        IdleRefreshStates = TRUE;  // force status variable check on next Idle
+        IdleCheckClipboard = TRUE; // also check the clipboard
+
 
         EndStopRefresh(); // snooper starts again now
         return 0;

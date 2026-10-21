@@ -61,6 +61,7 @@ struct CBuildScriptState
         CopyFileToItself, // IDS_CANNOTCOPYFILETOITSELF
         MoveFileToItself, // IDS_CANNOTMOVEFILETOITSELF
         MoveDirToItself,  // IDS_CANNOTMOVEDIRTOITSELF
+        DirectoryTargetInsideSource, // IDS_DIRECTORYTARGETINSOURCE
     };
     ESelfOpReject SelfOpReject;
 

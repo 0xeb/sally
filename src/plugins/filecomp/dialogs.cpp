@@ -40,15 +40,14 @@ void AddToHistory(const wchar_t* path)
 
 CCompareFilesDialog::CCompareFilesDialog(HWND parent, std::wstring& path1,
                                          std::wstring& path2, BOOL& succes,
-                                         CCompareOptions* options)
+                                         CCompareOptions* options, const CFilecompPathContext* pathContext)
     : CCommonDialog(IDD_COMPAREFILES, parent), Path1(path1), Path2(path2),
       Succes(succes)
 {
     CALL_STACK_MESSAGE_NONE
     Options = options;
+    PathContext = pathContext ? *pathContext : CaptureFilecompPathContext(*SG, *gPathService, FilecompInitialDirectory(path1));
 }
-
-// FileExistsW is now available from shared lcutils.h
 
 void CCompareFilesDialog::Validate(CTransferInfo& ti)
 {
@@ -66,7 +65,8 @@ void CCompareFilesDialog::Validate(CTransferInfo& ti)
             ti.ErrorOn(IDE_PATH1 + i);
             return;
         }
-        if (!FileExistsW(path.c_str()))
+        std::wstring resolved;
+        if (!ResolveFilecompInputPath(*gPathService, PathContext, path, resolved) || !FilecompFileExists(*SG, resolved))
         {
             const std::wstring message = SPLFormatStringOwned(
                 SPLLoadStrOwned(SG, HLanguage, IDS_FILEDOESNOTEXIST).c_str(), path.c_str());
@@ -94,8 +94,19 @@ void CCompareFilesDialog::Transfer(CTransferInfo& ti)
     }
     else
     {
-        Path1 = SPLGetWindowTextOwned(hEdit1 ? hEdit1 : hWnd1);
-        Path2 = SPLGetWindowTextOwned(hEdit2 ? hEdit2 : hWnd2);
+        std::wstring staged[2];
+        if (!ResolveFilecompInputPath(*gPathService, PathContext, SPLGetWindowTextOwned(hEdit1 ? hEdit1 : hWnd1), staged[0]))
+        {
+            ti.ErrorOn(IDE_PATH1);
+            return;
+        }
+        if (!ResolveFilecompInputPath(*gPathService, PathContext, SPLGetWindowTextOwned(hEdit2 ? hEdit2 : hWnd2), staged[1]))
+        {
+            ti.ErrorOn(IDE_PATH2);
+            return;
+        }
+        Path1.swap(staged[0]);
+        Path2.swap(staged[1]);
         AddToHistory(Path2.c_str());
         AddToHistory(Path1.c_str());
         Succes = TRUE;
@@ -156,6 +167,15 @@ CCompareFilesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        try
+        {
+            if (!CompareDialogHistoryQueue.Add(new CWindowQueueItem(HWindow)))
+                TRACE_E("Unable to register Compare Files history recipient.");
+        }
+        catch (const std::bad_alloc&)
+        {
+            TRACE_E("Unable to register Compare Files history recipient.");
+        }
         HWND hWnd1 = GetDlgItem(HWindow, IDE_PATH1), hWnd2 = GetDlgItem(HWindow, IDE_PATH2);
 
         SG->InstallWordBreakProc(hWnd1); // install WordBreakProc into the combo box
@@ -205,7 +225,7 @@ CCompareFilesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             CAdvancedOptionsDialog dlg(HWindow, Options, &setDefault);
             if (dlg.Execute() == IDOK && setDefault)
             {
-                if (memcmp(Options, &DefCompareOptions, sizeof(*Options)) != 0)
+                if (!(*Options == DefCompareOptions))
                 {
                     DefCompareOptions = *Options;
                     MainWindowQueue.BroadcastMessage(WM_USER_CFGCHNG, CC_DEFOPTIONS | CC_HAVEHWND, (LPARAM)GetParent(HWindow));
@@ -281,6 +301,7 @@ CCompareFilesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     }
 
     case WM_DESTROY:
+        CompareDialogHistoryQueue.Remove(HWindow);
         DragAcceptFiles(GetDlgItem(HWindow, IDE_PATH1), FALSE);
         DragAcceptFiles(GetDlgItem(HWindow, IDE_PATH2), FALSE);
         break;

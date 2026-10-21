@@ -9,6 +9,7 @@
 #include "lang\lang.rh"
 #include "dialogs.h"
 #include "split.h"
+#include "split_plan.h"
 #include "combine.h"
 #include "plugindarkmode.h"
 
@@ -26,6 +27,9 @@ namespace split
     static CQuadWord qwFileSize;
     static std::wstring* pszTargetDir;
     static CQuadWord* pqwPartialSize;
+    static unsigned* pRequestedParts;
+    static unsigned EffectivePartCount = 0;
+    static bool SizeIsPreset = true;
 
     static HWND hDialog;
     static BOOL bDontHandleEdit = FALSE;
@@ -33,14 +37,9 @@ namespace split
     static CQuadWord GetSizeOfLastPart(const CQuadWord& filesize, const CQuadWord& partsize)
     {
         CALL_STACK_MESSAGE3("GetSizeOfLastPart(%I64u, %I64u)", filesize.Value, partsize.Value);
-        if (!partsize.Value)
-        {
-            TRACE_E("S/C.GetSizeOfLastPart: partsize == 0 ?!?");
-            return CQuadWord(0, 0); // guard against division by zero; should not happen
-        }
-        CQuadWord last;
-        last.Value = filesize.Value % partsize.Value;
-        return last.Value ? last : partsize;
+        CQuadWord result;
+        result.Value = sally::split::LastPartForSize(filesize.Value, partsize.Value);
+        return result;
     }
 
     static void OnSizeChange(const CQuadWord& size)
@@ -56,7 +55,7 @@ namespace split
             if (size.Value)
             {
                 const std::wstring count = std::to_wstring(
-                    ((qwFileSize - CQuadWord(1, 0)) / size + CQuadWord(1, 0)).Value);
+                    sally::split::PartsForSize(qwFileSize.Value, size.Value));
                 SetDlgItemTextW(hDialog, IDC_EDIT_NUMBER, count.c_str());
             }
         }
@@ -65,6 +64,9 @@ namespace split
             SetDlgItemTextW(hDialog, IDC_EDIT_LASTPART, L"");
             SetDlgItemTextW(hDialog, IDC_EDIT_NUMBER, L"");
         }
+        const sally::split::Plan plan{size == SIZE_AUTODETECT ? sally::split::Mode::Automatic : sally::split::Mode::Size,
+                                      qwFileSize.Value, size.Value, 0};
+        EnableWindow(GetDlgItem(hDialog, IDOK), plan.Valid());
         bDontHandleEdit = FALSE;
     }
 
@@ -74,6 +76,7 @@ namespace split
         int cursel = (int)SendMessage(GetDlgItem(hDialog, IDC_COMBO_SIZE), CB_GETCURSEL, 0, 0);
         if (cursel == CB_ERR)
             return;
+        SizeIsPreset = true;
         switch (cursel)
         {
         case 0:
@@ -107,12 +110,14 @@ namespace split
             OnSizeChange(SIZE_AUTODETECT);
             break;
         }
-        EnableWindow(GetDlgItem(hDialog, IDOK), TRUE);
     }
 
     static void OnComboEditChange()
     {
         CALL_STACK_MESSAGE1("OnComboEditChange()");
+        if (bDontHandleEdit)
+            return;
+        SizeIsPreset = false;
         const std::wstring text = SPLGetDlgItemTextOwned(hDialog, IDC_COMBO_SIZE);
         std::wstring number;
         number.reserve(text.size());
@@ -149,11 +154,12 @@ namespace split
         double size;
         wchar_t* numberEnd = NULL;
         size = wcstod(number.c_str(), &numberEnd);
-        if (ok && numberEnd != number.c_str() && *numberEnd == 0 && size > 0 &&
-            (size * multiplier < (double)0xffffffffffffffff))
+        uint64_t bytes = 0;
+        if (ok && numberEnd != number.c_str() && *numberEnd == 0 && sally::split::ParsePartBytes(size, multiplier, bytes))
         {
-            OnSizeChange(CQuadWord().SetDouble(size * multiplier));
-            EnableWindow(GetDlgItem(hDialog, IDOK), TRUE);
+            CQuadWord value;
+            value.Value = bytes;
+            OnSizeChange(value);
         }
         else
         {
@@ -171,31 +177,35 @@ namespace split
         if (bDontHandleEdit)
             return;
         std::wstring text = SPLGetDlgItemTextOwned(hDialog, IDC_EDIT_NUMBER);
-        int parts = _wtol(text.c_str());
-        if (CQuadWord(2 * parts, 0) > qwFileSize)
+        unsigned parts = 0;
+        bool clamped = false;
+        if (sally::split::ParsePartCount(text, qwFileSize.Value, parts, clamped))
         {
-            parts = (int)(qwFileSize.Value / 2);
+            EffectivePartCount = parts;
+            SizeIsPreset = false;
             bDontHandleEdit = TRUE;
-            text = std::to_wstring(parts);
-            SetDlgItemTextW(hDialog, IDC_EDIT_NUMBER, text.c_str());
-            bDontHandleEdit = FALSE;
-        }
-        if (parts > 0)
-        {
-            CQuadWord size = (qwFileSize + CQuadWord(parts - 1, 0)) / CQuadWord(parts, 0); // round up
+            if (clamped)
+                SetDlgItemTextW(hDialog, IDC_EDIT_NUMBER, std::to_wstring(parts).c_str());
+            const uint64_t base = qwFileSize.Value / parts;
+            CQuadWord size;
+            size.Value = base + (qwFileSize.Value % parts != 0);
             *pqwPartialSize = size;
-            const std::wstring sizeText = SPLNumberToStrOwned(SalamanderGeneral, size);
-            SetDlgItemTextW(hDialog, IDC_COMBO_SIZE, sizeText.c_str());
-            const std::wstring lastPart = SPLPrintDiskSizeOwned(
-                SalamanderGeneral, GetSizeOfLastPart(qwFileSize, size), 1);
-            SetDlgItemTextW(hDialog, IDC_EDIT_LASTPART, lastPart.c_str());
+            SetDlgItemTextW(hDialog, IDC_COMBO_SIZE, SPLNumberToStrOwned(SalamanderGeneral, size).c_str());
+            CQuadWord last;
+            last.Value = base; // remainder is distributed among the earlier parts
+            SetDlgItemTextW(hDialog, IDC_EDIT_LASTPART, SPLPrintDiskSizeOwned(SalamanderGeneral, last, 1).c_str());
             EnableWindow(GetDlgItem(hDialog, IDOK), TRUE);
+            bDontHandleEdit = FALSE;
         }
         else
         {
+            EffectivePartCount = 0;
+            SizeIsPreset = false;
+            bDontHandleEdit = TRUE;
             SetDlgItemTextW(hDialog, IDC_COMBO_SIZE, L"");
             SetDlgItemTextW(hDialog, IDC_EDIT_LASTPART, L"?");
             EnableWindow(GetDlgItem(hDialog, IDOK), FALSE);
+            bDontHandleEdit = FALSE;
         }
     }
 
@@ -266,6 +276,12 @@ namespace split
 
             case IDOK:
             {
+                const bool byNumber = IsDlgButtonChecked(hWnd, IDC_RADIO_NUMBER) == BST_CHECKED;
+                if (byNumber) OnEditChange();
+                else if (!SizeIsPreset || SendDlgItemMessageW(hWnd, IDC_COMBO_SIZE, CB_GETCURSEL, 0, 0) == CB_ERR) OnComboEditChange();
+                else OnComboSelChange();
+                if (!IsWindowEnabled(GetDlgItem(hWnd, IDOK))) return TRUE;
+                *pRequestedParts = byNumber ? EffectivePartCount : 0;
                 *pszTargetDir = SPLGetDlgItemTextOwned(hWnd, IDC_EDIT_DIR);
                 EndDialog(hWnd, TRUE);
                 break;
@@ -345,7 +361,7 @@ using namespace split;
 
 BOOL SplitDialog(const wchar_t* fileName, CQuadWord& fileSize,
                  std::wstring& targetDir,
-                 CQuadWord* partialSize, HWND hParent)
+                 CQuadWord* partialSize, unsigned* requestedParts, HWND hParent)
 {
     CALL_STACK_MESSAGE4("SplitDialog(%ls, %I64u, %ls, , )", fileName,
                         fileSize.Value, targetDir.c_str());
@@ -353,6 +369,9 @@ BOOL SplitDialog(const wchar_t* fileName, CQuadWord& fileSize,
     qwFileSize = fileSize;
     pszTargetDir = &targetDir;
     pqwPartialSize = partialSize;
+    pRequestedParts = requestedParts;
+    *pRequestedParts = 0;
+    EffectivePartCount = 0;
     return (BOOL)DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_SPLIT), hParent, SplitDlgProc, 0);
 }
 

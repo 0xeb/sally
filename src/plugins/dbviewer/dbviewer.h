@@ -4,34 +4,13 @@
 
 #pragma once
 
+#include "csv_config.h"
+
 #define SizeOf(x) (sizeof(x) / sizeof(x[0]))
 
 void GetDefaultLogFont(LOGFONT* lf);
 
 // Configuration variables
-
-struct CCSVConfig
-{
-    // 0: Auto-Select
-    // 1: '\t'
-    // 2: ';'
-    // 3: ','
-    // 4: ' '
-    // 5: ValueSeparatorChar
-    int ValueSeparator;
-    char ValueSeparatorChar;
-
-    // 0: Auto-Select
-    // 1: '\"'
-    // 2: '\''
-    // 3: None
-    int TextQualifier;
-
-    // 0: Auto-Select
-    // 1: As Column Name
-    // 2: As Data
-    int FirstRowAsName;
-};
 
 extern BOOL CfgAutoSelect;
 extern std::wstring CfgDefaultCoding;

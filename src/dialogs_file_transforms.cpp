@@ -283,8 +283,11 @@ void CFilterDialog::Validate(CTransferInfo& ti)
     {
         const std::wstring candidate = GetWindowTextStringW(GetDlgItem(HWindow, IDE_FILTER));
         CMaskGroup candidateMasks(candidate.c_str(), Filter->GetExtendedMode());
-        int errorPos;
-        if (!candidateMasks.PrepareMasks(errorPos))
+        int errorPos = 0;
+        // An enabled blank filter would match no files. Empty mask groups remain
+        // valid for other callers; require an actual mask in this dialog only.
+        if (candidate.find_first_not_of(L" ") == std::wstring::npos ||
+            !candidateMasks.PrepareMasks(errorPos))
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDE_FILTER));
@@ -831,6 +834,15 @@ void CCopyMoveMoreDialog::UpdateAdvancedText()
 void CCopyMoveMoreDialog::Validate(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CCopyMoveMoreDialog::Validate()");
+
+    // Empty target text must not become the source directory through the
+    // general path parser's intentional current-directory fallback.
+    if (GetWindowTextStringW(GetDlgItem(HWindow, IDE_PATH)).empty())
+    {
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_EMPTYNAMENOTALLOWED));
+        ti.ErrorOn(IDE_PATH);
+        return;
+    }
 
     BOOL useSpeedLimit;
     ti.CheckBox(IDC_CM_SPEEDLIMIT, useSpeedLimit);
@@ -2089,6 +2101,20 @@ void CUnpackDialog::EnableDelArcCheckbox()
                  i != CB_ERR && UnpackerConfig->GetUnpackerType(i) != CUSTOMUNPACKER_EXTERNAL);
 }
 
+void CUnpackDialog::Validate(CTransferInfo& ti)
+{
+    CALL_STACK_MESSAGE1("CUnpackDialog::Validate()");
+    HWND combo;
+    if (!ti.GetControl(combo, IDC_PACKER))
+        return;
+    const int index = (int)SendMessage(combo, CB_GETCURSEL, 0, 0);
+    if (index < 0 || index >= UnpackerConfig->GetUnpackersCount())
+    {
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKERSELECTIONREQUIRED));
+        ti.ErrorOn(IDC_PACKER);
+    }
+}
+
 void CUnpackDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CUnpackDialog::Transfer()");
@@ -2267,18 +2293,15 @@ void CChangeIconDialog::Transfer(CTransferInfo& ti)
         GetWindowTextW(edit, text.data(), length + 1);
         IconFile->assign(text.data());
         int curSel = (int)SendDlgItemMessage(HWindow, IDL_CHI_LIST, LB_GETCURSEL, 0, 0);
-        if (curSel == LB_ERR || curSel >= (int)IconsCount)
+        if (curSel < 0 || curSel >= (int)IconsCount)
         {
-            std::wstring fileName;
-            GetShell32(fileName);
-            *IconFile = fileName;
-            LoadIcons();
-            *IconIndex = 0;
+            // LoadIcons already handles unavailable files. A missing selection
+            // must not replace the file the user chose with SHELL32.DLL.
+            curSel = 0;
+            if (IconsCount > 0)
+                SendDlgItemMessage(HWindow, IDL_CHI_LIST, LB_SETCURSEL, curSel, 0);
         }
-        else
-        {
-            *IconIndex = curSel;
-        }
+        *IconIndex = curSel;
     }
 }
 
@@ -2336,8 +2359,11 @@ AGAIN:
 
     SendDlgItemMessage(HWindow, IDL_CHI_LIST, LB_SETCOUNT, IconsCount, 0);
 
-    if (IconsCount > 0 && *IconIndex < (int)IconsCount)
-        SendDlgItemMessage(HWindow, IDL_CHI_LIST, LB_SETCURSEL, *IconIndex, 0);
+    if (IconsCount > 0)
+    {
+        const int selection = *IconIndex >= 0 && *IconIndex < (int)IconsCount ? *IconIndex : 0;
+        SendDlgItemMessage(HWindow, IDL_CHI_LIST, LB_SETCURSEL, selection, 0);
+    }
 
     return TRUE;
 }

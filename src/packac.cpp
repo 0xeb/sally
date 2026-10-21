@@ -1077,7 +1077,9 @@ void CPackACDialog::Transfer(CTransferInfo& ti)
         // read the value of the checkbox
         ti.CheckBox(IDC_ACMODCUSTOM, doCustom);
         int i;
-        // go through all packers - configure paths and remove associations for those that were not found
+        // Update found paths and honor explicit deselection of discovered programs.
+        // No discoveries do not establish absence: drives may be excluded or the
+        // search stopped early, so keep that archiver's existing configuration.
         for (i = 0; i < ListView->GetPackersCount(); i++)
         {
             // ask for the packer
@@ -1093,7 +1095,7 @@ void CPackACDialog::Transfer(CTransferInfo& ti)
                 else
                     ArchiverConfig->SetPackerExeFile(index, fullName);
             }
-            else
+            else if (packer->GetCount() != 0)
             {
                 RemoveFromExtensions(i, index, packer);
                 if (doCustom)

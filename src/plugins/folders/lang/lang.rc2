@@ -17,5 +17,6 @@ STRINGTABLE
     IDS_PLUGINNAME              "Folders"
     IDS_ABOUT                   "About Plugin"
     IDS_PLUGIN_DESCRIPTION      "Browse folders such as Desktop, Control Panel, Recycle Bin, etc."
+    IDS_LISTFOLDERERROR          "Unable to list the folder.\n\nError: 0x%08X\n%s"
     IDS_DRIVEMENUTEXT,          "'\tDesktop"
 }

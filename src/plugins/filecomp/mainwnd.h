@@ -54,6 +54,7 @@ class CMainWindow : public CWindow
 protected:
     std::wstring Path1WStr,
         Path2WStr;
+    CFilecompPathContext PathContext;
     DWORD HeaderHeight;
     CFileHeaderWindow* LeftHeader;
     CFileHeaderWindow* RightHeader;
@@ -100,7 +101,8 @@ protected:
     UINT ShowCmd;
 
 public:
-    CMainWindow(const wchar_t* path1, const wchar_t* path2, CCompareOptions* options, UINT showCmd);
+    CMainWindow(const wchar_t* path1, const wchar_t* path2, CCompareOptions* options, UINT showCmd,
+                const CFilecompPathContext* pathContext = nullptr);
     virtual ~CMainWindow();
     BOOL Init();
     void EnableInput(BOOL enable);

@@ -7,6 +7,7 @@
 #include "common/text/EncodingDetector.h"
 #include "common/text/LegacySearchTextEncoding.h"
 #include "common/text/Utf16RegexBridge.h"
+#include "common/text/RegexWordBoundary.h"
 
 #include "cfgdlg.h"
 #include "find.h"
@@ -1320,9 +1321,9 @@ BOOL TestUtf16RegexContent(BOOL& ok, CQuadWord& fileOffset, const CQuadWord& tot
             {
                 if (data->WholeWords)
                 {
-                    if ((found == 0 || *(dcur + found - 1) != '_' && IsNotAlphaNorNum[*(dcur + found - 1)]) &&
-                        (found + foundLen == (lend - dcur) ||
-                         *(dcur + found + foundLen) != '_' && IsNotAlphaNorNum[*(dcur + found + foundLen)]))
+                    if (sally::text::HasWideWordBoundariesUtf8(
+                            std::string_view(dcur, static_cast<std::size_t>(lend - dcur)),
+                            static_cast<std::size_t>(found), static_cast<std::size_t>(foundLen)))
                     {
                         ok = TRUE;
                         return TRUE;
@@ -1482,9 +1483,14 @@ BOOL TestFileContentAux(BOOL& ok, CQuadWord& fileOffset, const CQuadWord& totalS
                     {
                         if (data->WholeWords)
                         {
-                            if ((found == 0 || *(beg + found - 1) != '_' && IsNotAlphaNorNum[*(beg + found - 1)]) &&
-                                (found + foundLen == (end - beg) ||
-                                 *(beg + found + foundLen) != '_' && IsNotAlphaNorNum[*(beg + found + foundLen)]))
+                            const bool wholeWord = regExp == &data->RegExpUtf8
+                                ? sally::text::HasWideWordBoundariesUtf8(
+                                      std::string_view(beg, static_cast<std::size_t>(end - beg)),
+                                      static_cast<std::size_t>(found), static_cast<std::size_t>(foundLen))
+                                : (found == 0 || *(beg + found - 1) != '_' && IsNotAlphaNorNum[*(beg + found - 1)]) &&
+                                      (found + foundLen == (end - beg) ||
+                                       *(beg + found + foundLen) != '_' && IsNotAlphaNorNum[*(beg + found + foundLen)]);
+                            if (wholeWord)
                             {
                                 ok = TRUE; // found
                                 break;

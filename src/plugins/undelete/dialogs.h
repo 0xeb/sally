@@ -77,6 +77,7 @@ public:
 protected:
     std::wstring& FileName;
 
+    virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
@@ -99,6 +100,8 @@ public:
     std::wstring TargetPath;
 
 protected:
+    virtual void Validate(CTransferInfo& ti);
+    virtual void Transfer(CTransferInfo& ti);
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 

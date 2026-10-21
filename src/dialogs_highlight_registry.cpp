@@ -3,10 +3,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/ColumnWidthInput.h"
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/BuiltinLanguages.h"
+#include "common/DialogFont.h"
+#include "common/configuration/Win32ConfigurationDraft.h"
+#include "common/configuration/ConfigurationLayout.h"
 #include "common/update/UpdateSchedule.h"
 #include "mainwnd.h"
 #include "usermenu.h"
@@ -15,6 +19,8 @@
 #include "dialogs.h"
 #include "sal_colors.h"
 #include "plugins.h"
+#include "zip.h"
+#include "pack.h"
 #include "fileswnd.h"
 #include "shellib.h"
 #include "editwnd.h"
@@ -33,6 +39,8 @@
         _ms_lvi.pszText = pszText_;                           \
         SNDMSG((hwndLV), LVM_SETITEMTEXTW, (WPARAM)(i), (LPARAM)(LV_ITEM*)&_ms_lvi); \
     }
+
+static void IndexColorSearchMetadata(sally::configuration::SearchIndex& index, int page);
 
 //****************************************************************************
 //
@@ -248,14 +256,25 @@ void CLoadSaveToRegistryMutex::Init()
 
 void CLoadSaveToRegistryMutex::Enter()
 {
-    DebugCheck++;
-    if (Mutex != NULL)
+    if (!TryEnter())
     {
-        if (WaitForSingleObject(Mutex, INFINITE) == WAIT_FAILED)
-            TRACE_E("CLoadSaveToRegistryMutex::Enter(): WaitForSingleObject() failed!");
+        ++DebugCheck; // legacy callers still pair Leave() after a failed acquisition
+        TRACE_E("CLoadSaveToRegistryMutex::Enter(): mutex acquisition failed!");
     }
-    else
-        TRACE_E("CLoadSaveToRegistryMutex::Enter(): the Mutex==NULL! Not initialized?");
+}
+
+BOOL CLoadSaveToRegistryMutex::TryEnter()
+{
+    if (Mutex == NULL)
+    {
+        SetLastError(ERROR_INVALID_HANDLE);
+        return FALSE;
+    }
+    const DWORD result = WaitForSingleObject(Mutex, INFINITE);
+    if (result != WAIT_OBJECT_0 && result != WAIT_ABANDONED)
+        return FALSE;
+    ++DebugCheck;
+    return TRUE;
 }
 
 void CLoadSaveToRegistryMutex::Leave()
@@ -687,6 +706,29 @@ int CConfiguration::GetMainWindowIconIndex()
 // CConfigurationDlg
 //
 
+namespace
+{
+    sally::configuration::DialogFont ReadConfigurationDialogFont(HWND parent, LOGFONTW& dialogFont)
+    {
+        sally::configuration::DialogFont result;
+        dialogFont = UseCustomPanelFont ? LogFont : Sally::Appearance::SystemDialogFont(0);
+        HDC fontDC = GetDC(parent);
+        const int dpi = fontDC != NULL ? GetDeviceCaps(fontDC, LOGPIXELSY) : 96;
+        if (fontDC != NULL)
+            ReleaseDC(parent, fontDC);
+        const long long height = dialogFont.lfHeight < 0 ? -static_cast<long long>(dialogFont.lfHeight) : dialogFont.lfHeight;
+        const long long points = (height * 72 + dpi / 2) / (dpi > 0 ? dpi : 96);
+        result.Points = static_cast<WORD>((std::min)(65535LL, (std::max)(1LL, points)));
+        result.Weight = static_cast<WORD>(dialogFont.lfWeight);
+        result.Italic = dialogFont.lfItalic;
+        result.Charset = dialogFont.lfCharSet;
+        result.Face.assign(dialogFont.lfFaceName, wcsnlen_s(dialogFont.lfFaceName, LF_FACESIZE));
+        dialogFont.lfHeight = -MulDiv(result.Points, dpi > 0 ? dpi : 96, 72);
+        dialogFont.lfWidth = 0;
+        return result;
+    }
+} // namespace
+
 CConfigurationDlg::CConfigurationDlg(HWND parent, CUserMenuItems* userMenuItems,
                                      int mode, int param)
     : CTreePropDialog(parent, HLanguage, LoadStrW(IDS_CONFIGURATION),
@@ -706,6 +748,9 @@ CConfigurationDlg::CConfigurationDlg(HWND parent, CUserMenuItems* userMenuItems,
       Page14(TRUE)
 {
     HOldPluginMsgBoxParent = NULL;
+    ApplyCaption = LoadStrOwned(IDS_CFG_APPLY);
+    LOGFONTW nativeFont;
+    ConfigurationFont = ReadConfigurationDialogFont(parent, nativeFont);
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // when the page order changes, update the constructor
     // mode == 0 ? Configuration.LastFocusedPage : 4
@@ -746,6 +791,504 @@ CConfigurationDlg::CConfigurationDlg(HWND parent, CUserMenuItems* userMenuItems,
            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     for (int i = 0; i < Count; i++)
         At(i)->SetDarkModeGroupBoxThemeEnabled(TRUE);
+    AppliedDrafts.resize(Count);
+}
+
+sally::configuration::DraftState CConfigurationDlg::CaptureDraft(int page)
+{
+    sally::configuration::DraftState state;
+    auto* selected = At(page);
+    if (selected->HWindow == NULL || selected == &PageSecurity)
+        return state; // Master-password operations are separately confirmed, immediate actions.
+    const bool modelPage = selected == &PageView || selected == &PageUserMenu || selected == &PageHotPath ||
+                           selected == &PageColors || selected == &Page13 || selected == &Page14 || selected == &Page15 ||
+                           selected == &PageP1 || selected == &PageP2 || selected == &PageP3 || selected == &PageP4;
+    sally::configuration::CaptureDraftControls(selected->HWindow, state, modelPage);
+    if (selected == &PageAppear)
+    {
+        state.Add(PageAppear.LocalUseCustomPanelFont);
+        sally::configuration::CaptureDraftFont(PageAppear.LocalPanelLogFont, state);
+    }
+    else if (selected == &PageViewer)
+    {
+        state.Add(PageViewer.LocalUseCustomViewerFont);
+        sally::configuration::CaptureDraftFont(PageViewer.LocalViewerLogFont, state);
+        for (auto color : PageViewer.TmpColors)
+            state.Add(color);
+    }
+    else if (selected == &PageView)
+    {
+        for (const auto& item : PageView.Config.Items)
+            state.Append(item.Mode, item.Name, item.Flags, item.LeftSmartMode, item.RightSmartMode, PageView.Config.SaveColumns(item.Columns));
+        sally::configuration::CaptureInvalidColumnWidthControls(selected->HWindow, state, IDC_VIEW_LEFT_WIDTH, IDC_VIEW_RIGHT_WIDTH);
+    }
+    else if (selected == &PageUserMenu)
+    {
+        for (int row = 0; row < PageUserMenu.UserMenuItems->Count; ++row)
+        {
+            const auto& item = *PageUserMenu.UserMenuItems->At(row);
+            state.Append(item.ItemName, item.UMCommand, item.Arguments, item.InitDir, item.Icon,
+                         item.ThroughShell, item.CloseShell, item.UseWindow, item.ShowInToolbar, item.Type);
+        }
+    }
+    else if (selected == &PageHotPath)
+    {
+        state.Add(IsDlgButtonChecked(selected->HWindow, IDC_HOTPATH_AUTOCONFIG));
+        for (int row = 0; row < HOT_PATHS_COUNT; ++row)
+            state.Append(PageHotPath.Config->GetNameW(row), PageHotPath.Config->GetPathW(row), PageHotPath.Config->GetVisible(row));
+    }
+    else if (selected == &PageColors)
+    {
+        state.Add(SendDlgItemMessageW(selected->HWindow, IDC_C_SCHEME, CB_GETCURSEL, 0, 0));
+        for (auto color : PageColors.TmpColors)
+            state.Add(color);
+        for (int row = 0; row < PageColors.HighlightMasks.Count; ++row)
+        {
+            const auto& item = *PageColors.HighlightMasks.At(row);
+            state.Append(item.Masks->GetMasksString(), item.Attr, item.ValidAttr, item.NormalFg, item.NormalBk,
+                         item.FocusedFg, item.FocusedBk, item.SelectedFg, item.SelectedBk, item.FocSelFg, item.FocSelBk, item.HighlightFg, item.HighlightBk);
+        }
+    }
+    else if (selected == &Page13 || selected == &Page14)
+    {
+        auto& viewers = selected == &Page13 ? Page13.ViewerMasks : Page14.ViewerMasks;
+        for (int row = 0; row < viewers.Count; ++row)
+        {
+            const auto& item = *viewers.At(row);
+            state.Append(item.Masks->GetMasksString(), item.Command, item.Arguments, item.InitDir, item.ViewerType, item.OldType);
+        }
+    }
+    else if (selected == &Page15)
+    {
+        for (int row = 0; row < Page15.EditorMasks.Count; ++row)
+        {
+            const auto& item = *Page15.EditorMasks.At(row);
+            state.Append(item.Masks->GetMasksString(), item.Command, item.Arguments, item.InitDir);
+        }
+    }
+    else if (selected == &PageP1)
+    {
+        auto& config = *PageP1.Config;
+        for (int row = 0; row < config.GetPackersCount(); ++row)
+            state.Append(config.GetPackerTitle(row), config.GetPackerExt(row), config.GetPackerType(row), config.GetPackerOldType(row),
+                         config.GetPackerCmdExecCopy(row), config.GetPackerCmdArgsCopy(row), config.GetPackerCmdExecMove(row), config.GetPackerCmdArgsMove(row),
+                         config.GetPackerSupLongNames(row), config.GetPackerSupMove(row), config.GetPackerNeedANSIListFile(row));
+    }
+    else if (selected == &PageP2)
+    {
+        auto& config = *PageP2.Config;
+        for (int row = 0; row < config.GetUnpackersCount(); ++row)
+            state.Append(config.GetUnpackerTitle(row), config.GetUnpackerExt(row), config.GetUnpackerType(row), config.GetUnpackerOldType(row),
+                         config.GetUnpackerCmdExecExtract(row), config.GetUnpackerCmdArgsExtract(row), config.GetUnpackerSupLongNames(row), config.GetUnpackerNeedANSIListFile(row));
+    }
+    else if (selected == &PageP3)
+    {
+        auto& config = *PageP3.Config;
+        for (int row = 0; row < config.GetArchiversCount(); ++row)
+            state.Append(config.GetArchiverUID(row), config.GetPackerExeFile(row), config.GetUnpackerExeFile(row), config.ArchiverExesAreSame(row));
+    }
+    else if (selected == &PageP4)
+    {
+        auto& config = *PageP4.Config;
+        for (int row = 0; row < config.GetFormatsCount(); ++row)
+            state.Append(config.GetExt(row), config.GetUsePacker(row), config.GetPackerIndex(row), config.GetUnpackerIndex(row), config.GetOldType(row));
+    }
+    return state;
+}
+
+void CConfigurationDlg::PageCreated(int page)
+{
+    AppliedDrafts[page] = CaptureDraft(page);
+    UpdateApplyState();
+}
+
+void CConfigurationDlg::ResetAppliedDrafts()
+{
+    for (int page = 0; page < Count; ++page)
+        if (At(page)->HWindow != NULL)
+            AppliedDrafts[page] = CaptureDraft(page);
+    UpdateApplyState();
+}
+
+void CConfigurationDlg::UpdateApplyState()
+{
+    bool changed = false;
+    for (int page = 0; page < Count && !changed; ++page)
+        if (At(page)->HWindow != NULL)
+            changed = CaptureDraft(page) != AppliedDrafts[page];
+    SetApplyButtonEnabled(changed);
+}
+
+bool CConfigurationDlg::PrepareDialogTemplate(const void* source, std::size_t size, std::vector<BYTE>& output)
+{
+    return sally::configuration::SetDialogTemplateFont(source, size, ConfigurationFont, output);
+}
+
+bool CConfigurationDlg::AfterTransfer(bool save)
+{
+    if (ApplyHandler)
+        ApplyHandler();
+    LOGFONTW nativeFont;
+    const auto selected = ReadConfigurationDialogFont(Dialog.HWindow, nativeFont);
+    if (selected.Points != ConfigurationFont.Points || selected.Face != ConfigurationFont.Face ||
+        selected.Weight != ConfigurationFont.Weight || selected.Italic != ConfigurationFont.Italic ||
+        selected.Charset != ConfigurationFont.Charset)
+    {
+        if (!ReflowFont(nativeFont))
+        {
+            gPrompter->ShowError(Dialog.HWindow, LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(ERROR_NOT_ENOUGH_MEMORY).c_str());
+            return false;
+        }
+        ConfigurationFont = selected;
+    }
+    ResetAppliedDrafts();
+    if (!save)
+        return true;
+    LONG error = ERROR_SUCCESS;
+    if (MainWindow->SaveConfig(Dialog.HWindow, &error))
+        return true;
+    const std::wstring message = LoadStrOwned(IDS_CFG_SAVE_FAILED) + L"\n\n" + GetErrorTextOwned(error);
+    gPrompter->ShowError(Dialog.HWindow, LoadStrW(IDS_ERRORSAVECONFIG), message.c_str());
+    return false;
+}
+
+namespace
+{
+    enum
+    {
+        ConfigurationSearchOpenId = 12,
+        ConfigurationSearchEditId,
+        ConfigurationSearchListId = 15,
+        ConfigurationSearchClearId,
+        ConfigurationSearchCloseId,
+    };
+
+    LRESULT CALLBACK ConfigurationSearchEditProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
+                                                  UINT_PTR subclass, DWORD_PTR)
+    {
+        if (message == WM_COMMAND && LOWORD(wParam) == ConfigurationSearchClearId)
+            return SendMessageW(GetParent(window), message, wParam, lParam);
+        if (message == WM_NCDESTROY)
+            RemoveWindowSubclass(window, ConfigurationSearchEditProc, subclass);
+        return DefSubclassProc(window, message, wParam, lParam);
+    }
+}
+
+int CConfigurationDlg::NavigationHeaderHeight(HWND window)
+{
+    RECT units = {0, 0, 0, 18};
+    Sally::Appearance::MapCurrentDialogRect(window, units);
+    return units.bottom;
+}
+
+void CConfigurationDlg::LayoutNavigation(const RECT& area)
+{
+    if (SearchEdit == NULL)
+        return;
+    RECT units = {0, 0, 4, 14};
+    Sally::Appearance::MapCurrentDialogRect(Dialog.HWindow, units);
+    const int width = (std::max)(0L, area.right - area.left);
+    const int header = sally::configuration::FitNavigationHeader(NavigationHeaderHeight(Dialog.HWindow), area.bottom - area.top);
+    const int rowHeight = (std::min<LONG>)(units.bottom, header);
+    const int backWidth = (std::min)(rowHeight, width);
+    const int backGap = (std::min<int>)(units.right, width - backWidth);
+    const int fieldWidth = width - backWidth - backGap;
+    const bool hasText = GetWindowTextLengthW(SearchEdit) != 0;
+    const int clearWidth = hasText ? (std::min)(rowHeight, fieldWidth) : 0;
+    const int fieldLeft = area.left + backWidth + backGap;
+    const int listTop = area.top + header;
+    SetWindowPos(SearchOpen, NULL, area.left, area.top, width, rowHeight, SWP_NOZORDER);
+    SetWindowPos(SearchClose, NULL, area.left, area.top, backWidth, rowHeight, SWP_NOZORDER);
+    // Reserve the edit's trailing area for its clear action, keeping one field row.
+    SetWindowPos(SearchEdit, NULL, fieldLeft, area.top, fieldWidth, rowHeight, SWP_NOZORDER);
+    SendMessageW(SearchEdit, EM_SETMARGINS, EC_RIGHTMARGIN, MAKELPARAM(0, clearWidth));
+    RECT field = {};
+    GetClientRect(SearchEdit, &field);
+    SetWindowPos(SearchClear, HWND_TOP, (std::max)(0L, field.right - clearWidth), 0,
+                 clearWidth, field.bottom, 0);
+    ShowWindow(SearchOpen, SearchExpanded ? SW_HIDE : SW_SHOW);
+    ShowWindow(SearchEdit, SearchExpanded ? SW_SHOW : SW_HIDE);
+    ShowWindow(SearchClose, SearchExpanded ? SW_SHOW : SW_HIDE);
+    ShowWindow(SearchClear, SearchExpanded && hasText ? SW_SHOW : SW_HIDE);
+    SetWindowPos(SearchList, NULL, area.left, listTop, width, (std::max)(0L, area.bottom - listTop), SWP_NOZORDER);
+
+    HDC dc = GetDC(SearchList);
+    if (dc != NULL)
+    {
+        const HGDIOBJ font = SelectObject(dc, reinterpret_cast<HFONT>(SendMessageW(SearchList, WM_GETFONT, 0, 0)));
+        int extent = 0;
+        for (const auto& result : SearchResults)
+        {
+            SIZE size = {};
+            if (GetTextExtentPoint32W(dc, result.Label.c_str(), static_cast<int>(result.Label.size()), &size))
+                extent = (std::max<int>)(extent, size.cx + 2 * GetSystemMetrics(SM_CXEDGE));
+        }
+        SelectObject(dc, font);
+        ReleaseDC(SearchList, dc);
+        SendMessageW(SearchList, LB_SETHORIZONTALEXTENT, extent, 0);
+    }
+}
+
+void CConfigurationDlg::UpdateSearch()
+{
+    const std::wstring query = GetWindowTextStringW(SearchEdit);
+    EnableWindow(SearchClear, !query.empty());
+    HasSearch = SearchExpanded && query.find_first_not_of(L" \t\r\n") != std::wstring::npos;
+    SearchResults = ConfigurationSearch.FindSubstring(query);
+    SendMessageW(SearchList, WM_SETREDRAW, FALSE, 0);
+    SendMessageW(SearchList, LB_RESETCONTENT, 0, 0);
+    for (const auto& result : SearchResults)
+        SendMessageW(SearchList, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(result.Label.c_str()));
+    if (HasSearch && SearchResults.empty())
+        SendMessageW(SearchList, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(LoadStrW(IDS_CFG_SEARCH_EMPTY)));
+    SendMessageW(SearchList, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(SearchList, NULL, TRUE);
+    ShowNavigationTree(!HasSearch);
+    ShowWindow(SearchList, HasSearch ? SW_SHOW : SW_HIDE);
+    RefreshLayout();
+}
+
+void CConfigurationDlg::ClearSearch()
+{
+    SetWindowTextW(SearchEdit, L"");
+    SetFocus(SearchEdit);
+}
+
+void CConfigurationDlg::OpenSearch()
+{
+    SearchExpanded = true;
+    UpdateSearch();
+    SetFocus(SearchEdit);
+    SendMessageW(SearchEdit, EM_SETSEL, 0, -1);
+}
+
+void CConfigurationDlg::CloseSearch()
+{
+    SearchExpanded = false;
+    SetWindowTextW(SearchEdit, L"");
+    UpdateSearch();
+    // The holder's navigation tree retains its selected page throughout search.
+    SetFocus(GetDlgItem(Dialog.HWindow, 1));
+}
+
+void CConfigurationDlg::DrawSearchAction(const DRAWITEMSTRUCT& item)
+{
+    const int saved = SaveDC(item.hDC);
+    if (saved == 0)
+        return;
+    DarkModeColors palette;
+    const bool dark = DarkMode_GetColors(&palette) != FALSE;
+    const COLORREF background = dark ? palette.DialogBackground : GetSysColor(COLOR_BTNFACE);
+    const COLORREF foreground = dark ? palette.DialogText : GetSysColor(COLOR_BTNTEXT);
+    const COLORREF subdued = dark ? palette.DisabledText : GetSysColor(COLOR_GRAYTEXT);
+    SetDCBrushColor(item.hDC, background);
+    FillRect(item.hDC, &item.rcItem, reinterpret_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
+    SelectObject(item.hDC, reinterpret_cast<HFONT>(SendMessageW(item.hwndItem, WM_GETFONT, 0, 0)));
+    SetBkMode(item.hDC, TRANSPARENT);
+    SetTextColor(item.hDC, foreground);
+    SetDCPenColor(item.hDC, foreground);
+    SelectObject(item.hDC, GetStockObject(DC_PEN));
+    SelectObject(item.hDC, GetStockObject(NULL_BRUSH));
+    const int height = item.rcItem.bottom - item.rcItem.top;
+    const int size = (std::max)(4, height * 3 / 5);
+    const int left = item.rcItem.left + (height - size) / 2;
+    const int top = item.rcItem.top + (height - size) / 2;
+    if (item.CtlID == ConfigurationSearchCloseId)
+    {
+        const int middle = item.rcItem.top + height / 2;
+        MoveToEx(item.hDC, left + size / 2, top, NULL);
+        LineTo(item.hDC, left, middle);
+        LineTo(item.hDC, left + size / 2, top + size);
+        MoveToEx(item.hDC, left, middle, NULL);
+        LineTo(item.hDC, left + size, middle);
+    }
+    else
+    {
+        Ellipse(item.hDC, left, top, left + size * 2 / 3, top + size * 2 / 3);
+        MoveToEx(item.hDC, left + size / 2, top + size / 2, NULL);
+        LineTo(item.hDC, left + size, top + size);
+        RECT text = item.rcItem;
+        text.left += height;
+        text.right -= (std::max)(2, height / 8);
+        SIZE shortcut = {};
+        GetTextExtentPoint32W(item.hDC, L"Ctrl+F", 6, &shortcut);
+        RECT label = text;
+        label.right = (std::max)(label.left, text.right - shortcut.cx - height / 3);
+        DrawTextW(item.hDC, SearchOpenCaption.c_str(), static_cast<int>(SearchOpenCaption.size()),
+                  &label, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+        SetTextColor(item.hDC, subdued);
+        DrawTextW(item.hDC, L"Ctrl+F", 6, &text, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    }
+    if ((item.itemState & ODS_FOCUS) && !(item.itemState & ODS_NOFOCUSRECT))
+    {
+        RECT focus = item.rcItem;
+        InflateRect(&focus, -1, -1);
+        DrawFocusRect(item.hDC, &focus);
+    }
+    RestoreDC(item.hDC, saved);
+}
+
+bool CConfigurationDlg::HandleDialogMessage(UINT message, WPARAM wParam, LPARAM lParam)
+{
+    if (message == WM_DRAWITEM && lParam != 0)
+    {
+        const auto& item = *reinterpret_cast<const DRAWITEMSTRUCT*>(lParam);
+        if (item.CtlID == ConfigurationSearchOpenId || item.CtlID == ConfigurationSearchCloseId)
+        {
+            DrawSearchAction(item);
+            return true;
+        }
+    }
+    if (message == WM_TIMER && wParam == 0x4346)
+    {
+        UpdateApplyState();
+        return true;
+    }
+    if (message != WM_COMMAND)
+        return false;
+    if (LOWORD(wParam) == ConfigurationSearchOpenId && HIWORD(wParam) == BN_CLICKED)
+    {
+        OpenSearch();
+        return true;
+    }
+    if (LOWORD(wParam) == ConfigurationSearchCloseId && HIWORD(wParam) == BN_CLICKED)
+    {
+        CloseSearch();
+        return true;
+    }
+    if (LOWORD(wParam) == ConfigurationSearchClearId && HIWORD(wParam) == BN_CLICKED)
+    {
+        ClearSearch();
+        return true;
+    }
+    if (LOWORD(wParam) == ConfigurationSearchEditId && HIWORD(wParam) == EN_CHANGE)
+    {
+        UpdateSearch();
+        return true;
+    }
+    if (LOWORD(wParam) == ConfigurationSearchListId && HIWORD(wParam) == LBN_SELCHANGE)
+    {
+        const int selection = static_cast<int>(SendMessageW(SearchList, LB_GETCURSEL, 0, 0));
+        if (selection >= 0 && static_cast<std::size_t>(selection) < SearchResults.size())
+        {
+            // Browsing previews the setting without moving keyboard navigation
+            // out of the results. Enter explicitly focuses the setting below.
+            if (NavigateToPage(SearchResults[selection].Page, SearchResults[selection].Control))
+                SetFocus(SearchList);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool CConfigurationDlg::PreTranslateMessage(const MSG& message)
+{
+    if (message.message == WM_KEYDOWN && message.wParam == VK_ESCAPE &&
+        SearchEdit != NULL && SearchExpanded)
+    {
+        if (GetWindowTextLengthW(SearchEdit) != 0)
+            ClearSearch();
+        else
+            CloseSearch();
+        return true;
+    }
+    if (message.message == WM_KEYDOWN && message.wParam == L'F' &&
+        (GetKeyState(VK_CONTROL) & 0x8000) != 0 && SearchEdit != NULL)
+    {
+        OpenSearch();
+        return true;
+    }
+    if (message.message == WM_KEYDOWN && message.wParam == VK_RETURN && HasSearch &&
+        (GetFocus() == SearchEdit || GetFocus() == SearchList))
+    {
+        int selection = static_cast<int>(SendMessageW(SearchList, LB_GETCURSEL, 0, 0));
+        if (selection == LB_ERR && !SearchResults.empty()) selection = 0;
+        if (selection >= 0 && static_cast<std::size_t>(selection) < SearchResults.size())
+            NavigateToPage(SearchResults[selection].Page, SearchResults[selection].Control);
+        return true;
+    }
+    return false;
+}
+
+void CConfigurationDlg::IndexPageResource(int page, const void* source, std::size_t size)
+{
+    sally::configuration::DialogTemplate resource;
+    if (!sally::configuration::ReadDialogTemplate(source, size, resource))
+        return;
+    ConfigurationSearch.AddPage(page, resource);
+    const auto choices = [&](int control, std::initializer_list<int> labels)
+    {
+        for (int label : labels)
+            ConfigurationSearch.AddOptionValue(page, control, LoadStrOwned(label));
+    };
+    const auto pluginChoices = [&](int control, auto getIndex)
+    {
+        for (int count = 0;; ++count)
+        {
+            const int index = (Plugins.*getIndex)(count);
+            if (index < 0) break;
+            CPluginData* plugin = Plugins.Get(index);
+            if (plugin != NULL) ConfigurationSearch.AddOptionValue(page, control, plugin->GetDisplayName());
+        }
+    };
+    const auto archiverChoices = [&](int control)
+    {
+        for (int index = 0; index < ArchiverConfig.GetArchiversCount(); ++index)
+            ConfigurationSearch.AddOptionValue(page, control, ArchiverConfig.GetArchiverTitle(index));
+    };
+    if (At(page) == &PageAppear)
+    {
+        choices(IDC_THEME_MODE, {IDS_THEME_MODE_LIGHT, IDS_THEME_MODE_DARK, IDS_THEME_MODE_SYSTEM});
+        for (const auto& icon : MainWindowIcons)
+            ConfigurationSearch.AddOptionValue(page, IDC_TITLEBAR_ICON_INDEX, LoadStrOwned(icon.TextResID));
+        choices(IDB_PANELFONT, {IDS_FONTDESCRIPTION_DEF, IDS_FONTDESCRIPTION_CST});
+    }
+    else if (At(page) == &PageGeneral)
+    {
+        for (int label : {IDS_UPDATECHECK_NEVER, IDS_UPDATECHECK_DAY, IDS_UPDATECHECK_WEEK,
+                          IDS_UPDATECHECK_MONTH, IDS_UPDATECHECK_3MONTHS, IDS_UPDATECHECK_6MONTHS, IDS_UPDATECHECK_STARTUP})
+            ConfigurationSearch.AddOptionValue(page, IDC_UPDATECHECK, LoadStrOwned(label));
+    }
+    else if (At(page) == &PageMainWindow)
+        choices(IDC_TITLEBAR_MODE, {IDS_TITLEBAR_DIRECTORY, IDS_TITLEBAR_COMPOSITE, IDS_TITLEBAR_FULLPATH});
+    else if (At(page) == &PagePanels)
+    {
+        choices(IDC_NAMEMANGLE, {IDS_NAMEMANGLE_ONTHEDISK, IDS_NAMEMANGLE_EXPLORER, IDS_NAMEMANGLE_VC,
+                                IDS_NAMEMANGLE_PARTMIXEDCASE, IDS_NAMEMANGLE_LOWERCASE, IDS_NAMEMANGLE_UPPERCASE});
+        choices(IDC_SIZEFORMAT, {IDS_SIZEMODE_BYTES, IDS_SIZEMODE_KB, IDS_SIZEMODE_MIXED});
+    }
+    else if (At(page) == &PageView)
+        choices(IDC_VIEW_LIST, {IDS_BRIEF_VIEW_NAME, IDS_DETAILED_VIEW_NAME, IDS_ICONS_VIEW_NAME,
+                                IDS_THUMBNAILS_VIEW_NAME, IDS_TILES_VIEW_NAME});
+    else if (At(page) == &Page13 || At(page) == &Page14)
+    {
+        choices(IDC_VIEW_TYPE, {IDS_VIEWER_EXTERNAL, IDS_VIEWER_INTERNAL});
+        pluginChoices(IDC_VIEW_TYPE, &CPlugins::GetViewerIndex);
+    }
+    else if (At(page) == &PageP1)
+    {
+        choices(IDC_P1_TYPE, {IDS_PUT_EXTERNAL});
+        pluginChoices(IDC_P1_TYPE, &CPlugins::GetCustomPackerIndex);
+    }
+    else if (At(page) == &PageP2)
+    {
+        choices(IDC_P2_TYPE, {IDS_PUT_EXTERNAL});
+        pluginChoices(IDC_P2_TYPE, &CPlugins::GetCustomUnpackerIndex);
+    }
+    else if (At(page) == &PageP3)
+        archiverChoices(IDC_P3_LIST);
+    else if (At(page) == &PageP4)
+    {
+        choices(IDC_P4_EDIT, {IDS_PUT_NONE});
+        archiverChoices(IDC_P4_VIEW);
+        archiverChoices(IDC_P4_EDIT);
+        pluginChoices(IDC_P4_VIEW, &CPlugins::GetPanelViewIndex);
+        pluginChoices(IDC_P4_EDIT, &CPlugins::GetPanelEditIndex);
+    }
+    else if (At(page) == &PageColors)
+        IndexColorSearchMetadata(ConfigurationSearch, page);
+    else if (At(page) == &PageSecurity)
+        ConfigurationSearch.AddKeywords(page, IDC_SEC_ENABLE_MASTERPWD, LoadStrOwned(IDS_CFGSEC_MASTERPWD_INFO));
 }
 
 void CConfigurationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -758,12 +1301,64 @@ void CConfigurationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // is called) -> we must set the parent for their message boxes
         HOldPluginMsgBoxParent = PluginMsgBoxParent;
         PluginMsgBoxParent = Dialog.HWindow;
+        const auto create = [&](DWORD extended, const wchar_t* className, DWORD style, int id, const wchar_t* text)
+        {
+            HWND control = CreateWindowExW(extended, className, text, WS_CHILD | WS_VISIBLE | style,
+                                            0, 0, 0, 0, Dialog.HWindow,
+                                            reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), HInstance, NULL);
+            SendMessageW(control, WM_SETFONT, SendMessageW(Dialog.HWindow, WM_GETFONT, 0, 0), FALSE);
+            return control;
+        };
+        SearchOpenCaption = LoadStrOwned(IDS_CFG_SEARCH_OPEN);
+        SearchCloseCaption = LoadStrOwned(IDS_CFG_SEARCH_CLOSE);
+        const std::wstring openLabel = SearchOpenCaption + L" (Ctrl+F)";
+        SearchOpen = create(0, L"BUTTON", WS_TABSTOP | BS_OWNERDRAW, ConfigurationSearchOpenId, openLabel.c_str());
+        SearchClose = create(0, L"BUTTON", WS_TABSTOP | BS_OWNERDRAW, ConfigurationSearchCloseId, SearchCloseCaption.c_str());
+        SearchEdit = create(WS_EX_CLIENTEDGE, L"EDIT", WS_TABSTOP | ES_AUTOHSCROLL | WS_CLIPCHILDREN, ConfigurationSearchEditId, L"");
+        SendMessageW(SearchEdit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(SearchOpenCaption.c_str()));
+        SearchClear = create(0, L"BUTTON", WS_TABSTOP | BS_PUSHBUTTON | BS_FLAT, ConfigurationSearchClearId, L"\u00D7");
+        CButton* clearButton = new CButton(Dialog.HWindow, ConfigurationSearchClearId, 0);
+        if (clearButton != NULL)
+            clearButton->SetToolTipText(LoadStrW(IDS_CFG_SEARCH_CLEAR));
+        SetParent(SearchClear, SearchEdit);
+        SetWindowSubclass(SearchEdit, ConfigurationSearchEditProc, 1, 0);
+        EnableWindow(SearchClear, FALSE);
+        SearchToolTip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, NULL, WS_POPUP | TTS_ALWAYSTIP,
+                                        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+                                        Dialog.HWindow, NULL, HInstance, NULL);
+        if (SearchToolTip != NULL)
+        {
+            const auto tip = [&](HWND control, const std::wstring& text)
+            {
+                TOOLINFOW info = {sizeof(info)};
+                info.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
+                info.hwnd = Dialog.HWindow;
+                info.uId = reinterpret_cast<UINT_PTR>(control);
+                info.lpszText = const_cast<wchar_t*>(text.c_str());
+                SendMessageW(SearchToolTip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&info));
+            };
+            tip(SearchOpen, SearchOpenCaption);
+            tip(SearchClose, SearchCloseCaption);
+        }
+        SearchList = create(WS_EX_CLIENTEDGE, L"LISTBOX", WS_TABSTOP | WS_VSCROLL | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_HSCROLL,
+                            ConfigurationSearchListId, L"");
+        ShowWindow(SearchList, SW_HIDE);
+        DarkMode_ApplyListTreeThemeRecursive(Dialog.HWindow);
+        RefreshLayout();
+        UpdateApplyState();
+        SetTimer(Dialog.HWindow, 0x4346, 150, NULL);
         MultiMonCenterWindow(Dialog.HWindow, Parent, TRUE);
         break;
     }
 
     case WM_DESTROY:
     {
+        KillTimer(Dialog.HWindow, 0x4346);
+        if (SearchToolTip != NULL)
+        {
+            DestroyWindow(SearchToolTip);
+            SearchToolTip = NULL;
+        }
         if (GetKeyState(VK_ESCAPE) & 0x8000) // prevent listing interruption in the panel after each ESC
             WaitForESCReleaseBeforeTestingESC = TRUE;
 
@@ -1004,6 +1599,8 @@ protected:
 CCfgPageView::CCfgPageView(int index)
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_VIEWS, IDD_CFGPAGE_VIEWS, PSP_USETITLE, NULL)
 {
+    for (int i = 0; i < VIEW_TEMPLATES_COUNT; ++i)
+        OriginalTemplateIndex[i] = i;
     Dirty = FALSE;
     Header = NULL;
     HListView = NULL;
@@ -1026,6 +1623,8 @@ void CCfgPageView::Transfer(CTransferInfo& ti)
     if (ti.Type == ttDataToWindow)
     {
         Config.Load(MainWindow->ViewTemplates);
+        for (int i = 0; i < VIEW_TEMPLATES_COUNT; ++i)
+            OriginalTemplateIndex[i] = i;
 
         DisableNotification = TRUE;
         wchar_t buff[20];
@@ -1083,11 +1682,43 @@ void CCfgPageView::Transfer(CTransferInfo& ti)
     else
     {
         MainWindow->ViewTemplates.Load(Config);
+        const auto preserveChoice = [&](CFilesWindow* panel)
+        {
+            if (panel == NULL)
+                return;
+            const int oldIndex = panel->GetViewTemplateIndex();
+            for (int i = 0; i < VIEW_TEMPLATES_COUNT; ++i)
+            {
+                if (OriginalTemplateIndex[i] == oldIndex)
+                {
+                    panel->ViewTemplate = &MainWindow->ViewTemplates.Items[i];
+                    break;
+                }
+            }
+        };
+        preserveChoice(MainWindow->LeftPanel);
+        preserveChoice(MainWindow->RightPanel);
+        // Apply establishes the baseline for the next draft on this open page.
+        for (int i = 0; i < VIEW_TEMPLATES_COUNT; ++i)
+            OriginalTemplateIndex[i] = i;
     }
 }
 
 void CCfgPageView::Validate(CTransferInfo& ti)
 {
+    for (int id : {IDC_VIEW_LEFT_WIDTH, IDC_VIEW_RIGHT_WIDTH})
+    {
+        HWND control = GetDlgItem(HWindow, id);
+        if (control == NULL || !IsWindowEnabled(control))
+            continue;
+        unsigned width;
+        if (!sally::configuration::TryParseColumnWidth(GetWindowTextStringW(control), width))
+        {
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INVALIDNUMBER));
+            ti.ErrorOn(id);
+            return;
+        }
+    }
 }
 
 const int CFGP2ItemsCount = 8 /*9*/;
@@ -1301,7 +1932,8 @@ void CCfgPageView::OnMove(BOOL up)
         ListView_SetItemState(HListView, index1, state2, LVIS_STATEIMAGEMASK);
         state1 |= LVIS_FOCUSED | LVIS_SELECTED;
         ListView_SetItemState(HListView, index2, state1, LVIS_STATEIMAGEMASK | LVIS_FOCUSED | LVIS_SELECTED);
-        Config.SwapItems(index1, index2);
+        if (Config.SwapItems(index1, index2))
+            std::swap(OriginalTemplateIndex[index1], OriginalTemplateIndex[index2]);
         LoadControls();
     }
     DisableNotification = FALSE;
@@ -1585,19 +2217,16 @@ CCfgPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int index2 = ListView_GetNextItem(HListView2, -1, LVNI_SELECTED);
                 if (index >= 2 && index2 != -1)
                 {
-                    CTransferInfo ti(HWindow, ttDataFromWindow);
-                    int tmp;
-                    if (LOWORD(wParam) == IDC_VIEW_LEFT_WIDTH)
+                    const int id = LOWORD(wParam);
+                    unsigned width;
+                    if (sally::configuration::TryParseColumnWidth(GetWindowTextStringW(GetDlgItem(HWindow, id)), width))
                     {
-                        ti.EditLine(IDC_VIEW_LEFT_WIDTH, tmp);
-                        Config.Items[index].Columns[index2].LeftWidth = tmp;
+                        if (id == IDC_VIEW_LEFT_WIDTH)
+                            Config.Items[index].Columns[index2].LeftWidth = width;
+                        else
+                            Config.Items[index].Columns[index2].RightWidth = width;
+                        Dirty = TRUE;
                     }
-                    else
-                    {
-                        ti.EditLine(IDC_VIEW_RIGHT_WIDTH, tmp);
-                        Config.Items[index].Columns[index2].RightWidth = tmp;
-                    }
-                    Dirty = TRUE;
                 }
             }
             break;
@@ -1701,9 +2330,10 @@ void CCfgPageViewer::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_LFEOL, Configuration.EOL_LF);
     ti.CheckBox(IDC_NULLEOL, Configuration.EOL_NULL);
     ti.EditLine(IDC_TABSIZE, Configuration.TabSize);
+    const int oldSavePosition = Configuration.SavePosition;
     ti.RadioButton(IDC_SAVEONCLOSE, 1, Configuration.SavePosition);
     ti.RadioButton(IDC_SETBYMAINWINDOW, 0, Configuration.SavePosition);
-    if (Configuration.SavePosition)
+    if (ti.Type == ttDataFromWindow && Configuration.SavePosition && !oldSavePosition)
         Configuration.WindowPlacement.length = 0;
 
     if (ti.Type == ttDataToWindow)
@@ -2589,64 +3219,16 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             case EDTLBN_MOVEITEM2:
             {
                 EDTLB_DISPINFO* dispInfo = (EDTLB_DISPINFO*)lParam;
-                int index;
+                int index = -1;
                 EditLB->GetCurSel(index);
-                int srcIndex = index;
-                int dstIndex = dispInfo->NewIndex;
-
-                CUserMenuItem* item = UserMenuItems->At(index);
-
-                if (item->Type == umitSubmenuBegin)
+                const int moved = UserMenuItems->MoveItem(index, dispInfo->NewIndex < index ? -1 : 1);
+                if (moved != index)
                 {
-                    int endIndex = UserMenuItems->GetSubmenuEndIndex(index);
-                    if (endIndex != -1)
-                    {
-                        // found SubmenuEnd
-                        BYTE buf[sizeof(CUserMenuItem)];
-                        if (srcIndex > dstIndex)
-                        {
-                            // move the whole block up
-                            if (index > 0)
-                            {
-                                memcpy(buf, UserMenuItems->At(index - 1), sizeof(CUserMenuItem));
-                                int i;
-                                for (i = index; i <= endIndex; i++)
-                                    memcpy(UserMenuItems->At(i - 1), UserMenuItems->At(i), sizeof(CUserMenuItem));
-                                memcpy(UserMenuItems->At(endIndex), buf, sizeof(CUserMenuItem));
-                                EditLB->SetCurSel(index - 1);
-                            }
-                        }
-                        else
-                        {
-                            // move the whole block down
-                            if (endIndex > 0 && endIndex < EditLB->GetCount() - 1)
-                            {
-                                memcpy(buf, UserMenuItems->At(endIndex + 1), sizeof(CUserMenuItem));
-                                int i;
-                                for (i = endIndex; i >= index; i--)
-                                    memcpy(UserMenuItems->At(i + 1), UserMenuItems->At(i), sizeof(CUserMenuItem));
-                                memcpy(UserMenuItems->At(index), buf, sizeof(CUserMenuItem));
-                                EditLB->SetCurSel(index + 1);
-                            }
-                        }
-                        InvalidateRect(EditLB->HWindow, NULL, FALSE);
-                    }
-
-                    SetWindowLongPtr(HWindow, DWLP_MSGRESULT, TRUE); // disallow the changes
-                    return TRUE;
+                    EditLB->SetCurSel(moved);
+                    InvalidateRect(EditLB->HWindow, NULL, FALSE);
                 }
-                else
-                {
-                    dstIndex = index + (srcIndex > dstIndex ? -1 : 1);
-
-                    BYTE buf[sizeof(CUserMenuItem)];
-                    memcpy(buf, UserMenuItems->At(srcIndex), sizeof(CUserMenuItem));
-                    memcpy(UserMenuItems->At(srcIndex), UserMenuItems->At(dstIndex), sizeof(CUserMenuItem));
-                    memcpy(UserMenuItems->At(dstIndex), buf, sizeof(CUserMenuItem));
-
-                    SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE); // allow the change
-                    return TRUE;
-                }
+                SetWindowLongPtr(HWindow, DWLP_MSGRESULT, TRUE); // the model moved the complete item
+                return TRUE;
             }
 
             case EDTLBN_DELETEITEM:
@@ -3291,6 +3873,20 @@ int CConfigurationPage7Masks[CFG_COLORS_BUTTONS] = {IDC_C_MASK1_L, IDC_C_MASK2_L
 int CConfigurationPage7ItemsBut[CFG_COLORS_BUTTONS] = {IDC_C_ITEM1_C, IDC_C_ITEM2_C, IDC_C_ITEM3_C, IDC_C_ITEM4_C, IDC_C_ITEM5_C};
 int CConfigurationPage7MasksBut[CFG_COLORS_BUTTONS] = {IDC_C_MASK1_C, IDC_C_MASK2_C, IDC_C_MASK3_C, IDC_C_MASK4_C, IDC_C_MASK5_C};
 
+static void IndexColorSearchMetadata(sally::configuration::SearchIndex& index, int page)
+{
+    for (int label : {IDS_COLORSCHEME_SALAMANDER, IDS_COLORSCHEME_EXPLORER, IDS_COLORSCHEME_NORTON,
+                      IDS_COLORSCHEME_NAVIGATOR, IDS_COLORSCHEME_CUSTOM})
+        index.AddOptionValue(page, IDC_C_SCHEME, LoadStrOwned(label));
+    for (const auto& item : Page7Data)
+    {
+        index.AddOptionValue(page, IDC_C_ITEM, LoadStrOwned(item.ItemLabel));
+        for (const auto& color : item.Items)
+            if (color.Label != 0)
+                index.AddKeywords(page, IDC_C_ITEM, LoadStrOwned(color.Label));
+    }
+}
+
 CCfgPageColors::CCfgPageColors()
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_COLORS, IDD_CFGPAGE_COLORS, PSP_USETITLE, NULL), HighlightMasks(10, 5)
 {
@@ -3824,24 +4420,15 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
                                          HWindow, &tpmPar);
             if (cmd != 0)
             {
-                int index = (int)SendMessageW(HScheme, CB_GETCURSEL, 0, 0);
-                if (index != 4)
+                const auto useCustomPalette = [&]()
                 {
-                    COLORREF* colors;
-                    if (index == 0)
-                        colors = SalamanderColors;
-                    else if (index == 1)
-                        colors = ExplorerColors;
-                    else if (index == 2)
-                        colors = NortonColors;
-                    else if (index == 3)
-                        colors = NavigatorColors;
-
-                    int i;
-                    for (i = 0; i < NUMBER_OF_COLORS; i++)
-                        TmpColors[i] = colors[i];
+                    const int scheme = (int)SendMessageW(HScheme, CB_GETCURSEL, 0, 0);
+                    if (!item || scheme < 0 || scheme >= 4)
+                        return;
+                    for (int i = 0; i < NUMBER_OF_COLORS; i++)
+                        TmpColors[i] = tmpColors[i];
                     SendMessageW(HScheme, CB_SETCURSEL, 4, 0);
-                }
+                };
 
                 if (cmd == 1 || cmd == 3)
                 {
@@ -3860,9 +4447,14 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
                         if (item)
                         {
                             int colorIndex = (cmd == 1) ? subData->ColorFg : subData->ColorBk;
-                            BYTE flags = GetFValue(TmpColors[colorIndex]);
+                            BYTE flags = GetFValue(tmpColors[colorIndex]);
                             flags &= ~SCF_DEFAULT;
-                            TmpColors[colorIndex] = cc.rgbResult & 0x00ffffff | (((DWORD)flags) << 24);
+                            const SALCOLOR chosen = cc.rgbResult & 0x00ffffff | (((DWORD)flags) << 24);
+                            if (chosen != tmpColors[colorIndex])
+                            {
+                                useCustomPalette();
+                                TmpColors[colorIndex] = chosen;
+                            }
                         }
                         else
                         {
@@ -3880,9 +4472,14 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
                     if (item)
                     {
                         int colorIndex = (cmd == 2) ? subData->ColorFg : subData->ColorBk;
-                        BYTE flags = GetFValue(TmpColors[colorIndex]);
+                        BYTE flags = GetFValue(tmpColors[colorIndex]);
                         flags |= SCF_DEFAULT;
-                        TmpColors[colorIndex] = TmpColors[colorIndex] & 0x00ffffff | (((DWORD)flags) << 24);
+                        const SALCOLOR chosen = tmpColors[colorIndex] & 0x00ffffff | (((DWORD)flags) << 24);
+                        if (chosen != tmpColors[colorIndex])
+                        {
+                            useCustomPalette();
+                            TmpColors[colorIndex] = chosen;
+                        }
                     }
                     else
                     {

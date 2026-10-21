@@ -147,4 +147,6 @@ STRINGTABLE
  IDS_TBTT_PROPERTIES, "Properties\tCtrl+F1"
  IDS_TBTT_FULLSCREEN, "Full Screen\tF11"
  IDS_TBTT_GOTO, "Current Record/Record Count\tG"
+ IDS_CSV_SEPARATOR_REQUIRED, "Enter a separator character, or choose Auto-Select."
+
 }

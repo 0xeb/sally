@@ -6,6 +6,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
+#include "common/FileListOutput.h"
 #include "common/Win32TextCodec.h"
 #include "common/unicode/helpers.h"
 #include "common/fsutil.h" // GetShortPathW
@@ -302,16 +303,36 @@ void CMainWindow::MakeFileList()
                            __hoCreateFile, hFile, openError, TRUE);
             if (hFile != INVALID_HANDLE_VALUE)
             {
-                // position the file pointer
-                gFileSystem->SeekHandle(hFile, 0, append ? FILE_END : FILE_BEGIN, NULL);
+                // An existing destination belongs to the user. Failed append
+                // rolls back only our added bytes; cleanup never deletes it.
+                sally::filelist::OutputTransaction output(*gFileSystem, hFile, append != FALSE,
+                    Configuration.FileListDestination == 2 && openError == ERROR_ALREADY_EXISTS);
+                const FileResult prepared = output.Prepare();
+                if (!prepared.success)
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORWRITINGFILE), GetErrorTextOwned(prepared.errorCode).c_str());
 
                 // fill the file with data -- insert one entry for each file or directory
                 BOOL deleteFile = TRUE;
-                if (panel->MakeFileList(hFile))
+                if (prepared.success && panel->MakeFileList(hFile))
                 {
-                    panel->SetSel(FALSE, -1, TRUE);                        // force redraw
-                    PostMessage(panel->HWindow, WM_USER_SELCHANGED, 0, 0); // sel-change notify
-                    deleteFile = FALSE;
+                    const FileResult committed = output.Commit();
+                    if (committed.success)
+                    {
+                        panel->SetSel(FALSE, -1, TRUE);                        // force redraw
+                        PostMessage(panel->HWindow, WM_USER_SELCHANGED, 0, 0); // sel-change notify
+                        deleteFile = FALSE;
+                    }
+                    else
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORWRITINGFILE), GetErrorTextOwned(committed.errorCode).c_str());
+                }
+                if (deleteFile)
+                {
+                    const FileResult restored = output.Rollback();
+                    if (!restored.success)
+                    {
+                        const std::wstring message = fileNameW + L"\n\n" + GetErrorTextOwned(restored.errorCode);
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORWRITINGFILE), message.c_str());
+                    }
                 }
 
                 if (!deleteFile && Configuration.FileListDestination == 0) // clipboard
@@ -354,7 +375,7 @@ void CMainWindow::MakeFileList()
                 gFileSystem->CloseFileHandle(hFile);
 
                 // if the destination was the clipboard, delete the temporary file
-                if (deleteFile || Configuration.FileListDestination == 0) // clipboard
+                if ((deleteFile && output.MayDeleteFailedOutput()) || Configuration.FileListDestination == 0) // clipboard
                     gFileSystem->DeleteFile(fileNameW.c_str());           // genuine wide path
                 else
                 {

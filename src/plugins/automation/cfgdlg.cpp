@@ -15,6 +15,7 @@
 #include "precomp.h"
 #include "automationplug.h"
 #include "cfgdlg.h"
+#include "directory_list.h"
 #include "lang\lang.rh"
 
 extern HINSTANCE g_hLangInst;
@@ -23,31 +24,6 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 
 const char CAutomationConfigDialog::SublassPropName[] = "AutCfgDlg";
 
-namespace
-{
-std::wstring GetListViewItemTextOwned(HWND list, int item)
-{
-    size_t capacity = 2;
-    const size_t limit = static_cast<size_t>((std::numeric_limits<int>::max)());
-    for (;;)
-    {
-        std::vector<wchar_t> buffer(capacity, L'\0');
-        LVITEMW entry = {};
-        entry.iSubItem = 0;
-        entry.pszText = buffer.data();
-        entry.cchTextMax = static_cast<int>(buffer.size());
-        const LRESULT copied = SendMessageW(
-            list, LVM_GETITEMTEXTW, item, reinterpret_cast<LPARAM>(&entry));
-        if (copied <= 0)
-            return std::wstring();
-        if (copied < static_cast<LRESULT>(buffer.size() - 1))
-            return std::wstring(buffer.data(), static_cast<size_t>(copied));
-        if (capacity > limit / 2)
-            return std::wstring();
-        capacity *= 2;
-    }
-}
-}
 
 CAutomationConfigDialog::CAutomationConfigDialog(HWND hwndParent)
     : CDialog(g_hLangInst, IDD_CONFIG, IDD_CONFIG, hwndParent)
@@ -161,7 +137,7 @@ void CAutomationConfigDialog::Transfer(CTransferInfo& ti)
         lvi.mask = LVIF_TEXT;
         for (iDir = 0; iDir < cDirs; iDir++)
         {
-            const std::wstring directory = GetListViewItemTextOwned(hwndList, iDir);
+            const std::wstring directory = sally::automation::GetListViewItemTextOwned(hwndList, iDir);
             g_oAutomationPlugin.AddScriptDirectory(directory.c_str());
         }
     }
@@ -276,55 +252,7 @@ BOOL CAutomationConfigDialog::DeleteDirectory()
 
 BOOL CAutomationConfigDialog::MoveDirectory(int iDelta)
 {
-    int iSel, iNew;
-    HWND hwndList;
-    LVITEMW lvi1 = {
-        0,
-    };
-    LVITEMW lvi2 = {
-        0,
-    };
-    wchar_t szItemText1[1024];
-    wchar_t szItemText2[1024];
-
-    hwndList = GetDlgItem(HWindow, IDC_DIRLIST);
-
-    iSel = ListView_GetNextItem(hwndList, -1, LVNI_ALL | LVNI_SELECTED);
-    if (iSel < 0)
-    {
-        return FALSE;
-    }
-
-    iNew = iSel + iDelta;
-    if (iNew < 0 || iNew >= ListView_GetItemCount(hwndList))
-    {
-        return FALSE;
-    }
-
-    lvi1.mask = LVIF_TEXT | LVIF_STATE;
-    lvi1.stateMask = ~0u;
-    lvi1.iItem = iSel;
-    lvi1.pszText = szItemText1;
-    lvi1.cchTextMax = _countof(szItemText1);
-    SendMessageW(hwndList, LVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&lvi1));
-
-    lvi2.mask = LVIF_TEXT | LVIF_STATE;
-    lvi2.stateMask = ~0u;
-    lvi2.iItem = iNew;
-    lvi2.pszText = szItemText2;
-    lvi2.cchTextMax = _countof(szItemText2);
-    SendMessageW(hwndList, LVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&lvi2));
-
-    lvi1.iItem = iNew;
-    lvi2.iItem = iSel;
-    lvi1.mask = lvi2.mask = LVIF_TEXT | LVIF_STATE;
-    lvi1.stateMask = lvi2.stateMask = ~0u;
-
-    // swap the items
-    SendMessageW(hwndList, LVM_SETITEMW, 0, reinterpret_cast<LPARAM>(&lvi1));
-    SendMessageW(hwndList, LVM_SETITEMW, 0, reinterpret_cast<LPARAM>(&lvi2));
-
-    return TRUE;
+    return sally::automation::MoveDirectoryListItem(GetDlgItem(HWindow, IDC_DIRLIST), iDelta);
 }
 
 BOOL CAutomationConfigDialog::NewDirectory()
@@ -375,7 +303,7 @@ BOOL CAutomationConfigDialog::OnDirListEndLabelEdit(NMLVDISPINFOW* nmlv)
             // the edit was cancelled,
             // if the text is empty (e.g. new directory insertion
             // was cancelled), delete the item
-            if (GetListViewItemTextOwned(nmlv->hdr.hwndFrom,
+            if (sally::automation::GetListViewItemTextOwned(nmlv->hdr.hwndFrom,
                                          nmlv->item.iItem)
                     .empty())
                 DeleteDirectory();
@@ -766,7 +694,7 @@ void CAutomationConfigDialog::OnBrowseBtnClicked()
         }
         else
         {
-            if (GetListViewItemTextOwned(hwndList, iSel).empty())
+            if (sally::automation::GetListViewItemTextOwned(hwndList, iSel).empty())
                 DeleteDirectory();
         }
 

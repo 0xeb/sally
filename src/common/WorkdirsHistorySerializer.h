@@ -79,7 +79,7 @@ bool ParseEntry(const std::wstring& payloadW, Entry& outEntry,
 //
 // Both helpers operate on `IRegistry*` so a test harness can swap in a
 // mock if it wants; the production path uses the global gRegistry.
-void WriteEntries(IRegistry* reg, HKEY historyKey, const std::vector<Entry>& entries);
+bool WriteEntries(IRegistry* reg, HKEY historyKey, const std::vector<Entry>& entries);
 void ReadEntries(IRegistry* reg, HKEY historyKey, std::vector<Entry>& outEntries,
                  PluginFSPathDetector detector = nullptr);
 } // namespace sally::path::history

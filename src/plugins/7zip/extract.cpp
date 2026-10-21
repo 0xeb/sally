@@ -489,14 +489,12 @@ STDMETHODIMP CExtractCallbackImp::CryptoGetTextPassword(BSTR* password)
 {
     if (!PasswordIsDefined /*&& !Silent*/) // Silent is for skip, which is not implemented in 7za.dll
     {
-        char pwd[PASSWORD_LEN];
-
-        pwd[0] = 0;
-        switch (SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_PASSWORD, (LPARAM)pwd))
+        std::wstring pwd;
+        switch (SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_PASSWORD, reinterpret_cast<LPARAM>(&pwd)))
         {
         case IDOK:
             PasswordIsDefined = true;
-            Password = GetUnicodeString(pwd);
+            Password = pwd.c_str();
             break;
 
         case IDCANCEL:

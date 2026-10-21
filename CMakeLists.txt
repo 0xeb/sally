@@ -130,7 +130,7 @@ target_compile_definitions(sally PRIVATE
 
 target_link_libraries(sally PRIVATE
   sally_supporter_md
-  comctl32 mpr ws2_32 netapi32 msimg32 shlwapi
+  comctl32 mpr ws2_32 netapi32 msimg32 shlwapi bcrypt
   yyjson
   ${SAL_COMMON_LIBS}
 )
@@ -214,6 +214,7 @@ add_executable(salmon WIN32
   "${SAL_SRC}/salmon/crash_issue.cpp"
   "${SAL_SRC}/salmon/dialogs.cpp"
   "${SAL_SRC}/salmon/minidump.cpp"
+  "${SAL_SRC}/common/Win32ThreadStartup.cpp"
   "${SAL_SRC}/salmon/precomp.cpp"
   "${SAL_SRC}/salmon/salmon.cpp"
   "${SAL_SRC}/salmon/salmon_unicode.cpp"

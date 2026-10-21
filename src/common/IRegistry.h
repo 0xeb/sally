@@ -99,6 +99,9 @@ public:
     // Query if key/value exists
     virtual bool KeyExists(HKEY root, const wchar_t* subKey) = 0;
     virtual bool ValueExists(HKEY key, const wchar_t* valueName) = 0;
+
+    virtual RegistryResult FlushKey(HKEY key)
+    { (void)key; return RegistryResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
 };
 
 // Global registry instance - default is Win32 implementation

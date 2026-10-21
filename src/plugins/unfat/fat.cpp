@@ -11,6 +11,7 @@
 //
 //****************************************************************************
 
+#include "fat_chain.h"
 #include "precomp.h"
 
 #include "fat.h"
@@ -451,10 +452,8 @@ BOOL CFATImage::AddDirectory(std::wstring& root, TDirectArray<DWORD>* fat,
         }
         else
         {
-            if ((dirEnt.Short.NTRes & 0x08) != 0)
-                _strlwr(name8_3);
             std::wstring shortName;
-            if (!DecodeFatOemName(name8_3, shortName))
+            if (!DecodeFatShortName(name8_3, dirEnt.Short.NTRes, shortName))
             { // the decode degrades rather than refuses; only an allocation can get here
                 TRACE_E(LOW_MEMORY);
                 ok = FALSE;
@@ -603,96 +602,44 @@ BOOL CFATImage::LoadFAT(DWORD cluster, TDirectArray<DWORD>* fat, HWND hParent,
     if (cluster == 0) // size==0
         return TRUE;
 
-    DWORD beginOfFAT = BS.RsvdSecCnt * BS.BytsPerSec;
-
-    CQuadWord seek;
-
-    DWORD entry = cluster;
-    fat->Add(entry);
-    if (!fat->IsGood())
+    const uint64_t beginOfFAT = uint64_t(BS.RsvdSecCnt) * BS.BytsPerSec;
+    const uint64_t tableBytes = uint64_t(FATSz) * BS.BytsPerSec;
+    const auto type = FATType == fteFAT12   ? sally::fat::Type::Fat12
+                      : FATType == fteFAT16 ? sally::fat::Type::Fat16
+                      : FATType == fteFAT32 ? sally::fat::Type::Fat32
+                                            : static_cast<sally::fat::Type>(-1);
+    const auto result = sally::fat::ReadChain(type, CountOfClusters, tableBytes, cluster, [&](uint64_t offset, uint8_t* data, size_t bytes)
+                                              {
+            CQuadWord seek;
+            seek.Value = VolumeStart.Value + beginOfFAT;
+            if (seek.Value < VolumeStart.Value || offset > ~uint64_t{0} - seek.Value)
+                return false;
+            seek.Value += offset;
+            if (!SalamanderSafeFile->SafeFileSeekMsg(&File, &seek, FILE_BEGIN, hParent,
+                                                     buttons, pressedButton, silentMask, TRUE))
+                return false;
+            DWORD read = 0;
+            return SalamanderSafeFile->SafeFileRead(&File, data, static_cast<DWORD>(bytes), &read, hParent,
+                SAFE_FILE_CHECK_SIZE | buttons, pressedButton, silentMask) && read == bytes; }, [&](uint32_t entry)
+                                              {
+            fat->Add(entry);
+            return fat->IsGood() != FALSE; });
+    if (result == sally::fat::ChainResult::Complete)
+        return TRUE;
+    // Do not leave a plausible-looking truncated chain for any failed caller.
+    fat->ResetState();
+    fat->DetachMembers();
+    if (result == sally::fat::ChainResult::NoMemory)
     {
         TRACE_E(LOW_MEMORY);
-        fat->ResetState();
-        return FALSE;
     }
-
-    BOOL eoc = FALSE; // End Of Clusterchain
-    do
+    else if (result == sally::fat::ChainResult::Corrupt)
     {
-        BOOL oddCluster = (entry & 1) != 0;
-
-        seek.Value = VolumeStart.Value + beginOfFAT;
-        switch (FATType)
-        {
-        case fteFAT12:
-            seek.Value += entry + (entry / 2);
-            break;
-        case fteFAT16:
-            seek.Value += entry * 2;
-            break;
-        case fteFAT32:
-            seek.Value += entry * 4;
-            break;
-        }
-
-        // attempt to read the entry from the FAT
-        if (!SalamanderSafeFile->SafeFileSeekMsg(&File, &seek, FILE_BEGIN, hParent,
-                                                 buttons, pressedButton, silentMask, TRUE))
-        {
-            return FALSE;
-        }
-
-        DWORD read; // number of bytes read
-        if (!SalamanderSafeFile->SafeFileRead(&File, &entry, sizeof(entry), &read, hParent,
-                                              SAFE_FILE_CHECK_SIZE | buttons, pressedButton, silentMask))
-        {
-            return FALSE;
-        }
-
-        switch (FATType)
-        {
-        case fteFAT12:
-        {
-            // Since 12 bits is not an integral number of bytes, we have
-            // to specify how these are arranged. Two FAT12 entries are
-            // stored into three bytes;
-            // if these bytes are uv,wx,yz then the entries are xuv and yzw.
-            if (oddCluster)
-                entry >>= 4;
-            entry &= 0x00000FFF;
-            if (entry == 0x00000FFF)
-                eoc = TRUE;
-            break;
-        }
-
-        case fteFAT16:
-        {
-            entry &= 0x0000FFFF;
-            if (entry == 0x0000FFFF)
-                eoc = TRUE;
-            break;
-        }
-
-        case fteFAT32:
-        {
-            entry &= 0x0FFFFFFF;
-            if (entry == 0x0FFFFFFF)
-                eoc = TRUE;
-            break;
-        }
-        }
-        if (!eoc)
-        {
-            fat->Add(entry);
-            if (!fat->IsGood())
-            {
-                TRACE_E(LOW_MEMORY);
-                fat->ResetState();
-                return FALSE;
-            }
-        }
-    } while (!eoc);
-    return TRUE;
+        const std::wstring detail = SPLGetErrorTextOwned(SalamanderGeneral, ERROR_FILE_CORRUPT);
+        Error(IDS_ERROR_PARSING_FILE, FALSE, File.FileName, detail.c_str());
+        SetLastError(ERROR_FILE_CORRUPT);
+    }
+    return FALSE;
 }
 
 static std::wstring FormatLocalDateOrTime(const SYSTEMTIME& time, bool date)
@@ -909,13 +856,14 @@ BOOL CFATImage::PickFATVolume(const CPartitionEntry* partitionTable, DWORD numEn
     DWORD i;
     for (i = 0; i < numEntries; i++)
     {
-        if (partitionTable->Type == PARTITIONTYPE_FAT12 ||
-            partitionTable->Type == PARTITIONTYPE_FAT16 ||
-            partitionTable->Type == PARTITIONTYPE_FAT16_32M ||
-            partitionTable->Type == PARTITIONTYPE_FAT32 ||
-            partitionTable->Type == PARTITIONTYPE_FAT32_LBA)
+        const CPartitionEntry& partition = partitionTable[i];
+        if (partition.Type == PARTITIONTYPE_FAT12 ||
+            partition.Type == PARTITIONTYPE_FAT16 ||
+            partition.Type == PARTITIONTYPE_FAT16_32M ||
+            partition.Type == PARTITIONTYPE_FAT32 ||
+            partition.Type == PARTITIONTYPE_FAT32_LBA)
         {
-            volumeStart->SetUI64(partitionTable->StartLBA * (unsigned __int64)512);
+            volumeStart->SetUI64(partition.StartLBA * (unsigned __int64)512);
             return TRUE;
         }
     }

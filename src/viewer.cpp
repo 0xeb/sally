@@ -433,18 +433,37 @@ CFindSetDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CViewerGoToOffsetDialog
 //
 
+namespace
+{
+    void TransferViewerOffset(CTransferInfo& ti, __int64& offset, BOOL hex)
+    {
+        __int64 candidate = offset;
+        ti.EditLine(IDE_VGTO_OFFSET, candidate, TRUE, TRUE, hex, FALSE, TRUE);
+        // The edit accepts unsigned numbers, but the viewer seeks with signed
+        // offsets. Reject the upper half instead of letting it wrap below zero.
+        if (ti.Type == ttDataFromWindow && (!ti.IsGood() || candidate < 0))
+        {
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INVALIDNUMBER));
+            ti.ErrorOn(IDE_VGTO_OFFSET);
+            return;
+        }
+        if (ti.IsGood())
+            offset = candidate;
+    }
+} // namespace
+
 void CViewerGoToOffsetDialog::Validate(CTransferInfo& ti)
 {
-    int h;
+    int h = FALSE;
     ti.CheckBox(IDC_VGTO_HEX, h);
-    __int64 dummy;
-    ti.EditLine(IDE_VGTO_OFFSET, dummy, TRUE, TRUE, h);
+    __int64 dummy = 0;
+    TransferViewerOffset(ti, dummy, h);
 }
 
 void CViewerGoToOffsetDialog::Transfer(CTransferInfo& ti)
 {
     ti.CheckBox(IDC_VGTO_HEX, Configuration.GoToOffsetIsHex);
-    ti.EditLine(IDE_VGTO_OFFSET, *Offset, TRUE, TRUE, Configuration.GoToOffsetIsHex);
+    TransferViewerOffset(ti, *Offset, Configuration.GoToOffsetIsHex);
 }
 
 INT_PTR
@@ -461,7 +480,7 @@ CViewerGoToOffsetDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             CTransferInfo ti(HWindow, ttDataFromWindow);
             __int64 off;
             ti.EditLine(IDE_VGTO_OFFSET, off, TRUE, TRUE, !h, FALSE, TRUE); // do not show an error; just skip conversion
-            if (ti.IsGood())
+            if (ti.IsGood() && off >= 0)
             {
                 CTransferInfo ti2(HWindow, ttDataToWindow);
                 ti2.EditLine(IDE_VGTO_OFFSET, off, FALSE, TRUE, h);

@@ -33,6 +33,7 @@
 #include "plugindarkmode.h"
 #include "plugin_text_encoding.h"
 #include "plugin_window_text.h"
+#include "plugin_integer_text.h"
 
 #ifdef ENABLE_PROPERTYDIALOG
 #include "arraylt.h"
@@ -1458,23 +1459,12 @@ void CTransferInfo::EditLine(int ctrlID, int& value, BOOL select)
                     break;
                 }
 
-                const wchar_t* s = text.c_str();
-                if (*s == L'-' || *s == L'+')
-                    s++;        // skip sign
-                while (*s != 0) // validate number
+                if (!sally::plugin_text::ParseSignedInteger(text, value))
                 {
-                    if (*s < L'0' || *s > L'9')
-                    {
-                        MessageBoxW(HWindow, WinLibStrings[WLS_INVALID_NUMBER].c_str(),
-                                    WinLibStrings[WLS_ERROR].c_str(), MB_OK | MB_ICONEXCLAMATION);
-                        ErrorOn(ctrlID);
-                        break;
-                    }
-                    s++;
+                    MessageBoxW(HWindow, WinLibStrings[WLS_INVALID_NUMBER].c_str(),
+                                WinLibStrings[WLS_ERROR].c_str(), MB_OK | MB_ICONEXCLAMATION);
+                    ErrorOn(ctrlID);
                 }
-
-                wchar_t* endptr;
-                value = wcstoul(text.c_str(), &endptr, 10); // replacement for atoi / _ttoi, which return 2147483647 instead of 4000000000 (because it is a signed int)
                 break;
             }
             }

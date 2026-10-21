@@ -22,6 +22,7 @@
 #include "selfextr/comdefs.h"
 #include "config.h"
 #include "typecons.h"
+#include "zip64_extension.h"
 #include "zip_name_normalize.h"
 #include "zip_ext_info_compare.h"
 #include "chicon.h"
@@ -445,9 +446,8 @@ int CZipCommon::Flush(CFile* file, const void* buffer, unsigned bytesToWrite,
                       bool* skipAll)
 {
     CALL_STACK_MESSAGE3("CZipCommon::Flush(, , 0x%X, ) file: %ls", bytesToWrite, file->FileName.c_str());
-    unsigned long bytesWritten; //number of butes read by ReadFile()
+    unsigned long bytesWritten; // bytes accepted by WriteFile()
     int result;                 //temp variable
-    int errorID = 0;            //error string identifier
 
     if (!bytesToWrite)
         return 0;
@@ -470,15 +470,20 @@ int CZipCommon::Flush(CFile* file, const void* buffer, unsigned bytesToWrite,
         {
             if (WriteFile(file->File, buffer, bytesToWrite, &bytesWritten, NULL))
             {
-                file->RealFilePointer += bytesWritten;
-                return 0; //OK
+                if (bytesWritten != 0)
+                {
+                    file->RealFilePointer += bytesWritten;
+                    buffer = static_cast<const char*>(buffer) + bytesWritten;
+                    bytesToWrite -= bytesWritten;
+                    if (bytesToWrite == 0)
+                        return 0;
+                    continue;
+                }
+                SetLastError(ERROR_WRITE_FAULT);
             }
-            else
-            {
-                result = ProcessError(IDS_ERRWRITE, GetLastError(), file->FileName.c_str(), file->Flags, skipAll);
-                if (result != ERR_RETRY)
-                    return result;
-            }
+            result = ProcessError(IDS_ERRWRITE, GetLastError(), file->FileName.c_str(), file->Flags, skipAll);
+            if (result != ERR_RETRY)
+                return result;
         }
     }
 }
@@ -1037,17 +1042,12 @@ int CZipCommon::FindZip64EOCentrDirLocator()
     }
 
     // Refuse files with encrypted Central Directory
-    if (zip64Record.Size >= sizeof(CZip64EOCentrDirRecord) + sizeof(CZip64EOCentrDirRecordVer2) - sizeof(zip64Record.Signature) - sizeof(zip64Record.Size))
-    {
-        CZip64EOCentrDirRecordVer2 zip64RecordVer2;
-
-        if (Read(ZipFile, &zip64RecordVer2, sizeof(zip64Record), NULL, NULL))
-            return IDS_NODISPLAY;
-        if ((zip64RecordVer2.Method != CM_STORED) || (zip64RecordVer2.AlgID != 0))
-        {
-            return IDS_UNSUP_CD_ENCRYPTION;
-        }
-    }
+    const Zip64ExtensionResult extension = ReadZip64Extension(zip64Record.Size,
+        [this](void* data, unsigned size) { return Read(ZipFile, data, size, NULL, NULL) == 0; });
+    if (extension == Zip64ExtensionResult::ReadError)
+        return IDS_NODISPLAY;
+    if (extension == Zip64ExtensionResult::Unsupported)
+        return IDS_UNSUP_CD_ENCRYPTION;
 
     return 0;
 }

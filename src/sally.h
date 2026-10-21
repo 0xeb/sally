@@ -413,6 +413,9 @@ public:
 public:
     CViewTemplates();
 
+    BOOL IsValidIndex(int index) const;
+    int NormalizeIndex(int index) const;
+
     // sets the attributes
     void Set(DWORD index, DWORD viewMode, const wchar_t* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode);
     void Set(DWORD index, const wchar_t* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode);

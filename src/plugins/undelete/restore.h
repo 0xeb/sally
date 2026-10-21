@@ -4,4 +4,6 @@
 
 #pragma once
 
+BOOL PrepareRestoreDirectory(const wchar_t* targetPath, HWND parent);
+
 BOOL RestoreEncryptedFiles(const wchar_t* targetPath, HWND parent);

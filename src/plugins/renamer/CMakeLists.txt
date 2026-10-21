@@ -16,6 +16,7 @@ sal_add_plugin(NAME renamer
     "${SAL_PLUGINS}/renamer/renamer_execute_undo.cpp"
     "${SAL_PLUGINS}/renamer/renamer_file_ops.cpp"
     "${SAL_PLUGINS}/renamer/renamer_external_command.cpp"
+    "${SAL_PLUGINS}/renamer/filter_process.cpp"
     "${SAL_PLUGINS}/renamer/utils.cpp"
     "${SAL_PLUGINS}/renamer/varstr.cpp"
     # Character utilities from shared/plugcore

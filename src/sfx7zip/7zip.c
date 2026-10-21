@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //
@@ -19,6 +20,7 @@
 
 #include "7zip.h"
 #include "extract.h"
+#include "progress.h"
 #include "resource.h"
 
 #include "7zip/archive/7zHeader.h"
@@ -358,8 +360,8 @@ int UnpackArchive(struct SCabinet* cabinet)
     if ((szRes = SzArchiveOpen(&archiveStream.InStream, &db, &allocImp, &allocTempImp)) == SZ_OK)
     {
         UInt32 i;
-        unsigned long totalProgress = 0;
-        unsigned long actualProgress = 0;
+        unsigned long long totalProgress = 0;
+        unsigned long long actualProgress = 0;
 
         // if you need cache, use these 3 variables.
         // if you use external function, you can make these variable as static.
@@ -373,11 +375,11 @@ int UnpackArchive(struct SCabinet* cabinet)
             CFileItem* f = db.Database.Files + i;
             if (f->IsDirectory)
             {
-                totalProgress++;
+                totalProgress = SfxProgressAdd(totalProgress, 1);
             }
             else
             {
-                totalProgress += f->Size + 1;
+                totalProgress = SfxProgressAdd(SfxProgressAdd(totalProgress, f->Size), 1);
             }
         }
 
@@ -417,7 +419,7 @@ int UnpackArchive(struct SCabinet* cabinet)
 
             if (f->IsDirectory)
             {
-                actualProgress++;
+                actualProgress = SfxProgressAdd(actualProgress, 1);
                 RefreshProgress(totalProgress, actualProgress, TRUE);
                 CreateDirectoryW(uName, NULL);
             }
@@ -457,7 +459,7 @@ int UnpackArchive(struct SCabinet* cabinet)
                 if (writeSize > 0) // error
                     break;
 
-                actualProgress += f->Size + 1;
+                actualProgress = SfxProgressAdd(SfxProgressAdd(actualProgress, f->Size), 1);
                 RefreshProgress(totalProgress, actualProgress, TRUE);
 
                 // set file time

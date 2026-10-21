@@ -7,6 +7,8 @@
 #include "precomp.h"
 #endif
 
+#include "ByteTextConversion.h"
+#include "ConvertedFileReplacement.h"
 #include "worker.h"
 #include "common/HeadlessScriptExecutor.h"
 #include "common/IFileSystem.h"
@@ -456,48 +458,10 @@ static void TranslateConvertChunk(const char* source,
                                   bool& crlfBreak,
                                   std::vector<char>& target)
 {
-    target.clear();
-    target.reserve(sourceSize * 2);
-
-    for (DWORD i = 0; i < sourceSize; ++i)
-    {
-        const unsigned char ch = static_cast<unsigned char>(source[i]);
-        const bool lastChar = i == sourceSize - 1;
-
-        if (convertData.EOFType != 0)
-        {
-            if (crlfBreak && i == 0 && ch == '\n')
-            {
-                crlfBreak = false;
-                continue;
-            }
-
-            if (ch == '\r' || ch == '\n')
-            {
-                switch (convertData.EOFType)
-                {
-                case 2:
-                    target.push_back(convertData.CodeTable[static_cast<unsigned char>('\n')]);
-                    break;
-                case 3:
-                    target.push_back(convertData.CodeTable[static_cast<unsigned char>('\r')]);
-                    break;
-                default:
-                    target.push_back(convertData.CodeTable[static_cast<unsigned char>('\r')]);
-                    target.push_back(convertData.CodeTable[static_cast<unsigned char>('\n')]);
-                    break;
-                }
-
-                if (lastChar && ch == '\r')
-                    crlfBreak = true;
-                if (!lastChar && ch == '\r' && source[i + 1] == '\n')
-                    ++i;
-                continue;
-            }
-        }
-
-        target.push_back(convertData.CodeTable[ch]);
-    }
+    target.resize(static_cast<std::size_t>(sourceSize) * 2);
+    const auto written = sally::conversion::ConvertByteChunk(source, sourceSize,
+                                                             convertData.CodeTable, convertData.EOFType, crlfBreak, target.data());
+    target.resize(written);
 }
 
 static bool WriteAllW(HANDLE file, const std::vector<char>& bytes, DWORD& error)
@@ -593,37 +557,6 @@ static CFileOperationResult AskConvertFileError(IWorkerObserver& observer,
     }
 }
 
-static CFileOperationResult AskConvertMoveError(IWorkerObserver& observer,
-                                                const std::wstring& tempPath,
-                                                const std::wstring& sourcePath,
-                                                DWORD error,
-                                                CFileOperationExecutionState& state,
-                                                bool& retry)
-{
-    retry = false;
-    observer.WaitIfSuspended();
-    if (observer.IsCancelled())
-        return ErrorResult(ERROR_CANCELLED);
-    if (state.SkipAllErrors)
-        return SuccessResult(true);
-
-    int response = observer.AskCannotMoveErr(tempPath.c_str(), sourcePath.c_str(), error, false);
-    switch (response)
-    {
-    case IDRETRY:
-        retry = true;
-        return SuccessResult();
-    case IDB_SKIPALL:
-        state.SkipAllErrors = true;
-        [[fallthrough]];
-    case IDB_SKIP:
-        return SuccessResult(true);
-    case IDCANCEL:
-    default:
-        return ErrorResult(error != ERROR_SUCCESS ? error : ERROR_CANCELLED);
-    }
-}
-
 static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
                                                 const std::wstring& sourcePath,
                                                 const CConvertData* convertData,
@@ -642,8 +575,8 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
     while (true)
     {
         HANDLE source = ExecutorFs()->CreateFile(sourcePath.c_str(), GENERIC_READ,
-                                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                    NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                                 NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (source == INVALID_HANDLE_VALUE)
         {
             bool retry = false;
@@ -654,6 +587,17 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
             return openResult;
         }
 
+        sally::conversion::FileMetadata metadata;
+        const auto captured = sally::conversion::CaptureMetadata(*ExecutorFs(), source, sourcePath, metadata);
+        if (!captured.success)
+        {
+            ExecutorFs()->CloseFileHandle(source);
+            bool retry = false;
+            const auto decision = AskConvertFileError(observer, L"Error reading file", sourcePath, captured.errorCode, state, retry);
+            if (retry)
+                continue;
+            return decision;
+        }
         std::wstring tempPath;
         DWORD tempError = ERROR_SUCCESS;
         HANDLE target = CreateConvertTempFileW(ParentDirectoryW(sourcePath), tempPath, tempError);
@@ -731,11 +675,13 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
         if (restart)
             continue;
 
-        ExecutorFs()->CloseFileHandle(source);
-        const FileResult closeFileResult = ExecutorFs()->CloseFileHandle(target);
-        if (!closeFileResult.success)
+        const auto finalized = sally::conversion::FinalizeContents(*ExecutorFs(), target, metadata);
+        const auto sourceClosed = ExecutorFs()->CloseFileHandle(source);
+        const auto targetClosed = ExecutorFs()->CloseFileHandle(target);
+        if (!finalized.success || !sourceClosed.success || !targetClosed.success)
         {
-            DWORD error = closeFileResult.errorCode;
+            DWORD error = !finalized.success ? finalized.errorCode : !sourceClosed.success ? sourceClosed.errorCode
+                                                                                           : targetClosed.errorCode;
             ExecutorFs()->DeleteFile(tempPath.c_str());
 
             bool retry = false;
@@ -746,36 +692,31 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
             return closeDecision;
         }
 
-        const DWORD sourceAttrs = ExecutorFs()->GetFileAttributes(sourcePath.c_str());
-        if (sourceAttrs != INVALID_FILE_ATTRIBUTES &&
-            (sourceAttrs & FILE_ATTRIBUTE_READONLY) != 0)
-        {
-            ExecutorFs()->SetFileAttributes(sourcePath.c_str(), sourceAttrs & ~FILE_ATTRIBUTE_READONLY);
-        }
-
-        while (true)
-        {
-            const FileResult moveResult = ExecutorFs()->MoveFileWithFlags(
-                tempPath.c_str(), sourcePath.c_str(), MoveFlags::ReplaceExisting);
-            if (moveResult.success)
+        const auto completed = sally::conversion::CompleteReplacement(
+            *ExecutorFs(), sourcePath, tempPath, metadata,
+            [&](const std::wstring& from, const std::wstring& to, DWORD error, bool recovery)
             {
-                if (sourceAttrs != INVALID_FILE_ATTRIBUTES)
-                    ExecutorFs()->SetFileAttributes(sourcePath.c_str(), sourceAttrs);
-                return SuccessResult();
-            }
-
-            DWORD error = moveResult.errorCode;
-            bool retry = false;
-            CFileOperationResult moveErrorResult =
-                AskConvertMoveError(observer, tempPath, sourcePath, error, state, retry);
-            if (retry)
-                continue;
-
-            ExecutorFs()->DeleteFile(tempPath.c_str());
-            if (sourceAttrs != INVALID_FILE_ATTRIBUTES)
-                ExecutorFs()->SetFileAttributes(sourcePath.c_str(), sourceAttrs);
-            return moveErrorResult;
-        }
+                using sally::conversion::Decision;
+                observer.WaitIfSuspended();
+                if (!recovery)
+                {
+                    if (observer.IsCancelled())
+                        return Decision::Cancel;
+                    if (state.SkipAllErrors)
+                        return Decision::Skip;
+                }
+                const int answer = observer.AskCannotMoveErr(from.c_str(), to.c_str(), error, false);
+                if (answer == IDRETRY)
+                    return Decision::Retry;
+                if (answer == IDB_SKIPALL)
+                    state.SkipAllErrors = true;
+                return answer == IDB_SKIP || answer == IDB_SKIPALL ? Decision::Skip : Decision::Cancel;
+            },
+            [&](const std::wstring& retained, DWORD error)
+            {
+                observer.NotifyError(L"Error converting file", retained.c_str(), std::to_wstring(error).c_str());
+            });
+        return completed.Continue ? SuccessResult(!completed.Converted) : ErrorResult(completed.Error);
     }
 }
 
@@ -1189,66 +1130,29 @@ static CFileOperationResult ExecuteChangeAttributesW(IWorkerObserver& observer,
                 return SuccessResult();
             }
 
-            const bool isReadOnly = (attrs & FILE_ATTRIBUTE_READONLY) != 0;
-            if (isReadOnly)
-                ExecutorFs()->SetFileAttributes(attrPath.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+            const FILETIME* created = attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL;
+            const FILETIME* accessed = attrsData->ChangeTimeAccessed ? &attrsData->TimeAccessed : NULL;
+            const FILETIME* modified = attrsData->ChangeTimeModified ? &attrsData->TimeModified : NULL;
+            const auto timeResult = ExecutorFs()->SetPathFileTime(attrPath.c_str(), created, accessed, modified);
+            if (timeResult.success)
+                return SuccessResult();
 
-            DWORD flags = (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0;
-            HANDLE file = ExecutorFs()->CreateFile(attrPath.c_str(), FILE_WRITE_ATTRIBUTES,
-                                      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                      NULL, OPEN_EXISTING, flags, NULL);
-            if (file != INVALID_HANDLE_VALUE)
+            const DWORD error = timeResult.errorCode;
+            if (state.SkipAllErrors)
+                return SuccessResult(true);
+            const int response = AskFileError(observer, L"Error changing attributes", path, error);
+            switch (response)
             {
-                const FILETIME* created = attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL;
-                const FILETIME* accessed = attrsData->ChangeTimeAccessed ? &attrsData->TimeAccessed : NULL;
-                const FILETIME* modified = attrsData->ChangeTimeModified ? &attrsData->TimeModified : NULL;
-                const FileResult timeResult = ExecutorFs()->SetHandleFileTime(
-                    file, created, accessed, modified);
-                const DWORD error = timeResult.errorCode;
-                ExecutorFs()->CloseFileHandle(file);
-                if (isReadOnly)
-                    ExecutorFs()->SetFileAttributes(attrPath.c_str(), attrs);
-                if (timeResult.success)
-                    return SuccessResult();
-
-                if (state.SkipAllErrors)
-                    return SuccessResult(true);
-                int response = AskFileError(observer, L"Error changing attributes", path, error);
-                switch (response)
-                {
-                case IDRETRY:
-                    break;
-                case IDB_SKIPALL:
-                    state.SkipAllErrors = true;
-                    [[fallthrough]];
-                case IDB_SKIP:
-                    return SuccessResult(true);
-                case IDCANCEL:
-                default:
-                    return ErrorResult(error);
-                }
-            }
-            else
-            {
-                DWORD error = GetLastError();
-                if (isReadOnly)
-                    ExecutorFs()->SetFileAttributes(attrPath.c_str(), attrs);
-                if (state.SkipAllErrors)
-                    return SuccessResult(true);
-                int response = AskFileError(observer, L"Error changing attributes", path, error);
-                switch (response)
-                {
-                case IDRETRY:
-                    break;
-                case IDB_SKIPALL:
-                    state.SkipAllErrors = true;
-                    [[fallthrough]];
-                case IDB_SKIP:
-                    return SuccessResult(true);
-                case IDCANCEL:
-                default:
-                    return ErrorResult(error);
-                }
+            case IDRETRY:
+                break;
+            case IDB_SKIPALL:
+                state.SkipAllErrors = true;
+                [[fallthrough]];
+            case IDB_SKIP:
+                return SuccessResult(true);
+            case IDCANCEL:
+            default:
+                return ErrorResult(error);
             }
         }
         else
@@ -1453,6 +1357,7 @@ CScriptExecutionResult ExecuteOperationsHeadlessWithOptions(IWorkerObserver& obs
     if (script.CopySecurity)
         effectiveOptions.CopySecurity = true;
 
+    script.ResetCopyCompletion();
     int totalProgressOps = 0;
     for (int i = 0; i < script.Count; ++i)
     {
@@ -1473,8 +1378,14 @@ CScriptExecutionResult ExecuteOperationsHeadlessWithOptions(IWorkerObserver& obs
             return result;
         }
 
-        const COperation& op = script.At(i);
-        CFileOperationResult opResult = ExecuteScriptOperation(observer, op, state, effectiveOptions);
+        COperation& op = script.At(i);
+        const bool retainSourceDirectory =
+            (op.Opcode == ocDeleteDirLink && !script.CanRemoveFollowedLink(i)) ||
+            (op.Opcode == ocDeleteDir && !script.CanRemoveMovedDirectory(i));
+        CFileOperationResult opResult = retainSourceDirectory
+                                            ? SuccessResult(true)
+                                            : ExecuteScriptOperation(observer, op, state, effectiveOptions);
+        op.CopyCompleted = opResult.success && !opResult.skipped;
         if (!opResult.success)
         {
             result.lastError = opResult.lastError != ERROR_SUCCESS ? opResult.lastError : ERROR_INVALID_PARAMETER;

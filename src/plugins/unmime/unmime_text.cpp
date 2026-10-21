@@ -49,3 +49,36 @@ bool EncodeUnmimeAsciiToken(const std::wstring& token, std::string& bytes)
     bytes.swap(encoded);
     return true;
 }
+
+std::vector<std::wstring> SplitUnmimeMasks(const wchar_t* masks)
+{
+    std::vector<std::wstring> result;
+    if (masks == nullptr)
+        return result;
+
+    std::wstring current;
+    for (const wchar_t* cursor = masks;; ++cursor)
+    {
+        if (*cursor == L';' && cursor[1] == L';')
+        {
+            current.push_back(L';');
+            ++cursor;
+            continue;
+        }
+        if (*cursor == L';' || *cursor == L'\0')
+        {
+            const size_t first = current.find_first_not_of(L" \t\r\n");
+            if (first != std::wstring::npos)
+            {
+                const size_t last = current.find_last_not_of(L" \t\r\n");
+                result.emplace_back(current.substr(first, last - first + 1));
+            }
+            current.clear();
+            if (*cursor == L'\0')
+                break;
+        }
+        else
+            current.push_back(*cursor);
+    }
+    return result;
+}

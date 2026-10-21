@@ -199,6 +199,11 @@ struct CConfig
 // configuration
 extern CConfig Config;
 
+// The editor owns a draft. Applying accepted global preferences is separate;
+// nested pack options can retain ownership of their unaccepted checkbox.
+BOOL EditConfiguration(HWND parent, CConfig& draft);
+void ApplyConfiguration(const CConfig& accepted);
+
 std::wstring LangStr(int resID);
 std::wstring GetInfoW(const FILETIME* lastWrite, UINT64 size);
 

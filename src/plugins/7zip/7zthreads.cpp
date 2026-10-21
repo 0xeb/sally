@@ -76,7 +76,7 @@ BOOL CALLBACK SubClassedProgressDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
             int res = (int)dlg.Execute();
 
             if (IDOK == res)
-                strcpy((char*)lParam, dlg.GetPassword());
+                dlg.TakePassword(*reinterpret_cast<std::wstring*>(lParam));
             return res;
         }
         }

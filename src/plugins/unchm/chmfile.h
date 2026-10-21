@@ -23,6 +23,8 @@ class CCHMFile
 public:
     CCHMFile();
     virtual ~CCHMFile();
+    CCHMFile(const CCHMFile&) = delete;
+    CCHMFile& operator=(const CCHMFile&) = delete;
 
     BOOL Open(const wchar_t* fileName, BOOL quiet = FALSE);
     BOOL Close();
@@ -42,6 +44,7 @@ public:
 
 protected:
     chmFile* CHM;
+    HMODULE ChmLibrary;
     std::wstring FileName;
     FILETIME FileTime;
 

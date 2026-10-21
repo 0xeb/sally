@@ -2036,4 +2036,12 @@
 // The new name entered in Quick Rename cannot be represented by the negotiated connection encoding.
 #define IDS_RENAMENAME_CANNOTENCODE     11407
 
+// The enabled log limit must fit its unsigned byte budget.
+#define IDS_LOGSIZEOUTOFRANGE           11408
+
+// Logging is enabled, but this connection's log is no longer available.
+#define IDS_FSLOGUNAVAILABLE           11409
+
+#define IDS_ITEMRETRYPOLICYHINT        11410
+
 #endif // __FTP_RH2

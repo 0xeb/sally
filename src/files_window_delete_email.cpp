@@ -1185,17 +1185,14 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
 // designator, accept the 8.3 alias when CP_ACP cannot spell the path, and refuse when neither
 // exists - instead of handing MAPI a '?'-bearing path, which is what the previous code did every
 // time and which names no file at all.
-static bool NameForMapi(const std::wstring& widePath, std::wstring& out)
+bool ResolveMapiAttachmentName(const std::wstring& widePath, std::wstring& out)
 {
     auto shortName = [](const std::wstring& p) { return GetShortPathW(p.c_str()); };
     const auto resolved = sally::unicode::ResolveAnsiToolPath(widePath, shortName);
     if (!resolved.Usable())
     {
-        // Needs BOTH a name CP_ACP cannot spell AND 8.3 generation disabled on the volume.
-        // Aborting matches how every other AddFile failure here already behaves. A dedicated
-        // message would be better, but adding a string id costs a translated row in all nine
-        // sally.slt packs, and inventing that text is worse than the trace.
-        TRACE_E("EmailFiles: no ANSI name designates this file, cannot attach it via Simple MAPI.");
+        const std::wstring message = FormatStrW(LoadStrW(IDS_EMAILFILES_PATHERROR), widePath.c_str());
+        gPrompter->ShowError(NULL, LoadStrW(IDS_ERRORTITLE), message.c_str());
         return false;
     }
     out = resolved.WidePath;
@@ -1243,6 +1240,8 @@ BOOL EmailFilesAddDirectoryW(CSimpleMAPI* mapi, const wchar_t* path, BOOL* errGe
 
         if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         {
+            if (file.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+                continue;
             if (!EmailFilesAddDirectoryW(mapi, myPath.c_str(), errGetFileSizeOfLnkTgtIgnAll))
             {
                 ok = FALSE;
@@ -1262,7 +1261,7 @@ BOOL EmailFilesAddDirectoryW(CSimpleMAPI* mapi, const wchar_t* path, BOOL* errGe
             std::wstring mapiName;
             // Keep the original wide path or the exact 8.3 wide alias. CSimpleMAPI owns it as
             // UTF-16 and performs the one exact conversion at MAPISendMail's external ANSI ABI.
-            if (cancel || !NameForMapi(myPath, mapiName) || !mapi->AddFile(mapiName.c_str(), &size))
+            if (cancel || !ResolveMapiAttachmentName(myPath, mapiName) || !mapi->AddFile(mapiName.c_str(), &size))
             {
                 ok = FALSE;
                 break;
@@ -1325,6 +1324,8 @@ void CFilesWindow::EmailFiles()
                             SalPathAppendW(itemPathW, f->Name);
                             if (isDir)
                             {
+                                if (f->Attr & FILE_ATTRIBUTE_REPARSE_POINT)
+                                    continue;
                                 if (!EmailFilesAddDirectoryW(mapi, itemPathW.c_str(), &errGetFileSizeOfLnkTgtIgnAll))
                                 {
                                     send = FALSE;
@@ -1342,7 +1343,7 @@ void CFilesWindow::EmailFiles()
                                     size = f->Size;
                                 }
                                 std::wstring mapiName;
-                                if (cancel || !NameForMapi(itemPathW, mapiName) ||
+                                if (cancel || !ResolveMapiAttachmentName(itemPathW, mapiName) ||
                                     !mapi->AddFile(mapiName.c_str(), &size))
                                 {
                                     send = FALSE;

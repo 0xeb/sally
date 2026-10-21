@@ -456,8 +456,8 @@ public:
     // adds names to the list box
     void AddNamesToListbox(HWND listbox);
 
-    // loads the list
-    void Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry);
+    // During parser upgrades, retain current defaults and merge saved user types.
+    void Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry, BOOL onlyUserDefined = FALSE);
     // saves the list
     void Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry);
 
@@ -481,7 +481,8 @@ struct CFTPServer
 {
     std::wstring ItemName;           // bookmark label (for the Bookmarks list box in the Connect dialog)
     std::wstring Address;            // semantic host/IP, dynamically owned UTF-16
-    std::wstring InitialPath;        // semantic initial remote path; encoded only after session negotiation
+    std::wstring InitialPath;        // initial remote path; encoded only after session negotiation
+    BOOL InitialPathIsEscaped;       // explicit byte-preserving representation; legacy records default to semantic text
     int AnonymousConnection;         // TRUE = anonymous login, FALSE = UserName and Password apply
     std::wstring UserName;           // semantic user name; empty and non-anonymous means ask the user
     BYTE* EncryptedPassword;         // password; if empty (or NULL) and not an anonymous login, ask the user
@@ -550,7 +551,7 @@ struct CFTPServer
              int keepAliveCommand,
              int encryptControlConnection,
              int encryptDataConnection,
-             int compressData) noexcept;
+             int compressData, BOOL initialPathIsEscaped = FALSE) noexcept;
 
     // sets the structure based on source 'src', returns FALSE on error
     BOOL Set(const CFTPServer& src)
@@ -582,7 +583,7 @@ struct CFTPServer
                    src.KeepAliveCommand,
                    src.EncryptControlConnection,
                    src.EncryptDataConnection,
-                   src.CompressData);
+                   src.CompressData, src.InitialPathIsEscaped);
     }
 
     // loads the structure, returns TRUE if the item is valid (should be added to the list)
@@ -635,7 +636,7 @@ public:
                    int keepAliveCommand = -1 /* -1 will be replaced with Config.KeepAliveCommand */,
                    int encryptControlConnection = 0,
                    int encryptDataConnection = 0,
-                   int compressData = -1 /*default*/);
+                   int compressData = -1 /*default*/, BOOL initialPathIsEscaped = FALSE);
 
     void AddNamesToListbox(HWND list);
 
@@ -1117,6 +1118,9 @@ protected:                             // data used from multiple threads, acces
 
 public:
     CConfiguration();
+
+    // Retired controls never change transfer behavior or configuration validation.
+    void ResetUnsupportedOptions() noexcept;
     ~CConfiguration();
 
     BOOL InitWithSalamanderGeneral();        // initialization after obtaining the SalamanderGeneral pointer
@@ -1274,6 +1278,23 @@ public:
 // ****************************************************************************
 // CSimpleListPluginDataInterface
 //
+
+// Both listing formats use the same private POD prefix. PluginData is never borrowed
+// from a panel interface and never interpreted as an untagged text/pointer alternative.
+enum class CFtpListingItemKind
+{
+    Parsed,
+    RawLine
+};
+struct CFtpListingItemData
+{
+    char* RawName; // Salamander allocator, exact remote bytes
+    wchar_t* Row;  // CRT allocator, presentation-only simple listing row
+    CFtpListingItemKind Kind;
+};
+CFtpListingItemData* FtpCreateSimpleListingItem(std::wstring_view row) noexcept;
+void FtpDestroySimpleListingItem(CFtpListingItemData* item) noexcept;
+BOOL FtpGetListingWireName(const CFileData& file, const CFtpTextCodec& codec, std::string& name) noexcept;
 
 class CSimpleListPluginDataInterface : public CPluginDataInterfaceAbstract
 {
@@ -1497,6 +1518,14 @@ enum CFTPErrorState
     fesInaccessiblePath, // the path cannot be listed, the path must be shortened
 };
 
+class IFtpFileOpenHost;
+struct CFtpFileDownloadPlan
+{
+    std::string WireName;
+    BOOL AsciiMode = FALSE;
+    CQuadWord Size = CQuadWord(-1, -1);
+};
+
 class CPluginFSInterface : public CPluginFSInterfaceAbstract
 {
 protected:
@@ -1554,6 +1583,14 @@ public:
                            std::wstring& fullPath) const;
     BOOL DecodeSessionBytes(std::string_view bytes, std::wstring& text) const;
     BOOL EncodeSessionText(const wchar_t* text, std::string& bytes) const;
+    BOOL EncodeSessionUserPart(const wchar_t* text, std::string& bytes) const;
+
+    BOOL PrepareFileDownload(const CFileData& file, CFTPListingPluginDataInterface* dataIface,
+                             CFtpFileDownloadPlan& plan);
+    void DownloadFileCopy(HWND parent, const CFtpFileDownloadPlan& plan, const wchar_t* target,
+                          BOOL& created, BOOL& incomplete, CQuadWord& size);
+    void OpenFileCopy(int panel, CFileData& file, IFtpFileOpenHost* host = NULL);
+    void ActivateLink(int panel, const wchar_t* fsName, CFileData& file);
     BOOL GetEncodedSessionUserLength(int& userLength) const;
     BOOL ResolveFullServerPathBytes(HWND parent, std::string& path, BOOL& success);
     BOOL ChangePathBytes(int currentFSNameIndex, std::wstring& fsName, int fsNameIndex,

@@ -750,19 +750,22 @@ static const TChar* FTPFindPathT(const TChar* path, int userLength)
     {
         p = FTPFindEndOfUserNameOrHostInURLT(p);
     }
-    if (*p == '@' || *p == ':') // user + password
+    if (*p == '@' || *p == ':')
     {
-        BOOL passwd = *p == ':';
-        p++;
-        if (passwd) // next is password
+        const BOOL password = *p == ':';
+        const TChar* passwordEnd = p + 1;
+        if (password)
         {
-            while (*p != 0 && *p != '@' && *p != ':' && *p != '/' && *p != '\\')
-                p++; // find end of password
-            p++;
+            while (*passwordEnd != 0 && *passwordEnd != '@' && *passwordEnd != ':' &&
+                   *passwordEnd != '/' && *passwordEnd != '\\')
+                ++passwordEnd;
         }
-        // next is host
-        while (*p != 0 && *p != ':' && *p != '/' && *p != '\\')
-            p++; // find end of host
+        if (!password || *passwordEnd == '@')
+        {
+            p = password ? passwordEnd + 1 : p + 1;
+            while (*p != 0 && *p != ':' && *p != '/' && *p != '\\')
+                ++p;
+        }
     }
     if (*p == ':')
     {

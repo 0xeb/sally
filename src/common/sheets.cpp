@@ -9,6 +9,7 @@
 #include <tchar.h>
 #include <ostream>
 #include <uxtheme.h>
+#include <algorithm>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -22,6 +23,8 @@
 #include "winlib.h"
 #include "multimon.h"
 #include "sheets.h"
+#include "configuration/ConfigurationLayout.h"
+#include "DialogFont.h"
 #ifndef __TRACESERVER
 #include "darkmode.h"
 #endif
@@ -73,6 +76,16 @@ void CElasticLayout::AddResizeCtrl(int resID)
     else
     {
         TRACE_E("CElasticLayout::AddResizeCtrl() Unknown control: resID=" << resID);
+    }
+}
+
+void CElasticLayout::Scale(int numeratorX, int denominatorX, int numeratorY, int denominatorY)
+{
+    SplitY = MulDiv(SplitY, numeratorY, denominatorY);
+    for (int i = 0; i < ResizeCtrls.Count; ++i)
+    {
+        ResizeCtrls[i].Pos.x = MulDiv(ResizeCtrls[i].Pos.x, numeratorX, denominatorX);
+        ResizeCtrls[i].Pos.y = MulDiv(ResizeCtrls[i].Pos.y, numeratorY, denominatorY);
     }
 }
 
@@ -590,6 +603,7 @@ int CPropertyDialog::GetCurSel()
 #define _TPD_IDC_CAPTION 3
 #define _TPD_IDC_RECT 4
 #define _TPD_IDC_OK 5
+#define _TPD_IDC_APPLY 6
 // dimensions in dlg units
 #define _TPD_LEFTMARGIN 4  // indentation of TreeView and Caption from left edge
 #define _TPD_TOPMARGIN 4   // indentation of TreeView and Caption from top edge
@@ -696,7 +710,9 @@ CTPHCaptionWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HFONT hFont = NULL;
             HFONT hOldFont = NULL;
             LOGFONT srcLF;
-            HFONT hSrcFont = (HFONT)HANDLES(GetStockObject(DEFAULT_GUI_FONT));
+            HFONT hSrcFont = reinterpret_cast<HFONT>(SendMessageW(GetParent(HWindow), WM_GETFONT, 0, 0));
+            if (hSrcFont == NULL)
+                hSrcFont = (HFONT)HANDLES(GetStockObject(DEFAULT_GUI_FONT));
             GetObject(hSrcFont, sizeof(srcLF), &srcLF);
             srcLF.lfHeight = (int)(srcLF.lfHeight * 1.2);
             // srcLF.lfWeight = FW_BOLD; // on Vista bold looks pretty ugly and unreadable
@@ -711,7 +727,7 @@ CTPHCaptionWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             else
                 oldColor = SetTextColor(hdc, GetSysColor(COLOR_CAPTIONTEXT));
             r.left += 8;
-            DrawTextW(hdc, Text, (int)wcslen(Text), &r, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOPREFIX);
+            DrawTextW(hdc, Text, (int)wcslen(Text), &r, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOPREFIX | DT_END_ELLIPSIS);
             SetTextColor(hdc, oldColor);
             SelectObject(hdc, hOldFont);
             SetBkMode(hdc, oldBkMode);
@@ -755,9 +771,17 @@ CTreePropHolderDlg::CTreePropHolderDlg(HWND hParent, DWORD* windowHeight)
     WindowHeight = windowHeight;
 }
 
+CTreePropHolderDlg::~CTreePropHolderDlg()
+{
+    for (HFONT font : ReflowFonts)
+        HANDLES(DeleteObject(font));
+}
+
 INT_PTR
 CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+    if (TPD != NULL && TPD->HandleDialogMessage(uMsg, wParam, lParam))
+        return TRUE;
     // WM_INITDIALOG will be called only when we know the window dimensions
     if (TPD != NULL && uMsg != WM_INITDIALOG)
         TPD->DialogProc(uMsg, wParam, lParam); // forward messages
@@ -777,7 +801,19 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         ChildDialogRect.top = p.y;
         ChildDialogRect.right = p.x + w;
         ChildDialogRect.bottom = p.y + h;
-        DestroyWindow(hwnd);
+        NaturalPageSize = {w, h};
+        MaximumPageSize = NaturalPageSize;
+        PageSizes.resize(TPD->Count);
+        if (TPD->ScrollablePages())
+        {
+            PageViewport = hwnd;
+            SetWindowLongPtrW(hwnd, GWL_STYLE, GetWindowLongPtrW(hwnd, GWL_STYLE) |
+                WS_VISIBLE | WS_CLIPCHILDREN | WS_VSCROLL | WS_HSCROLL);
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_CONTROLPARENT);
+            new CTPHPageViewport(HWindow, _TPD_IDC_RECT, this);
+        }
+        else
+            DestroyWindow(hwnd);
         HTreeView = GetDlgItem(HWindow, _TPD_IDC_TREE);
         BOOL appIsThemed = IsAppThemed();
         if (appIsThemed)
@@ -833,11 +869,16 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int height = (int)*WindowHeight;
         RECT clipR; // we do not want to be larger than screen height
         MultiMonGetClipRectByWindow(HWindow, &clipR, NULL);
+        if (TPD->ScrollablePages())
+        {
+            MinWindowSize.cx = (std::min)(MinWindowSize.cx, clipR.right - clipR.left);
+            MinWindowSize.cy = (std::min)(MinWindowSize.cy, clipR.bottom - clipR.top);
+        }
         if (height > clipR.bottom - clipR.top)
             height = clipR.bottom - clipR.top;
         if (height < MinWindowSize.cy)
             height = MinWindowSize.cy;
-        SetWindowPos(HWindow, NULL, 0, 0, r.right - r.left, height,
+        SetWindowPos(HWindow, NULL, 0, 0, MinWindowSize.cx, height,
                      SWP_NOZORDER | SWP_NOMOVE);
 
         LayoutControls();
@@ -881,21 +922,33 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         case _TPD_IDC_OK:
+        case _TPD_IDC_APPLY:
         {
-            // I must perform validation of the current page
-            if (!ChildDialog->ValidateData())
-                return TRUE;
-
-            // iterate through all pages for transfer
+            // Validate every created page before transferring any edited data.
+            // A previously visited page can still contain an invalid edit.
+            for (int i = 0; i < TPD->Count; i++)
+                if (TPD->At(i)->HWindow != NULL && !TPD->At(i)->ValidateData())
+                {
+                    HWND invalidControl = GetFocus();
+                    TreeView_SelectItem(HTreeView, TPD->At(i)->HTreeItem);
+                    if (IsChild(TPD->At(i)->HWindow, invalidControl)) SetFocus(invalidControl);
+                    return TRUE;
+                }
             for (int i = 0; i < TPD->Count; i++)
                 if (TPD->At(i)->HWindow != NULL)
                     if (!TPD->At(i)->TransferData(ttDataFromWindow))
                         return TRUE;
-            wParam = IDOK;
+            const bool save = LOWORD(wParam) == _TPD_IDC_OK;
+            if (!TPD->AfterTransfer(save) || !save)
+                return TRUE;
+            ExitButton = IDOK;
+            PostMessageW(HWindow, WM_NULL, 0, 0); // wake a GetMessage dispatching a sent command
+            return TRUE;
         }
         case IDCANCEL:
         {
             ExitButton = LOWORD(wParam);
+            PostMessageW(HWindow, WM_NULL, 0, 0);
             return TRUE;
         }
         }
@@ -1033,31 +1086,311 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     return CDialog::DialogProc(uMsg, wParam, lParam);
 }
 
+CTPHPageViewport::CTPHPageViewport(HWND parent, int id, CTreePropHolderDlg* holder)
+    : CWindow(parent, id, ooAllocated), Holder(holder)
+{
+}
+
+LRESULT CTPHPageViewport::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
+{
+    if (message == WM_VSCROLL || message == WM_HSCROLL)
+    {
+        Holder->ScrollPage(message == WM_VSCROLL ? SB_VERT : SB_HORZ, LOWORD(wParam));
+        return 0;
+    }
+    if (message == WM_MOUSEWHEEL)
+    {
+        WheelRemainder += GET_WHEEL_DELTA_WPARAM(wParam);
+        while (WheelRemainder >= WHEEL_DELTA || WheelRemainder <= -WHEEL_DELTA)
+        {
+            const bool up = WheelRemainder > 0;
+            UINT lines = 3;
+            SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &lines, 0);
+            if (lines == WHEEL_PAGESCROLL)
+                Holder->ScrollPage(SB_VERT, up ? SB_PAGEUP : SB_PAGEDOWN);
+            else
+                for (UINT i = 0; i < lines; ++i) Holder->ScrollPage(SB_VERT, up ? SB_LINEUP : SB_LINEDOWN);
+            WheelRemainder += up ? -WHEEL_DELTA : WHEEL_DELTA;
+        }
+        return 0;
+    }
+    return CWindow::WindowProc(message, wParam, lParam);
+}
+
+void CTreePropHolderDlg::LayoutPageViewport()
+{
+    if (PageViewport == NULL || ChildDialog == NULL || ChildDialog->HWindow == NULL)
+        return;
+    RECT client;
+    // Each scrollbar can make the other necessary; recompute after the client
+    // area changes instead of assuming a particular font or monitor DPI.
+    for (int pass = 0; pass != 3; ++pass)
+    {
+        GetClientRect(PageViewport, &client);
+        SCROLLINFO horizontal = {sizeof(horizontal), SIF_RANGE | SIF_PAGE};
+        horizontal.nMax = (std::max)(0L, NaturalPageSize.cx - 1);
+        horizontal.nPage = (std::max)(0L, client.right);
+        SetScrollInfo(PageViewport, SB_HORZ, &horizontal, TRUE);
+        SCROLLINFO vertical = {sizeof(vertical), SIF_RANGE | SIF_PAGE};
+        vertical.nMax = (std::max)(0L, NaturalPageSize.cy - 1);
+        vertical.nPage = (std::max)(0L, client.bottom);
+        SetScrollInfo(PageViewport, SB_VERT, &vertical, TRUE);
+    }
+    GetClientRect(PageViewport, &client);
+    SetWindowPos(ChildDialog->HWindow, NULL,
+                  -GetScrollPos(PageViewport, SB_HORZ), -GetScrollPos(PageViewport, SB_VERT),
+                  (std::max)(NaturalPageSize.cx, client.right), (std::max)(NaturalPageSize.cy, client.bottom),
+                  SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void CTreePropHolderDlg::ScrollPage(int bar, int command)
+{
+    if (PageViewport == NULL)
+        return;
+    SCROLLINFO info = {sizeof(info), SIF_ALL};
+    if (!GetScrollInfo(PageViewport, bar, &info))
+        return;
+    RECT line = {0, 0, 0, 10};
+    MapDialogRect(HWindow, &line);
+    const int step = (std::max)(1L, line.bottom);
+    int position = info.nPos;
+    switch (command)
+    {
+    case SB_LINEUP: position -= step; break;
+    case SB_LINEDOWN: position += step; break;
+    case SB_PAGEUP: position -= static_cast<int>(info.nPage); break;
+    case SB_PAGEDOWN: position += static_cast<int>(info.nPage); break;
+    case SB_TOP: position = info.nMin; break;
+    case SB_BOTTOM: position = info.nMax; break;
+    case SB_THUMBTRACK:
+    case SB_THUMBPOSITION: position = info.nTrackPos; break;
+    default: return;
+    }
+    SetScrollPos(PageViewport, bar, position, TRUE);
+    LayoutPageViewport();
+}
+
+void CTreePropHolderDlg::EnsurePageFocusVisible()
+{
+    if (PageViewport == NULL || ChildDialog == NULL || ChildDialog->HWindow == NULL)
+        return;
+    HWND focus = GetFocus();
+    if (focus == LastPageFocus)
+        return;
+    LastPageFocus = focus;
+    if (focus == NULL || !IsChild(ChildDialog->HWindow, focus))
+        return;
+    RECT control, client;
+    GetWindowRect(focus, &control);
+    MapWindowPoints(NULL, PageViewport, reinterpret_cast<POINT*>(&control), 2);
+    GetClientRect(PageViewport, &client);
+    const int dx = control.left < 0 ? control.left : control.right > client.right ? control.right - client.right : 0;
+    const int dy = control.top < 0 ? control.top : control.bottom > client.bottom ? control.bottom - client.bottom : 0;
+    if (dx != 0) SetScrollPos(PageViewport, SB_HORZ, GetScrollPos(PageViewport, SB_HORZ) + dx, TRUE);
+    if (dy != 0) SetScrollPos(PageViewport, SB_VERT, GetScrollPos(PageViewport, SB_VERT) + dy, TRUE);
+    if (dx != 0 || dy != 0) LayoutPageViewport();
+}
+
+namespace
+{
+    LRESULT CALLBACK LiveDialogFontProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
+                                        UINT_PTR id, DWORD_PTR font)
+    {
+        if (message == WM_GETFONT)
+            return static_cast<LRESULT>(font);
+        if (message == WM_SETFONT)
+        {
+            SetWindowSubclass(window, LiveDialogFontProc, id, static_cast<DWORD_PTR>(wParam));
+            if (lParam != 0) InvalidateRect(window, NULL, TRUE);
+            return 0; // USER32 continues to own only the original template font.
+        }
+        if (message == WM_NCDESTROY)
+            RemoveWindowSubclass(window, LiveDialogFontProc, id);
+        return DefSubclassProc(window, message, wParam, lParam);
+    }
+
+    struct FontReflowControl
+    {
+        HWND Window;
+        LOGFONTW Font = {};
+        RECT Bounds;
+        bool DirectPageChild = false;
+        std::vector<int> Columns;
+    };
+} // namespace
+
+bool CTreePropHolderDlg::ReflowFont(const LOGFONTW& requested)
+{
+    HFONT font = HANDLES(CreateFontIndirectW(&requested));
+    if (font == NULL)
+        return false;
+    HFONT previousFont = (HFONT)SendMessageW(HWindow, WM_GETFONT, 0, 0);
+    LOGFONTW previousDescription = {};
+    GetObjectW(previousFont, sizeof(previousDescription), &previousDescription);
+    const SIZE oldUnits = Sally::Appearance::DialogFontUnits(HWindow, previousFont);
+    const SIZE newUnits = Sally::Appearance::DialogFontUnits(HWindow, font);
+    if (oldUnits.cx <= 0 || oldUnits.cy <= 0 || newUnits.cx <= 0 || newUnits.cy <= 0)
+    {
+        HANDLES(DeleteObject(font));
+        return false;
+    }
+    ReflowFonts.push_back(font);
+    std::vector<FontReflowControl> controls;
+    EnumChildWindows(HWindow, [](HWND window, LPARAM context) -> BOOL
+                     {
+        auto& items = *reinterpret_cast<std::vector<FontReflowControl>*>(context);
+        FontReflowControl item;
+        item.Window = window;
+        const HFONT controlFont = (HFONT)SendMessageW(window, WM_GETFONT, 0, 0);
+        GetObjectW(controlFont, sizeof(item.Font), &item.Font);
+        GetWindowRect(window, &item.Bounds);
+        MapWindowPoints(NULL, ::GetParent(window), reinterpret_cast<POINT*>(&item.Bounds), 2);
+        wchar_t className[32] = {};
+        GetClassNameW(window, className, ARRAYSIZE(className));
+        if (wcscmp(className, WC_LISTVIEWW) == 0)
+        {
+            const int count = Header_GetItemCount(ListView_GetHeader(window));
+            for (int i = 0; i < count; ++i)
+                item.Columns.push_back(ListView_GetColumnWidth(window, i));
+        }
+        items.push_back(std::move(item));
+        return TRUE; }, reinterpret_cast<LPARAM>(&controls));
+    for (auto& control : controls)
+        for (int page = 0; page < TPD->Count; ++page)
+            if (TPD->At(page)->HWindow != NULL && ::GetParent(control.Window) == TPD->At(page)->HWindow)
+                control.DirectPageChild = true;
+
+    // USER32 retains the font/base units from the creation template. Keep an
+    // explicit live font for this container and the already-created pages;
+    // resources for pages opened later use the newly selected template font.
+    if (!SetWindowSubclass(HWindow, LiveDialogFontProc, 1, reinterpret_cast<DWORD_PTR>(font)))
+        return false;
+    for (int page = 0; page < TPD->Count; ++page)
+    {
+        HWND window = TPD->At(page)->HWindow;
+        if (window != NULL && !SetWindowSubclass(window, LiveDialogFontProc, 1, reinterpret_cast<DWORD_PTR>(font)))
+        {
+            SetWindowSubclass(HWindow, LiveDialogFontProc, 1, reinterpret_cast<DWORD_PTR>(previousFont));
+            for (int undo = 0; undo < page; ++undo)
+                if (TPD->At(undo)->HWindow != NULL)
+                    SetWindowSubclass(TPD->At(undo)->HWindow, LiveDialogFontProc, 1, reinterpret_cast<DWORD_PTR>(previousFont));
+            return false;
+        }
+    }
+
+    SendMessageW(HWindow, WM_SETREDRAW, FALSE, 0);
+    SendMessageW(HWindow, WM_SETFONT, reinterpret_cast<WPARAM>(font), FALSE);
+    for (const auto& control : controls)
+    {
+        HFONT controlFont = font;
+        // Font previews keep their chosen face/style while adopting the dialog's
+        // new size. Capture LOGFONTs before WM_SETFONT can retire owner-draw fonts.
+        if (control.Font.lfFaceName[0] != 0 &&
+            (wcscmp(control.Font.lfFaceName, previousDescription.lfFaceName) != 0 ||
+             control.Font.lfWeight != previousDescription.lfWeight || control.Font.lfItalic != previousDescription.lfItalic))
+        {
+            LOGFONTW preview = control.Font;
+            preview.lfHeight = requested.lfHeight;
+            preview.lfWidth = 0;
+            HFONT created = HANDLES(CreateFontIndirectW(&preview));
+            if (created != NULL)
+            {
+                ReflowFonts.push_back(created);
+                controlFont = created;
+            }
+        }
+        SendMessageW(control.Window, WM_SETFONT, reinterpret_cast<WPARAM>(controlFont), FALSE);
+        if (control.DirectPageChild)
+            SetWindowPos(control.Window, NULL,
+                         MulDiv(control.Bounds.left, newUnits.cx, oldUnits.cx), MulDiv(control.Bounds.top, newUnits.cy, oldUnits.cy),
+                         MulDiv(control.Bounds.right - control.Bounds.left, newUnits.cx, oldUnits.cx),
+                         MulDiv(control.Bounds.bottom - control.Bounds.top, newUnits.cy, oldUnits.cy), SWP_NOZORDER | SWP_NOACTIVATE);
+        for (std::size_t column = 0; column < control.Columns.size(); ++column)
+            ListView_SetColumnWidth(control.Window, static_cast<int>(column), MulDiv(control.Columns[column], newUnits.cx, oldUnits.cx));
+    }
+    const auto scaleSize = [&](SIZE& size)
+    {
+        size.cx = MulDiv(size.cx, newUnits.cx, oldUnits.cx);
+        size.cy = MulDiv(size.cy, newUnits.cy, oldUnits.cy);
+    };
+    scaleSize(MaximumPageSize);
+    scaleSize(NaturalPageSize);
+    scaleSize(ButtonSize);
+    scaleSize(MarginSize);
+    TreeWidth = MulDiv(TreeWidth, newUnits.cx, oldUnits.cx);
+    CaptionHeight = MulDiv(CaptionHeight, newUnits.cy, oldUnits.cy);
+    ButtonMargin = MulDiv(ButtonMargin, newUnits.cx, oldUnits.cx);
+    for (int page = 0; page < TPD->Count; ++page)
+    {
+        scaleSize(PageSizes[page]);
+        auto* item = TPD->At(page);
+        if (item->HWindow != NULL)
+        {
+            RECT client;
+            GetClientRect(item->HWindow, &client);
+            if (item->ElasticLayout != NULL)
+                item->ElasticLayout->Scale(newUnits.cx, oldUnits.cx, newUnits.cy, oldUnits.cy);
+            SetWindowPos(item->HWindow, NULL, 0, 0, MulDiv(client.right, newUnits.cx, oldUnits.cx),
+                         MulDiv(client.bottom, newUnits.cy, oldUnits.cy), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+    }
+    RECT outer, client, workArea;
+    GetWindowRect(HWindow, &outer);
+    GetClientRect(HWindow, &client);
+    MultiMonGetClipRectByWindow(HWindow, &workArea, NULL);
+    const int borderX = outer.right - outer.left - client.right;
+    const int borderY = outer.bottom - outer.top - client.bottom;
+    MinWindowSize.cx = (std::min)(TreeWidth + MaximumPageSize.cx + 3 * MarginSize.cx + borderX, workArea.right - workArea.left);
+    MinWindowSize.cy = (std::min)(MaximumPageSize.cy + CaptionHeight + ButtonSize.cy + 6 * MarginSize.cy + borderY, workArea.bottom - workArea.top);
+    const int height = (std::max)(MinWindowSize.cy, (std::min<LONG>)(MulDiv(client.bottom, newUnits.cy, oldUnits.cy) + borderY, workArea.bottom - workArea.top));
+    SetWindowPos(HWindow, NULL, (std::max)(workArea.left, (std::min)(outer.left, workArea.right - MinWindowSize.cx)),
+                 (std::max)(workArea.top, (std::min)(outer.top, workArea.bottom - height)), MinWindowSize.cx, height, SWP_NOZORDER | SWP_NOACTIVATE);
+    LastPageFocus = NULL;
+    LayoutControls();
+    SendMessageW(HWindow, WM_SETREDRAW, TRUE, 0);
+    RedrawWindow(HWindow, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_FRAME);
+    return true;
+}
+
 void CTreePropHolderDlg::LayoutControls()
 {
-    if (ChildDialog->HWindow == NULL)
+    if (ChildDialog == NULL || ChildDialog->HWindow == NULL)
         return;
 
     RECT cRect;
     GetClientRect(HWindow, &cRect);
 
-    int sepY = cRect.bottom - MarginSize.cy - ButtonSize.cy - MarginSize.cy - 1;
-
     GripSize.cx = GetSystemMetrics(SM_CXVSCROLL);
     GripSize.cy = GetSystemMetrics(SM_CYHSCROLL);
+
+    const bool apply = TPD->ApplyButtonCaption() != NULL;
+    const int buttonCount = apply ? 4 : 3;
+    const auto fitted = sally::configuration::FitPropertyLayout(cRect.right, TreeWidth, buttonCount,
+        ButtonSize.cx, ButtonSize.cy, ButtonMargin, MarginSize.cx, MarginSize.cy, GripSize.cx,
+        Sally::Appearance::DialogFontUnits(HWindow, (HFONT)SendMessageW(HWindow, WM_GETFONT, 0, 0)).cy);
+    const bool scrollable = TPD->ScrollablePages();
+    const int navigationWidth = scrollable ? fitted.NavigationWidth : TreeWidth;
+    const int buttonColumns = scrollable ? fitted.ButtonColumns : buttonCount;
+    const int buttonWidth = scrollable ? fitted.ButtonWidth : ButtonSize.cx;
+    const int buttonHeight = scrollable ? fitted.ButtonHeight : ButtonSize.cy;
+    const int footerHeight = scrollable ? fitted.FooterHeight : 2 * MarginSize.cy + ButtonSize.cy;
+    int sepY = cRect.bottom - footerHeight - 1;
 
     HDWP hdwp = HANDLES(BeginDeferWindowPos(8));
     if (hdwp != NULL)
     {
-        // treeview
+        // treeview; optional search controls share the navigation column.
+        const int navigationHeader = scrollable ?
+            sally::configuration::FitNavigationHeader(TPD->NavigationHeaderHeight(HWindow), sepY - 2 * MarginSize.cy) :
+            TPD->NavigationHeaderHeight(HWindow);
         hdwp = HANDLES(DeferWindowPos(hdwp, HTreeView, NULL,
                                       MarginSize.cx,
-                                      MarginSize.cy,
-                                      TreeWidth,
-                                      sepY - 2 * MarginSize.cy,
+                                      MarginSize.cy + navigationHeader,
+                                      navigationWidth,
+                                      (std::max)(0L, sepY - 2 * MarginSize.cy - navigationHeader),
                                       SWP_NOZORDER));
         // caption
-        int captionX = MarginSize.cx + TreeWidth + MarginSize.cx;
+        int captionX = MarginSize.cx + navigationWidth + MarginSize.cx;
         HWND hCaption = GetDlgItem(HWindow, _TPD_IDC_CAPTION);
         hdwp = HANDLES(DeferWindowPos(hdwp, hCaption, NULL,
                                       captionX,
@@ -1066,13 +1399,13 @@ void CTreePropHolderDlg::LayoutControls()
                                       CaptionHeight,
                                       SWP_NOZORDER));
         // child dialog
-        int dlgX = MarginSize.cx + TreeWidth + MarginSize.cx;
+        int dlgX = MarginSize.cx + navigationWidth + MarginSize.cx;
         int dlgY = MarginSize.cy + CaptionHeight + MarginSize.cy;
         ChildDialogRect.left = dlgX;
         ChildDialogRect.top = dlgY;
         ChildDialogRect.right = cRect.right - MarginSize.cx;
         ChildDialogRect.bottom = sepY - MarginSize.cy;
-        hdwp = HANDLES(DeferWindowPos(hdwp, ChildDialog->HWindow, NULL,
+        hdwp = HANDLES(DeferWindowPos(hdwp, PageViewport != NULL ? PageViewport : ChildDialog->HWindow, NULL,
                                       ChildDialogRect.left,
                                       ChildDialogRect.top,
                                       ChildDialogRect.right - ChildDialogRect.left,
@@ -1086,32 +1419,20 @@ void CTreePropHolderDlg::LayoutControls()
                                       cRect.right - 2 * MarginSize.cx,
                                       1,
                                       SWP_NOZORDER));
-        // OK button
-        int buttonsX = cRect.right - (3 * ButtonSize.cx + 2 * ButtonMargin) - GripSize.cx / 2;
-        int buttonsY = sepY + 1 + MarginSize.cy;
-        HWND hOK = GetDlgItem(HWindow, _TPD_IDC_OK);
-        hdwp = HANDLES(DeferWindowPos(hdwp, hOK, NULL,
-                                      buttonsX,
-                                      buttonsY,
-                                      ButtonSize.cx,
-                                      ButtonSize.cy,
-                                      SWP_NOZORDER));
-        // Cancel button
-        HWND hCancel = GetDlgItem(HWindow, IDCANCEL);
-        hdwp = HANDLES(DeferWindowPos(hdwp, hCancel, NULL,
-                                      buttonsX + ButtonSize.cx + ButtonMargin,
-                                      buttonsY,
-                                      ButtonSize.cx,
-                                      ButtonSize.cy,
-                                      SWP_NOZORDER));
-        // Help button
-        HWND hHelp = GetDlgItem(HWindow, _TPD_IDC_HELP);
-        hdwp = HANDLES(DeferWindowPos(hdwp, hHelp, NULL,
-                                      buttonsX + 2 * ButtonSize.cx + 2 * ButtonMargin,
-                                      buttonsY,
-                                      ButtonSize.cx,
-                                      ButtonSize.cy,
-                                      SWP_NOZORDER));
+        const int buttons[] = {_TPD_IDC_OK, _TPD_IDC_APPLY, IDCANCEL, _TPD_IDC_HELP};
+        for (int index = 0; index < buttonCount; ++index)
+        {
+            const int row = index / buttonColumns;
+            const int column = index % buttonColumns;
+            const int rowCount = (std::min)(buttonColumns, buttonCount - row * buttonColumns);
+            const int buttonsX = cRect.right - MarginSize.cx - GripSize.cx / 2 -
+                                 rowCount * buttonWidth - (rowCount - 1) * ButtonMargin;
+            const int id = buttons[apply || index == 0 ? index : index + 1];
+            hdwp = HANDLES(DeferWindowPos(hdwp, GetDlgItem(HWindow, id), NULL,
+                                          buttonsX + column * (buttonWidth + ButtonMargin),
+                                          sepY + 1 + MarginSize.cy + row * (buttonHeight + ButtonMargin),
+                                          buttonWidth, buttonHeight, SWP_NOZORDER));
+        }
         // Grip (resize)
         HWND hGrip = GetDlgItem(HWindow, _TPD_IDC_GRIP);
         hdwp = HANDLES(DeferWindowPos(hdwp, hGrip, NULL,
@@ -1122,6 +1443,9 @@ void CTreePropHolderDlg::LayoutControls()
                                       SWP_NOZORDER));
 
         HANDLES(EndDeferWindowPos(hdwp));
+        LayoutPageViewport();
+        const RECT navigation = {MarginSize.cx, MarginSize.cy, MarginSize.cx + navigationWidth, sepY - MarginSize.cy};
+        TPD->LayoutNavigation(navigation);
         // hack: there seems to be a bug in treeview/common controls: if a scrollbar appears due to content,
         // the selected item is not redrawn, so it is cropped on the right; it may be related to full row
         // select and still aero look; anyway redrawing under W7 does not flicker, we can probably afford it
@@ -1165,6 +1489,13 @@ int CTreePropHolderDlg::BuildAndMeasureTree()
     return width;
 }
 
+void CTreePropDialog::SetApplyButtonEnabled(bool enabled)
+{
+    const HWND apply = GetDlgItem(Dialog.HWindow, _TPD_IDC_APPLY);
+    if (!enabled && GetFocus() == apply) SetFocus(GetDlgItem(Dialog.HWindow, _TPD_IDC_OK));
+    EnableWindow(apply, enabled);
+}
+
 void CTreePropHolderDlg::EnableButtons()
 {
 }
@@ -1173,6 +1504,11 @@ BOOL CTreePropHolderDlg::SelectPage(int pageIndex)
 {
     if (pageIndex < 0 || pageIndex >= TPD->Count)
         return FALSE;
+    if (pageIndex == CurrentPageIndex)
+    {
+        ChildDialog = TPD->At(pageIndex);
+        return ChildDialog->HWindow != NULL;
+    }
     HWND HHideWindow = NULL;
     if (ChildDialog != NULL)
     {
@@ -1185,8 +1521,37 @@ BOOL CTreePropHolderDlg::SelectPage(int pageIndex)
         ChildDialog = TPD->At(pageIndex);
         if (ChildDialog->HWindow == NULL)
         {
-            ChildDialog->SetParent(HWindow);
-            ChildDialog->Create();
+            ChildDialog->SetParent(PageViewport != NULL ? PageViewport : HWindow);
+            HRSRC resource = FindResourceW(TPD->Modul, MAKEINTRESOURCEW(ChildDialog->ResID), RT_DIALOG);
+            HGLOBAL loaded = resource != NULL ? LoadResource(TPD->Modul, resource) : NULL;
+            const void* source = loaded != NULL ? LockResource(loaded) : NULL;
+            std::vector<BYTE> prepared;
+            if (source != NULL && TPD->PrepareDialogTemplate(source, SizeofResource(TPD->Modul, resource), prepared))
+                ChildDialog->CreateFromTemplate(reinterpret_cast<const DLGTEMPLATE*>(prepared.data()));
+            else
+                ChildDialog->Create();
+            if (ChildDialog->HWindow == NULL)
+                return FALSE;
+            RECT natural;
+            GetClientRect(ChildDialog->HWindow, &natural);
+            if (TPD->ScrollablePages())
+            {
+                // Most resources share a common empty canvas. Scroll only to
+                // real content, rather than into that unused bottom margin.
+                int bottom = 0;
+                for (HWND child = GetWindow(ChildDialog->HWindow, GW_CHILD); child != NULL; child = GetWindow(child, GW_HWNDNEXT))
+                {
+                    RECT bounds;
+                    GetWindowRect(child, &bounds);
+                    MapWindowPoints(NULL, ChildDialog->HWindow, reinterpret_cast<POINT*>(&bounds), 2);
+                    bottom = (std::max)(bottom, static_cast<int>(bounds.bottom));
+                }
+                RECT margin = {0, 0, 0, 4};
+                Sally::Appearance::MapCurrentDialogRect(ChildDialog->HWindow, margin);
+                if (bottom > 0) natural.bottom = (std::min)(natural.bottom, bottom + margin.bottom);
+            }
+            PageSizes[pageIndex] = {natural.right, natural.bottom};
+            TPD->PageCreated(pageIndex);
         }
 
         NMHDR nmhdr;
@@ -1200,11 +1565,20 @@ BOOL CTreePropHolderDlg::SelectPage(int pageIndex)
 
         CaptionWindow->SetText(ChildDialog->Title);
 
-        SetWindowPos(ChildDialog->HWindow, HTreeView,
-                     ChildDialogRect.left, ChildDialogRect.top,
-                     ChildDialogRect.right - ChildDialogRect.left,
-                     ChildDialogRect.bottom - ChildDialogRect.top,
-                     SWP_SHOWWINDOW);
+        if (PageViewport != NULL)
+        {
+            NaturalPageSize = PageSizes[pageIndex];
+            SetScrollPos(PageViewport, SB_HORZ, 0, TRUE);
+            SetScrollPos(PageViewport, SB_VERT, 0, TRUE);
+            LayoutPageViewport();
+            ShowWindow(ChildDialog->HWindow, SW_SHOW);
+        }
+        else
+            SetWindowPos(ChildDialog->HWindow, HTreeView,
+                         ChildDialogRect.left, ChildDialogRect.top,
+                         ChildDialogRect.right - ChildDialogRect.left,
+                         ChildDialogRect.bottom - ChildDialogRect.top,
+                         SWP_SHOWWINDOW);
         CurrentPageIndex = pageIndex;
         EnableButtons();
     }
@@ -1245,6 +1619,8 @@ int CTreePropHolderDlg::ExecuteIndirect(LPCDLGTEMPLATE hDialogTemplate)
     MSG msg;
     while (ExitButton == -1 && GetMessageW(&msg, NULL, 0, 0))
     {
+        if (TPD != NULL && TPD->PreTranslateMessage(msg))
+            continue;
         CWindowsObject* wnd = WindowsManager.GetWindowPtr(GetActiveWindow());
         if ((msg.message == WM_KEYDOWN || msg.message == WM_KEYUP) &&
             msg.wParam == VK_TAB && (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0)
@@ -1257,6 +1633,7 @@ int CTreePropHolderDlg::ExecuteIndirect(LPCDLGTEMPLATE hDialogTemplate)
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
+        EnsurePageFocusVisible();
     }
     EnableWindow(Parent, TRUE);
     DestroyWindow(HWindow);
@@ -1341,6 +1718,7 @@ int CTreePropDialog::Execute(const WCHAR* buttonOK,
                 TRACE_ET(L"Unable to find resource for page number: " << i);
                 return 0;
             }
+            IndexPageResource(i, pageTemplate, SizeofResource(Modul, hrsrc));
             BOOL dlgEx = *pageTemplate /*dlgVer*/ == 1 && *(pageTemplate + 1) /*signature*/ == 0xffff; // DLGEX
             if (!dlgEx)
                 TRACE_CT(L"CTreePropDialog::Execute(): DLG is no longer supported! PageResID=" << At(i)->ResID);
@@ -1424,7 +1802,7 @@ int CTreePropDialog::Execute(const WCHAR* buttonOK,
         *(DWORD*)lpw = WS_VISIBLE | WS_POPUP | WS_BORDER | WS_SYSMENU | WS_CAPTION |
                        DS_SETFONT | DS_MODALFRAME | DS_CENTER | DS_FIXEDSYS | WS_SIZEBOX;
         lpw += 2;
-        *lpw++ = 8; // cDlgItems (number of controls)
+        *lpw++ = ApplyButtonCaption() != NULL ? 9 : 8; // cDlgItems
         *lpw++ = 0; // x
         *lpw++ = 0; // y
         *lpw++ = 0; // cx
@@ -1466,6 +1844,9 @@ int CTreePropDialog::Execute(const WCHAR* buttonOK,
         AddItemEx(lpw, L"button", _TPD_IDC_OK,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 0, buttonOK);
+        if (ApplyButtonCaption() != NULL)
+            AddItemEx(lpw, L"button", _TPD_IDC_APPLY, 0, 0, 0, 0,
+                      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, ApplyButtonCaption());
         AddItemEx(lpw, L"button", IDCANCEL,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, buttonCancel);
@@ -1477,9 +1858,14 @@ int CTreePropDialog::Execute(const WCHAR* buttonOK,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | SBS_SIZEBOX | SBS_SIZEBOXBOTTOMRIGHTALIGN, 0, L"");
 
+        const std::size_t templateSize = reinterpret_cast<const BYTE*>(lpw) - reinterpret_cast<const BYTE*>(hgbl);
+        std::vector<BYTE> prepared;
+        const bool customized = PrepareDialogTemplate(hgbl, templateSize, prepared);
         GlobalUnlock(hgbl);
-
-        return Dialog.ExecuteIndirect((LPDLGTEMPLATE)hgbl);
+        const int result = Dialog.ExecuteIndirect(customized ? reinterpret_cast<const DLGTEMPLATE*>(prepared.data())
+                                                            : reinterpret_cast<const DLGTEMPLATE*>(hgbl));
+        GlobalFree(hgbl);
+        return result;
     }
     else
     {
@@ -1499,6 +1885,21 @@ int CTreePropDialog::GetCurSel()
         if (At(i) == page)
             return i;
     return -1;
+}
+
+bool CTreePropDialog::NavigateToPage(int page, int control)
+{
+    if (page < 0 || page >= Count || !TreeView_SelectItem(Dialog.HTreeView, At(page)->HTreeItem))
+        return false;
+    if (Dialog.CurrentPageIndex != page || At(page)->HWindow == NULL)
+        return false;
+    HWND target = control != 0 ? GetDlgItem(At(page)->HWindow, control) : NULL;
+    if (target == NULL || !IsWindowEnabled(target) || !IsWindowVisible(target))
+        target = GetNextDlgTabItem(At(page)->HWindow, NULL, FALSE);
+    if (target != NULL)
+        SetFocus(target);
+    Dialog.EnsurePageFocusVisible();
+    return true;
 }
 
 int CTreePropDialog::Add(CPropSheetPage* page, CPropSheetPage* parent, BOOL* expanded)

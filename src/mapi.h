@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 typedef unsigned long ULONG;
 typedef unsigned long FAR* LPULONG;
 typedef unsigned long FLAGS;
@@ -124,7 +126,7 @@ protected:
     CQuadWord TotalSize;           // total size of the files (from FileNames)
 
 public:
-    CSimpleMAPI();
+    explicit CSimpleMAPI(PFNMAPISENDMAIL sendMail = NULL);
     ~CSimpleMAPI();
 
     // tries to load mapi32.dll library and link required functions
@@ -158,3 +160,5 @@ public:
 // 2) add files to the allocated instance using AddFile method
 // 3) call SimpleMAPISendMail with the instance; it will handle destruction
 BOOL SimpleMAPISendMail(CSimpleMAPI* mapi);
+
+bool ResolveMapiAttachmentName(const std::wstring& widePath, std::wstring& out);

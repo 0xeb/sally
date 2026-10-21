@@ -21,12 +21,18 @@ protected:
     std::wstring& Path2;
     BOOL& Succes;
     CCompareOptions* Options;
+    CFilecompPathContext PathContext;
     WNDPROC OldEditProc1, OldEditProc2;
 
 public:
     CCompareFilesDialog(HWND parent, std::wstring& path1, std::wstring& path2,
-                        BOOL& succes, CCompareOptions* options);
-    virtual ~CCompareFilesDialog() { MainWindowQueue.Remove(HWindow); }
+                        BOOL& succes, CCompareOptions* options,
+                        const CFilecompPathContext* pathContext = nullptr);
+    virtual ~CCompareFilesDialog()
+    {
+        CompareDialogHistoryQueue.Remove(HWindow);
+        MainWindowQueue.Remove(HWindow);
+    }
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
 

@@ -9,6 +9,9 @@
 #include "dialogs.h"
 #include "folders.h"
 #include "iltools.h"
+#include "folders.rh2"
+
+extern HINSTANCE HLanguage;
 
 //
 // ****************************************************************************
@@ -147,11 +150,32 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex,
         return FALSE; // ListCurrentPath failed due to memory, fatal error
     }
 
+    ErrorState = fesOK; // a failed pending folder has been discarded; retry the current folder
     return TRUE;
 }
 
 extern IShellFolder* ChangePathNewFolder;
 extern LPITEMIDLIST ChangePathNewPIDL;
+
+namespace
+{
+    // Shell HRESULTs must reach the presentation adapter before another API changes error state.
+    void ShowFolderListingError(HRESULT error) noexcept
+    {
+        try
+        {
+            const std::wstring detail = SPLGetErrorTextOwned(SalamanderGeneral, static_cast<int>(error));
+            const std::wstring format = SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_LISTFOLDERERROR);
+            const std::wstring caption = SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME);
+            const std::wstring message = SPLFormatStringOwned(format.c_str(), static_cast<unsigned>(error), detail.c_str());
+            SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(), message.c_str(), caption.c_str(), MB_OK | MB_ICONEXCLAMATION);
+        }
+        catch (...)
+        {
+            TRACE_E("Unable to display folder listing error: " << error);
+        }
+    }
+} // namespace
 
 BOOL WINAPI
 CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
@@ -159,143 +183,146 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                                     int& iconsType, BOOL forceRefresh)
 {
     TRACE_I("CPluginFSInterface::ListCurrentPath");
+    pluginData = NULL;
+    const BOOL changingFolder = ChangePathNewFolder != NULL && ChangePathNewPIDL != NULL;
+    LPCITEMIDLIST currentPIDL = changingFolder ? ChangePathNewPIDL : CurrentPIDL;
+    IShellFolder* currentFolder = changingFolder ? ChangePathNewFolder : CurrentFolder;
+    CPluginDataInterface* data = NULL;
+    IEnumIDList* enumeration = NULL;
+    CFileData file{};
 
-    CFileData file;
-    DWORD flags;
-
-    LPCITEMIDLIST currentPIDL = CurrentPIDL;
-    IShellFolder* currentFolder = CurrentFolder;
-    if (ChangePathNewFolder != NULL && ChangePathNewPIDL != NULL)
+    const auto releaseRow = [&]()
     {
-        currentFolder = ChangePathNewFolder;
-        currentPIDL = ChangePathNewPIDL;
-    }
-
-    // if this is not the Desktop (empty PIDL), insert ".."
-    if (!ILIsEmpty(currentPIDL))
+        if (file.Name != NULL)
+            SalamanderGeneral->Free(file.Name);
+        if (file.PluginData != 0)
+            ILFree(reinterpret_cast<LPITEMIDLIST>(file.PluginData));
+        file = CFileData{};
+    };
+    const auto fail = [&](HRESULT error) -> BOOL
     {
-        file.Name = SalamanderGeneral->DupStr(L"..");
-        if (file.Name == NULL)
-            goto ON_FATAL_ERROR;
-        file.NameLen = 2;
-        file.Ext = file.Name + file.NameLen;
-        file.Size = CQuadWord(0, 0);
-        file.Attr = FILE_ATTRIBUTE_DIRECTORY;
-        file.LastWrite.dwLowDateTime = 0;
-        file.LastWrite.dwHighDateTime = 0;
-        file.Hidden = 0;
-        file.DosName = NULL;
-        file.PluginData = NULL;
-        file.IsLink = 0;
-        file.IsOffline = 0;
-        if (!dir->AddDir(NULL, file, NULL))
-            goto ON_FATAL_ERROR;
-    }
-
-    LPENUMIDLIST enumIDList;
-    flags = SHCONTF_FOLDERS | SHCONTF_NONFOLDERS | SHCONTF_INCLUDEHIDDEN;
-    if (SUCCEEDED(currentFolder->EnumObjects(NULL, flags, &enumIDList)))
-    {
-        int sortByExtDirsAsFiles;
-        SalamanderGeneral->GetConfigParameter(SALCFG_SORTBYEXTDIRSASFILES, &sortByExtDirsAsFiles,
-                                              sizeof(sortByExtDirsAsFiles), NULL);
-
-        ULONG celt;
-        LPITEMIDLIST idList; // single-level PIDL, relative to the folder
-        STRRET str;
-        while (enumIDList->Next(1, &idList, &celt) == NOERROR)
+        releaseRow();
+        if (enumeration != NULL)
         {
-            if (SUCCEEDED(currentFolder->GetDisplayNameOf(idList, SHGDN_INFOLDER, &str)))
-            {
-                PWSTR name = NULL;
-                if (SUCCEEDED(StrRetToStrW(&str, idList, &name)))
-                {
-                    file.Name = SalamanderGeneral->DupStr(name);
-                    CoTaskMemFree(name);
-                    if (file.Name == NULL)
-                    {
-                        enumIDList->Release();
-                        goto ON_FATAL_ERROR;
-                    }
-                    file.NameLen = static_cast<DWORD>(wcslen(file.Name));
-
-                    BOOL isDir = FALSE;
-                    file.Hidden = 0;
-
-                    SFGAOF uAttr = SFGAO_FOLDER | SFGAO_GHOSTED;
-                    if (SUCCEEDED(currentFolder->GetAttributesOf(1, (LPCITEMIDLIST*)&idList, &uAttr)))
-                    {
-                        isDir = (uAttr & SFGAO_FOLDER) != 0;
-                        file.Hidden = (uAttr & SFGAO_GHOSTED) ? 1 : 0;
-                    }
-
-                    if (!sortByExtDirsAsFiles && isDir)
-                        file.Ext = file.Name + file.NameLen; // folders do not have extensions
-                    else
-                    {
-                        wchar_t* s = wcsrchr(file.Name, L'.');
-                        if (s != NULL)
-                            file.Ext = s + 1; // ".cvspass" is treated as an extension in Windows
-                        else
-                            file.Ext = file.Name + file.NameLen;
-                    }
-                    file.Size = CQuadWord(0, 0);
-                    file.Attr = 0;
-                    file.LastWrite.dwLowDateTime = 0;
-                    file.LastWrite.dwHighDateTime = 0;
-                    file.PluginData = (DWORD_PTR)idList; // destruction is performed in CPluginDataInterface::ReleasePluginData
-                    file.DosName = NULL;
-
-                    // FIXME: in time this will probably need a more sophisticated method (the folder will know whether its items should have an overlay)
-                    if (isDir)
-                        file.IsLink = 0;
-                    else
-                        file.IsLink = SalamanderGeneral->IsFileLink(file.Ext);
-                    file.IsOffline = 0;
-
-                    BOOL ret = isDir ? dir->AddDir(NULL, file, NULL) : dir->AddFile(NULL, file, NULL);
-                    if (!ret)
-                    {
-                        SalamanderGeneral->Free(file.Name);
-                        enumIDList->Release();
-                        goto ON_FATAL_ERROR;
-                    }
-                }
-            }
+            enumeration->Release();
+            enumeration = NULL;
         }
-        enumIDList->Release();
-
-        // passing the path through globals
-        if (ChangePathNewFolder != NULL && ChangePathNewPIDL != NULL)
+        // On FALSE the host ignores pluginData and only frees its own part of each row.
+        // Clear through the owning interface while it is still alive.
+        dir->Clear(data);
+        delete data;
+        data = NULL;
+        if (changingFolder)
         {
-            if (CurrentPIDL != NULL)
-                ILFree(CurrentPIDL);
+            ChangePathNewFolder->Release();
+            ChangePathNewFolder = NULL;
+            ILFree(ChangePathNewPIDL);
+            ChangePathNewPIDL = NULL;
+        }
+        ErrorState = changingFolder ? fesInaccessiblePath : fesFatal;
+        ShowFolderListingError(error);
+        return FALSE;
+    };
+
+    try
+    {
+        if (currentFolder == NULL || currentPIDL == NULL || !CheckPIDL(currentPIDL))
+            return fail(E_INVALIDARG);
+        data = new CPluginDataInterface(currentFolder, currentPIDL);
+        if (data == NULL || !data->IsGood())
+            return fail(E_OUTOFMEMORY);
+
+        HRESULT error = currentFolder->EnumObjects(NULL, SHCONTF_FOLDERS | SHCONTF_NONFOLDERS | SHCONTF_INCLUDEHIDDEN, &enumeration);
+        if (FAILED(error))
+            return fail(error);
+        const BOOL empty = error == S_FALSE;
+        if (!empty && (error != S_OK || enumeration == NULL))
+            return fail(E_UNEXPECTED);
+
+        if (!ILIsEmpty(currentPIDL))
+        {
+            file.Name = SalamanderGeneral->DupStr(L"..");
+            if (file.Name == NULL)
+                return fail(E_OUTOFMEMORY);
+            file.NameLen = 2;
+            file.Ext = file.Name + file.NameLen;
+            file.Size = CQuadWord(0, 0);
+            file.Attr = FILE_ATTRIBUTE_DIRECTORY;
+            if (!dir->AddDir(NULL, file, NULL))
+                return fail(E_OUTOFMEMORY);
+            file = CFileData{}; // ownership transferred to dir
+        }
+
+        int sortByExtDirsAsFiles = FALSE;
+        if (!empty)
+            SalamanderGeneral->GetConfigParameter(SALCFG_SORTBYEXTDIRSASFILES, &sortByExtDirsAsFiles, sizeof(sortByExtDirsAsFiles), NULL);
+        while (!empty)
+        {
+            LPITEMIDLIST item = NULL;
+            ULONG fetched = 0;
+            error = enumeration->Next(1, &item, &fetched);
+            file.PluginData = reinterpret_cast<DWORD_PTR>(item);
+            if (error == S_FALSE && fetched == 0 && item == NULL)
+                break;
+            if (FAILED(error))
+                return fail(error);
+            if (error != S_OK || fetched != 1 || item == NULL)
+                return fail(E_UNEXPECTED);
+
+            STRRET nameResult{};
+            error = currentFolder->GetDisplayNameOf(item, SHGDN_INFOLDER, &nameResult);
+            if (FAILED(error))
+                return fail(error);
+            PWSTR name = NULL;
+            error = StrRetToStrW(&nameResult, item, &name);
+            if (SUCCEEDED(error) && name != NULL)
+                file.Name = SalamanderGeneral->DupStr(name);
+            CoTaskMemFree(name);
+            if (FAILED(error))
+                return fail(error);
+            if (file.Name == NULL)
+                return fail(E_OUTOFMEMORY);
+            file.NameLen = static_cast<DWORD>(wcslen(file.Name));
+
+            SFGAOF attributes = SFGAO_FOLDER | SFGAO_GHOSTED;
+            LPCITEMIDLIST child = item;
+            error = currentFolder->GetAttributesOf(1, &child, &attributes);
+            if (FAILED(error))
+                return fail(error);
+            const BOOL isDir = (attributes & SFGAO_FOLDER) != 0;
+            file.Hidden = (attributes & SFGAO_GHOSTED) != 0;
+            wchar_t* extension = !sortByExtDirsAsFiles && isDir ? NULL : wcsrchr(file.Name, L'.');
+            file.Ext = extension != NULL ? extension + 1 : file.Name + file.NameLen;
+            file.Size = CQuadWord(0, 0);
+            file.IsLink = !isDir && SalamanderGeneral->IsFileLink(file.Ext);
+            if (!(isDir ? dir->AddDir(NULL, file, NULL) : dir->AddFile(NULL, file, NULL)))
+                return fail(E_OUTOFMEMORY);
+            file = CFileData{}; // dir now owns both name and PIDL
+        }
+        if (enumeration != NULL)
+        {
+            enumeration->Release();
+            enumeration = NULL;
+        }
+        if (changingFolder)
+        {
+            ILFree(CurrentPIDL);
             if (CurrentFolder != NULL)
                 CurrentFolder->Release();
-
-            // set the new values
             CurrentFolder = ChangePathNewFolder;
             CurrentPIDL = ChangePathNewPIDL;
             ChangePathNewFolder = NULL;
             ChangePathNewPIDL = NULL;
         }
-
-        if (!CheckPIDL(CurrentPIDL) || CurrentFolder == NULL)
-            goto ON_FATAL_ERROR;
-
+        pluginData = data;
         iconsType = pitFromPlugin;
-        pluginData = new CPluginDataInterface(CurrentFolder, CurrentPIDL);
-        if (pluginData == NULL)
-            goto ON_FATAL_ERROR;
-
+        ErrorState = fesOK;
         return TRUE;
     }
-    else
-        TRACE_E("EnumObjects failed");
-
-ON_FATAL_ERROR:
-    ErrorState = fesFatal;
-    return FALSE;
+    catch (...)
+    {
+        return fail(E_OUTOFMEMORY);
+    }
 }
 
 BOOL WINAPI

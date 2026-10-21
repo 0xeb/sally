@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include <string>
+#include <winioctl.h>
 
 #include "dlldefs.h"
 #include "archive_name.h"
@@ -157,7 +158,7 @@ void SCommonHeader::Initialize()
     Mode.Set(0, 0);
     MTime.Set(0, 0);
     Format = e_Unknown;
-    IsExtendedTar = FALSE;
+    Sparse.Reset();
 }
 
 //
@@ -609,71 +610,35 @@ int CArchive::WriteOutData(const SCommonHeader& header, const wchar_t* targetPat
     CQuadWord size(0, 0);
     CQuadWord filePos, sizeDelta;
     filePos = Stream->GetStreamPos();
-    // if this is a tar archive with an extended header, process the extensions
-    // TODO: if the extended header contains a long name we must handle it
-    //   while reading the header; only sparse files should remain here
-    // TODO: in general extend tar type detection too
-    if (header.IsExtendedTar)
+    const CQuadWord storedSize = header.Sparse.Active
+                                     ? CQuadWord().SetUI64(header.Sparse.StoredSize)
+                                     : header.FileInfo.Size;
+    size_t extentIndex = 0;
+    std::uint64_t extentRead = 0;
+    if (header.Sparse.Active && !simulate)
     {
-        // TODO: this still needs more thorough handling
-        const TTarBlock* tarHeader;
-        do
-        {
-            // read the next block
-            tarHeader = (const TTarBlock*)Stream->GetBlock(BLOCKSIZE);
-            if (tarHeader == NULL)
-            {
-                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
-                if (!simulate)
-                {
-                    CloseHandle(file);
-                    DeleteFileW(extractedName.c_str());
-                }
-                return TAR_ERROR;
-            }
-            EArchiveFormat format;
-            BOOL finished;
-            if (!IsTarHeader(tarHeader->RawBlock, finished, format))
-            {
-                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
-                if (!simulate)
-                {
-                    CloseHandle(file);
-                    DeleteFileW(extractedName.c_str());
-                }
-                return TAR_ERROR;
-            }
-            if (!simulate)
-            {
-                // TODO: process extended headers according to their specific type here
-            }
-            // update the progress if necessary
-            if (doProgress)
-            {
-                sizeDelta = filePos;
-                filePos = Stream->GetStreamPos();
-                sizeDelta = filePos - sizeDelta;
-                // advance the progress and handle cancellation
-                if (!SalamanderIf->ProgressAddSize((int)sizeDelta.Value, TRUE))
-                {
-                    // handle cancellation
-                    if (!simulate)
-                    {
-                        CloseHandle(file);
-                        DeleteFileW(extractedName.c_str());
-                    }
-                    return TAR_ERROR;
-                }
-            }
-            size += CQuadWord(BLOCKSIZE, 0);
-            Offset += CQuadWord(BLOCKSIZE, 0);
-        } while (tarHeader->SparseHeader.isextended);
+        // Best effort: unsupported filesystems still receive correct zero-filled holes.
+        DWORD returned;
+        DeviceIoControl(file, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &returned, NULL);
     }
-    // TODO: verify once more how the size should be processed here
-    size.Set(0, 0);
-    while (size < header.FileInfo.Size)
+    const auto sparseWriteError = [&](DWORD error)
     {
-        unsigned short toRead = (unsigned short)(header.FileInfo.Size - size > CQuadWord(BUFSIZE, 0) ? BUFSIZE : (header.FileInfo.Size - size).Value);
+        std::wstring message = LangStr(IDS_TARERR_FWRITE) + SPLGetErrorTextOwned(SalamanderGeneral, error);
+        SalamanderGeneral->ShowMessageBox(message.c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
+        CloseHandle(file);
+        DeleteFileW(extractedName.c_str());
+        return TAR_ERROR;
+    };
+    while (size < storedSize)
+    {
+        unsigned short toRead = (unsigned short)(storedSize - size > CQuadWord(BUFSIZE, 0) ? BUFSIZE : (storedSize - size).Value);
+        if (header.Sparse.Active)
+        {
+            const auto& extent = header.Sparse.Extents[extentIndex];
+            const auto remaining = extent.Length - extentRead;
+            if (remaining < toRead)
+                toRead = static_cast<unsigned short>(remaining);
+        }
         const unsigned char* buffer = Stream->GetBlock(toRead);
 
         if (buffer == NULL)
@@ -691,7 +656,14 @@ int CArchive::WriteOutData(const SCommonHeader& header, const wchar_t* targetPat
         }
         if (!simulate)
         {
-            DWORD written;
+            if (header.Sparse.Active && extentRead == 0)
+            {
+                LARGE_INTEGER position;
+                position.QuadPart = static_cast<LONGLONG>(header.Sparse.Extents[extentIndex].Offset);
+                if (!SetFilePointerEx(file, position, NULL, FILE_BEGIN))
+                    return sparseWriteError(GetLastError());
+            }
+            DWORD written = 0;
             if (!WriteFile(file, buffer, toRead, &written, NULL) || written != toRead)
             {
                 std::wstring message = LangStr(IDS_TARERR_FWRITE).c_str();
@@ -730,6 +702,15 @@ int CArchive::WriteOutData(const SCommonHeader& header, const wchar_t* targetPat
             for (k = 0; k < toRead; k++)
                 checksum += buffer[k];
         }
+        if (header.Sparse.Active)
+        {
+            extentRead += toRead;
+            if (extentRead == header.Sparse.Extents[extentIndex].Length)
+            {
+                ++extentIndex;
+                extentRead = 0;
+            }
+        }
         size += CQuadWord(toRead, 0);
         Offset += CQuadWord(toRead, 0);
     }
@@ -744,6 +725,13 @@ int CArchive::WriteOutData(const SCommonHeader& header, const wchar_t* targetPat
             DeleteFileW(extractedName.c_str());
         }
         return TAR_ERROR;
+    }
+    if (header.Sparse.Active && !simulate)
+    {
+        LARGE_INTEGER end;
+        end.QuadPart = static_cast<LONGLONG>(header.Sparse.LogicalSize);
+        if (!SetFilePointerEx(file, end, NULL, FILE_BEGIN) || !SetEndOfFile(file))
+            return sparseWriteError(GetLastError());
     }
     // set the properties of the created file
     if (!simulate)
@@ -1563,6 +1551,7 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
             break;
         case AREGTYPE:
         case REGTYPE:
+        case GNUTYPE_SPARSE:
         case CONTTYPE: // according to the tar sources this counts as a file for some reason...
             // files to extract
             header.IsDir = FALSE;
@@ -1605,11 +1594,39 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
                                               MSGBOX_ERROR);
             return TAR_ERROR;
         }
-        if (header.Format == e_TarOldGnu &&
-            tarHeader->OldGnuHeader.isextended)
-            header.IsExtendedTar = TRUE;
-        // TODO: if the header contains an extension other than sparse blocks,
-        //   such as a long name, it needs to be handled here
+        if (tarHeader->Header.typeflag == GNUTYPE_SPARSE)
+        {
+            // Stream reads may reuse its buffer; own the main sparse header first.
+            const TTarBlock mainHeader = *tarHeader;
+            auto& sparse = header.Sparse;
+            sparse.Active = true;
+            sparse.StoredSize = header.FileInfo.Size.Value;
+            bool valid = header.Format == e_TarOldGnu &&
+                         CTarSparseMap::ReadNumber(mainHeader.OldGnuHeader.realsize, 12, sparse.LogicalSize);
+            for (const auto& extent : mainHeader.OldGnuHeader.sp)
+                valid = valid && sparse.Append(extent.offset, extent.numbytes);
+            bool extended = mainHeader.OldGnuHeader.isextended != 0;
+            while (valid && extended)
+            {
+                // Sparse continuation blocks are raw maps, with no TAR checksum/header.
+                const TTarBlock* extension = reinterpret_cast<const TTarBlock*>(Stream->GetBlock(BLOCKSIZE));
+                if (extension == NULL)
+                {
+                    valid = false;
+                    break;
+                }
+                Offset += CQuadWord(BLOCKSIZE, 0);
+                for (const auto& extent : extension->SparseHeader.sp)
+                    valid = valid && sparse.Append(extent.offset, extent.numbytes);
+                extended = extension->SparseHeader.isextended != 0;
+            }
+            if (!valid || !sparse.Complete())
+            {
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
+                return TAR_ERROR;
+            }
+            header.FileInfo.Size.SetUI64(sparse.LogicalSize);
+        }
         return TAR_OK;
     }
 }

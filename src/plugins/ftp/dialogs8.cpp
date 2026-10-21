@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "plugin_window_text.h"
+#include "ftp_log_limit.h"
 
 // Wide. This existed to widen a narrow LoadStr at the last moment; LangStr
 // means there is nothing left to widen.
@@ -366,7 +367,6 @@ CConnectAdvancedDlg::CConnectAdvancedDlg(HWND parent, CFTPServer* server,
 
     Server = server;
     LastUseMaxCon = -1;
-    LastUseTotSpeed = -1;
     LastKeepConnectionAlive = -1;
     KASendCmd = -1;
 }
@@ -452,25 +452,6 @@ void CConnectAdvancedDlg::Validate(CTransferInfo& ti)
             ShowMessage(HWindow, LangStr(IDS_KAEVERYGRTHSTOP).c_str(),
                                              LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDE_KEEPALIVESTOPAFTER);
-            return;
-        }
-    }
-
-    // test if "server speed limit" (if used) is valid number
-    int enableSrvSpeedLimit;
-    ti.CheckBox(IDC_SRVSPEEDLIMIT, enableSrvSpeedLimit);
-    double srvSpeedLimit;
-    if (enableSrvSpeedLimit == 1)
-    {
-        const wchar_t buff[] = L"%g";
-        ti.EditLine(IDE_SRVSPEEDLIMIT, srvSpeedLimit, buff);
-        if (!ti.IsGood())
-            return; // an error has already occurred
-        if (ti.IsGood() && srvSpeedLimit <= 0)
-        {
-            ShowMessage(HWindow, LangStr(IDS_MUSTBEGRTHANZERO).c_str(),
-                                             LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
-            ti.ErrorOn(IDE_SRVSPEEDLIMIT);
             return;
         }
     }
@@ -679,15 +660,6 @@ void CConnectAdvancedDlg::Transfer(CTransferInfo& ti)
     {
         ti.EditLine(IDE_MAXCONCURRENTCON, Server->MaxConcurrentConnections);
     }
-    ti.CheckBox(IDC_SRVSPEEDLIMIT, Server->UseServerSpeedLimit);
-    if (ti.Type == ttDataFromWindow && Server->UseServerSpeedLimit == 1)
-    {
-        const wchar_t buff[] = L"%g";
-        ti.EditLine(IDE_SRVSPEEDLIMIT, Server->ServerSpeedLimit, buff);
-        if (ti.Type == ttDataFromWindow &&
-            Server->ServerSpeedLimit < 0.001)
-            Server->ServerSpeedLimit = 0.001; // at least 1 byte per second
-    }
     ti.CheckBox(IDC_USELISTINGSCACHE, Server->UseListingsCache);
     ti.CheckBox(IDC_ENCRYPTCONTROLCONN, Server->EncryptControlConnection);
     ti.CheckBox(IDC_ENCRYPTDATACONN, Server->EncryptDataConnection);
@@ -770,10 +742,6 @@ void CConnectAdvancedDlg::EnableControls()
     CheckboxEditLineInteger(HWindow, IDC_MAXCONCURRENTCON, IDE_MAXCONCURRENTCON, &LastUseMaxCon,
                             MaxConnectionsText, Server->MaxConcurrentConnections,
                             Config.UseMaxConcurrentConnections, Config.MaxConcurrentConnections);
-
-    CheckboxEditLineDouble(HWindow, IDC_SRVSPEEDLIMIT, IDE_SRVSPEEDLIMIT, &LastUseTotSpeed,
-                           TotalSpeedText, Server->ServerSpeedLimit,
-                           Config.UseServerSpeedLimit, Config.ServerSpeedLimit);
 
     int auxLastKeepConnectionAlive = LastKeepConnectionAlive;
     CheckboxCombo(HWindow, IDC_USEKEEPALIVE, IDC_KEEPALIVESEND, &auxLastKeepConnectionAlive,
@@ -1361,6 +1329,14 @@ void CConfigPageLogs::Validate(CTransferInfo& ti)
                     ti.ErrorOn(arr[i]);
                     return;
                 }
+                if (arr[i] == IDE_LOGMAXSIZE && !sally::ftp::IsValidLogKilobytes(num))
+                {
+                    const std::wstring message = SPLFormatStringOwned(
+                        LangStr(IDS_LOGSIZEOUTOFRANGE).c_str(), static_cast<unsigned>(sally::ftp::MaximumLogKilobytes));
+                    ShowMessage(HWindow, message.c_str(), LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
+                    ti.ErrorOn(IDE_LOGMAXSIZE);
+                    return;
+                }
             }
         }
     }
@@ -1380,9 +1356,8 @@ void CConfigPageLogs::Transfer(CTransferInfo& ti)
             if (Config.UseLogMaxSize)
             {
                 ti.EditLine(IDE_LOGMAXSIZE, Config.LogMaxSize);
-                Config.LogMaxSize = (Config.LogMaxSize * 1024) / 1024; // trim any excessively large number
-                if (Config.LogMaxSize <= 0)
-                    Config.LogMaxSize = 1;
+                if (!ti.IsGood())
+                    return;
             }
             if (Config.UseMaxClosedConLogs)
                 ti.EditLine(IDE_MAXCLOSEDCONLOGS, Config.MaxClosedConLogs);

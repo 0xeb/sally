@@ -100,8 +100,7 @@ CNextVolumeDialog::CNextVolumeDialog(HWND parent, const std::wstring& volumeName
     InitialVolumePathW = initialVolumePath;
     DiskNameW = diskName;
     CabNumber = cabNumber;
-    CurrentPath = VolumeNameW;
-    SPLCutDirectoryOwned(SalamanderGeneral, CurrentPath);
+    CurrentPath = InitialVolumePathW;
 }
 
 INT_PTR WINAPI NextVolumeDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -261,7 +260,10 @@ BOOL CNextVolumeDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
         return TRUE;
     }
 
-    *VolumePath = volumePathW;
+    // Publish the directory that was actually resolved and validated.
+    SPLCutDirectoryOwned(SalamanderGeneral, fullNameW);
+    SPLSalPathAddBackslashOwned(fullNameW);
+    *VolumePath = fullNameW;
 
     EndDialog(Dlg, IDOK);
     return TRUE;

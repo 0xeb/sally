@@ -159,6 +159,13 @@ int FormatShellMenuDiagRecord(const ShellMenuDiagRecord& record, char* buf, int 
         const std::string verbEsc = AsciiEscapedW(record.Verb.c_str());
         char fragment[512];
         std::string report;
+        sprintf_s(fragment, "background create=0x%08lX interface=0x%08lX query=0x%08lX raw=%d final=%d\n",
+                  static_cast<unsigned long>(record.BackgroundCreateHr),
+                  static_cast<unsigned long>(record.BackgroundInterfaceHr),
+                  static_cast<unsigned long>(record.BackgroundQueryHr),
+                  record.BackgroundRawCount, record.BackgroundFinalCount);
+        if (record.BackgroundCreateHr != E_PENDING)
+            report += fragment;
 
         sprintf_s(fragment, "tick=%u dir=\"", record.Tick);
         report += fragment;

@@ -296,9 +296,7 @@ BOOL CPakIface::DeleteFiles(BOOL* needOptim)
         return FALSE;
     PakSize = Header.DirOffset + Header.DirSize;
 
-    BOOL ret;
-    if (ub || i < DelRegions.Count)
-        ret = FALSE;
+    const BOOL ret = !ub && i == DelRegions.Count;
     DelRegions.Destroy();
     return ret;
 }

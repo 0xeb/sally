@@ -16,6 +16,10 @@
 #include "common/IEnvironment.h"
 #include "common/IPathService.h"
 #include "common/fsutil.h"
+#include "common/CommandLinePathText.h"
+#include "ui/UnicodeHistoryUtils.h"
+#include <memory>
+#include <utility>
 
 //******************************************************************************
 //
@@ -131,7 +135,26 @@ struct CExecuteWideExpData
     BOOL* FileNameUsed;
 
     CUserMenuAdvancedData* UserMenuAdvancedData; // applies only to User Menu, otherwise NULL here
+    bool ShortPathUnavailable = false;
+    std::wstring UnavailableShortPath;
 };
+
+static void ExecuteRecordMissingShortPath(CExecuteWideExpData* data, const wchar_t* path)
+{
+    if (!data->ShortPathUnavailable)
+    {
+        data->UnavailableShortPath = path != NULL ? path : L"";
+        data->ShortPathUnavailable = true;
+    }
+}
+
+static bool ExecuteRequireDosName(CExecuteWideExpData* data)
+{
+    if (data->DosName != NULL && data->DosName[0] != 0)
+        return true;
+    ExecuteRecordMissingShortPath(data, data->Name);
+    return false;
+}
 
 void ExecuteMarkFileNameUsed(CExecuteWideExpData* data)
 {
@@ -259,13 +282,18 @@ std::wstring ExecuteDirectoryValueW(BOOL windowsDirectory, BOOL trailingBackslas
     return value;
 }
 
-std::wstring ExecuteShortDirectoryValueW(BOOL windowsDirectory)
+std::wstring ExecuteShortDirectoryValueW(BOOL windowsDirectory, CExecuteWideExpData* data)
 {
     const std::wstring path = ExecuteDirectoryValueW(windowsDirectory, FALSE);
     if (path.empty())
+    {
+        ExecuteRecordMissingShortPath(data, LoadStrW(windowsDirectory ? IDS_EXECUTE_DOSWINDIR : IDS_EXECUTE_DOSSYSDIR));
         return path;
+    }
     std::wstring shortPath = GetShortPathW(path.c_str());
-    if (!shortPath.empty() && shortPath.back() != L'\\')
+    if (shortPath.empty())
+        ExecuteRecordMissingShortPath(data, path.c_str());
+    else if (shortPath.back() != L'\\')
         shortPath.push_back(L'\\');
     return shortPath;
 }
@@ -312,6 +340,8 @@ std::wstring ExecuteExpDOSPathW(void* param)
 {
     CExecuteWideExpData* data = (CExecuteWideExpData*)param;
     ExecuteMarkFileNameUsed(data);
+    if (!ExecuteRequireDosName(data))
+        return std::wstring();
     return ExecutePathValueW(data->DosName, TRUE, "ExecuteExpDOSPathW");
 }
 
@@ -326,6 +356,8 @@ std::wstring ExecuteExpDOSNameW(void* param)
 {
     CExecuteWideExpData* data = (CExecuteWideExpData*)param;
     ExecuteMarkFileNameUsed(data);
+    if (!ExecuteRequireDosName(data))
+        return std::wstring();
     return ExecuteNameValueW(data->DosName, "ExecuteExpDOSNameW");
 }
 
@@ -347,6 +379,8 @@ std::wstring ExecuteExpDOSFullNameW(void* param)
 {
     CExecuteWideExpData* data = (CExecuteWideExpData*)param;
     ExecuteMarkFileNameUsed(data);
+    if (!ExecuteRequireDosName(data))
+        return std::wstring();
     return ExecuteFullNameValueW(data->DosName);
 }
 
@@ -368,6 +402,8 @@ std::wstring ExecuteExpDOSNamePartW(void* param)
 {
     CExecuteWideExpData* data = (CExecuteWideExpData*)param;
     ExecuteMarkFileNameUsed(data);
+    if (!ExecuteRequireDosName(data))
+        return std::wstring();
     return ExecuteNamePartValueW(data->DosName, "ExecuteExpDOSNamePartW");
 }
 
@@ -375,6 +411,8 @@ std::wstring ExecuteExpDOSExtPartW(void* param)
 {
     CExecuteWideExpData* data = (CExecuteWideExpData*)param;
     ExecuteMarkFileNameUsed(data);
+    if (!ExecuteRequireDosName(data))
+        return std::wstring();
     return ExecuteExtPartValueW(data->DosName, "ExecuteExpDOSExtPartW");
 }
 
@@ -393,11 +431,13 @@ std::wstring ExecuteExpDOSFullPathW(void* param)
 {
     CExecuteWideExpData* data = (CExecuteWideExpData*)param;
     ExecuteMarkFileNameUsed(data);
+    if (!ExecuteRequireDosName(data))
+        return std::wstring();
     return ExecuteFullPathValueW(data->DosName, TRUE, "ExecuteExpDOSFullPathW");
 }
 
-std::wstring ExecuteExpDOSWinDirW(void*) { return ExecuteShortDirectoryValueW(TRUE); }
-std::wstring ExecuteExpDOSSysDirW(void*) { return ExecuteShortDirectoryValueW(FALSE); }
+std::wstring ExecuteExpDOSWinDirW(void* param) { return ExecuteShortDirectoryValueW(TRUE, static_cast<CExecuteWideExpData*>(param)); }
+std::wstring ExecuteExpDOSSysDirW(void* param) { return ExecuteShortDirectoryValueW(FALSE, static_cast<CExecuteWideExpData*>(param)); }
 
 std::wstring ExecuteExpFullPath2W(void* param)
 {
@@ -615,7 +655,7 @@ MENU_TEMPLATE_ITEM CommandExecutes[] =
 
 CExecuteItem CommandExecutes[] =
     {
-        {EXECUTE_BROWSE, IDS_EXECUTE_BROWSE, EIF_REPLACE_ALL},
+        {EXECUTE_BROWSE, IDS_EXECUTE_BROWSE, EIF_REPLACE_ALL | EIF_BROWSE_TEMPLATE},
         {EXECUTE_SEPARATOR, 0, 0},
         {EXECUTE_WINDIR, IDS_EXECUTE_WINDIR, EIF_VARIABLE},
         {EXECUTE_SYSDIR, IDS_EXECUTE_SYSDIR, EIF_VARIABLE},
@@ -1686,6 +1726,28 @@ BOOL ValidateUserMenuArguments(HWND msgParent, const wchar_t* varText, int& erro
     return TRUE;
 }
 
+// Callback failures must not publish partial arguments or silently change a
+// requested DOS path into an empty value or drive-root fallback.
+static BOOL ExpandExecuteArgumentsW(HWND parent, const wchar_t* text, std::wstring& output,
+                                    const sally::unicode::WideVarEntry* variables,
+                                    CExecuteWideExpData* data, BOOL ignoreEnvironmentErrors)
+{
+    std::wstring candidate;
+    if (!ExpandWideVarStringW(parent, text, candidate, variables, data, ignoreEnvironmentErrors))
+        return FALSE;
+    if (data->ShortPathUnavailable)
+    {
+        if (parent != NULL)
+        {
+            const std::wstring message = FormatStrW(LoadStrW(IDS_EXECUTE_SHORTNAMEUNAVAILABLE), data->UnavailableShortPath.c_str());
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), message.c_str());
+        }
+        return FALSE;
+    }
+    output = std::move(candidate);
+    return TRUE;
+}
+
 BOOL ExpandUserMenuArguments(HWND msgParent, const wchar_t* name, const wchar_t* dosName, const wchar_t* varText,
                              std::wstring& output, BOOL* fileNameUsed,
                              CUserMenuAdvancedData* userMenuAdvancedData,
@@ -1698,8 +1760,8 @@ BOOL ExpandUserMenuArguments(HWND msgParent, const wchar_t* name, const wchar_t*
     data.DosName = dosName;
     data.FileNameUsed = fileNameUsed;
     data.UserMenuAdvancedData = userMenuAdvancedData;
-    return ExpandWideVarStringW(msgParent, varText, output, UserMenuArgsExpArrayW, &data,
-                                ignoreEnvVarNotFoundOrTooLong);
+    return ExpandExecuteArgumentsW(msgParent, varText, output, UserMenuArgsExpArrayW, &data,
+                                   ignoreEnvVarNotFoundOrTooLong);
 }
 
 BOOL ValidateCommandFile(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2)
@@ -1747,7 +1809,7 @@ BOOL ExpandArguments(HWND msgParent, const wchar_t* name, const wchar_t* dosName
     data.DosName = dosName;
     data.FileNameUsed = fileNameUsed;
     data.UserMenuAdvancedData = NULL;
-    return ExpandWideVarStringW(msgParent, varText, output, ArgumentsExpArrayW, &data, FALSE);
+    return ExpandExecuteArgumentsW(msgParent, varText, output, ArgumentsExpArrayW, &data, FALSE);
 }
 
 BOOL ValidateInitDir(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2)
@@ -2015,7 +2077,7 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
         wchar_t buff[255];
         if (item->Keyword == EXECUTE_BROWSE)
         {
-            BrowseCommand(hParent, editlineResID, filterResID);
+            BrowseCommand(hParent, editlineResID, filterResID, item->Flags);
             return item;
         }
         if (item->Keyword == EXECUTE_BROWSEDIR)
@@ -2099,11 +2161,45 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
 // parent dialog's own ANSI/Unicode nature - this same dialog already sends it wide text
 // via SetDlgItemTextW elsewhere), so SendMessageW round-trips correctly. GetOpenFileNameW
 // avoids narrowing the picked path (and the browsed-from starting path) through CP_ACP.
-BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
+// A picked path is literal data. These adapters encode/decode only the syntax
+// owned by the destination edit; ordinary icon/file paths use no browse flags.
+std::wstring FormatBrowsedFileName(std::wstring file, BYTE browseFlags)
+{
+    if (browseFlags & EIF_BROWSE_TEMPLATE)
+        EscapeHotPathDollars(file);
+    if (browseFlags & EIF_BROWSE_QUOTED)
+        file = sally::input::QuoteCommandLinePath(file);
+    return file;
+}
+
+std::wstring DecodeBrowsedFileName(std::wstring text, BYTE browseFlags)
+{
+    if ((browseFlags & EIF_BROWSE_QUOTED) && !text.empty() && text.front() == L'"')
+    {
+        int count = 0;
+        auto** arguments = CommandLineToArgvW(text.c_str(), &count);
+        std::unique_ptr<void, decltype(&LocalFree)> owner(arguments, &LocalFree);
+        if (arguments != nullptr && count == 1)
+            text = arguments[0];
+    }
+    if (browseFlags & EIF_BROWSE_TEMPLATE)
+    {
+        size_t position = 0;
+        while ((position = text.find(L"$$", position)) != std::wstring::npos)
+        {
+            text.erase(position, 1);
+            ++position;
+        }
+    }
+    return text;
+}
+
+BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID, BYTE browseFlags)
 {
     CALL_STACK_MESSAGE2("BrowseCommand(, %d)", editlineResID);
     HWND hEdit = GetDlgItem(hParent, editlineResID);
     std::wstring file = GetWindowTextStringW(hEdit);
+    file = DecodeBrowsedFileName(std::move(file), browseFlags);
     OPENFILENAMEW ofn;
     memset(&ofn, 0, sizeof(OPENFILENAMEW));
     ofn.lStructSize = sizeof(OPENFILENAMEW);
@@ -2125,7 +2221,8 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
         if (SalGetFullNameW(file))
         {
             CALL_STACK_MESSAGE1("BrowseCommand::SendMessage");
-            SendMessageW(hEdit, WM_SETTEXT, 0, (LPARAM)file.c_str());
+            const std::wstring text = FormatBrowsedFileName(file, browseFlags);
+            SendMessageW(hEdit, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(text.c_str()));
             return TRUE;
         }
     }

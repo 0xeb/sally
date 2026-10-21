@@ -95,6 +95,7 @@ sal_add_plugin(NAME 7zip
     "${SEVENZIP_7ZA}/cpp/Windows/TimeUtils.cpp"
     # Plugin sources
     "${SEVENZIP_DIR}/7zclient.cpp"
+    "${SEVENZIP_DIR}/7z_update_list.cpp"
     "${SEVENZIP_DIR}/7zip.cpp"
     "${SEVENZIP_DIR}/7zthreads.cpp"
     "${SEVENZIP_DIR}/dialogs.cpp"

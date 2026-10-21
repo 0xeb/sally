@@ -4,6 +4,8 @@
 sal_add_plugin(NAME filecomp
   SOURCES
     "${SAL_SRC}/common/PanelTextPainter.cpp"
+    "${SAL_SRC}/common/Win32PathService.cpp"
+    "${SAL_PLUGINS}/filecomp/filecomp_input_paths.cpp"
     # Shared sources (filecomp doesn't use mhandles.cpp)
     "${SAL_SHARED}/auxtools.cpp"
     "${SAL_SHARED}/dbg.cpp"

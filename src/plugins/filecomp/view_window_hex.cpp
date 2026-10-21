@@ -181,8 +181,12 @@ BOOL CHexFileViewWindow::SetData(QWORD firstDiff, const wchar_t* path, QWORD sib
     DestroyData();
 
     // FILE_SHARE_WRITE : See also CFilecompWorker::GuardedBody()
-    HANDLE hFile = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     Path = path ? path : L""; // Path may be needed in Retry dialog upon WM_USER_HANDLEFILEERROR
+    std::wstring ioName;
+    const PathResult prepared = gPathService->PrepareForIo(path, ioName);
+    if (!prepared.success)
+        return ErrorL(prepared.errorCode, GetParent(HWindow), IDS_OPEN, path);
+    HANDLE hFile = CreateFileW(ioName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
         return Error(GetParent(HWindow), IDS_OPEN, path);
 

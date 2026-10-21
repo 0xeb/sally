@@ -26,12 +26,6 @@ bool DecodeFileCompLegacyText(const char* bytes, size_t byteCount,
     return static_cast<bool>(Win32DecodeTextPermissive(CP_ACP, bytes, byteCount, text));
 }
 
-bool EncodeFileCompLegacyText(const wchar_t* text, size_t characterCount,
-                              std::string& bytes) noexcept
-{
-    return static_cast<bool>(Win32EncodeText(CP_ACP, text, characterCount, bytes));
-}
-
 static wchar_t ProjectFileCompLegacyByteCell(char byte) noexcept
 {
     std::wstring display;

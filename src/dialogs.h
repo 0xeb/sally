@@ -325,6 +325,8 @@ public:
                     CChangeAttrsData* attrsData, CConvertData* convertData,
                     BOOL runningInOwnThread, CStartProgressDialogData* progrDlgData);
     ~CProgressDialog();
+    BOOL WasOperationStarted() const { return OperationWasStarted; }
+    DWORD GetStartupError() const { return StartupError; }
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -333,9 +335,12 @@ protected:
 
     void SetDlgTitle(BOOL minimized);
     void SetWindowIcon();
+    void FailStartup(DWORD error);
 
 protected:
     BOOL RunningInOwnThread;                // TRUE/FALSE = dialog runs in its own thread ("background") / dialog runs in the main thread and is modal to its parent (usually one of the panels)
+    BOOL OperationWasStarted;
+    DWORD StartupError;
     CStartProgressDialogData* ProgrDlgData; // non-NULL only if the dialog runs in its own thread and the main thread hasn't been resumed yet (waiting for dialog opening and operation start)
 
     HANDLE Worker;                // worker thread associated with this dialog (NULL if it doesn't exist yet/any more)
@@ -816,6 +821,7 @@ public:
                   CTruncatedString* subject, CUnpackerConfig* config,
                   BOOL* delArchiveWhenDone);
 
+    virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
@@ -1054,6 +1060,8 @@ public:
     CPluginKeys(HWND hParent, CPluginData* plugin);
     ~CPluginKeys();
     BOOL IsGood();
+    // Apply a confirmed reset only after the plugin has actually unloaded.
+    void CompleteReset(BOOL pluginUnloaded);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -1337,6 +1345,7 @@ protected:
     int GetFocusedIndex();                     // returns index to SharetDirs array or -1 if no item is selected
     void DeleteShare(const wchar_t* shareName); // request the system to remove the share; takes
                                                 // the exact wide share name now, no ANSI round trip before NetShareDel
+    virtual DWORD RemoveShare(const wchar_t* shareName); // thin native adapter; returns NetShareDel's status
     void OnContextMenu(int x, int y);        // shows the context menu for the selected item at coordinates x, y
     void EnableControls();                   // button enabler
 };

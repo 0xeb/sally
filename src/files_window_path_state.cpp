@@ -1911,10 +1911,8 @@ void CFilesWindow::SelectUnselectByFocusedItem(BOOL select, BOOL byName)
     if (FocusedIndex >= 0 && FocusedIndex < Dirs->Count + Files->Count)
     {
 
-        //    if (!byName && FocusedIndex < Dirs->Count)
-        //    {
-        //
-        //    }
+        if (!byName && FocusedIndex < Dirs->Count)
+            return; // directories do not have file extensions
 
         BOOL isDir = FocusedIndex < Dirs->Count;
         const CFileData* focusedItem = isDir ? &Dirs->At(FocusedIndex) : &Files->At(FocusedIndex - Dirs->Count);
@@ -1940,13 +1938,15 @@ void CFilesWindow::SelectUnselectByFocusedItem(BOOL select, BOOL byName)
         for (i = firstIndex; i <= lastIndex; i++)
         {
             BOOL itemIsDir = i < Dirs->Count;
+            if (!byName && itemIsDir)
+                continue;
             CFileData* item = itemIsDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
             const wchar_t* str = byName ? item->Name : (itemIsDir ? L"" : item->Ext);
             int len = byName ? (itemIsDir ? item->NameLen : (int)(item->Ext - item->Name)) : (itemIsDir ? 0 : (int)wcslen(item->Ext));
             if (!itemIsDir && byName && *item->Ext != 0)
                 len--; // skip '.'
             if (len == focusedLen && StrNICmpW(str, focusedStr, len) == 0 &&
-                _wcsicmp(SelectUnselectMatchKeyW(item, itemIsDir, byName).c_str(), focusedKeyW.c_str()) == 0)
+                StrICmpW(SelectUnselectMatchKeyW(item, itemIsDir, byName).c_str(), focusedKeyW.c_str()) == 0)
                 SetSel(select, item);
         }
         if (SelectedCount != lastSelectdCount)

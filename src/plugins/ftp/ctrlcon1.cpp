@@ -127,6 +127,33 @@ CControlConnectionSocket::~CControlConnectionSocket()
         Logs.ClosingConnection(LogUID);
 }
 
+CFTPServer* CControlConnectionSocket::CreateBookmark(const wchar_t* name, const wchar_t* path,
+                                                     CTransferMode transferMode, const char* serverType, BOOL pathIsEscaped)
+{
+    CFTPServer* bookmark = new CFTPServer;
+    if (bookmark == NULL)
+        return NULL;
+    HANDLES(EnterCriticalSection(&SocketCritSect));
+    const BOOL anonymous = User == L"anonymous";
+    const BOOL good = bookmark->Set(name, Host.c_str(), path, anonymous,
+                                    anonymous ? NULL : User.c_str(), NULL, 0, FALSE,
+                                    ProxyServer != NULL ? ProxyServer->ProxyUID : -1,
+                                    NULL, serverType, static_cast<int>(transferMode) + 1, Port,
+                                    UsePassiveMode != FALSE, KeepAliveEnabled != FALSE,
+                                    2, 1, 0, 2, UseListingsCache != FALSE,
+                                    InitFTPCommands.c_str(),
+                                    UseLIST_aCommand ? LIST_a_CMD_TEXT : ListCommand.c_str(),
+                                    KeepAliveSendEvery, KeepAliveStopAfter, KeepAliveCommand,
+                                    EncryptControlConnection, EncryptDataConnection, CompressData, pathIsEscaped);
+    HANDLES(LeaveCriticalSection(&SocketCritSect));
+    if (!good)
+    {
+        delete bookmark;
+        return NULL;
+    }
+    return bookmark;
+}
+
 DWORD
 CControlConnectionSocket::GetTimeFromStart()
 {
@@ -625,7 +652,7 @@ BOOL CControlConnectionSocket::StartControlConnection(HWND parent, std::wstring&
         attemptNum = *totalAttemptNum; // initialize with the total number of attempts
     CDynString welcomeMessage;
     BOOL useWelcomeMessage = canShowWelcomeDlg && !reconnect && Config.ShowWelcomeMessage;
-    BOOL retryLoginWithoutAsking = FALSE;
+    BOOL userRetryLoginWithoutAsking = FALSE;
     BOOL fastRetry = FALSE;
     unsigned short port;
     in_addr srvAddr;
@@ -1044,22 +1071,27 @@ RETRY_LABEL:
                 {
                     connectingToAs.clear();
                 }
-                if (CEnterStrDlg(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXPASSTITLE).c_str(),
-                                 SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXPASSTEXT).c_str(),
-                                 proxyScriptParams.ProxyPassword, TRUE,
-                                 connectingToAs.c_str(), FALSE)
-                        .Execute() != IDCANCEL)
-                { // value change -> we must update the originals as well
-                    HANDLES(EnterCriticalSection(&SocketCritSect));
-                    BOOL stored = ProxyServer == NULL ||
-                                  ProxyServer->SetProxyPassword(proxyScriptParams.ProxyPassword.c_str());
-                    HANDLES(LeaveCriticalSection(&SocketCritSect));
-                    if (!stored)
-                    {
-                        fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
-                        state = sccsFatalError;
-                        break;
-                    }
+                const INT_PTR passwordResult = CEnterStrDlg(
+                                                   parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXPASSTITLE).c_str(),
+                                                   SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXPASSTEXT).c_str(),
+                                                   proxyScriptParams.ProxyPassword, TRUE, connectingToAs.c_str(), FALSE)
+                                                   .Execute();
+                if (passwordResult != IDOK)
+                {
+                    state = sccsDone;
+                    actionCanceled = passwordResult == IDCANCEL;
+                    break;
+                }
+                // Only accepted input may update the stored proxy credential.
+                HANDLES(EnterCriticalSection(&SocketCritSect));
+                const BOOL stored = ProxyServer == NULL ||
+                                    ProxyServer->SetProxyPassword(proxyScriptParams.ProxyPassword.c_str());
+                HANDLES(LeaveCriticalSection(&SocketCritSect));
+                if (!stored)
+                {
+                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                    state = sccsFatalError;
+                    break;
                 }
             }
 
@@ -2027,11 +2059,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                     if (FTP_DIGIT_1(replyCode) == FTP_D1_TRANSIENTERROR || // e.g. 421 Service not available (too many users), closing control connection
                                                         FTP_DIGIT_1(replyCode) == FTP_D1_ERROR)            // e.g. 530 Not logged in (invalid password)
                                                     {
-                                                        if (FTP_DIGIT_1(replyCode) == FTP_D1_TRANSIENTERROR)
-                                                        { // convenient handling of the "too many users" error - no questions, immediately "retry"
-                                                            // drawback: with this code comes a message that may require changing user/password
-                                                            retryLoginWithoutAsking = TRUE;
-                                                        }
+                                                        // A temporary failure authorizes this reply's retry only.
+                                                        const BOOL retryCurrentLoginWithoutAsking =
+                                                            FTP_DIGIT_1(replyCode) == FTP_D1_TRANSIENTERROR || userRetryLoginWithoutAsking;
 
                                                         if (!FtpStoreProtocolBytes(
                                                                 std::string_view(reply, static_cast<size_t>(replySize)),
@@ -2043,7 +2073,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                             break;
                                                         }
                                                         SkipFTPReply(replySize);
-                                                        if (!retryLoginWithoutAsking)
+                                                        if (!retryCurrentLoginWithoutAsking)
                                                         {
                                                             fastRetry = TRUE; // user-induced delay, some servers do not like it (ftp.novell.com - kills after 20s)
                                                             BOOL proxyUsed = ProxyServer != NULL;
@@ -2131,7 +2161,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                                     FTPSecureWipe(stagedPassword);
                                                                     FTPSecureWipe(stagedAccount);
 
-                                                                    retryLoginWithoutAsking = dlg.RetryWithoutAsking;
+                                                                    userRetryLoginWithoutAsking = dlg.RetryWithoutAsking;
                                                                     if (dlg.LoginChanged && event != ccsevClosed && !proxyUsed)
                                                                     { // retry login (without waiting and closing the connection) - handles responses such as "invalid user/password"
                                                                         state = sccsRetryLogin;

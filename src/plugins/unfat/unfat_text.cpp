@@ -18,3 +18,18 @@ bool DecodeFatOemName(const char* bytes, std::wstring& name)
     return bytes != nullptr &&
            Win32DecodeTextPermissive(CP_OEMCP, bytes, std::strlen(bytes), name).Succeeded();
 }
+
+bool DecodeFatShortName(const char* bytes, uint8_t caseFlags, std::wstring& name)
+{
+    std::wstring decoded;
+    if (!DecodeFatOemName(bytes, decoded))
+        return false;
+    const size_t dot = decoded.find_last_of(L'.');
+    const size_t baseLength = dot == std::wstring::npos ? decoded.size() : dot;
+    if ((caseFlags & 0x08) && baseLength)
+        CharLowerBuffW(decoded.data(), static_cast<DWORD>(baseLength));
+    if ((caseFlags & 0x10) && dot != std::wstring::npos && dot + 1 < decoded.size())
+        CharLowerBuffW(decoded.data() + dot + 1, static_cast<DWORD>(decoded.size() - dot - 1));
+    name.swap(decoded);
+    return true;
+}

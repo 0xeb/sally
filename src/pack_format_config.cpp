@@ -353,7 +353,7 @@ CExecuteItem CmdCustomPackers[] =
         {PACK_EXE_ZIP16, IDS_PACK_EXE_ZIP16, EIF_VARIABLE | EIF_REPLACE_ALL},
         {PACK_EXE_UZP16, IDS_PACK_EXE_UZP16, EIF_VARIABLE | EIF_REPLACE_ALL},
         {EXECUTE_SEPARATOR, 0, 0},
-        {EXECUTE_BROWSE, IDS_PACK_EXE_BROWSE, EIF_REPLACE_ALL},
+        {EXECUTE_BROWSE, IDS_PACK_EXE_BROWSE, EIF_REPLACE_ALL | EIF_BROWSE_TEMPLATE | EIF_BROWSE_QUOTED},
         {EXECUTE_TERMINATOR, 0, 0},
 };
 
@@ -545,7 +545,7 @@ BOOL CPackerFormatConfig::BuildArray(int* line, int* column)
         {
             const int len = static_cast<int>(std::wcslen(ptr));
             wchar_t* ext = static_cast<wchar_t*>(
-                malloc((static_cast<size_t>(len) + 1) * sizeof(wchar_t)));
+                malloc((static_cast<size_t>(len) + 2) * sizeof(wchar_t)));
             if (ext == NULL)
             {
                 if (ret)
@@ -560,7 +560,9 @@ BOOL CPackerFormatConfig::BuildArray(int* line, int* column)
             }
             int last = len - 1;
             int idx = 0;
-            for (int source = len - 2; source >= 0; --source)
+            // The bucket is only an accelerator. Keep every UTF-16 code unit
+            // in the pattern so collisions in its low byte cannot match.
+            for (int source = len - 1; source >= 0; --source)
                 ext[idx++] = sally::unicode::FoldCharW(ptr[source]);
             ext[idx++] = L'.';
             ext[idx] = L'\0';
@@ -656,7 +658,7 @@ int CPackerFormatConfig::PackIsArchive(const wchar_t* archiveName, int archiveNa
         for (int i = 0; i < array->Count; ++i)
         {
             const wchar_t* pattern = array->At(i).GetExt();
-            int nameIndex = idx - 1;
+            int nameIndex = idx;
             while (*pattern != L'\0' && nameIndex >= 0)
             {
                 const wchar_t name = archiveName[nameIndex];

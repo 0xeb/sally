@@ -645,8 +645,8 @@ CLogsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             MyEnableMenuItem(hMenu, CM_SAVELOG, !Empty);
             MyEnableMenuItem(hMenu, CM_SAVEALLLOGS, !Empty);
             MyEnableMenuItem(hMenu, CM_CLEARLOG, !Empty);
-            MyEnableMenuItem(hMenu, CM_REMOVELOG, !Empty);
-            MyEnableMenuItem(hMenu, CM_REMOVEALLLOGS, !Empty);
+            MyEnableMenuItem(hMenu, CM_REMOVELOG, !Empty && LastLogUID != -1 && Logs.CanRemoveLog(LastLogUID));
+            MyEnableMenuItem(hMenu, CM_REMOVEALLLOGS, !Empty && Logs.CanRemoveLog(-1));
             CheckMenuItem(hMenu, CM_SHOWLOGFORPANEL, MF_BYCOMMAND | (Config.AlwaysShowLogForActPan ? MF_CHECKED : MF_UNCHECKED));
         }
         break;

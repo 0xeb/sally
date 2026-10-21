@@ -28,6 +28,8 @@ sal_add_plugin(NAME ftp
     "${SAL_PLUGINS}/ftp/ftp3.cpp"
     "${SAL_PLUGINS}/ftp/ftp4.cpp"
     "${SAL_PLUGINS}/ftp/ftp_diskwork_core.cpp"
+    "${SAL_PLUGINS}/ftp/ftp_file_open.cpp"
+    "${SAL_PLUGINS}/ftp/ftp_retry_policy.cpp"
     "${SAL_PLUGINS}/ftp/ftp_owned_path.cpp"
     "${SAL_PLUGINS}/ftp/ftp_command_builder.cpp"
     "${SAL_PLUGINS}/ftp/ftp_persisted_text_codec.cpp"

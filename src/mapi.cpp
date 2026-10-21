@@ -3,18 +3,25 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/IThreadStartup.h"
 
 #include "mapi.h"
 #include "ui/IPrompter.h"
 #include "common/Win32TextCodec.h"
 #include "common/unicode/helpers.h"
 
-CSimpleMAPI::CSimpleMAPI()
+static void ShowMailFailure(const std::wstring& detail)
+{
+    const std::wstring message = FormatStrW(LoadStrW(IDS_EMAILFILES_SENDERROR), detail.c_str());
+    gPrompter->ShowError(NULL, LoadStrW(IDS_ERRORTITLE), message.c_str());
+}
+
+CSimpleMAPI::CSimpleMAPI(PFNMAPISENDMAIL sendMail)
     : FileNames(10, 50), TotalSize(0, 0)
 {
     CALL_STACK_MESSAGE_NONE
     HLibrary = NULL;
-    MAPISendMail = NULL;
+    MAPISendMail = sendMail;
 };
 
 CSimpleMAPI::~CSimpleMAPI()
@@ -103,21 +110,23 @@ BOOL CSimpleMAPI::AddFile(const wchar_t* fileName, const CQuadWord* size)
 BOOL CSimpleMAPI::SendMail()
 {
     CALL_STACK_MESSAGE1("CSimpleMAPI::SendMail()");
-    if (HLibrary == NULL)
+    if (MAPISendMail == NULL)
     {
-        TRACE_E("HLibrary == NULL");
+        gPrompter->ShowError(NULL, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_EMAILFILES_MAPIERROR));
         return FALSE;
     }
     if (FileNames.Count == 0)
     {
         TRACE_E("FileNames.Count == 0");
+        ShowMailFailure(FormatThreadStartupErrorW(ERROR_INVALID_PARAMETER));
         return FALSE;
     }
 
-    MapiFileDesc* fileDesc = (MapiFileDesc*)malloc(FileNames.Count * sizeof(MapiFileDesc));
+    MapiFileDesc* fileDesc = static_cast<MapiFileDesc*>(gThreadStartup->AllocateBuffer(FileNames.Count * sizeof(MapiFileDesc)));
     if (fileDesc == NULL)
     {
         TRACE_E(LOW_MEMORY);
+        ShowMailFailure(FormatThreadStartupErrorW(ERROR_NOT_ENOUGH_MEMORY));
         return FALSE;
     }
 
@@ -130,11 +139,12 @@ BOOL CSimpleMAPI::SendMail()
     // could point MAPISendMail at a different file than the one the user selected. These ANSI
     // copies must outlive the MAPISendMail call below, so they are freed alongside
     // fileDesc/subject after it returns, not before.
-    char** fileNamesA = (char**)malloc(FileNames.Count * sizeof(char*));
+    char** fileNamesA = static_cast<char**>(gThreadStartup->AllocateBuffer(FileNames.Count * sizeof(char*)));
     if (fileNamesA == NULL)
     {
         TRACE_E(LOW_MEMORY);
         free(fileDesc);
+        ShowMailFailure(FormatThreadStartupErrorW(ERROR_NOT_ENOUGH_MEMORY));
         return FALSE;
     }
     ZeroMemory(fileNamesA, FileNames.Count * sizeof(char*));
@@ -149,14 +159,17 @@ BOOL CSimpleMAPI::SendMail()
         if (!Win32EncodeAcpExact(FileNames[i], fileNameA))
         {
             TRACE_E("CSimpleMAPI::SendMail(): an attachment path cannot be represented in the system code page");
+            const std::wstring message = FormatStrW(LoadStrW(IDS_EMAILFILES_PATHERROR), FileNames[i]);
+            gPrompter->ShowError(NULL, LoadStrW(IDS_ERRORTITLE), message.c_str());
             ok = FALSE;
             break;
         }
 
-        fileNamesA[i] = (char*)malloc(fileNameA.size() + 1);
+        fileNamesA[i] = static_cast<char*>(gThreadStartup->AllocateBuffer(fileNameA.size() + 1));
         if (fileNamesA[i] == NULL)
         {
             TRACE_E(LOW_MEMORY);
+            ShowMailFailure(FormatThreadStartupErrorW(ERROR_NOT_ENOUGH_MEMORY));
             ok = FALSE;
             break;
         }
@@ -206,6 +219,7 @@ BOOL CSimpleMAPI::SendMail()
             free(fileNamesA[i]);
         free(fileNamesA);
         free(fileDesc);
+        ShowMailFailure(FormatThreadStartupErrorW(ERROR_NOT_ENOUGH_MEMORY));
         return FALSE;
     }
 
@@ -234,18 +248,9 @@ BOOL CSimpleMAPI::SendMail()
         free(fileNamesA[i]);
     free(fileNamesA);
     free(fileDesc);
-    // report nothing because various clients return different values
-    // for example Outlook 6 on XP returned 1 when cancelling a message or 3
-    // when cancelling the connection wizard (if it was not configured)
-    /*
-  if (ret != 0)
-  {
-    std::wstring msg = FormatStrW(L"error 3: %d", err);
-    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-    return FALSE;
-  }
-*/
-    return TRUE;
+    if (ret != SUCCESS_SUCCESS && ret != MAPI_USER_ABORT)
+        ShowMailFailure(FormatStrW(LoadStrW(IDS_EMAILFILES_PROVIDERERROR), static_cast<unsigned>(ret)));
+    return ret == SUCCESS_SUCCESS;
 }
 
 unsigned SimpleMAPISendMailThreadBody(void* param)
@@ -297,12 +302,15 @@ BOOL SimpleMAPISendMail(CSimpleMAPI* mapi)
     HCURSOR hOldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
     DWORD threadID;
-    HANDLE thread = HANDLES(CreateThread(NULL, 0, SimpleMAPISendMailThread, mapi, 0, &threadID));
+    const StartupHandleResult started = gThreadStartup->StartThread(SimpleMAPISendMailThread, mapi, &threadID);
+    HANDLE thread = started.Handle;
+    HANDLES_ADD_EX(__otQuiet, thread != NULL, __htThread, __hoCreateThread, thread, started.Error, TRUE);
     if (thread == NULL)
     {
         TRACE_E("Unable to start SimpleMAPISendMailThread thread.");
         delete mapi;
         SetCursor(hOldCur);
+        ShowMailFailure(FormatThreadStartupErrorW(started.Error));
         return FALSE;
     }
 

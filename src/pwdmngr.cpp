@@ -5,6 +5,7 @@
 #include "precomp.h"
 #include <memory>
 #include <time.h>
+#include <stdexcept>
 
 #include "cfgdlg.h"
 #include "ui/IPrompter.h"
@@ -12,11 +13,78 @@
 #include "plugins.h"
 #include "spl_crypt.h"
 #include "common/Win32TextCodec.h"
+#include "common/IRegistry.h"
+#include "common/ISecureRandom.h"
+#include "common/security/ICredentialChangeHost.h"
 
 const wchar_t* SALAMANDER_PWDMNGR_USEMASTERPWD = L"Use Master Password";
 const wchar_t* SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER = L"Master Password Verifier";
 
-CPasswordManager PasswordManager;
+using namespace sally::security;
+
+struct CPasswordPersistence
+{
+    struct CachedPlaintext
+    {
+        CredentialBytes Text;
+        std::vector<CipherFingerprint> Aliases;
+    };
+    ICredentialChangeHost& Host;
+    CredentialRewriteJournal Journal;
+    bool Active = false;
+    bool Failed = false;
+    bool BeforeProtected = false;
+    std::vector<CachedPlaintext> Cache;
+    explicit CPasswordPersistence(ICredentialChangeHost& host) : Host(host), Journal(host) {}
+    CachedPlaintext& CacheFor(const wchar_t* text)
+    {
+        const auto* bytes = reinterpret_cast<const BYTE*>(text);
+        const size_t size = wcslen(text) * sizeof(wchar_t);
+        for (auto& entry : Cache)
+            if (entry.Text.size() == size && (size == 0 || memcmp(entry.Text.data(), bytes, size) == 0))
+                return entry;
+        Cache.push_back({CredentialBytes(bytes, bytes + size), {}});
+        return Cache.back();
+    }
+};
+
+namespace
+{
+    class CPasswordProfileLock
+    {
+        ICredentialChangeHost* Host;
+        bool Held = false;
+
+    public:
+        explicit CPasswordProfileLock(CPasswordPersistence* persistence)
+            : Host(persistence != nullptr ? &persistence->Host : nullptr)
+        {
+            if (Host == nullptr)
+                Held = true;
+            else
+            {
+                const auto result = Host->Acquire();
+                Held = result.success;
+                if (!Held)
+                    SetLastError(result.errorCode);
+            }
+        }
+        ~CPasswordProfileLock()
+        {
+            if (Held && Host != nullptr)
+                Host->Release();
+        }
+        explicit operator bool() const { return Held; }
+    };
+    bool PasswordResult(const RegistryResult& result)
+    {
+        if (!result.success)
+            SetLastError(result.errorCode);
+        return result.success;
+    }
+} // namespace
+
+CPasswordManager PasswordManager(nullptr, GetCredentialChangeHost());
 
 CSalamanderCryptAbstract* GetSalamanderCrypt();
 
@@ -50,22 +118,6 @@ struct CSecureByteArrayDeleter
 
     int Size;
 };
-
-//****************************************************************************
-//
-// FillBufferWithRandomData
-//
-
-void FillBufferWithRandomData(BYTE* buf, int len)
-{
-    static unsigned calls = 0; // ensure a different random header each time
-
-    if (++calls == 1)
-        srand((unsigned)time(NULL) ^ (unsigned)_getpid());
-
-    while (len--)
-        *buf++ = (rand() >> 7) & 0xff;
-}
 
 //****************************************************************************
 //
@@ -358,16 +410,25 @@ bool UnscrambleUtf8Password(const BYTE* scrambledBytes, size_t scrambledLength,
 static BOOL GetDlgItemPasswordW(HWND hWindow, int ctrlID,
                                 std::wstring& password)
 {
-    const int length = GetWindowTextLengthW(GetDlgItem(hWindow, ctrlID));
-    if (length < 0 || length > SAL_AES_MAX_PWD_LENGTH)
+    SecureClear(password);
+    const HWND edit = GetDlgItem(hWindow, ctrlID);
+    if (edit == NULL)
+    {
+        SetLastError(ERROR_INVALID_WINDOW_HANDLE);
+        return FALSE;
+    }
+    SetLastError(ERROR_SUCCESS);
+    const int length = GetWindowTextLengthW(edit);
+    if ((length == 0 && GetLastError() != ERROR_SUCCESS) ||
+        length < 0 || length > SAL_AES_MAX_PWD_LENGTH)
         return FALSE;
 
     try
     {
         std::vector<wchar_t> buffer(static_cast<size_t>(length) + 1, L'\0');
-        const int copied = GetDlgItemTextW(hWindow, ctrlID, buffer.data(),
-                                           static_cast<int>(buffer.size()));
-        if (copied != length)
+        SetLastError(ERROR_SUCCESS);
+        const int copied = GetWindowTextW(edit, buffer.data(), static_cast<int>(buffer.size()));
+        if ((copied == 0 && GetLastError() != ERROR_SUCCESS) || copied != length)
         {
             SecureZeroMemory(buffer.data(), buffer.size() * sizeof(wchar_t));
             return FALSE;
@@ -426,6 +487,20 @@ void CChangeMasterPassword::Validate(CTransferInfo& ti)
             ti.ErrorOn(IDC_CHMP_NEWPWD);
             return;
         }
+        std::wstring confirmation;
+        const BOOL confirmed = GetDlgItemPasswordW(HWindow, IDC_CHMP_RETYPEPWD, confirmation) && newPwd == confirmation;
+        SecureClear(confirmation);
+        if (!confirmed)
+        {
+            SecureClear(newPwd);
+            ti.ErrorOn(IDC_CHMP_RETYPEPWD);
+            return;
+        }
+        if (newPwd.empty() && !PwdManager->IsUsingMasterPassword())
+        {
+            ti.ErrorOn(IDC_CHMP_NEWPWD);
+            return;
+        }
         if (!newPwd.empty() && !PwdManager->IsPasswordSecure(newPwd.c_str()))
         {
             if (gPrompter->AskYesNo(LoadStrW(IDS_WARNINGTITLE), LoadStrW(IDS_INSECUREPASSWORD)).type == PromptResult::kNo)
@@ -476,16 +551,29 @@ void CChangeMasterPassword::Transfer(CTransferInfo& ti)
         if (PwdManager->IsUsingMasterPassword())
         {
             std::wstring oldPwd;
-            GetDlgItemPasswordW(HWindow, IDC_CHMP_CURRENTPWD, oldPwd);
-            PwdManager->EnterMasterPassword(oldPwd.c_str());
+            const BOOL entered = GetDlgItemPasswordW(HWindow, IDC_CHMP_CURRENTPWD, oldPwd) &&
+                                 PwdManager->EnterMasterPassword(oldPwd.c_str());
             SecureClear(oldPwd);
+            if (!entered)
+            {
+                ti.ErrorOn(IDC_CHMP_CURRENTPWD);
+                return;
+            }
         }
 
         std::wstring newPwd;
-        GetDlgItemPasswordW(HWindow, IDC_CHMP_NEWPWD, newPwd);
+        if (!GetDlgItemPasswordW(HWindow, IDC_CHMP_NEWPWD, newPwd))
+        {
+            SecureClear(newPwd);
+            ti.ErrorOn(IDC_CHMP_NEWPWD);
+            return;
+        }
         if (!PwdManager->SetMasterPassword(HWindow, newPwd.c_str()))
-            gPrompter->ShowError(LoadStrW(IDS_WARNINGTITLE),
-                                 GetErrorTextOwned(GetLastError()).c_str());
+        {
+            const DWORD error = GetLastError();
+            ti.ErrorOn(IDC_CHMP_NEWPWD);
+            gPrompter->ShowError(LoadStrW(IDS_WARNINGTITLE), GetErrorTextOwned(error).c_str());
+        }
         SecureClear(newPwd);
     }
 }
@@ -496,7 +584,7 @@ void CChangeMasterPassword::EnableControls()
     std::wstring retypedPwd;
     const BOOL read = GetDlgItemPasswordW(HWindow, IDC_CHMP_NEWPWD, newPwd) &&
                       GetDlgItemPasswordW(HWindow, IDC_CHMP_RETYPEPWD, retypedPwd);
-    BOOL enableOK = read && _wcsicmp(newPwd.c_str(), retypedPwd.c_str()) == 0;
+    BOOL enableOK = read && newPwd == retypedPwd;
     if (enableOK && !PwdManager->IsUsingMasterPassword() && newPwd.empty())
         enableOK = FALSE;
     EnableWindow(GetDlgItem(HWindow, IDOK), enableOK);
@@ -643,7 +731,10 @@ void CCfgPageSecurity::Transfer(CTransferInfo& ti)
 void CCfgPageSecurity::EnableControls()
 {
     BOOL useMasterPwd = IsDlgButtonChecked(HWindow, IDC_SEC_ENABLE_MASTERPWD);
-    EnableWindow(GetDlgItem(HWindow, IDC_SEC_CHANGE_MASTERPWD), useMasterPwd);
+    EnableWindow(GetDlgItem(HWindow, IDC_SEC_ENABLE_MASTERPWD), PasswordManager.IsPersistentStateValid());
+    EnableWindow(GetDlgItem(HWindow, IDC_SEC_CHANGE_MASTERPWD), useMasterPwd && PasswordManager.IsPersistentStateValid());
+    if (!PasswordManager.IsPersistentStateValid())
+        SetDlgItemTextW(HWindow, IDC_STATIC_2, LoadStrW(IDS_MASTERPASSWORD_STORE_DAMAGED));
 }
 
 INT_PTR
@@ -691,8 +782,14 @@ CCfgPageSecurity::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 CRemoveMasterPassword dlg(HWindow, &PasswordManager);
                 if (dlg.Execute() == IDOK)
                 {
-                    PasswordManager.SetMasterPassword(HWindow, NULL);
-                    PasswordManager.NotifyAboutMasterPasswordChange(HWindow);
+                    if (PasswordManager.SetMasterPassword(HWindow, NULL))
+                        PasswordManager.NotifyAboutMasterPasswordChange(HWindow);
+                    else
+                    {
+                        const DWORD error = GetLastError();
+                        CheckDlgButton(HWindow, IDC_SEC_ENABLE_MASTERPWD, BST_CHECKED);
+                        gPrompter->ShowError(LoadStrW(IDS_ERROR), GetErrorTextOwned(error).c_str());
+                    }
                 }
                 else
                 {
@@ -736,12 +833,14 @@ CCfgPageSecurity::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 #define PWDMNGR_SIGNATURE_UTF8_SCRAMBLED 3 // UTF-8 payload, dynamically scrambled only
 #define PWDMNGR_SIGNATURE_UTF8_ENCRYPTED 4 // UTF-8 payload, dynamically scrambled and AES encrypted
 
-CPasswordManager::CPasswordManager()
+CPasswordManager::CPasswordManager(ISecureRandom* random, ICredentialChangeHost* persistence)
+    : SecureRandom(random != nullptr ? random : GetWin32SecureRandom())
 {
     UseMasterPassword = FALSE;
     MasterPasswordVerifierIsLegacy = FALSE;
 
     SalamanderCrypt = GetSalamanderCrypt();
+    if (persistence != nullptr) Persistence.reset(new CPasswordPersistence(*persistence));
 }
 
 CPasswordManager::~CPasswordManager()
@@ -772,13 +871,139 @@ BOOL CPasswordManager::IsPasswordSecure(const wchar_t* password)
     return l >= 6 && (a + b + c + d) >= 2;
 }
 
+BOOL CPasswordManager::EnsureCredentialJournal()
+{
+    try
+    {
+        if (!Persistence)
+            return TRUE;
+        CredentialAuthority authority;
+        authority.Protected = UseMasterPassword != FALSE;
+        authority.Verifier.assign(MasterPasswordVerifier.begin(), MasterPasswordVerifier.end());
+        if (!Persistence->Journal.IsLoaded() && !PasswordResult(Persistence->Journal.Load(authority)))
+            return FALSE;
+        if (!(Persistence->Journal.Authority() == authority))
+        {
+            SetLastError(ERROR_REVISION_MISMATCH);
+            return FALSE;
+        }
+        return PasswordResult(Persistence->Journal.CheckRevision());
+    }
+    catch (const std::bad_alloc&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_FILE_TOO_LARGE);
+        return FALSE;
+    }
+}
+
+BOOL CPasswordManager::CheckCredentialRevision()
+{
+    CPasswordProfileLock lock(Persistence.get());
+    return lock && PersistentStateValid && EnsureCredentialJournal();
+}
+
 BOOL CPasswordManager::EncryptPassword(const wchar_t* plainPassword, BYTE** encryptedPassword, int* encryptedPasswordSize, BOOL encrypt)
+{
+    if (encryptedPassword != nullptr)
+        *encryptedPassword = nullptr;
+    if (encryptedPasswordSize != nullptr)
+        *encryptedPasswordSize = 0;
+    CPasswordProfileLock lock(Persistence.get());
+    auto fail = [&]() -> BOOL
+    {
+        if (Persistence && Persistence->Active)
+            Persistence->Failed = true;
+        return FALSE;
+    };
+    if (!lock || !PersistentStateValid || !EnsureCredentialJournal())
+        return fail();
+    BYTE* result = nullptr;
+    int size = 0;
+    if (encryptedPassword == nullptr || encryptedPasswordSize == nullptr ||
+        !EncryptRaw(plainPassword, &result, &size, encrypt, PlainMasterPassword))
+        return fail();
+    bool okay = true;
+    if (Persistence && Persistence->Active)
+    {
+        try
+        {
+            auto canonical = [&](BOOL protectedValue, const std::wstring& master, CredentialBytes& bytes) -> bool
+            {
+                BYTE* data = nullptr;
+                int count = 0;
+                if (!EncryptRaw(plainPassword, &data, &count, protectedValue, master))
+                    return false;
+                try
+                {
+                    bytes.assign(data, data + count);
+                }
+                catch (...)
+                {
+                    SecureZeroMemory(data, count);
+                    free(data);
+                    throw;
+                }
+                SecureZeroMemory(data, count);
+                free(data);
+                return true;
+            };
+            CredentialBytes before, after;
+            CipherFingerprint alias;
+            okay = canonical(Persistence->BeforeProtected, OldPlainMasterPassword, before) &&
+                   canonical(UseMasterPassword, PlainMasterPassword, after);
+            if (okay)
+            {
+                const DWORD error = FingerprintCipher(result, size, alias);
+                okay = error == ERROR_SUCCESS;
+                if (!okay)
+                    SetLastError(error);
+            }
+            if (okay)
+            {
+                auto& cache = Persistence->CacheFor(plainPassword);
+                auto aliases = cache.Aliases;
+                aliases.push_back(alias);
+                okay = PasswordResult(Persistence->Journal.Record(aliases, before, after));
+                if (okay)
+                    cache.Aliases.push_back(alias);
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            okay = false;
+        }
+        catch (const std::length_error&)
+        {
+            SetLastError(ERROR_FILE_TOO_LARGE);
+            okay = false;
+        }
+    }
+    if (!okay)
+    {
+        SecureZeroMemory(result, size);
+        free(result);
+        return fail();
+    }
+    *encryptedPassword = result;
+    *encryptedPasswordSize = size;
+    return TRUE;
+}
+
+BOOL CPasswordManager::EncryptRaw(const wchar_t* plainPassword, BYTE** encryptedPassword, int* encryptedPasswordSize, BOOL encrypt, const std::wstring& master)
 {
     if (encryptedPassword != NULL)
         *encryptedPassword = NULL;
     if (encryptedPasswordSize != NULL)
         *encryptedPasswordSize = 0;
-    if (encrypt && (!UseMasterPassword || PlainMasterPassword.empty()))
+    if (!PersistentStateValid)
+        return FALSE;
+    if (encrypt && master.empty())
     {
         TRACE_E("CPasswordManager::EncryptPassword(): Unexpected situation, Master Password was not entered. Call AskForMasterPassword() first.");
         return FALSE;
@@ -836,7 +1061,7 @@ BOOL CPasswordManager::EncryptPassword(const wchar_t* plainPassword, BYTE** encr
     if (encrypt)
     {
         std::string masterPasswordBytes;
-        if (!EncodeMasterPassword(PlainMasterPassword, CP_UTF8,
+        if (!EncodeMasterPassword(master, CP_UTF8,
                                   masterPasswordBytes))
         {
             SecureZeroMemory(result, resultSize);
@@ -845,7 +1070,16 @@ BOOL CPasswordManager::EncryptPassword(const wchar_t* plainPassword, BYTE** encr
             return FALSE;
         }
 
-        FillBufferWithRandomData(result + 1, 16);
+        const DWORD randomError = SecureRandom->Fill(result + 1, 16);
+        if (randomError != ERROR_SUCCESS)
+        {
+            SecureClear(masterPasswordBytes);
+            SecureZeroMemory(result, resultSize);
+            free(result);
+            SecureClear(scrambledPassword);
+            SetLastError(randomError);
+            return FALSE;
+        }
         memcpy(result + 1 + 16, scrambledPassword.data(), scrambledPasswordLen);
         CSalAES aes;
         WORD dummy;
@@ -890,6 +1124,53 @@ void mytrace(const char *txt)
 
 BOOL CPasswordManager::DecryptPassword(const BYTE* encryptedPassword, int encryptedPasswordSize, std::wstring* plainPassword)
 {
+    CPasswordProfileLock lock(Persistence.get());
+    auto fail = [&]() -> BOOL
+    {
+        if (Persistence && Persistence->Active)
+            Persistence->Failed = true;
+        return FALSE;
+    };
+    if (!lock || !PersistentStateValid || !EnsureCredentialJournal())
+        return fail();
+    if (!Persistence)
+        return DecryptRaw(encryptedPassword, encryptedPasswordSize, plainPassword);
+    if (encryptedPassword == nullptr || encryptedPasswordSize <= 1)
+        return fail();
+    CipherFingerprint alias;
+    const DWORD error = FingerprintCipher(encryptedPassword, encryptedPasswordSize, alias);
+    if (error != ERROR_SUCCESS)
+    {
+        SetLastError(error);
+        return fail();
+    }
+    const auto* canonical = Persistence->Journal.Resolve(alias);
+    std::wstring decoded;
+    if (!DecryptRaw(canonical != nullptr ? canonical->data() : encryptedPassword,
+                    canonical != nullptr ? static_cast<int>(canonical->size()) : encryptedPasswordSize,
+                    &decoded))
+        return fail();
+    try
+    {
+        if (Persistence->Active)
+            Persistence->CacheFor(decoded.c_str()).Aliases.push_back(alias);
+    }
+    catch (const std::bad_alloc&)
+    {
+        SecureClear(decoded);
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return fail();
+    }
+    if (plainPassword != nullptr)
+        plainPassword->swap(decoded);
+    SecureClear(decoded);
+    return TRUE;
+}
+
+BOOL CPasswordManager::DecryptRaw(const BYTE* encryptedPassword, int encryptedPasswordSize, std::wstring* plainPassword)
+{
+    if (!PersistentStateValid)
+        return FALSE;
     if (encryptedPassword == NULL || encryptedPasswordSize <= 1)
     {
         TRACE_E("CPasswordManager::DecryptPassword(): encryptedPassword == NULL || encryptedPasswordSize == 0!");
@@ -1032,67 +1313,173 @@ BOOL CPasswordManager::DecryptPassword(const BYTE* encryptedPassword, int encryp
 
 BOOL CPasswordManager::IsPasswordEncrypted(const BYTE* encryptedPassword, int encryptedPasswordSize)
 {
-    if (encryptedPassword != NULL && encryptedPasswordSize > 0 &&
-        (*encryptedPassword == PWDMNGR_SIGNATURE_ENCRYPTED ||
-         *encryptedPassword == PWDMNGR_SIGNATURE_UTF8_ENCRYPTED))
-        return TRUE;
-    else
-        return FALSE;
+    if (Persistence)
+    {
+        CPasswordProfileLock lock(Persistence.get());
+        if (!lock || !EnsureCredentialJournal())
+            return TRUE;
+        if (encryptedPassword != nullptr && encryptedPasswordSize > 0)
+        {
+            CipherFingerprint alias;
+            const DWORD error = FingerprintCipher(encryptedPassword, encryptedPasswordSize, alias);
+            if (error != ERROR_SUCCESS)
+            {
+                SetLastError(error);
+                return TRUE;
+            }
+            if (const auto* canonical = Persistence->Journal.Resolve(alias))
+            {
+                encryptedPassword = canonical->data();
+                encryptedPasswordSize = static_cast<int>(canonical->size());
+            }
+        }
+    }
+    return encryptedPassword != nullptr && encryptedPasswordSize > 0 &&
+           (*encryptedPassword == PWDMNGR_SIGNATURE_ENCRYPTED || *encryptedPassword == PWDMNGR_SIGNATURE_UTF8_ENCRYPTED);
 }
 
 BOOL CPasswordManager::SetMasterPassword(HWND hParent, const wchar_t* password)
 {
-    if (!OldPlainMasterPassword.empty())
+    CPasswordProfileLock lock(Persistence.get());
+    if (!lock || !PersistentStateValid || !EnsureCredentialJournal())
+        return FALSE;
+    if (!OldPlainMasterPassword.empty() || (Persistence && Persistence->Active) ||
+        (UseMasterPassword && PlainMasterPassword.empty()))
     {
-        TRACE_E("CPasswordManager::SetMasterPassword() unexpected old-password owner");
-        SecureClear(OldPlainMasterPassword);
+        SetLastError(ERROR_INVALID_STATE);
+        return FALSE;
     }
-
     std::wstring newPassword;
     std::vector<BYTE> newVerifier;
-    if (password != NULL && password[0] != L'\0')
+    try
+    {
+        if (password != nullptr && password[0] != L'\0')
+        {
+            newPassword = password;
+            if (!CreateMasterPasswordVerifier(newPassword.c_str(), newVerifier))
+            {
+                SecureClear(newPassword);
+                return FALSE;
+            }
+        }
+        if (Persistence)
+        {
+            CredentialAuthority target;
+            target.Protected = !newPassword.empty();
+            target.Verifier.assign(newVerifier.begin(), newVerifier.end());
+            std::vector<CredentialRewrite> prepared;
+            for (const auto& record : Persistence->Journal.Records())
+            {
+                CredentialRewrite next;
+                next.Aliases = record.Aliases;
+                next.Before = Persistence->Journal.ReadableCipher(record);
+                std::wstring plaintext;
+                if (!DecryptRaw(next.Before.data(), static_cast<int>(next.Before.size()), &plaintext))
+                {
+                    SecureClear(newPassword);
+                    SecureClear(newVerifier);
+                    return FALSE;
+                }
+                BYTE* data = nullptr;
+                int size = 0;
+                const BOOL encrypted = EncryptRaw(plaintext.c_str(), &data, &size, target.Protected, newPassword);
+                SecureClear(plaintext);
+                if (!encrypted)
+                {
+                    SecureClear(newPassword);
+                    SecureClear(newVerifier);
+                    return FALSE;
+                }
+                try
+                {
+                    next.After.assign(data, data + size);
+                }
+                catch (...)
+                {
+                    SecureZeroMemory(data, size);
+                    free(data);
+                    throw;
+                }
+                SecureZeroMemory(data, size);
+                free(data);
+                prepared.push_back(std::move(next));
+            }
+            if (!PasswordResult(Persistence->Journal.Begin(target, std::move(prepared))))
+            {
+                SecureClear(newPassword);
+                SecureClear(newVerifier);
+                return FALSE;
+            }
+            Persistence->BeforeProtected = UseMasterPassword != FALSE;
+            Persistence->Failed = false;
+            Persistence->Active = true;
+        }
+    }
+    catch (const std::bad_alloc&)
+    {
+        SecureClear(newPassword);
+        SecureClear(newVerifier);
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
+
+    const BOOL oldUse = UseMasterPassword;
+    const BOOL oldLegacy = MasterPasswordVerifierIsLegacy;
+    OldPlainMasterPassword = std::move(PlainMasterPassword);
+    MasterPasswordVerifier.swap(newVerifier); // newVerifier now owns the old verifier
+    MasterPasswordVerifierIsLegacy = FALSE;
+    UseMasterPassword = !newPassword.empty();
+    PlainMasterPassword.swap(newPassword);
+    const int event = !UseMasterPassword ? PME_MASTERPASSWORDREMOVED
+                      : oldUse           ? PME_MASTERPASSWORDCHANGED
+                                         : PME_MASTERPASSWORDCREATED;
+    bool success = true;
+    if (Persistence)
     {
         try
         {
-            newPassword = password;
+            success = Persistence->Host.Notify(hParent, event) && !Persistence->Failed;
+            if (success)
+                success = PasswordResult(Persistence->Host.SaveConfiguration(hParent)) && !Persistence->Failed;
+            if (success)
+            {
+                CredentialAuthority authority;
+                authority.Protected = UseMasterPassword != FALSE;
+                authority.Verifier.assign(MasterPasswordVerifier.begin(), MasterPasswordVerifier.end());
+                success = PasswordResult(Persistence->Journal.Commit(authority));
+            }
         }
         catch (const std::bad_alloc&)
         {
             SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-            return FALSE;
+            success = false;
         }
-        if (!CreateMasterPasswordVerifier(newPassword.c_str(), newVerifier))
+        if (!success)
         {
-            SecureClear(newPassword);
-            return FALSE;
+            const DWORD failure = GetLastError();
+            Persistence->Journal.Abort(); // durable old authority; pending restart also selects the old authority
+            SecureClear(PlainMasterPassword);
+            PlainMasterPassword.swap(OldPlainMasterPassword);
+            MasterPasswordVerifier.swap(newVerifier);
+            UseMasterPassword = oldUse;
+            MasterPasswordVerifierIsLegacy = oldLegacy;
+            SetLastError(failure != ERROR_SUCCESS ? failure : ERROR_WRITE_FAULT);
         }
-    }
-
-    OldPlainMasterPassword = std::move(PlainMasterPassword);
-    SecureClear(MasterPasswordVerifier);
-    MasterPasswordVerifier.swap(newVerifier);
-    SecureClear(newVerifier);
-    MasterPasswordVerifierIsLegacy = FALSE;
-
-    if (newPassword.empty())
-    {
-        UseMasterPassword = FALSE;
-        Plugins.PasswordManagerEvent(hParent, PME_MASTERPASSWORDREMOVED);
+        Persistence->Active = false;
+        Persistence->Cache.clear();
     }
     else
-    {
-        UseMasterPassword = TRUE;
-        PlainMasterPassword.swap(newPassword);
-        Plugins.PasswordManagerEvent(hParent, OldPlainMasterPassword.empty() ? PME_MASTERPASSWORDCREATED : PME_MASTERPASSWORDCHANGED);
-    }
-
+        success = Plugins.PasswordManagerEvent(hParent, event) != FALSE;
     SecureClear(newPassword);
+    SecureClear(newVerifier);
     SecureClear(OldPlainMasterPassword);
-    return TRUE;
+    return success;
 }
 
 BOOL CPasswordManager::EnterMasterPassword(const wchar_t* password)
 {
+    if (!PersistentStateValid)
+        return FALSE;
     if (!UseMasterPassword || password == NULL)
     {
         TRACE_E("CPasswordManager::EnterMasterPassword(): Unexpected situation, Master Password is not used.");
@@ -1139,8 +1526,16 @@ BOOL CPasswordManager::CreateMasterPasswordVerifier(
     CMasterPasswordVerifierUtf8 candidate = {};
     candidate.Magic = PWDMNGR_MASTER_VERIFIER_UTF8_MAGIC;
     candidate.Version = PWDMNGR_MASTER_VERIFIER_UTF8_VERSION;
-    FillBufferWithRandomData(candidate.Salt, sizeof(candidate.Salt));
-    FillBufferWithRandomData(candidate.Dummy, sizeof(candidate.Dummy));
+    DWORD randomError = SecureRandom->Fill(candidate.Salt, sizeof(candidate.Salt));
+    if (randomError == ERROR_SUCCESS)
+        randomError = SecureRandom->Fill(candidate.Dummy, sizeof(candidate.Dummy));
+    if (randomError != ERROR_SUCCESS)
+    {
+        SecureClear(passwordBytes);
+        SecureZeroMemory(&candidate, sizeof(candidate));
+        SetLastError(randomError);
+        return FALSE;
+    }
 
     CSalAES aes;
     WORD dummy;
@@ -1178,6 +1573,8 @@ BOOL CPasswordManager::CreateMasterPasswordVerifier(
 
 BOOL CPasswordManager::VerifyMasterPassword(const wchar_t* password)
 {
+    if (!PersistentStateValid)
+        return FALSE;
     if (!UseMasterPassword || password == NULL)
     {
         TRACE_E("CPasswordManager::VerifyMasterPassword() Using of Master Password is turned off in Salamanader configuration.");
@@ -1275,107 +1672,197 @@ void CPasswordManager::NotifyAboutMasterPasswordChange(HWND hParent)
 
 BOOL CPasswordManager::Save(HKEY hKey)
 {
-    if (UseMasterPassword)
+    try
     {
-        if (MasterPasswordVerifier.empty())
+        CPasswordProfileLock lock(Persistence.get());
+        if (!lock || !EnsureCredentialJournal())
             return FALSE;
-
-        std::vector<BYTE> upgraded;
-        const std::vector<BYTE>* record = &MasterPasswordVerifier;
-        if (MasterPasswordVerifierIsLegacy && !PlainMasterPassword.empty())
+        if (!PersistentStateValid)
+            return FALSE;
+        if (UseMasterPassword)
         {
-            if (!CreateMasterPasswordVerifier(PlainMasterPassword.c_str(),
-                                              upgraded))
+            if (MasterPasswordVerifier.empty())
                 return FALSE;
-            record = &upgraded;
+
+            std::vector<BYTE> upgraded;
+            const std::vector<BYTE>* record = &MasterPasswordVerifier;
+            if (MasterPasswordVerifierIsLegacy && !PlainMasterPassword.empty())
+            {
+                if (!CreateMasterPasswordVerifier(PlainMasterPassword.c_str(),
+                                                  upgraded))
+                    return FALSE;
+                record = &upgraded;
+            }
+
+            BOOL ret = SetValue(
+                hKey, SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER, REG_BINARY,
+                record->data(), static_cast<DWORD>(record->size()));
+            if (ret)
+                ret = SetValue(hKey, SALAMANDER_PWDMNGR_USEMASTERPWD,
+                               REG_DWORD, &UseMasterPassword,
+                               sizeof(UseMasterPassword));
+            if (ret && record == &upgraded && Persistence)
+            {
+                CredentialAuthority authority;
+                authority.Protected = true;
+                authority.Verifier.assign(upgraded.begin(), upgraded.end());
+                ret = PasswordResult(Persistence->Journal.Commit(authority));
+            }
+            if (ret && record == &upgraded)
+            {
+                SecureClear(MasterPasswordVerifier);
+                MasterPasswordVerifier.swap(upgraded);
+                MasterPasswordVerifierIsLegacy = FALSE;
+            }
+            SecureClear(upgraded);
+            return ret;
         }
 
-        BOOL ret = SetValue(
-            hKey, SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER, REG_BINARY,
-            record->data(), static_cast<DWORD>(record->size()));
-        if (ret)
-            ret = SetValue(hKey, SALAMANDER_PWDMNGR_USEMASTERPWD,
-                           REG_DWORD, &UseMasterPassword,
-                           sizeof(UseMasterPassword));
-        if (ret && record == &upgraded)
-        {
-            SecureClear(MasterPasswordVerifier);
-            MasterPasswordVerifier.swap(upgraded);
-            MasterPasswordVerifierIsLegacy = FALSE;
-        }
-        SecureClear(upgraded);
+        const BOOL ret = SetValue(hKey, SALAMANDER_PWDMNGR_USEMASTERPWD,
+                                  REG_DWORD, &UseMasterPassword,
+                                  sizeof(UseMasterPassword));
+        DeleteValue(hKey, SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER);
         return ret;
     }
-
-    const BOOL ret = SetValue(hKey, SALAMANDER_PWDMNGR_USEMASTERPWD,
-                              REG_DWORD, &UseMasterPassword,
-                              sizeof(UseMasterPassword));
-    DeleteValue(hKey, SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER);
-    return ret;
+    catch (const std::bad_alloc&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_FILE_TOO_LARGE);
+        return FALSE;
+    }
 }
 
 BOOL CPasswordManager::Load(HKEY hKey)
 {
-    BOOL loadedUseMasterPassword = FALSE;
-    if (!GetValue(hKey, SALAMANDER_PWDMNGR_USEMASTERPWD, REG_DWORD,
-                  &loadedUseMasterPassword,
-                  sizeof(loadedUseMasterPassword)))
+    try
     {
-        loadedUseMasterPassword = FALSE; // absent in old configurations
-    }
+        PersistentStateValid = FALSE;
+        if (Persistence)
+        {
+            CredentialJournalSnapshot snapshot;
+            if (!PasswordResult(Persistence->Host.Read(snapshot)))
+                return FALSE;
+            if (snapshot.Present)
+            {
+                if (!PasswordResult(Persistence->Journal.Load({})))
+                    return FALSE;
+                const auto& authority = Persistence->Journal.Authority();
+                const auto& bytes = authority.Verifier;
+                const BOOL legacy = bytes.size() == sizeof(CMasterPasswordVerifier);
+                if (authority.Protected && !legacy)
+                {
+                    if (bytes.size() != sizeof(CMasterPasswordVerifierUtf8))
+                        return FALSE;
+                    CMasterPasswordVerifierUtf8 verifier;
+                    memcpy(&verifier, bytes.data(), sizeof(verifier));
+                    const bool valid = verifier.Magic == PWDMNGR_MASTER_VERIFIER_UTF8_MAGIC &&
+                                       verifier.Version == PWDMNGR_MASTER_VERIFIER_UTF8_VERSION;
+                    SecureZeroMemory(&verifier, sizeof(verifier));
+                    if (!valid)
+                        return FALSE;
+                }
+                SecureClear(PlainMasterPassword);
+                SecureClear(OldPlainMasterPassword);
+                SecureClear(MasterPasswordVerifier);
+                MasterPasswordVerifier.assign(bytes.begin(), bytes.end());
+                MasterPasswordVerifierIsLegacy = authority.Protected && legacy;
+                UseMasterPassword = authority.Protected;
+                PersistentStateValid = TRUE;
+                return TRUE;
+            }
+        }
+        BOOL loadedUseMasterPassword = FALSE;
+        IRegistry* registry = gRegistry != NULL ? gRegistry : GetWin32Registry();
+        DWORD enabled = FALSE;
+        const RegistryResult enabledResult = registry->GetDWord(hKey, SALAMANDER_PWDMNGR_USEMASTERPWD, enabled);
+        if (!enabledResult.success && !enabledResult.notFound())
+            return FALSE;
+        if (enabledResult.notFound())
+        {
+            RegValueType type = RegValueType::None;
+            DWORD size = 0;
+            const RegistryResult verifier = registry->ReadValue(hKey, SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER, type, NULL, size);
+            // A genuinely old/unconfigured store has neither value. A verifier
+            // without its protection flag is inconsistent, not an empty store.
+            if (verifier.success || !verifier.notFound())
+                return FALSE;
+        }
+        loadedUseMasterPassword = enabledResult.success && enabled != FALSE;
 
-    std::vector<BYTE> loadedVerifier;
-    BOOL loadedLegacy = FALSE;
-    if (loadedUseMasterPassword)
-    {
-        DWORD size = 0;
-        if (!GetSize(hKey, SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER,
-                     REG_BINARY, size) ||
-            (size != sizeof(CMasterPasswordVerifier) &&
-             size != sizeof(CMasterPasswordVerifierUtf8)))
-            return FALSE;
-        try
+        std::vector<BYTE> loadedVerifier;
+        BOOL loadedLegacy = FALSE;
+        if (loadedUseMasterPassword)
         {
-            loadedVerifier.resize(size);
-        }
-        catch (const std::bad_alloc&)
-        {
-            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-            return FALSE;
-        }
-        if (!GetValue(hKey, SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER,
-                      REG_BINARY, loadedVerifier.data(), size))
-        {
-            SecureClear(loadedVerifier);
-            return FALSE;
-        }
-        loadedLegacy = size == sizeof(CMasterPasswordVerifier);
-        if (!loadedLegacy)
-        {
-            const CMasterPasswordVerifierUtf8* current =
-                reinterpret_cast<const CMasterPasswordVerifierUtf8*>(
-                    loadedVerifier.data());
-            if (current->Magic != PWDMNGR_MASTER_VERIFIER_UTF8_MAGIC ||
-                current->Version != PWDMNGR_MASTER_VERIFIER_UTF8_VERSION)
+            DWORD size = 0;
+            RegValueType type = RegValueType::None;
+            if (!registry->ReadValue(hKey, SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER, type, NULL, size).success ||
+                type != RegValueType::Binary ||
+                (size != sizeof(CMasterPasswordVerifier) &&
+                 size != sizeof(CMasterPasswordVerifierUtf8)))
+                return FALSE;
+            try
+            {
+                loadedVerifier.resize(size);
+            }
+            catch (const std::bad_alloc&)
+            {
+                SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+                return FALSE;
+            }
+            const DWORD expectedSize = size;
+            if (!registry->ReadValue(hKey, SALAMANDER_PWDMNGR_MASTERPWD_VERIFIER,
+                                     type, loadedVerifier.data(), size)
+                     .success ||
+                type != RegValueType::Binary || size != expectedSize)
             {
                 SecureClear(loadedVerifier);
                 return FALSE;
             }
+            loadedLegacy = size == sizeof(CMasterPasswordVerifier);
+            if (!loadedLegacy)
+            {
+                const CMasterPasswordVerifierUtf8* current =
+                    reinterpret_cast<const CMasterPasswordVerifierUtf8*>(
+                        loadedVerifier.data());
+                if (current->Magic != PWDMNGR_MASTER_VERIFIER_UTF8_MAGIC ||
+                    current->Version != PWDMNGR_MASTER_VERIFIER_UTF8_VERSION)
+                {
+                    SecureClear(loadedVerifier);
+                    return FALSE;
+                }
+            }
         }
-    }
 
-    SecureClear(PlainMasterPassword);
-    SecureClear(OldPlainMasterPassword);
-    SecureClear(MasterPasswordVerifier);
-    MasterPasswordVerifier.swap(loadedVerifier);
-    SecureClear(loadedVerifier);
-    MasterPasswordVerifierIsLegacy = loadedLegacy;
-    UseMasterPassword = loadedUseMasterPassword;
-    return TRUE;
+        SecureClear(PlainMasterPassword);
+        SecureClear(OldPlainMasterPassword);
+        SecureClear(MasterPasswordVerifier);
+        MasterPasswordVerifier.swap(loadedVerifier);
+        SecureClear(loadedVerifier);
+        MasterPasswordVerifierIsLegacy = loadedLegacy;
+        UseMasterPassword = loadedUseMasterPassword;
+        PersistentStateValid = TRUE;
+        return TRUE;
+    }
+    catch (const std::bad_alloc&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_FILE_TOO_LARGE);
+        return FALSE;
+    }
 }
 
 BOOL CPasswordManager::AskForMasterPassword(HWND hParent)
 {
+    if (!PersistentStateValid)
+        return FALSE;
     // return FALSE if master password usage is disabled
     if (!UseMasterPassword)
         return FALSE;

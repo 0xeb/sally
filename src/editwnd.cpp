@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/CommandLinePathText.h"
 
 #include "cfgdlg.h"
 #include "mainwnd.h"
@@ -959,6 +960,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 else
                     return 0;
+                nameW = sally::input::QuoteCommandLinePath(nameW);
                 nameW += L' ';
                 InsertTextW(nameW.c_str());
                 return 0;
@@ -1205,9 +1207,9 @@ public:
         return FALSE;
     }
 
-    // Wide sibling. The drop data is CF_UNICODETEXT - already wide - and the
-    // narrow path below only exists for the legacy CF_HDROP branch.
-    BOOL InsertTextW(POINTL pt, const wchar_t* text)
+    // Keep drop text wide. Only a path from file metadata gets argument
+    // quoting, after the optional Alt basename selection.
+    BOOL InsertTextW(POINTL pt, const wchar_t* text, BOOL filePath = FALSE)
     {
         int xPos;
         if (HitTest(pt, FALSE, &xPos))
@@ -1233,8 +1235,9 @@ public:
             }
             if (ImageDragging)
                 ImageDragShow(FALSE);
+            const std::wstring insertion = filePath ? sally::input::QuoteCommandLinePath(start) : std::wstring(start);
             SendMessage(EditLine->HWindow, EM_SETSEL, xPos, xPos);
-            SendMessageW(EditLine->HWindow, EM_REPLACESEL, TRUE, (LPARAM)start);
+            SendMessageW(EditLine->HWindow, EM_REPLACESEL, TRUE, (LPARAM)insertion.c_str());
             UpdateWindow(EditLine->HWindow);
             if (ImageDragging)
                 ImageDragShow(TRUE);
@@ -1437,59 +1440,51 @@ public:
     (IDataObject* pDataObject, DWORD grfKeyState, POINTL pt,
      DWORD* pdwEffect)
     {
-        // attempt to extract text from the DataObject
-        FORMATETC formatEtc;
-        ZeroMemory(&formatEtc, sizeof(formatEtc));
-        formatEtc.cfFormat = UseUnicode ? CF_UNICODETEXT : CF_TEXT;
-        formatEtc.dwAspect = DVASPECT_CONTENT;
-        formatEtc.lindex = -1;
-        formatEtc.tymed = TYMED_HGLOBAL;
-
-        STGMEDIUM stgMedium;
-        ZeroMemory(&stgMedium, sizeof(stgMedium));
-        stgMedium.tymed = TYMED_HGLOBAL;
-
         if (ImageDragging)
             ImageDragLeave();
         SetInsertMark(-1);
 
-        if (pDataObject->GetData(&formatEtc, &stgMedium) == S_OK)
+        // A single file is a command argument even when the data object also
+        // offers display text. Unstructured dropped text stays ordinary text.
+        std::wstring path;
+        if (GetNameFromDataObject(pDataObject, &path))
         {
-            const SIZE_T byteSize = stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL
-                                        ? GlobalSize(stgMedium.hGlobal)
-                                        : 0;
-            const void* payload = byteSize != 0 ? HANDLES(GlobalLock(stgMedium.hGlobal)) : NULL;
-            if (payload != NULL)
+            if (!IsPluginFSPath(path.c_str()))
             {
-                std::wstring text;
-                const DWORD decodeError = UseUnicode
-                                              ? sally::clipboard::DecodeUnicodeClipboardPayload(
-                                                    payload, byteSize, text)
-                                              : sally::clipboard::DecodeAnsiClipboardPayload(
-                                                    payload, byteSize, GetACP(), text);
-                if (decodeError == ERROR_SUCCESS && !text.empty())
-                    InsertTextW(pt, text.c_str());
-                HANDLES(GlobalUnlock(stgMedium.hGlobal));
+                if (!path.empty() && path.back() == L'\\')
+                    path.pop_back();
+                if (path.length() == 2 && path[0] != L'\\')
+                    path.push_back(L'\\');
             }
-            ReleaseStgMedium(&stgMedium);
+            else
+                PluginFSConvertPathToExternal(path);
+            InsertTextW(pt, path.c_str(), TRUE);
         }
         else
         {
-            std::wstring path;
-            if (GetNameFromDataObject(pDataObject, &path))
+            FORMATETC formatEtc = {};
+            formatEtc.cfFormat = UseUnicode ? CF_UNICODETEXT : CF_TEXT;
+            formatEtc.dwAspect = DVASPECT_CONTENT;
+            formatEtc.lindex = -1;
+            formatEtc.tymed = TYMED_HGLOBAL;
+            STGMEDIUM stgMedium = {};
+            if (pDataObject->GetData(&formatEtc, &stgMedium) == S_OK)
             {
-                if (!IsPluginFSPath(path.c_str()))
+                const SIZE_T byteSize = stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL
+                                            ? GlobalSize(stgMedium.hGlobal)
+                                            : 0;
+                const void* payload = byteSize != 0 ? HANDLES(GlobalLock(stgMedium.hGlobal)) : NULL;
+                if (payload != NULL)
                 {
-                    if (!path.empty() && path.back() == L'\\')
-                        path.pop_back(); // trailing '\\' is not welcomed
-                    if (path.length() == 2 && path[0] != L'\\')
-                        path.push_back(L'\\'); // a non-UNC root path must end with '\\'
+                    std::wstring text;
+                    const DWORD decodeError = UseUnicode
+                                                  ? sally::clipboard::DecodeUnicodeClipboardPayload(payload, byteSize, text)
+                                                  : sally::clipboard::DecodeAnsiClipboardPayload(payload, byteSize, GetACP(), text);
+                    if (decodeError == ERROR_SUCCESS && !text.empty())
+                        InsertTextW(pt, text.c_str());
+                    HANDLES(GlobalUnlock(stgMedium.hGlobal));
                 }
-                else
-                {
-                    PluginFSConvertPathToExternal(path);
-                }
-                InsertTextW(pt, path.c_str());
+                ReleaseStgMedium(&stgMedium);
             }
         }
 
@@ -1504,10 +1499,15 @@ public:
     }
 };
 
+IDropTarget* CreateEditLineDropTarget(CEditLine* editLine)
+{
+    return new CEditDropTarget(editLine);
+}
+
 void CEditLine::RegisterDragDrop()
 {
     CALL_STACK_MESSAGE1("CEditLine::RegisterDragDrop()");
-    CEditDropTarget* dropTarget = new CEditDropTarget(this);
+    IDropTarget* dropTarget = CreateEditLineDropTarget(this);
     if (dropTarget != NULL)
     {
         if (HANDLES(RegisterDragDrop(HWindow, dropTarget)) != S_OK)

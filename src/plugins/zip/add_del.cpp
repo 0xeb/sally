@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "sfx_payload_copy.h"
 #include "precomp.h"
 #include "SallyUrls.h"
 #include <tchar.h>
@@ -511,15 +512,10 @@ int CZipPack::CreateSFX()
         else
         {
             Salamander->ProgressDialogAddText(LoadStrW(IDS_COPYDATA).c_str(), FALSE);
-            char* buffer = (char*)malloc(DECOMPRESS_INBUFFER_SIZE);
-            if (!buffer)
-                ErrorID = IDS_LOWMEM;
-            {
-                ErrorID = MoveData(ArchiveDataOffs, 0, ZipFile->Size, buffer);
-                if (!ErrorID && Flush(TempFile, TempFile->OutputBuffer, TempFile->BufferPosition, NULL))
-                    ErrorID = IDS_NODISPLAY;
-            }
-            free(buffer);
+            ErrorID = CopySfxPayload(DECOMPRESS_INBUFFER_SIZE, IDS_LOWMEM,
+                [](size_t bytes) { return static_cast<char*>(malloc(bytes)); },
+                [&](char* buffer) { return MoveData(ArchiveDataOffs, 0, ZipFile->Size, buffer); },
+                [&]() { return Flush(TempFile, TempFile->OutputBuffer, TempFile->BufferPosition, NULL) ? IDS_NODISPLAY : 0; });
         }
     }
 

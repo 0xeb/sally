@@ -520,6 +520,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     {
         ConfigVersion = CURRENT_CONFIG_VERSION; // the defaults are already in the current layout
     }
+    CfgDefaultCSV = NormalizeCsvConfig(CfgDefaultCSV);
 }
 
 void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)

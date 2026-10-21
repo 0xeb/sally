@@ -170,4 +170,7 @@ public:
     // finds the last (closing) submenu item addressed by variable 'index'
     // if not found, returns -1
     int GetSubmenuEndIndex(int index);
+
+    // Move an owned item (or complete submenu) one position without relocating its objects.
+    int MoveItem(int index, int direction);
 };

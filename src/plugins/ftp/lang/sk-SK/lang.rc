@@ -626,7 +626,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,169,88,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,231,88,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,312,1
-    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,297,12
     LTEXT           "&Detaily:",IDC_STATIC_3,7,9,55,8
     EDITTEXT        IDE_SCRD_DETAILS,64,9,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -651,7 +651,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,235,88,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,290,88,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,340,1
-    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,297,12
     LTEXT           "&Detaily:",IDC_STATIC_3,7,9,45,8
     EDITTEXT        IDE_SCRD_DETAILS,64,9,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -674,7 +674,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,168,101,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,230,101,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,311,1
-    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,297,12
     LTEXT           "Popi&s chyby:",IDC_STATIC_3,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,311,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -698,7 +698,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,148,101,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,210,101,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,270,1
-    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,164,12
     LTEXT           "Popi&s chyby:",IDC_STATIC_2,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,272,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -724,7 +724,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,235,101,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,290,101,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,340,1
-    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,164,12
     LTEXT           "Popi&s chyby:",IDC_STATIC_2,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,343,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -747,7 +747,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,170,70,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,232,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,314,1
-    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,297,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,9,53,8
     EDITTEXT        IDE_SCRD_SRCPATH,64,9,257,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -770,7 +770,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,258,70,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,314,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,369,1
-    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,297,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,9,53,8
     EDITTEXT        IDE_SCRD_SRCPATH,64,9,313,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -793,7 +793,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,228,70,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,288,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,338,1
-    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,297,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,9,53,8
     EDITTEXT        IDE_SCRD_SRCPATH,64,9,281,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -815,7 +815,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,164,70,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,226,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,304,1
-    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,297,12
     LTEXT           "&Cesta:",IDC_STATIC_3,7,9,63,8
     EDITTEXT        IDE_SCRD_SRCPATH,71,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -871,7 +871,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,143,46,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,205,46,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,260,1
-    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,164,12
     LTEXT           "&Cesta:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SCRD_SRCPATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -888,7 +888,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,164,46,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,226,46,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,303,1
-    CONTROL         "P&amätať si voľbu a nezobrazovať znova tento dialóg pre operácie s rovnakou chybou",IDC_SISE_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SISE_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,297,12
     LTEXT           "&Cesta:",IDC_STATIC_3,7,9,27,8
     EDITTEXT        IDE_SISE_PATH,37,9,272,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -905,7 +905,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,143,82,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,205,82,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,260,1
-    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,164,12
     LTEXT           "&Cesta:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -924,7 +924,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,148,106,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,210,106,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,271,1
-    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,164,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_2,7,9,53,8
     EDITTEXT        IDE_SSCD_SRCPATH,64,9,214,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -949,7 +949,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,235,106,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,290,106,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,340,1
-    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,164,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_2,7,9,53,8
     EDITTEXT        IDE_SSCD_SRCPATH,64,9,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -972,7 +972,7 @@ BEGIN
     PUSHBUTTON      "Zrušiť",IDCANCEL,143,70,50,14
     PUSHBUTTON      "Nápoveda",IDHELP,205,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,260,1
-    CONTROL         "&Teraz použiť pre operácie s rovnakou chybou",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Táto operácia (3 pokusy, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,164,12
     LTEXT           "&Cesta:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -1629,11 +1629,13 @@ STRINGTABLE
  IDS_OPERSTOPPED, "zastavený"
  IDS_FTPINACTIVE, "nečinné spojenie"
 
+ IDS_FSLOGUNAVAILABLE, "Protokol tohto spojenia nie je k dispozícii. Protokolovanie je zapnuté; nový protokol spustíte opätovným pripojením."
+ IDS_ITEMRETRYPOLICYHINT, "Ak s touto voľbou zvolíte Opakovať, zapamätá sa iba pre rovnaké chyby v tejto operácii. Opakovať vykoná najviac 3 automatické pokusy pre každú položku a chybu s odstupom jednej sekundy. Potom zvoľte ďalšiu akciu; ručné opakovanie obnoví počet pokusov."
  IDS_FSHAVENOLOG, "Toto spojenie s FTP serverom nemá žiadny log. Spojenie bolo zrejme spustené s vypnutým protokolovaním (pozrite sa na FTP Konfiguráciu - stránka Logy)."
 
  IDS_CLEARLOGQUESTION, "Naozaj chcete vyčistiť log ""%s""?"
  IDS_REMOVELOGQUESTION, "Naozaj chcete odstrániť log ""%s""?"
- IDS_REMOVEALLLOGSQUESTION, "Naozaj chcete odstrániť všetky logy?"
+ IDS_REMOVEALLLOGSQUESTION, "Odstrániť všetky protokoly, ktoré už nepatria spojeniu ani pracovnému vláknu? Používané protokoly zostanú zachované."
  IDS_TEXTCOPIEDTOCLIPBOARD, "Text bol úspešne skopírovaný do schránky."
  IDS_COPYTOCLIPBOARDERROR, "Nie je možné skopírovať text do schránky."
  IDS_SAVELOGFILTER, "Log súbory (*.log)|*.log|Všetky súbory (*.*)|*.*|"
@@ -2370,4 +2372,5 @@ STRINGTABLE
  IDS_NEWNAME_CANNOTENCODE, "Nový názov obsahuje znaky, ktoré nie je možné vyjadriť v kódovaní textu tohto spojenia, a preto ho nie je možné použiť ako názov súboru na serveri.\n\nPoložka zostala v chybovom stave."
  IDS_DIRNAME_CANNOTENCODE, "Názov adresára obsahuje znaky, ktoré nie je možné vyjadriť v kódovaní textu tohto spojenia, a preto adresár nie je možné na serveri vytvoriť."
  IDS_RENAMENAME_CANNOTENCODE, "Nový názov obsahuje znaky, ktoré nie je možné vyjadriť v kódovaní textu tohto spojenia, a preto položku nie je možné na serveri premenovať."
+ IDS_LOGSIZEOUTOFRANGE, "Limit veľkosti záznamu musí byť od 1 do %u KB."
 }

@@ -626,7 +626,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,169,88,50,14
     PUSHBUTTON      "帮助",IDHELP,231,88,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,312,1
-    CONTROL         "记住选择，并且对于相同错误的操作不要再显示此对话框(&R)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,306,12
     LTEXT           "详细(&E):",IDC_STATIC_3,7,9,50,8
     EDITTEXT        IDE_SCRD_DETAILS,59,9,260,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -651,7 +651,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,230,88,50,14
     PUSHBUTTON      "帮助",IDHELP,285,88,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,330,1
-    CONTROL         "记住选择，并且对于相同错误的操作不要再显示此对话框(&E)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,306,12
     LTEXT           "详细(&D):",IDC_STATIC_3,7,9,50,8
     EDITTEXT        IDE_SCRD_DETAILS,59,9,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -674,7 +674,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,169,101,50,14
     PUSHBUTTON      "帮助",IDHELP,231,101,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,313,1
-    CONTROL         "记住选择，并且对于相同错误的操作不要再显示此对话框(&R)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,306,12
     LTEXT           "错误描述(&E):",IDC_STATIC_3,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,313,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -698,7 +698,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,145,101,50,14
     PUSHBUTTON      "帮助",IDHELP,207,101,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,265,1
-    CONTROL         "现在应用到有相同错误的操作(&P)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,162,12
     LTEXT           "错误描述(&D):",IDC_STATIC_2,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,267,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -724,7 +724,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,230,101,50,14
     PUSHBUTTON      "帮助",IDHELP,285,101,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,330,1
-    CONTROL         "现在应用到有相同错误的操作(&P)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,162,12
     LTEXT           "错误描述(&D):",IDC_STATIC_2,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,333,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -747,7 +747,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,170,70,50,14
     PUSHBUTTON      "帮助",IDHELP,232,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,314,1
-    CONTROL         "记住选择，并且对于相同错误的操作不要再显示此对话框(&R)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,306,12
     LTEXT           "源路径(&U):",IDC_STATIC_3,7,9,50,8
     EDITTEXT        IDE_SCRD_SRCPATH,59,9,262,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -770,7 +770,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,249,70,55,14
     PUSHBUTTON      "帮助",IDHELP,309,70,55,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,359,1
-    CONTROL         "记住选择，并且对于相同错误的操作不要再显示此对话框(&E)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,306,12
     LTEXT           "源路径(&U):",IDC_STATIC_3,7,9,50,8
     EDITTEXT        IDE_SCRD_SRCPATH,59,9,308,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -793,7 +793,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,221,70,50,14
     PUSHBUTTON      "帮助",IDHELP,281,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,329,1
-    CONTROL         "记住选择，并且对于相同错误的操作不要再显示此对话框(&R)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,306,12
     LTEXT           "源路径(&U):",IDC_STATIC_3,7,9,50,8
     EDITTEXT        IDE_SCRD_SRCPATH,59,9,276,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -815,7 +815,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,169,70,50,14
     PUSHBUTTON      "帮助",IDHELP,231,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,314,1
-    CONTROL         "记住选择，并且对于相同错误的操作不要再显示此对话框(&R)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&O)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,306,12
     LTEXT           "路径(&A):",IDC_STATIC_3,7,9,50,8
     EDITTEXT        IDE_SCRD_SRCPATH,58,9,263,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -871,7 +871,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,147,46,50,14
     PUSHBUTTON      "帮助",IDHELP,209,46,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,269,1
-    CONTROL         "现在应用到有相同错误的操作(&P)",IDC_SCRD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&O)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,135,12
     LTEXT           "路径(&A):",IDC_STATIC_2,7,9,33,8
     EDITTEXT        IDE_SCRD_SRCPATH,41,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -888,7 +888,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,172,46,50,14
     PUSHBUTTON      "帮助",IDHELP,234,46,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,319,1
-    CONTROL         "记住选择，并且对于相同错误的操作不要再显示此对话框(&R)",IDC_SISE_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&O)",IDC_SISE_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,306,12
     LTEXT           "路径(&P):",IDC_STATIC_3,7,9,33,8
     EDITTEXT        IDE_SISE_PATH,43,9,282,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -905,7 +905,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,147,82,50,14
     PUSHBUTTON      "帮助",IDHELP,209,82,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,269,1
-    CONTROL         "现在应用到有相同错误的操作(&P)",IDC_SSCD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&O)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,162,12
     LTEXT           "路径(&A):",IDC_STATIC_2,7,9,33,8
     EDITTEXT        IDE_SSCD_PATH,41,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -924,7 +924,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,148,106,50,14
     PUSHBUTTON      "帮助",IDHELP,210,106,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,270,1
-    CONTROL         "现在应用到有相同错误的操作(&P)",IDC_SSCD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,162,12
     LTEXT           "源路径(&O):",IDC_STATIC_2,7,9,51,8
     EDITTEXT        IDE_SSCD_SRCPATH,58,9,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -949,7 +949,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,230,106,50,14
     PUSHBUTTON      "帮助",IDHELP,285,106,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,330,1
-    CONTROL         "现在应用到有相同错误的操作(&P)",IDC_SSCD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&V)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,162,12
     LTEXT           "源路径(&U):",IDC_STATIC_2,7,9,51,8
     EDITTEXT        IDE_SSCD_SRCPATH,58,9,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -972,7 +972,7 @@ BEGIN
     PUSHBUTTON      "取消",IDCANCEL,147,70,50,14
     PUSHBUTTON      "帮助",IDHELP,209,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,269,1
-    CONTROL         "现在应用到有相同错误的操作(&P)",IDC_SSCD_APPLYTOALL,
+    CONTROL         "仅此操作（重试3次，间隔1秒）(&O)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,162,12
     LTEXT           "路径(&A):",IDC_STATIC_2,7,9,33,8
     EDITTEXT        IDE_SSCD_PATH,41,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -1629,11 +1629,13 @@ STRINGTABLE
  IDS_OPERSTOPPED, "已停止"
  IDS_FTPINACTIVE, "连接不活动"
 
+ IDS_FSLOGUNAVAILABLE, "此连接的日志不可用。日志记录已启用；请重新连接以开始新日志。"
+ IDS_ITEMRETRYPOLICYHINT, "选择此选项并重试后，仅对本次操作中的相同错误记住重试选择。每个项目和错误最多自动重试3次，间隔1秒。之后需要再次选择操作；手动重试会重置次数限制。"
  IDS_FSHAVENOLOG, "这个 FTP 服务器连接没有日志。最有可能，连接启动时日志被禁用 (参见 FTP 配置中的日志页)。"
 
  IDS_CLEARLOGQUESTION, "你确定要清除日志 ""%s"" 吗？"
  IDS_REMOVELOGQUESTION, "你确定要移除日志 ""%s"" 吗？"
- IDS_REMOVEALLLOGSQUESTION, "你确定要移除所有日志吗？"
+ IDS_REMOVEALLLOGSQUESTION, "移除所有不再属于连接或活动传输线程的日志吗？正在使用的日志将被保留。"
  IDS_TEXTCOPIEDTOCLIPBOARD, "文本成功复制到剪贴板。"
  IDS_COPYTOCLIPBOARDERROR, "无法复制文本到剪贴板。"
  IDS_SAVELOGFILTER, "日志文件 (*.log)|*.log|所有文件 (*.*)|*.*|"
@@ -2370,4 +2372,5 @@ STRINGTABLE
  IDS_NEWNAME_CANNOTENCODE, "新名称包含此连接的文本编码无法表示的字符，因此无法用于在服务器上命名文件。\n\n该项目已保留其错误状态。"
  IDS_DIRNAME_CANNOTENCODE, "目录名称包含此连接的文本编码无法表示的字符，因此无法在服务器上创建该目录。"
  IDS_RENAMENAME_CANNOTENCODE, "新名称包含此连接的文本编码无法表示的字符，因此无法在服务器上重命名该项目。"
+ IDS_LOGSIZEOUTOFRANGE, "日志大小限制必须介于 1 和 %u KB 之间。"
 }

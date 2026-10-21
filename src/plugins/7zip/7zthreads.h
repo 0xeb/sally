@@ -13,6 +13,8 @@
 #define WM_7ZIP_SHOWMBOXEX 4
 #define WM_7ZIP_DIALOGERROR 5
 #define WM_7ZIP_PASSWORD 6
+// Synchronous plugin-private request: lParam borrows a caller-owned std::wstring*.
+// On IDOK the UI transfers the accepted UTF-16 owner; no frozen SDK/codec ABI uses it.
 
 // Argument to WM_7ZIP_CREATEFILE
 struct CCreateFileParams

@@ -272,8 +272,11 @@ void CSFVMD5Dialog::DeleteItem(int index)
     CALL_STACK_MESSAGE2("CSFVMD5Dialog::DeleteItem(%d)", index);
     // while the worker thread runs, the array is not modified (this function must not be called either)
     if (bThreadRunning)
+    {
         TRACE_E("CSFVMD5Dialog::DeleteItem(): unexpected situation: worker thread should not be running!");
-    if (FileList.Count > 0 && index < FileList.Count)
+        return;
+    }
+    if (index >= 0 && index < FileList.Count)
     {
         FileList.Delete(index);
         if (index >= FileList.Count)
@@ -1047,7 +1050,7 @@ void CCalculateDialog::OnContextMenu(int x, int y, eHASH_TYPE forceCopyHash)
     if (popup == NULL)
         return;
 
-    std::wstring checksum;
+    std::wstring copyValues[HT_COUNT];
 
     // A better approach would loading a menu template from the language file
     MENU_ITEM_INFO mii;
@@ -1078,11 +1081,14 @@ MENU_TEMPLATE_ITEM CalculateDialogMenu[] =
     {
         if (HashInfo[i].bCalculate)
         {
-            checksum = GetItemTextOwnedW(focIndex, 2 + j);
-            if (!checksum.empty() && checksum != SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CANCELED).c_str() &&
-                checksum != SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SKIPPED).c_str())
+            const int column = j++;
+            if (bThreadRunning && focIndex >= ScrollIndex)
+                continue;
+            std::wstring digestText = GetItemTextOwnedW(focIndex, 2 + column);
+            if (checksum::IsDigestText(HashInfo[i].Type, digestText))
             { // Check if the values have been calculated
-                mii.ID = ++j;
+                mii.ID = column + 1;
+                copyValues[column] = std::move(digestText);
                 const std::wstring menuText = SPLLoadStrOwned(
                     SalamanderGeneral, HLanguage, HashInfo[i].idContextMenu);
                 mii.String = const_cast<wchar_t*>(menuText.c_str());
@@ -1119,8 +1125,9 @@ MENU_TEMPLATE_ITEM CalculateDialogMenu[] =
     }
     else if ((id >= 1) && (id <= HT_COUNT))
     {
-        checksum = GetItemTextOwnedW(focIndex, 2 + id - 1);
-        SalamanderGeneral->CopyTextToClipboard(checksum.c_str(), -1, FALSE, NULL);
+        const std::wstring& digestText = copyValues[id - 1];
+        if (!digestText.empty())
+            SalamanderGeneral->CopyTextToClipboard(digestText.c_str(), -1, FALSE, NULL);
     }
 
     SalamanderGUI->DestroyMenuPopup(popup);
@@ -1374,7 +1381,7 @@ INT_PTR CCalculateDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 WORD wVKey = ((LPNMLVKEYDOWN)lParam)->wVKey;
                 if (!bThreadRunning && wVKey == VK_DELETE)
                 {
-                    DeleteItem(ListView_GetSelectionMark(hList));
+                    DeleteItem(ListView_GetNextItem(hList, -1, LVNI_SELECTED));
                 }
                 if (controlPressed)
                 {
@@ -1507,73 +1514,20 @@ BOOL CVerifyDialog::AnalyzeSourceFile()
     char* text = LoadFile(sourceFile.c_str());
     if (text == NULL)
         return FALSE;
-    char* line = strtok(text, "\r\n");
-
-    BOOL isSFV = TRUE, isMD5 = TRUE, isSHA1 = TRUE, isSHA256 = TRUE, isSHA512 = TRUE;
-    while (line != NULL)
-    {
-        LTrimStr(line);
-        // Patera 2006.08.17: # used by MD5summer (http://www.md5summer.org) for comment lines
-        if (line[0] && (line[0] != ';') && (line[0] != '#'))
-        {
-            // WARNING: the following code must match CCRCAlgo::ParseDigest() !!!
-            // checksum at the end (after ' ')
-
-            int posLast, lenLast;
-            GetLastWord(line, posLast, lenLast);
-            BOOL lastIsHex = IsHex(line + posLast, lenLast);
-
-            if (isSFV &&
-                (lenLast != 8 || !lastIsHex))
-            {                  // does not end with a checksum
-                isSFV = FALSE; // not an SFV
+    eHASH_TYPE preferred = HT_COUNT;
+    const size_t extension = sourceFile.find_last_of(L".\\/");
+    if (extension != std::wstring::npos && sourceFile[extension] == L'.')
+        for (const auto& info : Config.HashInfo)
+            if (!_wcsicmp(sourceFile.c_str() + extension, info.sSaveAsExt))
+            {
+                preferred = info.Type;
+                break;
             }
-
-            // WARNING: the following code must match CGenericHashAlgo::ParseDigest() !!!
-            // checksum at the beginning (before ' ') or checksum at the end (after ' ' or '=') and at the same time
-            // the hash name at the beginning (before '(' or ' ')
-
-            int posFirst, lenFirst;
-            GetFirstWord(line, posFirst, lenFirst);
-            BOOL firstIsHex = IsHex(line + posFirst, lenFirst);
-            int posFirstHashName, lenFirstHashName;
-            GetFirstWord(line, posFirstHashName, lenFirstHashName, '(');
-            GetLastWord(line, posLast, lenLast, '='); // '=' is the delimiter for the rest of the hash
-            lastIsHex = IsHex(line + posLast, lenLast);
-
-            if (isMD5 &&
-                (lenFirst != 32 || !firstIsHex) &&
-                (lenLast != 32 || !lastIsHex || lenFirstHashName != 3 || memcmp(line + posFirstHashName, "MD5", 3) != 0))
-            {                  // does not start with a checksum, nor is it: MD5 (apache_2.0.46-win32-x86-symbols.zip) = eb5ba72b4164d765a79a7e06cee4eead
-                isMD5 = FALSE; // not an MD5
-            }
-            if (isSHA1 &&
-                (lenFirst != 40 || !firstIsHex) &&
-                (lenLast != 40 || !lastIsHex || lenFirstHashName != 4 || memcmp(line + posFirstHashName, "SHA1", 4) != 0))
-            {                   // does not start with a checksum, nor is it: SHA1 (openldap-2.2.25.tgz) = a983e039486b8495819e69260a8fad1fb9c77520
-                isSHA1 = FALSE; // not a SHA1
-            }
-            if (isSHA256 &&
-                (lenFirst != 64 || !firstIsHex) &&
-                (lenLast != 64 || !lastIsHex || lenFirstHashName != 6 || memcmp(line + posFirstHashName, "SHA256", 6) != 0))
-            {                     // does not start with a checksum, nor is it: SHA256 (README) = baaa5da257f848a4eece4fcf7653a7a58930124ef244bda374a6e906207d8a73
-                isSHA256 = FALSE; // not a SHA256
-            }
-            if (isSHA512 &&
-                (lenFirst != 128 || !firstIsHex) &&
-                (lenLast != 128 || !lastIsHex || lenFirstHashName != 6 || memcmp(line + posFirstHashName, "SHA512", 6) != 0))
-            {                     // does not start with a checksum, nor is it: SHA512 (README) = baaa5da257f848a4eece4fcf7653a7a58930124ef244bda374a6e906207d8a73baaa5da257f848a4eece4fcf7653a7a58930124ef244bda374a6e906207d8a73
-                isSHA512 = FALSE; // not a SHA512
-            }
-        }
-        line = strtok(NULL, "\r\n");
-    }
-
+    const eHASH_TYPE HashType = checksum::AnalyzeDigestFormat(text, preferred);
     delete[] text;
-    if (!isMD5 && !isSFV && !isSHA1 && !isSHA256 && !isSHA512)
+    if (HashType == HT_COUNT)
         return Error(HWindow, 0, IDS_VERIFYTITLE, IDS_BADFILE);
 
-    eHASH_TYPE HashType = isSFV ? HT_CRC : (isMD5 ? HT_MD5 : (isSHA1 ? HT_SHA1 : (isSHA256 ? HT_SHA256 : HT_SHA512)));
     for (int i = 0; i < HT_COUNT; i++)
         if (HashType == Config.HashInfo[i].Type)
         {

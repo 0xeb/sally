@@ -248,8 +248,8 @@ BOOL CHotPathItems::Save(HKEY hKey)
                 // Wide-single-write: the *_W values carry the truth.
                 if (gRegistry != NULL)
                 {
-                    gRegistry->SetString(actKey, SALAMANDER_HOTPATHS_NAME_W, nameW.c_str());
-                    gRegistry->SetString(actKey, SALAMANDER_HOTPATHS_PATH_W, pathW.c_str());
+                    SetValueW(actKey, SALAMANDER_HOTPATHS_NAME_W, REG_SZ, nameW.c_str(), -1);
+                    SetValueW(actKey, SALAMANDER_HOTPATHS_PATH_W, REG_SZ, pathW.c_str(), -1);
                 }
                 // Legacy values are import-only. Remove stale mirrors after the wide write so
                 // an older build cannot silently act on a different best-fit path.

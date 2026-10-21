@@ -27,6 +27,9 @@ namespace
                             const ShellTarget& current)
             : CCommonDialog(HLanguage, IDD_DEFAULT_SHELL, parent), Current(current)
         {
+            ShellTarget resolved;
+            if (ResolveWindowsTerminalTarget(catalog, current, resolved))
+                Current = std::move(resolved);
             Choices.push_back(ShellTarget{});
             if (catalog.installed)
             {
@@ -61,7 +64,7 @@ namespace
             if (message == WM_INITDIALOG)
             {
                 HWND combo = GetDlgItem(HWindow, IDC_DEFAULT_SHELL_TARGET);
-                int selectedIndex = 0;
+                int selectedIndex = -1;
                 for (size_t index = 0; index < Choices.size(); index++)
                 {
                     const ShellTarget& target = Choices[index];
@@ -73,10 +76,10 @@ namespace
                     else
                         label = target.profileName.c_str();
                     SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label));
-                    if (SameTarget(target, Current))
+                    if (selectedIndex < 0 && SameTarget(target, Current))
                         selectedIndex = static_cast<int>(index);
                 }
-                SendMessage(combo, CB_SETCURSEL, selectedIndex, 0);
+                SendMessage(combo, CB_SETCURSEL, selectedIndex < 0 ? 0 : selectedIndex, 0);
                 return TRUE;
             }
 

@@ -1277,7 +1277,7 @@ MENU_TEMPLATE_ITEM HyperLinkMenu[] =
     DestroyMenu(hMenu);
     if (cmd == 1)
     {
-        CopyTextToClipboardW(TextW.c_str(), -1, TRUE, HWindow);
+        SendMessageW(HWindow, WM_COPY, 0, 0);
     }
 }
 
@@ -1287,6 +1287,13 @@ CHyperLink::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     CALL_STACK_MESSAGE4("CHyperLink::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
+    case WM_COPY:
+    {
+        const std::wstring& text = HintMode && !ToolTipText.empty() ? ToolTipText : TextW;
+        CopyTextToClipboardW(text.c_str(), -1, TRUE, HWindow);
+        return 0;
+    }
+
     case WM_SETCURSOR:
     {
         POINT p;

@@ -6,6 +6,12 @@
 
 #include <string>
 #include <vector>
+#include <memory>
+namespace sally::security
+{
+    class ICredentialChangeHost;
+}
+struct CPasswordPersistence;
 
 class CPasswordManager;
 
@@ -111,19 +117,27 @@ static_assert(sizeof(CMasterPasswordVerifier) == 42,
 static_assert(sizeof(CMasterPasswordVerifierUtf8) == 50,
               "UTF-8 master-password verifier layout drift");
 
+class ISecureRandom;
+
 class CPasswordManager
 {
 private:
-    BOOL UseMasterPassword;                          // the user has (at some point) provided the master password used for data encryption; the plaintext value may later be NULL and must be requested again
-    std::wstring PlainMasterPassword;    // plaintext session owner; never persisted
-    std::wstring OldPlainMasterPassword; // previous password during plug-in re-encryption callbacks
+    BOOL UseMasterPassword;                   // the user has (at some point) provided the master password used for data encryption; the plaintext value may later be NULL and must be requested again
+    std::wstring PlainMasterPassword;         // plaintext session owner; never persisted
+    std::wstring OldPlainMasterPassword;      // previous password during plug-in re-encryption callbacks
     std::vector<BYTE> MasterPasswordVerifier; // frozen legacy or versioned UTF-8 record
     BOOL MasterPasswordVerifierIsLegacy;
+    BOOL PersistentStateValid = TRUE;
+    std::unique_ptr<CPasswordPersistence> Persistence;
+    BOOL EncryptRaw(const wchar_t* plainPassword, BYTE** encryptedPassword, int* size, BOOL encrypt, const std::wstring& master);
+    BOOL DecryptRaw(const BYTE* encryptedPassword, int size, std::wstring* plainPassword);
+    BOOL EnsureCredentialJournal();
+    ISecureRandom* SecureRandom; // borrowed; production uses the Windows CNG provider
 
     CSalamanderCryptAbstract* SalamanderCrypt; // interface for the work with cryptographic library
 
 public:
-    CPasswordManager();
+    explicit CPasswordManager(ISecureRandom* random = nullptr, sally::security::ICredentialChangeHost* persistence = nullptr);
     ~CPasswordManager();
 
     BOOL IsPasswordSecure(const wchar_t* password); // returns TRUE when the password meets strength requirements, otherwise FALSE
@@ -135,8 +149,9 @@ public:
     BOOL EnterMasterPassword(const wchar_t* password);
 
     BOOL ChangeMasterPassword(HWND hParent);
-    BOOL IsUsingMasterPassword() { return UseMasterPassword; }         // are the passwords protected using AES/Master Password?
-    BOOL IsMasterPasswordSet() { return !PlainMasterPassword.empty(); } // has the user entered the Master Password in this session?
+    BOOL IsUsingMasterPassword() { return UseMasterPassword; }                                  // are the passwords protected using AES/Master Password?
+    BOOL IsMasterPasswordSet() { return PersistentStateValid && !PlainMasterPassword.empty(); } // has the user entered the Master Password in this session?
+    BOOL IsPersistentStateValid() const { return PersistentStateValid; }
 
     // when master password usage is enabled and the password has not been entered
     // in this session, it displays a dialog for entering it
@@ -147,6 +162,7 @@ public:
 
     void NotifyAboutMasterPasswordChange(HWND hParent);
 
+    BOOL CheckCredentialRevision();
     BOOL Save(HKEY hKey); // saves stored passwords to the Registry
     BOOL Load(HKEY hKey); // loads data from the registry
 

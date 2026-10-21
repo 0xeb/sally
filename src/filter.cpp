@@ -1475,14 +1475,14 @@ BOOL CFilterCriteria::LoadOld(HKEY hKey)
     // date/time
     UseFromDate = FALSE;
     UseToDate = FALSE;
-    int dateAction;
-    int day;
-    int month;
-    int year;
-    int timeAction;
-    int hour;
-    int minute;
-    int second;
+    int dateAction = 0;
+    int day = 1;
+    int month = 1;
+    int year = 1601;
+    int timeAction = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
     GetValueW(hKey, OLD_FINDOPTIONSITEM_DATEACTION_REG, REG_DWORD, &dateAction, sizeof(DWORD));
     GetValueW(hKey, OLD_FINDOPTIONSITEM_DAY_REG, REG_DWORD, &day, sizeof(DWORD));
     GetValueW(hKey, OLD_FINDOPTIONSITEM_MONTH_REG, REG_DWORD, &month, sizeof(DWORD));
@@ -1592,7 +1592,9 @@ BOOL CFilterCriteria::LoadOld(HKEY hKey)
 CFilterCriteriaDialog::CFilterCriteriaDialog(HWND hParent, CFilterCriteria* data, BOOL enableDirectory)
     : CCommonDialog(HLanguage, IDD_FINDADVANCED, IDD_FINDADVANCED, hParent)
 {
-    Data = data;
+    Draft = *data;
+    OriginalData = data;
+    Data = &Draft;
     EnableDirectory = enableDirectory;
 }
 
@@ -1818,7 +1820,13 @@ void CFilterCriteriaDialog::Transfer(CTransferInfo& ti)
     if (ti.Type == ttDataToWindow)
         EnableControls();
     else
+    {
         Data->NeedPrepare = TRUE;
+        // Validate temporarily redirects Data to its own copy. Only the actual
+        // accepted transfer may commit this dialog's draft to the caller.
+        if (Data == &Draft && ti.IsGood())
+            *OriginalData = Draft;
+    }
 }
 
 void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
@@ -1828,8 +1836,7 @@ void CFilterCriteriaDialog::Validate(CTransferInfo& ti)
     // we store a pointer to the data
     CFilterCriteria* oldData = Data;
     // and we switch to a temporary copy
-    CFilterCriteria data;
-    memmove(&data, Data, sizeof(data));
+    CFilterCriteria data = *Data;
     Data = &data;
 
     TransferData(ttDataFromWindow);

@@ -64,6 +64,7 @@
 #define IDS_PARTIALRECOVER          103
 #define IDS_PARTIALRECOVER_DONTASK  104
 #define IDS_ERRORRECOVER            105
+#define IDS_SELECTVOLUME            106
 
 #define IDH_UNDELETE             2000
 #define IDH_RESTOREENCRFILES     2001

@@ -132,7 +132,7 @@ STRINGTABLE
   IDS_ERROR, "Erreur"
   IDS_NOTFOUND, "Fichier non trouvé"
   IDS_BADDLL, "Version du fichier unrar.dll incorrecte. Veuillez réinstaller le module UnRAR."
-  IDS_SELECTFIRST, "Il semblerait que cette archive soit divisée en plusieurs volumes. Si tel est le cas, veuillez sélectionner le premier volume de l'archive et appuyer sur OK.\n\nS'il ne s'agit pas d'une archive multi-volumes, appuyez sur Annuler."
+  IDS_SELECTFIRST, "Pour continuer, sélectionnez le premier volume de l'archive. Cliquez sur Annuler pour arrêter."
   IDS_SELECTFIRSTTITLE, "Sélectionnez le premier volume"
   IDS_FILENOTFOUND "Fichier non trouvé au sein de l'archive."
   IDS_LISTINFO_PAKEDSIZE      "Compressé"

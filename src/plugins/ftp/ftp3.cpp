@@ -97,14 +97,15 @@ void CServerTypeList::AddNamesToListbox(HWND listbox)
     }
 }
 
-void CServerTypeList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
+void CServerTypeList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry, BOOL onlyUserDefined)
 {
     HKEY actKey;
     if (registry->OpenKey(regKey, CONFIG_SERVERTYPES, actKey))
     {
         HKEY subKey;
         int i = 0;
-        DestroyMembers();
+        if (!onlyUserDefined)
+            DestroyMembers();
         for (;;)
         {
             std::wstring itemKey;
@@ -126,8 +127,22 @@ void CServerTypeList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
             {
                 delete item;
             }
+            else if (onlyUserDefined && item->TypeName[0] != '*')
+                delete item; // Refresh unmodified built-ins from current defaults.
             else
             {
+                int existing = -1;
+                if (onlyUserDefined && ContainsTypeName(item->TypeName, NULL, &existing) &&
+                    At(existing)->TypeName[0] != '*')
+                {
+                    // Editing a built-in turns it into a user definition with
+                    // the same visible name. Preserve that override in place.
+                    CServerType* previous = At(existing);
+                    At(existing) = item;
+                    delete previous;
+                    registry->CloseKey(subKey);
+                    continue;
+                }
                 Add(item);
                 if (!IsGood())
                 {
@@ -279,7 +294,7 @@ BOOL CFTPServerList::AddServer(const wchar_t* itemName,
                                int keepAliveCommand,
                                int encryptControlConnection,
                                int encryptDataConnection,
-                               int compressData)
+                               int compressData, BOOL initialPathIsEscaped)
 {
     if (keepAliveSendEvery == -1)
         keepAliveSendEvery = Config.KeepAliveSendEvery;
@@ -318,7 +333,7 @@ BOOL CFTPServerList::AddServer(const wchar_t* itemName,
                    keepAliveCommand,
                    encryptControlConnection,
                    encryptDataConnection,
-                   compressData))
+                   compressData, initialPathIsEscaped))
         {
             Add(n);
             if (!IsGood())
@@ -540,6 +555,17 @@ void CFTPServerList::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract*
 // ****************************************************************************
 // CConfiguration
 //
+
+void CConfiguration::ResetUnsupportedOptions() noexcept
+{
+    EnableTotalSpeedLimit = FALSE;
+    TotalSpeedLimit = 2;
+    UseServerSpeedLimit = FALSE;
+    ServerSpeedLimit = 2;
+    DownloadAddToQueue = FALSE;
+    DeleteAddToQueue = FALSE;
+    ChAttrAddToQueue = FALSE;
+}
 
 CConfiguration::CConfiguration()
 {

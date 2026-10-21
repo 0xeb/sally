@@ -2727,6 +2727,10 @@ STRINGTABLE
  IDS_CANNOTMOVEFILETOITSELF, "Nu pot muta un fisier peste el insusi."
 
  IDS_CANNOTMOVEDIRTOITSELF, "Nu pot muta un director peste el insusi."
+ IDS_DIRECTORYTARGETINSOURCE, "Un dosar nu poate fi copiat sau mutat în el însuși sau într-unul dintre subdosarele sale."
+ IDS_UNPACKERSELECTIONREQUIRED, "Selectați un dezarhivator pentru a continua. Dacă lista este goală, adăugați unul în Configurare."
+ IDS_EXECUTE_SHORTNAMEUNAVAILABLE, "Nu este disponibilă o cale DOS (8.3) pentru '%s'."
+ IDS_OPERATIONSTARTFAILED, "Operația cu fișiere nu a putut fi pornită.\n\n%s"
 
  IDS_NOTENOUGHSPACE, "Se pare ca nu este suficient spatiu pe drive-ul tinta.\nDoriti sa continuati?\n\nSpatiul cerut: %s bytes.\nSpatiul disponibil: %s bytes."
 
@@ -3231,6 +3235,7 @@ STRINGTABLE
  IDS_PACKERR_NOOUTPUT, "Nu am output de la arhivatorul extern, verificati-va configurarea."
  IDS_PACKERR_UNABLETOREN, "Nu pot redenumi fisierul arhiva temporar (%1) in nume arhiva (%2)."
  IDS_PACKERR_INVALIDNAME, "Acest nume fisier e invalid pe sistemul de fisiere Windows. Arhivatorii externi nu suporta dezarhivarea in alt nume fisier deci nu e posibil sa se dezarhiveze."
+ IDS_PACKERR_EXCLUSIONMASK, "Dezarhivatoarele externe nu acceptă măști de excludere ('|'). Alegeți un dezarhivator intern sau eliminați excluderile."
 
  IDS_PACKRET_GENERAL, "Cod de exit %d."
  IDS_PACKRET_WARNING, "Atentionare intalnita."
@@ -3579,6 +3584,9 @@ IDS_OLDPLUGINVERSION2, "Plugin (%s) nu e suportat de aceasta versiune de Sally. 
  IDS_EMAILFILES_SUBJECT, "Emailing:"
  IDS_EMAILFILES_BODY, "Fisierele dumneavoastra sunt atasate si pregatite sa fie trimise cu acest mesaj."
  IDS_EMAILFILES_MAPIERROR, "Nu pot trimite mail. Nici un program de mail nu e setat sa trimita mail, MAPI32.DLL nu a fost  gasit."
+ IDS_EMAILFILES_PATHERROR, "Programul de e-mail nu poate atașa acest fișier cu numele său actual:\n\n%s"
+ IDS_EMAILFILES_SENDERROR, "Mesajul de e-mail nu a putut fi creat.\n\n%s"
+ IDS_EMAILFILES_PROVIDERERROR, "Programul de e-mail a raportat eroarea %u."
 
  IDS_PLUGINSUFFIX, " (Plugin)"
 
@@ -4135,4 +4143,18 @@ IDS_OLDPLUGINVERSION2, "Plugin (%s) nu e suportat de aceasta versiune de Sally. 
  IDS_UPDATECHECK_STARTUP, "La fiecare pornire"
  IDS_UPDATER_CANNOT_START, "Programul de actualizare Sally nu a putut fi pornit:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "O Parola Master este folosita pentru a proteja informatii sensibile ca parole FTP sau WinSCP prin cifrul puternic AES. Daca creezi o Parola Master ti se va cere sa o introduci o data pe sesiune cand Sally preia informatii protejate."
+ // Configuration navigation
+ IDS_CFG_SEARCH_LABEL, "&Caută setări:"
+ IDS_CFG_SEARCH_HINT, "Cuvinte, ""expresii"", AND, OR, NOT"
+ IDS_CFG_SEARCH_INVALID, "Căutare nevalidă. Verificați ghilimelele și parantezele."
+ IDS_CFG_SEARCH_EMPTY, "Nu există setări corespunzătoare."
+ IDS_CFG_SEARCH_CLEAR, "Șterge căutarea (Esc)"
+ IDS_CFG_SEARCH_OPEN, "Caută setări"
+ IDS_CFG_SEARCH_CLOSE, "Închide căutarea"
+ IDS_CFG_SAVE, "&Salvează"
+ IDS_CFG_APPLY, "&Aplică"
+ IDS_CFG_SAVE_FAILED, "Configurația nu a putut fi salvată. Modificările rămân disponibile în această fereastră."
+
+ IDS_MASTERPASSWORD_STORE_DAMAGED, "Setările salvate ale parolei principale nu au putut fi citite. Sally le va păstra și nu va salva modificări de configurație. Restaurați o copie de siguranță validă înainte de a schimba parolele."
+
 }

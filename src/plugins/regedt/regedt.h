@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "regedt_value_types.h"
+
 #define CURRENT_CONFIG_VERSION 1
 
 // menu ID definitions
@@ -173,14 +175,6 @@ extern int Len_REG_RESOURCE_LIST;
 extern int Len_REG_SZ;
 extern int Len_REG_FULL_RESOURCE_DESCRIPTOR;
 extern int Len_REG_RESOURCE_REQUIREMENTS_LIST;
-
-struct CRegTypeText
-{
-    const wchar_t* Text;
-    DWORD Type;
-    unsigned CanCreate : 1;
-    unsigned CanEdit : 1;
-};
 
 extern CRegTypeText RegTypeTexts[];
 

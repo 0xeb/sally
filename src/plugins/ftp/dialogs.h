@@ -119,20 +119,12 @@ protected:
 
 class CConfigPageGeneral : public CCommonPropSheetPage
 {
-protected:
-    int LastTotSpeed;             // last value of the "total speed limit" checkbox
-    std::wstring TotalSpeedText; // remembered contents of the "total speed limit" line
-
 public:
     CConfigPageGeneral();
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
 
-protected:
-    void EnableControls();
-
-    virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //
@@ -145,8 +137,6 @@ class CConfigPageDefaults : public CCommonPropSheetPage
 protected:
     int LastMaxCon;                                  // last value of the "max concurrent connections" checkbox
     std::wstring MaxConnectionsText;                // remembered contents of the "max concurrent connections" line
-    int LastSrvSpeed;                                // last value of the "server speed limit" checkbox
-    std::wstring ServerSpeedText;                    // remembered contents of the "server speed limit" line
     CFTPProxyServerList* TmpFTPProxyServerList; // temporary copy of the list of user-defined proxy servers
 
 public:
@@ -386,8 +376,6 @@ protected:
     CFTPProxyServerList* TmpFTPProxyServerList;       // temporary copy of the proxy server list (to allow cancel)
     int LastUseMaxCon;                               // last value of the "max. concurrent connections" checkbox
     std::wstring MaxConnectionsText;                // remembered contents of the "max. concurrent connections" line
-    int LastUseTotSpeed;                             // last value of the "total speed limit for this server" checkbox
-    std::wstring TotalSpeedText;                    // remembered contents of the "total speed limit for this server" line
     int LastKeepConnectionAlive;                    // last value of the "keep connection alive" checkbox
     int KASendCmd;                                   // value to keep the state of the "keep-alive send command" combo
     std::wstring KeepAliveEveryText;                // remembered contents of the "keep-alive send every" line
@@ -1592,3 +1580,6 @@ public:
 protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
+
+// Thin main-thread presentation adapter for operation-local retry scope and limits.
+HWND FTPAttachItemRetryHint(HWND dialog);

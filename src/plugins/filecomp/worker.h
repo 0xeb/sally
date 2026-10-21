@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
+#include <string>
 
 // ****************************************************************************
 //
@@ -54,10 +55,34 @@ struct CCompareOptions
 
     // Name of conversion table, "" means autodetection, used only for text
     // file comparison, with ASCII8 encoding and PerformASCII8InputEnc != 0
-    char ASCII8InputEncTableName[2][101];
+    std::wstring ASCII8InputEncTableName[2];
 
     // Normalize Unicode texts to Normalization Form C using normaliz.dll
     BOOL NormalizationForm;
+
+    bool operator==(const CCompareOptions& other) const noexcept
+    {
+        if ((ForceText != 0) != (other.ForceText != 0) ||
+            (ForceBinary != 0) != (other.ForceBinary != 0) ||
+            (IgnoreSpaceChange != 0) != (other.IgnoreSpaceChange != 0) ||
+            (IgnoreAllSpace != 0) != (other.IgnoreAllSpace != 0) ||
+            (IgnoreLineBreakChanges != 0) != (other.IgnoreLineBreakChanges != 0) ||
+            (IgnoreCase != 0) != (other.IgnoreCase != 0) ||
+            (DetailedDifferences != 0) != (other.DetailedDifferences != 0) ||
+            (NormalizationForm != 0) != (other.NormalizationForm != 0))
+            return false;
+        for (int file = 0; file < 2; ++file)
+        {
+            if (EolConversion[file] != other.EolConversion[file] ||
+                Encoding[file] != other.Encoding[file] ||
+                Endians[file] != other.Endians[file] ||
+                (PerformASCII8InputEnc[file] != 0) != (other.PerformASCII8InputEnc[file] != 0) ||
+                ASCII8InputEncTableName[file] != other.ASCII8InputEncTableName[file])
+                return false;
+        }
+        // IgnoreSomeSpace is derived by the worker, not independently saved intent.
+        return true;
+    }
 };
 
 extern CCompareOptions DefaultCompareOptions;

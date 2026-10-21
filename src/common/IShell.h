@@ -133,6 +133,16 @@ public:
     virtual ShellResult GetFileSystemPathFromIdList(LPCITEMIDLIST itemId, std::wstring& path)
     { (void)itemId; (void)path; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
 
+    // Open a legacy CSIDL namespace folder, including non-filesystem locations.
+    // Native dispatch suppresses its error UI; the caller owns error reporting.
+    virtual ShellResult OpenSpecialFolder(int folderId, HWND owner)
+    { (void)folderId; (void)owner; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+
+    // Prefer selecting the named child; otherwise retain the legacy fallback of
+    // opening the folder itself. An empty/null item just opens the folder.
+    virtual ShellResult OpenFolderAndSelectItem(const wchar_t* directory, const wchar_t* item, HWND owner)
+    { (void)directory; (void)item; (void)owner; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+
     // Move files/dirs to the Recycle Bin. Silent (no shell UI/confirm);
     // the caller owns confirmation and error display. parentWnd parents any
     // shell-internal window (the worker passes its CShellExecuteWnd).

@@ -1,4 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #ifdef SALLY_WORKER_CORE_STANDALONE
@@ -83,6 +85,35 @@ ShellResult ResultFromHResult(HRESULT result)
 {
     return SUCCEEDED(result) ? ShellResult::Ok()
                              : ShellResult::Error(static_cast<DWORD>(result));
+}
+
+struct ShellFolderIds
+{
+    PIDLIST_ABSOLUTE Folder = nullptr;
+    PIDLIST_RELATIVE Child = nullptr;
+    ShellFolderIds() = default;
+    ShellFolderIds(const ShellFolderIds&) = delete;
+    ShellFolderIds& operator=(const ShellFolderIds&) = delete;
+    ~ShellFolderIds()
+    {
+        CoTaskMemFree(Child);
+        CoTaskMemFree(Folder);
+    }
+};
+
+ShellResult ExecuteFolderId(HWND owner, PIDLIST_ABSOLUTE folder)
+{
+    SHELLEXECUTEINFOW request = {};
+    request.cbSize = sizeof(request);
+    request.fMask = SEE_MASK_IDLIST | SEE_MASK_FLAG_NO_UI;
+    request.hwnd = owner;
+    request.lpVerb = L"open";
+    request.lpIDList = folder;
+    request.nShow = SW_SHOWNORMAL;
+    if (ShellExecuteExW(&request))
+        return ShellResult::Ok();
+    const DWORD error = GetLastError();
+    return ShellResult::Error(error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE);
 }
 } // namespace
 
@@ -522,6 +553,67 @@ public:
         CoTaskMemFree(allocatedPath);
         path.swap(resolved);
         return ShellResult::Ok();
+    }
+
+    ShellResult OpenSpecialFolder(int folderId, HWND owner) override
+    {
+        ScopedComInitialization com;
+        if (!com.IsUsable())
+            return ResultFromHResult(com.GetResult());
+        ShellFolderIds ids;
+        const HRESULT result = SHGetSpecialFolderLocation(NULL, folderId, &ids.Folder);
+        if (FAILED(result) || ids.Folder == nullptr)
+            return ResultFromHResult(FAILED(result) ? result : E_FAIL);
+        return ExecuteFolderId(owner, ids.Folder);
+    }
+
+    ShellResult OpenFolderAndSelectItem(const wchar_t* directory, const wchar_t* item, HWND owner) override
+    {
+        if (directory == nullptr || *directory == 0)
+            return ShellResult::Error(ERROR_INVALID_PARAMETER);
+        ScopedComInitialization com;
+        if (!com.IsUsable())
+            return ResultFromHResult(com.GetResult());
+        ShellFolderIds ids;
+        const HRESULT parsed = SHParseDisplayName(directory, NULL, &ids.Folder, 0, NULL);
+        if (FAILED(parsed) || ids.Folder == nullptr)
+            return ResultFromHResult(FAILED(parsed) ? parsed : E_FAIL);
+
+        if (item != nullptr && *item != 0)
+        {
+            // Keep this dynamically resolved, matching the historical import floor.
+            typedef HRESULT(WINAPI * OpenAndSelectFn)(PCIDLIST_ABSOLUTE, UINT, PCUITEMID_CHILD_ARRAY, DWORD);
+            const HMODULE shell32 = GetModuleHandleW(L"shell32.dll");
+            const auto select = shell32 != nullptr
+                                    ? reinterpret_cast<OpenAndSelectFn>(GetProcAddress(shell32, "SHOpenFolderAndSelectItems"))
+                                    : nullptr;
+            if (select != nullptr)
+            {
+                std::wstring mutableItem(item);
+                IShellFolder* desktop = nullptr;
+                IShellFolder* folder = nullptr;
+                HRESULT result = SHGetDesktopFolder(&desktop);
+                if (SUCCEEDED(result) && desktop != nullptr)
+                    result = desktop->BindToObject(ids.Folder, NULL, IID_IShellFolder, reinterpret_cast<void**>(&folder));
+                if (desktop != nullptr)
+                    desktop->Release();
+                if (SUCCEEDED(result) && folder != nullptr)
+                {
+                    ULONG eaten = 0;
+                    result = folder->ParseDisplayName(NULL, NULL, mutableItem.data(), &eaten, &ids.Child, NULL);
+                    folder->Release();
+                    if (SUCCEEDED(result) && ids.Child != nullptr)
+                    {
+                        PCUITEMID_CHILD children[] = {reinterpret_cast<PCUITEMID_CHILD>(ids.Child)};
+                        if (SUCCEEDED(select(ids.Folder, 1, children, 0)))
+                            return ShellResult::Ok();
+                    }
+                }
+                else if (folder != nullptr)
+                    folder->Release();
+            }
+        }
+        return ExecuteFolderId(owner, ids.Folder);
     }
 
     ShellResult MoveToRecycleBin(const std::vector<std::wstring>& paths,

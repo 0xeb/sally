@@ -3,6 +3,40 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+HWND FTPAttachItemRetryHint(HWND dialog)
+{
+    for (int id : {IDC_SCRD_APPLYTOALL, IDC_SSCD_APPLYTOALL, IDC_SISE_APPLYTOALL})
+    {
+        HWND checkbox = GetDlgItem(dialog, id);
+        if (checkbox == NULL)
+            continue;
+        HWND tooltip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, NULL,
+                                       WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX,
+                                       CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+                                       dialog, NULL, DLLInstance, NULL);
+        if (tooltip == NULL)
+            return NULL;
+        TOOLINFOW tool = {};
+        tool.cbSize = TTTOOLINFOW_V1_SIZE;
+        tool.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
+        tool.hwnd = dialog;
+        tool.uId = reinterpret_cast<UINT_PTR>(checkbox);
+        tool.hinst = HLanguage;
+        tool.lpszText = MAKEINTRESOURCEW(IDS_ITEMRETRYPOLICYHINT);
+        if (!SendMessageW(tooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&tool)))
+        {
+            DestroyWindow(tooltip);
+            return NULL;
+        }
+        RECT width = {0, 0, 300, 0};
+        MapDialogRect(dialog, &width);
+        SendMessageW(tooltip, TTM_SETMAXTIPWIDTH, 0, width.right);
+        SendMessageW(tooltip, TTM_SETDELAYTIME, TTDT_AUTOPOP, 15000);
+        return tooltip; // owned popup; DestroyWindow(dialog) also destroys it
+    }
+    return NULL;
+}
+
 static char* DupDialogString(const char* text)
 {
     if (text == NULL)
@@ -483,6 +517,7 @@ CSolveItemErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        FTPAttachItemRetryHint(HWindow);
         int titleID = -1;
         switch (DlgType)
         {
@@ -721,6 +756,7 @@ CSolveItemErrUnkAttrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        FTPAttachItemRetryHint(HWindow);
         SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
         break;
     }
@@ -1019,6 +1055,7 @@ CSolveLowMemoryErr::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        FTPAttachItemRetryHint(HWindow);
         if (TitleID != -1)
             SetWindowTextW(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, TitleID).c_str());
         break;
@@ -1598,6 +1635,7 @@ CSolveItemErrorSimpleDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        FTPAttachItemRetryHint(HWindow);
         int titleID = IDS_SISE_TITLE1;
         switch (DlgType)
         {
@@ -1723,6 +1761,7 @@ CSolveServerCmdErr::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        FTPAttachItemRetryHint(HWindow);
         SetWindowTextW(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, TitleID).c_str());
         if (DlgType != siscdtSimple)
             SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
@@ -1843,6 +1882,7 @@ CSolveServerCmdErr2::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        FTPAttachItemRetryHint(HWindow);
         SetWindowTextW(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, TitleID).c_str());
         if (DlgType != siscdt2Simple)
             SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);

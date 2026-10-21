@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "nrg_tracks.h"
 #include "precomp.h"
 #include "dbg.h"
 
@@ -129,17 +130,19 @@ readCUEX(CFile& file, NRGHeader* header, CISOImage* iso)
 
     DWORD read;
 
-    int trackCount = (header->Size - 0x10) / 0x10;
+    if (header->Size < 0x10 || (header->Size - 0x10) % 0x10 != 0)
+        return FALSE;
+    const DWORD trackCount = (header->Size - 0x10) / 0x10;
 
     BYTE cuex_hdr[0x10];
-    if (!file.Read(&cuex_hdr, sizeof(cuex_hdr), &read, NULL, NULL))
+    if (!file.Read(&cuex_hdr, sizeof(cuex_hdr), &read, NULL, NULL) || read != sizeof(cuex_hdr))
         return FALSE;
 
-    int i;
+    DWORD i;
     for (i = 0; i < trackCount; i++)
     {
         BYTE data[0x10];
-        if (!file.Read(&data, sizeof(data), &read, NULL, NULL))
+        if (!file.Read(&data, sizeof(data), &read, NULL, NULL) || read != sizeof(data))
             return FALSE;
 
         CISOImage::Track* track = new CAudioTrack;
@@ -155,30 +158,24 @@ readDAOX(CFile& file, NRGHeader* header, CISOImage* iso)
 {
     CALL_STACK_MESSAGE3("readDAOX(, %p, %p)", header, iso);
 
-    DWORD read;
-
-    BYTE daox_hdr[0x16];
-    if (!file.Read(&daox_hdr, sizeof(daox_hdr), &read, NULL, NULL))
+    std::vector<sally::nrg::DaoTrack> records;
+    if (!sally::nrg::ReadDaoTracks(header->Size, static_cast<unsigned>(iso->GetTrackCount()), [&](uint8_t* bytes, size_t count)
+                                   {
+            DWORD read = 0;
+            return file.Read(bytes, static_cast<DWORD>(count), &read, NULL, NULL) && read == count; }, records))
         return FALSE;
-
-    BYTE firstTrack = daox_hdr[0x14];
-    BYTE lastTrack = daox_hdr[0x15];
-
-    int i;
-    for (i = firstTrack; i <= lastTrack; i++)
-    {
-        BYTE data[0x2A];
-        if (!file.Read(&data, sizeof(data), &read, NULL, NULL))
+    for (const auto& record : records)
+        if (iso->GetTrack(static_cast<int>(record.Index)) == NULL)
             return FALSE;
-
-        CISOImage::Track* track = iso->GetTrack(i - 1);
-        track->SectorSize = getWord(data + 0x0C);
-        SetTrackTypeMode(track, data[0x0E]);
-        track->Start = getLongLong(data + 0x1A);
-        track->End = getLongLong(data + 0x22);
+    for (const auto& record : records)
+    {
+        CISOImage::Track* track = iso->GetTrack(static_cast<int>(record.Index));
+        track->SectorSize = record.SectorSize;
+        SetTrackTypeMode(track, record.Type);
+        track->Start = static_cast<LONGLONG>(record.Start);
+        track->End = static_cast<LONGLONG>(record.End);
         track->SectorHeaderSize = CISOImage::GetHeaderSizeFromMode(track->Mode, track->SectorSize);
-    } // for
-
+    }
     return TRUE;
 }
 
@@ -187,11 +184,14 @@ readETNF(CFile& file, NRGHeader* header, CISOImage* iso)
 {
     CALL_STACK_MESSAGE3("readETNF(, %p, %p)", header, iso);
 
+    if (header->Size == 0 || header->Size % 0x14 != 0)
+        return FALSE;
+
     DWORD read;
     BYTE* data = new BYTE[header->Size];
     ZeroMemory(data, header->Size);
 
-    if (!file.Read(data, header->Size, &read, NULL, NULL))
+    if (!file.Read(data, header->Size, &read, NULL, NULL) || read != header->Size)
     {
         delete[] data;
         return FALSE;
@@ -228,11 +228,14 @@ readETN2(CFile& file, NRGHeader* header, CISOImage* iso)
 {
     CALL_STACK_MESSAGE3("readETN2(, %p, %p)", header, iso);
 
+    if (header->Size < 0x10)
+        return FALSE;
+
     DWORD read;
     BYTE* data = new BYTE[header->Size];
     ZeroMemory(data, header->Size);
 
-    if (!file.Read(data, header->Size, &read, NULL, NULL))
+    if (!file.Read(data, header->Size, &read, NULL, NULL) || read != header->Size)
     {
         delete[] data;
         return FALSE;
@@ -264,7 +267,7 @@ readCDTX(CFile& file, NRGHeader* header, CISOImage* iso)
     const size_t allocationSize = static_cast<size_t>(header->Size) + terminatorCount;
     char* data = new char[allocationSize];
 
-    if (!file.Read(data, header->Size, &read, NULL, NULL))
+    if (!file.Read(data, header->Size, &read, NULL, NULL) || read != header->Size)
     {
         delete[] data;
         return FALSE;
@@ -333,7 +336,7 @@ readSINF(CFile& file, NRGHeader* header, CISOImage* iso)
     DWORD read;
     DWORD count;
 
-    if (!file.Read(&count, sizeof(count), &read, NULL, NULL))
+    if (header->Size < sizeof(count) || !file.Read(&count, sizeof(count), &read, NULL, NULL) || read != sizeof(count))
         return FALSE;
 
     count = SWAPDWORD(count);
@@ -368,6 +371,11 @@ ReadNRGRoot(CFile& file, CISOImage* iso)
 
     offset = getLongLong(&offset);
 
+    const LONGLONG footerEnd = file.Seek(0, FILE_CURRENT);
+    if (footerEnd < 12 || offset < 0 || offset > footerEnd - 12)
+        return FALSE;
+    const LONGLONG footerStart = footerEnd - 12;
+
     // set file pointer to start of session information
     if (file.Seek(offset, FILE_BEGIN) == -1)
         return FALSE;
@@ -377,19 +385,45 @@ ReadNRGRoot(CFile& file, CISOImage* iso)
         if (!ReadHeader(file, &header))
             return FALSE;
 
+        if (strncmp(header.ID, "NER5", 4) == 0)
+            return file.Seek(0, FILE_CURRENT) - 8 == footerStart;
+        const LONGLONG chunkStart = file.Seek(0, FILE_CURRENT);
+        if (chunkStart < 0 || chunkStart > footerStart || header.Size > uint64_t(footerStart - chunkStart))
+            return FALSE;
+        const LONGLONG chunkEnd = chunkStart + header.Size;
+
         if (strncmp(header.ID, "CUEX", 4) == 0)
-            readCUEX(file, &header, iso);
+        {
+            if (!readCUEX(file, &header, iso))
+                return FALSE;
+        }
         else if (strncmp(header.ID, "DAOX", 4) == 0)
-            readDAOX(file, &header, iso);
+        {
+            if (!readDAOX(file, &header, iso))
+                return FALSE;
+        }
         else if (strncmp(header.ID, "SINF", 4) == 0)
-            readSINF(file, &header, iso);
+        {
+            if (!readSINF(file, &header, iso))
+                return FALSE;
+        }
         else if (strncmp(header.ID, "ETNF", 4) == 0)
-            readETNF(file, &header, iso);
+        {
+            if (!readETNF(file, &header, iso))
+                return FALSE;
+        }
         else if (strncmp(header.ID, "ETN2", 4) == 0)
-            readETN2(file, &header, iso);
+        {
+            if (!readETN2(file, &header, iso))
+                return FALSE;
+        }
         else if (strncmp(header.ID, "CDTX", 4) == 0)
-            readCDTX(file, &header, iso);
-        else if (file.Seek(header.Size, FILE_CURRENT) == -1)
+        {
+            if (!readCDTX(file, &header, iso))
+                return FALSE;
+        }
+        const LONGLONG consumed = file.Seek(0, FILE_CURRENT);
+        if (consumed < chunkStart || consumed > chunkEnd || file.Seek(chunkEnd, FILE_BEGIN) != chunkEnd)
             return FALSE;
 
     } while (strncmp(header.ID, "NER5", 4) != 0);

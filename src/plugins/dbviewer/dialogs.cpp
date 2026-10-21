@@ -115,8 +115,20 @@ CGoToDialog::CGoToDialog(HWND hParent, int* record, int recordCount)
     RecordCount = recordCount;
 }
 
+void CGoToDialog::Validate(CTransferInfo& ti)
+{
+    if (RecordCount <= 0)
+        ti.ErrorOn(IDC_GOTO_RECORD);
+}
+
 void CGoToDialog::Transfer(CTransferInfo& ti)
 {
+    if (ti.Type == ttDataFromWindow)
+    {
+        Validate(ti);
+        if (!ti.IsGood())
+            return;
+    }
     HWND hWnd;
     if (ti.GetControl(hWnd, IDC_GOTO_RECORD))
     {
@@ -147,6 +159,7 @@ CGoToDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        EnableWindow(GetDlgItem(HWindow, IDOK), RecordCount > 0);
         SendDlgItemMessage(HWindow, IDC_GOTO_RECORD, EM_SETLIMITTEXT, 10, 0);
         break;
     }
@@ -192,31 +205,43 @@ CCSVOptionsDialog::CCSVOptionsDialog(HWND hParent, CCSVConfig* cfgCSV, CCSVConfi
 
 void CCSVOptionsDialog::MyTransfer(CTransferInfo& ti, CCSVConfig* cfg)
 {
-    ti.RadioButton(IDC_CSV_AS_SEP, 0, cfg->ValueSeparator);
-    ti.RadioButton(IDC_CSV_TABULATOR, 1, cfg->ValueSeparator);
-    ti.RadioButton(IDC_CSV_SEMICOLON, 2, cfg->ValueSeparator);
-    ti.RadioButton(IDC_CSV_COMMA, 3, cfg->ValueSeparator);
-    ti.RadioButton(IDC_CSV_SPACE, 4, cfg->ValueSeparator);
-    ti.RadioButton(IDC_CSV_OTHER, 5, cfg->ValueSeparator);
+    CCSVConfig draft = *cfg;
+    ti.RadioButton(IDC_CSV_AS_SEP, 0, draft.ValueSeparator);
+    ti.RadioButton(IDC_CSV_TABULATOR, 1, draft.ValueSeparator);
+    ti.RadioButton(IDC_CSV_SEMICOLON, 2, draft.ValueSeparator);
+    ti.RadioButton(IDC_CSV_COMMA, 3, draft.ValueSeparator);
+    ti.RadioButton(IDC_CSV_SPACE, 4, draft.ValueSeparator);
+    ti.RadioButton(IDC_CSV_OTHER, 5, draft.ValueSeparator);
 
-    ti.RadioButton(IDC_CSV_AS_TQ, 0, cfg->TextQualifier);
-    ti.RadioButton(IDC_CSV_DOUBLE, 1, cfg->TextQualifier);
-    ti.RadioButton(IDC_CSV_QUOTES, 2, cfg->TextQualifier);
-    ti.RadioButton(IDC_CSV_NONE, 3, cfg->TextQualifier);
+    ti.RadioButton(IDC_CSV_AS_TQ, 0, draft.TextQualifier);
+    ti.RadioButton(IDC_CSV_DOUBLE, 1, draft.TextQualifier);
+    ti.RadioButton(IDC_CSV_QUOTES, 2, draft.TextQualifier);
+    ti.RadioButton(IDC_CSV_NONE, 3, draft.TextQualifier);
     char buff[2];
     buff[0] = ' ';
     if (ti.Type == ttDataToWindow)
     {
-        buff[0] = cfg->ValueSeparatorChar;
+        buff[0] = draft.ValueSeparatorChar;
         buff[1] = 0;
     }
     ti.EditLine(IDE_CSV_OTHER, buff, 2);
     if (ti.Type == ttDataFromWindow)
-        cfg->ValueSeparatorChar = buff[0]; // if the string is empty, this becomes '\0'
+        draft.ValueSeparatorChar = buff[0]; // if the string is empty, this becomes '\0'
 
-    ti.RadioButton(IDC_CSV_AS_FR, 0, cfg->FirstRowAsName);
-    ti.RadioButton(IDC_CSV_ASHEADER, 1, cfg->FirstRowAsName);
-    ti.RadioButton(IDC_CSV_ASDATA, 2, cfg->FirstRowAsName);
+    ti.RadioButton(IDC_CSV_AS_FR, 0, draft.FirstRowAsName);
+    ti.RadioButton(IDC_CSV_ASHEADER, 1, draft.FirstRowAsName);
+    ti.RadioButton(IDC_CSV_ASDATA, 2, draft.FirstRowAsName);
+    if (ti.Type == ttDataFromWindow && ti.IsGood())
+    {
+        if (!IsCsvSeparatorValid(draft))
+        {
+            SalGeneral->SalMessageBox(HWindow, LangStr(IDS_CSV_SEPARATOR_REQUIRED).c_str(),
+                                      LangStr(IDS_PLUGINNAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
+            ti.ErrorOn(IDE_CSV_OTHER);
+        }
+        else
+            *cfg = draft;
+    }
 }
 
 void CCSVOptionsDialog::EnableControls()
@@ -254,10 +279,12 @@ CCSVOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDC_CSV_SETDEF:
         {
             CTransferInfo ti(HWindow, ttDataFromWindow);
-            MyTransfer(ti, DefaultCfgCSV);
+            if (DefaultCfgCSV != NULL)
+                MyTransfer(ti, DefaultCfgCSV);
             return 0;
         }
 
+        case IDC_CSV_AS_SEP:
         case IDC_CSV_TABULATOR:
         case IDC_CSV_SEMICOLON:
         case IDC_CSV_COMMA:
@@ -299,7 +326,7 @@ void CPropertiesDialog::Transfer(CTransferInfo& ti)
 //
 
 CConfigurationDialog::CConfigurationDialog(HWND hParent, BOOL enableCSVOptions)
-    : CCommonDialog(HLanguage, IDD_CONFIGURATION, IDD_CONFIGURATION, hParent)
+    : CCommonDialog(HLanguage, IDD_CONFIGURATION, IDD_CONFIGURATION, hParent), CSVConfig(CfgDefaultCSV)
 {
     bEnableCSVOptions = enableCSVOptions;
     HFont = NULL;
@@ -315,17 +342,19 @@ CConfigurationDialog::~CConfigurationDialog()
 
 void CConfigurationDialog::Transfer(CTransferInfo& ti)
 {
+    const BOOL oldSavePosition = CfgSavePosition;
     ti.RadioButton(IDC_CFG_SAVEPOSONCLOSE, 1, CfgSavePosition);
     ti.RadioButton(IDC_CFG_SETBYMAINWINDOW, 0, CfgSavePosition);
     if (ti.Type == ttDataToWindow)
     {
         SetFontText();
     }
-    else
+    else if (ti.IsGood())
     {
         CfgUseCustomFont = UseCustomFont;
         memcpy(&CfgLogFont, &LogFont, sizeof(LOGFONT));
-        if (CfgSavePosition)
+        CfgDefaultCSV = CSVConfig;
+        if (CfgSavePosition && !oldSavePosition)
             CfgWindowPlacement.length = 0;
     }
 }
@@ -421,7 +450,7 @@ MENU_TEMPLATE_ITEM ConfigurationDialogMenu[] =
         }
         case IDB_CFG_CSVOPTIONS:
         {
-            CCSVOptionsDialog(HWindow, &CfgDefaultCSV, NULL).Execute();
+            CCSVOptionsDialog(HWindow, &CSVConfig, NULL).Execute();
             return 0;
         }
         }
@@ -545,11 +574,11 @@ void CColumnsDialog::Validate(CTransferInfo& ti)
 
 void CColumnsDialog::OnMove(BOOL up)
 {
-    DisableNotification = TRUE;
     int index1 = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
-    int index2 = index1;
-    if (index1 == -1)
+    if (index1 < 0 || index1 >= MyColumns.Count)
         return;
+    DisableNotification = TRUE;
+    int index2 = index1;
     if (up && index1 > 0)
         index2 = index1 - 1;
     if (!up && index1 < MyColumns.Count - 1)

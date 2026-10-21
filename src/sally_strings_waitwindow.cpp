@@ -5,6 +5,7 @@
 
 #include "precomp.h"
 #include "common/IRegistry.h" // wide facades
+#include "common/configuration/RegistryWriteMonitor.h"
 #include "common/reg_sz_safe_length.h" // SetValueW REG_SZ scan bound
 #include "common/HistoryValueIo.h" // history value shapes
 #include "common/SubstResolution.h" // wide SUBST resolution
@@ -1870,7 +1871,7 @@ void DrawSplitLine(HWND HWindow, int newDragSplitX, int oldDragSplitX, RECT clie
 
 BOOL CreateKeyW(HKEY hKey, const wchar_t* name, HKEY& createdKey)
 {
-    return gRegistry->CreateKey(hKey, name, createdKey).success;
+    return sally::configuration::RegistryWriteMonitor::Record(gRegistry->CreateKey(hKey, name, createdKey));
 }
 
 BOOL OpenKeyW(HKEY hKey, const wchar_t* name, HKEY& openedKey)
@@ -1880,12 +1881,12 @@ BOOL OpenKeyW(HKEY hKey, const wchar_t* name, HKEY& openedKey)
 
 BOOL DeleteKeyW(HKEY hKey, const wchar_t* name)
 {
-    return gRegistry->DeleteKey(hKey, name).success;
+    return sally::configuration::RegistryWriteMonitor::Record(gRegistry->DeleteKey(hKey, name), true);
 }
 
 BOOL DeleteValueW(HKEY hKey, const wchar_t* name)
 {
-    return gRegistry->DeleteValue(hKey, name).success;
+    return sally::configuration::RegistryWriteMonitor::Record(gRegistry->DeleteValue(hKey, name), true);
 }
 
 BOOL SetValueW(HKEY hKey, const wchar_t* name, DWORD type, const void* data, DWORD dataSize)
@@ -1915,21 +1916,21 @@ BOOL SetValueW(HKEY hKey, const wchar_t* name, DWORD type, const void* data, DWO
             TRACE_EW(L"SetValueW: REG_SZ value '" << name << L"' has no wide NUL terminator within "
                      L"the safe scan bound - refusing to write (narrow data passed where a wide "
                      L"string was required?)");
-            return FALSE;
+            return sally::configuration::RegistryWriteMonitor::Record(RegistryResult::Error(ERROR_INVALID_DATA));
         }
-        return gRegistry->SetString(hKey, name, wideData).success;
+        return sally::configuration::RegistryWriteMonitor::Record(gRegistry->SetString(hKey, name, wideData));
     }
     case REG_DWORD:
-        return gRegistry->SetDWord(hKey, name, *(const DWORD*)data).success;
+        return sally::configuration::RegistryWriteMonitor::Record(gRegistry->SetDWord(hKey, name, *(const DWORD*)data));
     case REG_QWORD:
-        return gRegistry->SetQWord(hKey, name, *(const uint64_t*)data).success;
+        return sally::configuration::RegistryWriteMonitor::Record(gRegistry->SetQWord(hKey, name, *(const uint64_t*)data));
     default:
         // Everything else - REG_BINARY, but also REG_EXPAND_SZ and REG_MULTI_SZ, which v107
         // plugins do write - is bytes. Write them under the TYPE THE CALLER ASKED FOR: SetBinary
         // hard-codes REG_BINARY, and the read side refuses a type mismatch, so stamping the wrong
         // type here makes the value unreadable forever after. The worker path (regwork.cpp) has
         // always preserved the type; this facade must too.
-        return gRegistry->WriteValue(hKey, name, (RegValueType)type, data, dataSize).success;
+        return sally::configuration::RegistryWriteMonitor::Record(gRegistry->WriteValue(hKey, name, (RegValueType)type, data, dataSize));
     }
 }
 
@@ -2422,7 +2423,9 @@ BOOL LoadViewers(HKEY hKey, const wchar_t* name, CViewerMasks* viewerMasks)
                     {
                         delete item;
                         viewerMasks->ResetState();
-                        break;
+                        CloseKey(subKey);
+                        CloseKey(viewersKey);
+                        return FALSE;
                     }
                 }
                 else
@@ -2430,11 +2433,11 @@ BOOL LoadViewers(HKEY hKey, const wchar_t* name, CViewerMasks* viewerMasks)
                     if (item != NULL)
                         delete item;
                     TRACE_E(LOW_MEMORY);
-                    break;
+                    CloseKey(subKey);
+                    CloseKey(viewersKey);
+                    return FALSE;
                 }
             }
-            else
-                break;
             _itow_s(++i, buf, _countof(buf), 10);
             CloseKey(subKey);
         }
@@ -2519,7 +2522,9 @@ BOOL LoadEditors(HKEY hKey, const wchar_t* name, CEditorMasks* editorMasks)
                     {
                         delete item;
                         editorMasks->ResetState();
-                        break;
+                        CloseKey(subKey);
+                        CloseKey(editorKey);
+                        return FALSE;
                     }
                 }
                 else
@@ -2527,11 +2532,11 @@ BOOL LoadEditors(HKEY hKey, const wchar_t* name, CEditorMasks* editorMasks)
                     if (item != NULL)
                         delete item;
                     TRACE_E(LOW_MEMORY);
-                    break;
+                    CloseKey(subKey);
+                    CloseKey(editorKey);
+                    return FALSE;
                 }
             }
-            else
-                break;
             _itow_s(++i, buf, _countof(buf), 10);
             CloseKey(subKey);
         }

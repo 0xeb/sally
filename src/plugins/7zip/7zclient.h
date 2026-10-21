@@ -111,8 +111,8 @@ protected:
 
     int GetArchiveItemList(IInArchive* archive, TIndirectArray<CArchiveItem>** archiveItems, UINT32* numItems);
 
-    int UpdateMakeUpdateList(TIndirectArray<CFileItem>* fileList, TIndirectArray<CArchiveItem>* archiveItems,
-                             TIndirectArray<CUpdateInfo>* updateList);
+    static int UpdateMakeUpdateList(TIndirectArray<CFileItem>* fileList, TIndirectArray<CArchiveItem>* archiveItems,
+                                    TIndirectArray<CUpdateInfo>* updateList);
     int DeleteMakeUpdateList(TIndirectArray<CArchiveItem>* archiveItems, TIndirectArray<CArchiveItemInfo>* deleteList,
                              TIndirectArray<CUpdateInfo>* updateList);
 

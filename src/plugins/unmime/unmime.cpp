@@ -436,6 +436,14 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
 {
     CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %ls, %ls, %ls, %d,)",
                         fileName, mask, targetDir, delArchiveWhenDone);
+    std::vector<std::wstring> masks;
+    for (const std::wstring& item : SplitUnmimeMasks(mask))
+    {
+        std::wstring prepared;
+        if (!SPLPrepareMaskOwned(SalamanderGeneral, item.c_str(), prepared))
+            return FALSE;
+        masks.push_back(std::move(prepared));
+    }
     CArchiveData ArchiveData;
     // get the filetime of the "archive" - files inside will have the same time
     HANDLE hFile = CreateFileW(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
@@ -481,6 +489,25 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                     (m->iBlockType == BLOCK_BODY && !m->bAttachment && G.bListMessageBodies) ||
                     (m->iBlockType == BLOCK_BODY && m->bAttachment && G.bListAttachments))
                 {
+                    std::wstring decodedName;
+                    if (!DecodeUnmimeNameBytes(m->cFileName, decodedName))
+                    {
+                        SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOWMEM).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
+                        Salamander->CloseProgressDialog();
+                        return FALSE;
+                    }
+                    const BOOL hasExtension = decodedName.find(L'.') != std::wstring::npos;
+                    BOOL matches = FALSE;
+                    for (const std::wstring& prepared : masks)
+                    {
+                        if (SalamanderGeneral->AgreeMask(decodedName.c_str(), prepared.c_str(), hasExtension))
+                        {
+                            matches = TRUE;
+                            break;
+                        }
+                    }
+                    if (!matches)
+                        continue;
                     m->bSelected = 1;
                     totalSize += CQuadWord(m->iSize, 0);
                 }

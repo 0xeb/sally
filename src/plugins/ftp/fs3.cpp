@@ -754,32 +754,30 @@ catch (...)
 
 void CPluginFSInterface::AddBookmark(HWND parent)
 {
+    if (ControlConnection == NULL)
+        return;
     std::wstring name = Host;
     std::wstring pathText;
-    if (!DecodeSessionBytes(Path, pathText))
+    if (!FtpFormatWirePath(ControlConnection->GetTextCodec(), Path, Config.ConvertHexEscSeq, pathText))
         return;
     if (CRenameDlg(parent, name, FALSE, TRUE).Execute() == IDOK)
     {
-        BOOL anonymous = User == L"anonymous";
-        if (Config.FTPServerList.AddServer(name.c_str(),
-                                           Host.c_str(),
-                                           pathText.c_str(),
-                                           anonymous,
-                                           anonymous ? NULL : User.c_str(),
-                                           NULL,
-                                           0,
-                                           FALSE,
-                                           -2,
-                                           NULL,
-                                           NULL,
-                                           0,
-                                           Port))
+        CFTPServer* bookmark = ControlConnection->CreateBookmark(
+            name.c_str(), pathText.c_str(), static_cast<CTransferMode>(TransferMode),
+            AutodetectSrvType ? NULL : LastServerType.c_str(), Config.ConvertHexEscSeq);
+        if (bookmark == NULL)
+            return;
+        Config.FTPServerList.Add(bookmark);
+        if (!Config.FTPServerList.IsGood())
         {
-            // bookmark added -> let the user place the new bookmark in the bookmark list
-            CConnectDlg dlg(parent, 2);
-            if (dlg.IsGood())
-                dlg.Execute();
+            Config.FTPServerList.ResetState();
+            delete bookmark;
+            return;
         }
+        // Let the user place the new bookmark in the list.
+        CConnectDlg dlg(parent, 2);
+        if (dlg.IsGood())
+            dlg.Execute();
     }
 }
 
@@ -1048,7 +1046,7 @@ void CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int men
                         SalamanderGeneral, &index, &salCmd, nameBuf, &enabled,
                         &type2))
                     {
-                        if (!enabled || salCmd == SALCMD_OPEN || // we cannot "open" files yet, so do not add it (we can do it only for directories and there it is uninteresting)
+                        if (!enabled ||
                             type2 == sctyForFocusedFile && isfocusedDir ||
                             (type2 != sctyForFocusedFile && type2 != sctyForFocusedFileOrDirectory &&
                              type2 != sctyForSelectedFilesAndDirectories))
@@ -1130,7 +1128,7 @@ void CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int men
                         GlobalShowLogUID = GetLogUID();
                         if (GlobalShowLogUID == -1 || !Logs.HasLogWithUID(GlobalShowLogUID))
                         {
-                            SalamanderGeneral->ShowMessageBox(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FSHAVENOLOG).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MSGBOX_ERROR);
+                            SalamanderGeneral->ShowMessageBox(SPLLoadStrOwned(SalamanderGeneral, HLanguage, Config.EnableLogging ? IDS_FSLOGUNAVAILABLE : IDS_FSHAVENOLOG).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MSGBOX_ERROR);
                         }
                         else                                                              // open the Logs window with the selected log GlobalShowLogUID
                             SalamanderGeneral->PostMenuExtCommand(FTPCMD_SHOWLOGS, TRUE); // runs later in "sal-idle"
@@ -1277,11 +1275,58 @@ BOOL CPluginFSInterface::IsListCommandLIST_a()
 // CSimpleListPluginDataInterface
 //
 
+CFtpListingItemData* FtpCreateSimpleListingItem(std::wstring_view row) noexcept
+{
+    if (row.size() > (std::numeric_limits<size_t>::max)() / sizeof(wchar_t) - 1)
+        return NULL;
+    auto* item = static_cast<CFtpListingItemData*>(calloc(1, sizeof(CFtpListingItemData)));
+    if (item == NULL)
+        return NULL;
+    item->Row = static_cast<wchar_t*>(malloc((row.size() + 1) * sizeof(wchar_t)));
+    if (item->Row == NULL)
+    {
+        free(item);
+        return NULL;
+    }
+    memcpy(item->Row, row.data(), row.size() * sizeof(wchar_t));
+    item->Row[row.size()] = 0;
+    item->Kind = CFtpListingItemKind::RawLine;
+    return item;
+}
+void FtpDestroySimpleListingItem(CFtpListingItemData* item) noexcept
+{
+    if (item != NULL)
+    {
+        free(item->Row);
+        free(item);
+    }
+}
+BOOL FtpGetListingWireName(const CFileData& file, const CFtpTextCodec& codec, std::string& name) noexcept
+{
+    const auto* item = reinterpret_cast<const CFtpListingItemData*>(file.PluginData);
+    if (item != NULL)
+    {
+        if (item->Kind != CFtpListingItemKind::Parsed)
+            return FALSE;
+        if (item->RawName != NULL)
+        {
+            const std::string_view raw(item->RawName);
+            if (raw.find_first_of(std::string_view("\r\n", 2)) != std::string_view::npos)
+                return FALSE;
+            return FtpStoreProtocolBytes(raw, name);
+        }
+    }
+    std::string staged;
+    if (file.Name == NULL || !codec.Encode(file.Name, file.NameLen, staged) ||
+        staged.find_first_of(std::string_view("\0\r\n", 3)) != std::string::npos)
+        return FALSE;
+    name.swap(staged);
+    return TRUE;
+}
+
 void CSimpleListPluginDataInterface::ReleasePluginData(CFileData& file, BOOL isDir)
 {
-    wchar_t* text = (wchar_t*)file.PluginData;
-    if (text != NULL)
-        free(text);
+    FtpDestroySimpleListingItem(reinterpret_cast<CFtpListingItemData*>(file.PluginData));
 }
 
 static wchar_t* SimpleTransferBuffer = NULL;
@@ -1289,7 +1334,8 @@ static wchar_t* SimpleTransferBuffer = NULL;
 // callback invoked from Salamander to obtain text
 void WINAPI GetRowText()
 {
-    const wchar_t* text = (const wchar_t*)((*TransferFileData)->PluginData);
+    const auto* item = reinterpret_cast<const CFtpListingItemData*>((*TransferFileData)->PluginData);
+    const wchar_t* text = item != NULL && item->Kind == CFtpListingItemKind::RawLine ? item->Row : NULL;
     if (text != NULL)
     {
         *TransferLen = static_cast<int>(wcslen(text));
@@ -1395,8 +1441,8 @@ CFTPListingPluginDataInterface::CFTPListingPluginDataInterface(TIndirectArray<CS
 {
     Columns = columns;
     DeleteColumns = deleteColumns;
-    RawNameOffset = 0;
-    ItemDataSize = sizeof(char*);
+    RawNameOffset = offsetof(CFtpListingItemData, RawName);
+    ItemDataSize = sizeof(CFtpListingItemData);
     BlocksColumnOffset = -1;
     BytesColumnOffset = -1;
     DateColumnOffset = -1;
@@ -1540,7 +1586,9 @@ void CFTPListingPluginDataInterface::StoreStringToColumn(CFileData& file, int co
 
 BOOL CFTPListingPluginDataInterface::StoreRawName(CFileData& file, const char* name, size_t length)
 {
-    if (file.PluginData == 0 || name == NULL)
+    if (file.PluginData == 0 || name == NULL ||
+        length >= static_cast<size_t>((std::numeric_limits<int>::max)()) ||
+        std::string_view(name, length).find_first_of(std::string_view("\0\r\n", 3)) != std::string_view::npos)
         return FALSE;
 
     char* copy = (char*)SalamanderGeneral->Alloc((int)length + 1);
@@ -1566,13 +1614,7 @@ const char* CFTPListingPluginDataInterface::GetRawName(const CFileData& file) co
 BOOL CFTPListingPluginDataInterface::GetWireName(const CFileData& file, const CFtpTextCodec& codec,
                                                   std::string& name) const
 {
-    const char* rawName = GetRawName(file);
-    if (rawName != NULL)
-    {
-        name.assign(rawName);
-        return TRUE;
-    }
-    return codec.Encode(file.Name, file.NameLen, name);
+    return FtpGetListingWireName(file, codec, name);
 }
 
 BOOL CFTPListingPluginDataInterface::DecodeTextForPresentation(

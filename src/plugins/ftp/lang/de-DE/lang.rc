@@ -626,7 +626,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,163,88,57,14
     PUSHBUTTON      "Hilfe",IDHELP,227,88,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,304,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,290,12
     LTEXT           "D&etails:",IDC_STATIC_3,7,9,41,8
     EDITTEXT        IDE_SCRD_DETAILS,50,9,261,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -651,7 +651,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,249,88,57,14
     PUSHBUTTON      "Hilfe",IDHELP,310,88,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,5,111,362,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "D&ieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,261,12
     LTEXT           "&Details:",IDC_STATIC_3,7,9,41,8
     EDITTEXT        IDE_SCRD_DETAILS,50,9,315,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -674,7 +674,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,163,101,57,14
     PUSHBUTTON      "Hilfe",IDHELP,227,101,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,305,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,261,12
     LTEXT           "F&ehlerbeschreibung:",IDC_STATIC_3,7,9,72,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,305,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -698,7 +698,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,141,101,57,14
     PUSHBUTTON      "Hilfe",IDHELP,205,101,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,262,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,261,12
     LTEXT           "Fehler&beschreibung:",IDC_STATIC_2,7,9,72,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,262,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -724,7 +724,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,249,101,57,14
     PUSHBUTTON      "Hilfe",IDHELP,310,101,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,5,124,362,1
-    CONTROL         "Auswahl &merken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,261,12
     LTEXT           "Fe&hlerbeschreibung:",IDC_STATIC_2,7,9,72,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,360,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -747,7 +747,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,163,70,57,14
     PUSHBUTTON      "Hilfe",IDHELP,227,70,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,306,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,261,12
     LTEXT           "Q&uellpfad:",IDC_STATIC_3,7,9,41,8
     EDITTEXT        IDE_SCRD_SRCPATH,50,9,263,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -770,7 +770,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,263,70,57,14
     PUSHBUTTON      "Hilfe",IDHELP,324,70,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,5,93,376,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,261,12
     LTEXT           "Q&uellpfad:",IDC_STATIC_3,7,9,41,8
     EDITTEXT        IDE_SCRD_SRCPATH,50,9,330,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -793,7 +793,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,222,70,55,14
     PUSHBUTTON      "Hilfe",IDHELP,281,70,55,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,331,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,261,12
     LTEXT           "Q&uellpfad:",IDC_STATIC_3,7,9,41,8
     EDITTEXT        IDE_SCRD_SRCPATH,50,9,287,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -815,7 +815,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,162,70,55,14
     PUSHBUTTON      "Hilfe",IDHELP,225,70,55,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,304,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,261,12
     LTEXT           "Pf&ad:",IDC_STATIC_3,7,9,63,8
     EDITTEXT        IDE_SCRD_SRCPATH,71,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -871,7 +871,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,143,46,57,14
     PUSHBUTTON      "Hilfe",IDHELP,207,46,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,265,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,261,12
     LTEXT           "&Pfad:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SCRD_SRCPATH,32,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -888,7 +888,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,162,46,55,14
     PUSHBUTTON      "Hilfe",IDHELP,225,46,55,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,303,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SISE_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SISE_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,261,12
     LTEXT           "&Pfad:",IDC_STATIC_3,7,9,27,8
     EDITTEXT        IDE_SISE_PATH,37,9,272,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -905,7 +905,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,143,82,57,14
     PUSHBUTTON      "Hilfe",IDHELP,207,82,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,265,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,261,12
     LTEXT           "&Pfad:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SSCD_PATH,32,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -924,7 +924,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,141,106,57,14
     PUSHBUTTON      "Hilfe",IDHELP,205,106,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,262,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,261,12
     LTEXT           "Q&uellpfad:",IDC_STATIC_2,7,9,41,8
     EDITTEXT        IDE_SSCD_SRCPATH,50,9,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -949,7 +949,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,249,106,57,14
     PUSHBUTTON      "Hilfe",IDHELP,310,106,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,5,127,362,1
-    CONTROL         "Auswahl &merken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,261,12
     LTEXT           "Q&uellpfad:",IDC_STATIC_2,7,9,41,8
     EDITTEXT        IDE_SSCD_SRCPATH,50,9,314,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -972,7 +972,7 @@ BEGIN
     PUSHBUTTON      "Abbrechen",IDCANCEL,143,70,57,14
     PUSHBUTTON      "Hilfe",IDHELP,207,70,57,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,265,1
-    CONTROL         "Auswahl me&rken und diesen Dialog bei gleichem Fehler nicht mehr zeigen",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Dieser Vorgang (3 Versuche, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,261,12
     LTEXT           "&Pfad:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SSCD_PATH,32,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -1629,11 +1629,13 @@ STRINGTABLE
  IDS_OPERSTOPPED, "gestoppt"
  IDS_FTPINACTIVE, "Verbindung nicht aktiv"
 
+ IDS_FSLOGUNAVAILABLE, "Das Protokoll dieser Verbindung ist nicht verfügbar. Die Protokollierung ist aktiviert; verbinden Sie sich erneut, um ein neues Protokoll zu starten."
+ IDS_ITEMRETRYPOLICYHINT, "Wenn Sie mit dieser Option Wiederholen wählen, gilt es nur für gleiche Fehler in diesem Vorgang. Wiederholen versucht es pro Element und Fehler höchstens 3-mal automatisch im Abstand von einer Sekunde. Danach ist eine neue Auswahl nötig; manuelles Wiederholen setzt das Limit zurück."
  IDS_FSHAVENOLOG, "Die Verbindung zum FTP-Server hat keine Logdatei. Wahrscheinlich, wurde die Verbindung ohne Logaufzeichnung gestartet (siehe 'FTP-Konfiguration'/'Logdateien')."
 
  IDS_CLEARLOGQUESTION, "Sind Sie sicher, dass Sie die Logdatei ""%s"" löschen möchten?"
  IDS_REMOVELOGQUESTION, "Sind Sie sicher, dass Sie die Logdatei ""%s"" entfernen möchten?"
- IDS_REMOVEALLLOGSQUESTION, "Sind Sie sicher, dass Sie alle Logdateien entfernen möchten?"
+ IDS_REMOVEALLLOGSQUESTION, "Alle Protokolle ohne zugehörige Verbindung oder aktiven Übertragungsthread entfernen? Verwendete Protokolle bleiben erhalten."
  IDS_TEXTCOPIEDTOCLIPBOARD, "Text wurde erfolgreich in den Zwischenspeicher kopiert."
  IDS_COPYTOCLIPBOARDERROR, "Text kann nicht in den Zwischenspeicher kopiert werden."
  IDS_SAVELOGFILTER, "Logdateien (*.log)|*.log|Alle Dateien (*.*)|*.*|"
@@ -2370,4 +2372,5 @@ STRINGTABLE
  IDS_NEWNAME_CANNOTENCODE, "Der neue Name enthält Zeichen, die in der Textkodierung dieser Verbindung nicht dargestellt werden können. Daher kann er nicht als Dateiname auf dem Server verwendet werden.\n\nDas Element verbleibt im Fehlerzustand."
  IDS_DIRNAME_CANNOTENCODE, "Der Verzeichnisname enthält Zeichen, die in der Textkodierung dieser Verbindung nicht dargestellt werden können. Daher kann das Verzeichnis auf dem Server nicht erstellt werden."
  IDS_RENAMENAME_CANNOTENCODE, "Der neue Name enthält Zeichen, die in der Textkodierung dieser Verbindung nicht dargestellt werden können. Daher kann das Element auf dem Server nicht umbenannt werden."
+ IDS_LOGSIZEOUTOFRANGE, "Die Größenbegrenzung des Protokolls muss zwischen 1 und %u KB liegen."
 }

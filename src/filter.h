@@ -119,6 +119,8 @@ class CFilterCriteriaDialog : public CCommonDialog
 protected:
     BOOL EnableDirectory;
     CFilterCriteria* Data;
+    CFilterCriteria Draft;
+    CFilterCriteria* OriginalData;
 
 public:
     CFilterCriteriaDialog(HWND hParent, CFilterCriteria* data, BOOL enableDirectory);

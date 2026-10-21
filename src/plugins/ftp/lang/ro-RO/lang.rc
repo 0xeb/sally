@@ -626,7 +626,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,176,88,60,14
     PUSHBUTTON      "Help",IDHELP,241,88,60,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,333,1
-    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,332,12
     LTEXT           "D&etalii:",IDC_STATIC_3,7,9,52,8
     EDITTEXT        IDE_SCRD_DETAILS,61,9,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -651,7 +651,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,251,88,53,14
     PUSHBUTTON      "Help",IDHELP,309,88,53,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,359,1
-    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,332,12
     LTEXT           "&Detalii:",IDC_STATIC_3,7,9,52,8
     EDITTEXT        IDE_SCRD_DETAILS,61,9,306,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -674,7 +674,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,176,101,60,14
     PUSHBUTTON      "Help",IDHELP,241,101,60,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,334,1
-    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,332,12
     LTEXT           "Descrierea &erorii:",IDC_STATIC_3,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,334,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -698,7 +698,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,146,101,60,14
     PUSHBUTTON      "Help",IDHELP,211,101,60,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,273,1
-    CONTROL         "A&plica acum la operatiunile cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,164,12
     LTEXT           "&Descrierea erorii:",IDC_STATIC_2,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,275,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -724,7 +724,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,251,101,53,14
     PUSHBUTTON      "Help",IDHELP,309,101,53,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,359,1
-    CONTROL         "A&plica acum la operatiunile cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,164,12
     LTEXT           "&Descrierea erorii:",IDC_STATIC_2,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,362,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -747,7 +747,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,176,70,60,14
     PUSHBUTTON      "Help",IDHELP,241,70,60,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,334,1
-    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,332,12
     LTEXT           "Calea su&rsei:",IDC_STATIC_3,7,9,52,8
     EDITTEXT        IDE_SCRD_SRCPATH,61,9,280,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -770,7 +770,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,257,70,50,14
     PUSHBUTTON      "Help",IDHELP,312,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,364,1
-    CONTROL         "T&ine minte alegerea facuta  si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,335,12
     LTEXT           "Calea su&rsei:",IDC_STATIC_3,7,9,52,8
     EDITTEXT        IDE_SCRD_SRCPATH,61,9,311,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -793,7 +793,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,228,70,50,14
     PUSHBUTTON      "Help",IDHELP,283,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,332,1
-    CONTROL         "Tine &minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,332,12
     LTEXT           "Calea su&rsei:",IDC_STATIC_3,7,9,52,8
     EDITTEXT        IDE_SCRD_SRCPATH,61,9,277,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -815,7 +815,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,180,70,50,14
     PUSHBUTTON      "Help",IDHELP,242,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,335,1
-    CONTROL         "&Tine minte alegerea facuta si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "Ac&eastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,332,12
     LTEXT           "Ca&le:",IDC_STATIC_3,7,9,63,8
     EDITTEXT        IDE_SCRD_SRCPATH,71,9,271,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -871,7 +871,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,139,46,60,14
     PUSHBUTTON      "Help",IDHELP,204,46,60,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,260,1
-    CONTROL         "A&plica operatiunilor cu aceeasi eroare",IDC_SCRD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,155,12
     LTEXT           "Ca&le:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SCRD_SRCPATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -888,7 +888,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,181,46,50,14
     PUSHBUTTON      "Help",IDHELP,243,46,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,336,1
-    CONTROL         "&Tine minte alegerea facuta  si nu arata acest dialog din nou pentru operatiuni cu aceeasi eroare",IDC_SISE_APPLYTOALL,
+    CONTROL         "Ac&eastă operație (3 încercări, 1 s)",IDC_SISE_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,335,12
     LTEXT           "&Cale:",IDC_STATIC_3,7,9,25,8
     EDITTEXT        IDE_SISE_PATH,35,9,307,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -905,7 +905,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,139,82,60,14
     PUSHBUTTON      "Help",IDHELP,204,82,60,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,260,1
-    CONTROL         "A&plica acum operatiunilor cu aceeasi eroare",IDC_SSCD_APPLYTOALL,
+    CONTROL         "Ac&eastă operație (3 încercări, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,158,12
     LTEXT           "&Cale:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -924,7 +924,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,146,106,60,14
     PUSHBUTTON      "Help",IDHELP,211,106,60,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,273,1
-    CONTROL         "A&plica acum operatiunilor cu aceeasi eroare",IDC_SSCD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,158,12
     LTEXT           "Calea s&ursei:",IDC_STATIC_2,7,9,52,8
     EDITTEXT        IDE_SSCD_SRCPATH,59,9,221,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -949,7 +949,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,251,106,53,14
     PUSHBUTTON      "Help",IDHELP,309,106,53,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,359,1
-    CONTROL         "A&plica acum operatiunilor cu aceeasi eroare",IDC_SSCD_APPLYTOALL,
+    CONTROL         "A&ceastă operație (3 încercări, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,158,12
     LTEXT           "Calea s&ursei:",IDC_STATIC_2,7,9,52,8
     EDITTEXT        IDE_SSCD_SRCPATH,59,9,307,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -972,7 +972,7 @@ BEGIN
     PUSHBUTTON      "Anuleaza",IDCANCEL,139,70,60,14
     PUSHBUTTON      "Help",IDHELP,204,70,60,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,260,1
-    CONTROL         "A&plica acum operatiunilor cu aceeasi eroare",IDC_SSCD_APPLYTOALL,
+    CONTROL         "Ac&eastă operație (3 încercări, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,158,12
     LTEXT           "&Cale:",IDC_STATIC_2,7,9,19,8
     EDITTEXT        IDE_SSCD_PATH,27,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -1629,11 +1629,13 @@ STRINGTABLE
  IDS_OPERSTOPPED, "oprit"
  IDS_FTPINACTIVE, "conexiune inactiva"
 
+ IDS_FSLOGUNAVAILABLE, "Jurnalul acestei conexiuni nu este disponibil. Înregistrarea este activată; reconectați-vă pentru a începe un jurnal nou."
+ IDS_ITEMRETRYPOLICYHINT, "Dacă alegeți Reîncercare cu această opțiune, alegerea este reținută doar pentru aceleași erori din această operație. Reîncercarea face cel mult 3 încercări automate pentru fiecare element și eroare, la o secundă distanță. Apoi alegeți din nou o acțiune; reîncercarea manuală resetează limita."
  IDS_FSHAVENOLOG, "Aceasta conexiune la server-ul FTP nu are log. Cel mai probabil, conexiunea a fost pornita cu log-are dezactivata (vezi pagina Logs in Configurare FTP)."
 
  IDS_CLEARLOGQUESTION, "Sunteti sigur-a ca doriti sa stergeti log-ul ""%s""?"
  IDS_REMOVELOGQUESTION, "Sunteti sigur-a ca doriti eliminarea log-ului ""%s""?"
- IDS_REMOVEALLLOGSQUESTION, "Sunteti sigur-a ca doriti eliminarea tuturor log-urilor?"
+ IDS_REMOVEALLLOGSQUESTION, "Eliminați toate jurnalele care nu mai aparțin unei conexiuni sau unui fir de transfer activ? Jurnalele utilizate vor fi păstrate."
  IDS_TEXTCOPIEDTOCLIPBOARD, "Textul a fost copiat cu succes in clipboard."
  IDS_COPYTOCLIPBOARDERROR, "Nu pot copia textul in clipboard."
  IDS_SAVELOGFILTER, "Fisiere log (*.log)|*.log|Toate fisierele (*.*)|*.*|"
@@ -2370,4 +2372,5 @@ STRINGTABLE
  IDS_NEWNAME_CANNOTENCODE, "Noul nume conține caractere care nu pot fi reprezentate în codificarea de text a acestei conexiuni, deci nu poate fi folosit pentru a denumi un fișier pe server.\n\nElementul a fost lăsat în starea de eroare."
  IDS_DIRNAME_CANNOTENCODE, "Numele directorului conține caractere care nu pot fi reprezentate în codificarea de text a acestei conexiuni, deci directorul nu poate fi creat pe server."
  IDS_RENAMENAME_CANNOTENCODE, "Noul nume conține caractere care nu pot fi reprezentate în codificarea de text a acestei conexiuni, deci elementul nu poate fi redenumit pe server."
+ IDS_LOGSIZEOUTOFRANGE, "Limita dimensiunii jurnalului trebuie să fie între 1 și %u KB."
 }

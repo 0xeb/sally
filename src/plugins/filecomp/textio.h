@@ -50,7 +50,7 @@ public:
     // 'size' must not exceed numeric_limits<size_t>::max - 1
     void Set(const wchar_t* name, HANDLE file, size_t size, int eolConversions,
              eEncoding encoding, eEndian endians, int performASCII8InputEnc,
-             const char* parASCII8InputEncTableName, BOOL normalizationForm, bool needMD5);
+             const std::wstring& parASCII8InputEncTableName, BOOL normalizationForm, bool needMD5);
     void Reset();
     void FetchFilePrefix();
     bool BOMTest();
@@ -123,7 +123,7 @@ protected:
     eEncoding Encoding;
     eEndian Endian;
     int PerformASCII8InputEnc;
-    char ASCII8InputEncTableName[101];
+    std::wstring ASCII8InputEncTableName;
     BOOL NormalizationForm;
     CSalamanderMD5* MD5;
 

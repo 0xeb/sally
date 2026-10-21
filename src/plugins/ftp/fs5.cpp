@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "ftp_file_open.h"
 
 #include <vector>
 
@@ -256,16 +257,11 @@ BOOL CPluginFSInterface::ChangeAttributes(const wchar_t* fsName, HWND parent, in
                             {
                                 oper->SetQueue(queue); // set the queue of its items for the operation
                                 queue = NULL;
-                                if (Config.ChAttrAddToQueue)
-                                    failed = FALSE; // perform the operation later -> for now the operation is successful
-                                else                // perform the operation in the active "control connection"
-                                {
-                                    // open the operation progress window and start the operation
-                                    if (RunOperation(SalamanderGeneral->GetMsgBoxParent(), operUID, oper, NULL))
-                                        failed = FALSE; // operation succeeded
-                                    else
-                                        ok = FALSE;
-                                }
+                                // open the operation progress window and start the operation
+                                if (RunOperation(SalamanderGeneral->GetMsgBoxParent(), operUID, oper, NULL))
+                                    failed = FALSE; // operation succeeded
+                                else
+                                    ok = FALSE;
                             }
                             else
                             {
@@ -386,6 +382,148 @@ BOOL CPluginFSInterface::ContainsHost(const wchar_t* host, int port, const wchar
            user != NULL && User == user;                                  // same user name (case-sensitive - Unix accounts)
 }
 
+BOOL CPluginFSInterface::PrepareFileDownload(const CFileData& file,
+                                             CFTPListingPluginDataInterface* dataIface,
+                                             CFtpFileDownloadPlan& plan)
+{
+    if (ControlConnection == NULL)
+        return FALSE;
+    CFtpFileDownloadPlan staged;
+    if (!FtpGetListingWireName(file, ControlConnection->GetTextCodec(), staged.WireName))
+        return FALSE;
+    staged.AsciiMode = TransferMode == trmASCII;
+    if (TransferMode == trmAutodetect && Config.ASCIIFileMasks != NULL)
+    {
+        const wchar_t *name = file.Name, *ext = file.Ext;
+        std::wstring basicNameStorage;
+        if (dataIface != NULL && !dataIface->GetBasicName(file, &name, &ext, basicNameStorage))
+        {
+            name = file.Name;
+            ext = file.Ext;
+        }
+        int error;
+        if (Config.ASCIIFileMasks->PrepareMasks(error))
+            staged.AsciiMode = Config.ASCIIFileMasks->AgreeMasks(name, ext);
+    }
+    BOOL sizeInBytes = FALSE;
+    if (file.IsLink || dataIface == NULL ||
+        !dataIface->GetSize(file, staged.Size, sizeInBytes) || !sizeInBytes)
+        staged.Size.Set(-1, -1);
+    plan = std::move(staged);
+    return TRUE;
+}
+
+void CPluginFSInterface::DownloadFileCopy(HWND parent, const CFtpFileDownloadPlan& plan,
+                                          const wchar_t* target, BOOL& created,
+                                          BOOL& incomplete, CQuadWord& size)
+{
+    created = FALSE;
+    incomplete = TRUE;
+    size.Set(0, 0);
+    if (ControlConnection == NULL)
+        return;
+    TotalConnectAttemptNum = 1;
+    int panel = PANEL_SOURCE;
+    const BOOL notInPanel = !SalamanderGeneral->GetPanelWithPluginFS(this, panel);
+    ControlConnection->DownloadOneFile(parent, plan.WireName.c_str(), plan.Size, plan.AsciiMode,
+                                       Path.c_str(), target, &created, &incomplete, &size,
+                                       &TotalConnectAttemptNum, panel, notInPanel, User);
+}
+
+void CPluginFSInterface::OpenFileCopy(int panel, CFileData& file, IFtpFileOpenHost* host)
+try
+{
+    if (ControlConnection == NULL)
+        return;
+    CPluginDataInterfaceAbstract* pluginData = SalamanderGeneral->GetPanelPluginData(panel);
+    if (pluginData == &SimpleListPluginDataInterface)
+        return;
+    auto* dataIface = static_cast<CFTPListingPluginDataInterface*>(pluginData);
+    std::wstring localName(file.Name != NULL ? file.Name : L"");
+    if (GetFTPServerPathType(Path.c_str()) == ftpsptOpenVMS)
+    {
+        FTPVMSCutFileVersion(localName.data(), -1);
+        localName.resize(wcslen(localName.c_str()));
+    }
+    if (!SPLSalMakeValidFileNameComponentOwned(SalamanderGeneral, localName))
+        return;
+    CFtpFileDownloadPlan plan;
+    if (!PrepareFileDownload(file, dataIface, plan))
+        return;
+    class COpenHost final : public IFtpFileOpenHost
+    {
+        CPluginFSInterface& FS;
+        const CFtpFileDownloadPlan& Plan;
+        HWND Parent;
+
+    public:
+        COpenHost(CPluginFSInterface& fs, const CFtpFileDownloadPlan& plan, HWND parent)
+            : FS(fs), Plan(plan), Parent(parent) {}
+        bool CreateTemporaryDirectory(std::wstring& directory) override
+        {
+            return SPLSalGetTempFileNameOwned(SalamanderGeneral, NULL, L"FTP", directory, FALSE, NULL) != FALSE;
+        }
+        bool DownloadCompleteCopy(const std::wstring& directory, const std::wstring& name) override
+        {
+            std::wstring target = directory;
+            SPLSalPathAppendOwned(target, name.c_str());
+            BOOL created, incomplete;
+            CQuadWord size;
+            FS.DownloadFileCopy(Parent, Plan, target.c_str(), created, incomplete, size);
+            return created && !incomplete;
+        }
+        void LaunchAssociation(const std::wstring& directory, const std::wstring& name) override
+        {
+            SalamanderGeneral->ExecuteAssociation(Parent, directory.c_str(), name.c_str());
+        }
+        void RemoveIncompleteCopy(const std::wstring& directory) noexcept override
+        {
+            SalamanderGeneral->RemoveTemporaryDir(directory.c_str());
+        }
+    } production(*this, plan, SalamanderGeneral->GetMsgBoxParent());
+    FtpOpenDownloadedCopy(localName, host != NULL ? *host : production);
+}
+catch (...)
+{
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+}
+
+void CPluginFSInterface::ActivateLink(int panel, const wchar_t* fsName, CFileData& file)
+try
+{
+    if (ControlConnection == NULL)
+        return;
+    std::string wireName, newPath = Path;
+    const CFTPServerPathType type = GetFTPServerPathType(Path.c_str());
+    if (!FtpGetListingWireName(file, ControlConnection->GetTextCodec(), wireName) ||
+        !FTPPathAppend(type, newPath, wireName.c_str(), TRUE))
+        return;
+    std::wstring userPart;
+    if (!BuildUserPartText(userPart, newPath.c_str()))
+        return;
+    const std::string backup = Path;
+    const int topIndex = SalamanderGeneral->GetPanelTopIndex(panel);
+    BOOL accepted = FALSE, rejectedReconnect = FALSE;
+    std::string reply;
+    TotalConnectAttemptNum = 1;
+    ControlConnection->SetStartTime();
+    const BOOL completed = ControlConnection->SendChangeWorkingPath(
+        FALSE, panel == PANEL_LEFT, SalamanderGeneral->GetMsgBoxParent(),
+        newPath.c_str(), User, &accepted, reply, Path.c_str(),
+        &TotalConnectAttemptNum, NULL, FALSE, &rejectedReconnect);
+    const CFtpLinkActivation action = FtpClassifyLinkActivation(
+        completed && !rejectedReconnect, accepted != FALSE, reply);
+    if (action == CFtpLinkActivation::File)
+        OpenFileCopy(panel, file);
+    else if (action == CFtpLinkActivation::Directory &&
+             SalamanderGeneral->ChangePanelPathToPluginFS(panel, fsName, userPart.c_str()))
+        TopIndexMem.Push(type, backup.c_str(), topIndex);
+}
+catch (...)
+{
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+}
+
 void CPluginFSInterface::ViewFile(const wchar_t* fsName, HWND parent,
                                   CSalamanderForViewFileOnFSAbstract* salamander,
                                   CFileData& file) try
@@ -487,41 +625,9 @@ void CPluginFSInterface::ViewFile(const wchar_t* fsName, HWND parent,
     CQuadWord newFileSize(0, 0);
     if (!fileExists) // preparing a copy of the file (download) is required
     {
-        TotalConnectAttemptNum = 1; // start of a user-requested action -> if reconnecting is needed, this is the first reconnect attempt
-        int panel;
-        BOOL notInPanel = !SalamanderGeneral->GetPanelWithPluginFS(this, panel);
-
-        BOOL asciiMode = FALSE;
-        const wchar_t *name, *ext; // helper variables for auto-detect-transfer-mode
-        std::wstring basicNameStorage;
-        if (TransferMode == trmAutodetect)
-        {
-            if (dataIface == NULL || !dataIface->GetBasicName(file, &name, &ext, basicNameStorage))
-            {
-                name = file.Name;
-                ext = file.Ext;
-            }
-            int dummy;
-            if (Config.ASCIIFileMasks->PrepareMasks(dummy))
-                asciiMode = Config.ASCIIFileMasks->AgreeMasks(name, ext);
-            else
-            {
-                TRACE_E("Unexpected situation in CPluginFSInterface::ViewFile(): Config.ASCIIFileMasks->PrepareMasks() failed!");
-                asciiMode = FALSE; // the binary mode is still the lesser evil
-            }
-        }
-        else
-            asciiMode = TransferMode == trmASCII;
-
-        CQuadWord fileSizeInBytes;
-        BOOL sizeInBytes;
-        if (dataIface == NULL || !dataIface->GetSize(file, fileSizeInBytes, sizeInBytes) || !sizeInBytes)
-            fileSizeInBytes.Set(-1, -1); // the file size is unknown
-
-        ControlConnection->DownloadOneFile(parent, fileNameA, fileSizeInBytes, asciiMode, Path.c_str(),
-                                           tmpFileName, &newFileCreated, &newFileIncomplete, &newFileSize,
-                                           &TotalConnectAttemptNum, panel, notInPanel,
-                                            User);
+        CFtpFileDownloadPlan plan;
+        if (PrepareFileDownload(file, dataIface, plan))
+            DownloadFileCopy(parent, plan, tmpFileName, newFileCreated, newFileIncomplete, newFileSize);
     }
 
     // open the viewer
@@ -1030,7 +1136,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFSOwned(
                 FTPSecureWipe(newUserPartText);
                 return FALSE;
             }
-            if (!ControlConnection->EncodeText(tgtPathText.c_str(), tgtPath))
+            if (!FtpParseWirePath(ControlConnection->GetTextCodec(), tgtPathText, Config.ConvertHexEscSeq, tgtPath))
             {
                 FTPSecureWipe(newUserPartText);
                 return FALSE;

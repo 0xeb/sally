@@ -132,7 +132,7 @@ STRINGTABLE
   IDS_ERROR, "Eroare"
   IDS_NOTFOUND, "Fisier negasit"
   IDS_BADDLL, "Versiune incorecta a unrar.dll. Va rugam reinstalati plugin UnRAR."
-  IDS_SELECTFIRST, "Se pare ca aceasta este o arhiva multi-volum. Daca e asa, va rugam selectati primul volum din arhiva si apasati OK.\n\nDaca nu e arhiva multi-volum, apasati Anuleazal."
+  IDS_SELECTFIRST, "Selectați primul volum al arhivei pentru a continua. Apăsați Anulare pentru a opri operația."
   IDS_SELECTFIRSTTITLE, "Selectati Primul Volum"
   IDS_FILENOTFOUND "Fisier negasit in arhiva."
   IDS_LISTINFO_PAKEDSIZE      "Arhivat"

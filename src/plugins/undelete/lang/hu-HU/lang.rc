@@ -210,4 +210,5 @@ STRINGTABLE
   IDS_PARTIALRECOVER, "A következő fájlt nem lehet teljesen visszaállítani: %s\n\nSzeretné a fájl töredékét visszaállítani?"
   IDS_PARTIALRECOVER_DONTASK, "Választás megjegyzése"
   IDS_ERRORRECOVER, "Fájl visszaállítási hiba: %s"
+    IDS_SELECTVOLUME, "Válasszon kötetet vagy lemezképet."
 }

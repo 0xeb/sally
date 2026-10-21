@@ -1029,7 +1029,7 @@ BOOL CMainToolBar::FillTII(int tbbeIndex, TLBI_ITEM_INFO2* tii, BOOL fillName)
         TRACE_E("tbbeIndex = " << tbbeIndex);
         return FALSE;
     }
-    if (ToolBarButtons[tbbeIndex].ImageIndex == 0xFFFF)
+    if (tbbeIndex != -1 && ToolBarButtons[tbbeIndex].ImageIndex == 0xFFFF)
     {
         // old item that was removed in this version
         return FALSE;

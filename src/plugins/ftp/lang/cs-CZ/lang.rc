@@ -626,7 +626,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,169,88,50,14
     PUSHBUTTON      "Nápověda",IDHELP,231,88,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,312,1
-    CONTROL         "P&amatovat si volbu a nezobrazovat znovu tento dialog pro operaci se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,295,12
     LTEXT           "&Detaily:",IDC_STATIC_3,7,9,55,8
     EDITTEXT        IDE_SCRD_DETAILS,64,9,255,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -651,7 +651,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,235,88,50,14
     PUSHBUTTON      "Nápověda",IDHELP,290,88,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,340,1
-    CONTROL         "P&amatovat si volbu a nezobrazovat znovu tento dialog pro operaci se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,295,12
     LTEXT           "&Detaily:",IDC_STATIC_3,7,9,45,8
     EDITTEXT        IDE_SCRD_DETAILS,64,9,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -674,7 +674,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,168,101,50,14
     PUSHBUTTON      "Nápověda",IDHELP,230,101,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,311,1
-    CONTROL         "P&amatovat si volbu a nezobrazovat znovu tento dialog pro operaci se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,295,12
     LTEXT           "Popi&s chyby:",IDC_STATIC_3,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,311,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -698,7 +698,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,148,101,50,14
     PUSHBUTTON      "Nápověda",IDHELP,210,101,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,270,1
-    CONTROL         "&Nyní použít pro operace se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,155,12
     LTEXT           "Popi&s chyby:",IDC_STATIC_2,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,272,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -724,7 +724,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,235,101,50,14
     PUSHBUTTON      "Nápověda",IDHELP,290,101,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,340,1
-    CONTROL         "&Nyní použít pro operace se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,155,12
     LTEXT           "Popi&s chyby:",IDC_STATIC_2,7,9,66,8
     EDITTEXT        IDE_SCRD_DETAILS,5,19,343,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -747,7 +747,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,170,70,50,14
     PUSHBUTTON      "Nápověda",IDHELP,232,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,314,1
-    CONTROL         "P&amatovat si volbu a nezobrazovat znovu tento dialog pro operaci se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,295,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,9,53,8
     EDITTEXT        IDE_SCRD_SRCPATH,64,9,257,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -770,7 +770,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,254,70,55,14
     PUSHBUTTON      "Nápověda",IDHELP,314,70,55,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,369,1
-    CONTROL         "P&amatovat si volbu a nezobrazovat znovu tento dialog pro operaci se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,295,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,9,53,8
     EDITTEXT        IDE_SCRD_SRCPATH,64,9,313,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -793,7 +793,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,227,70,50,14
     PUSHBUTTON      "Nápověda",IDHELP,287,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,338,1
-    CONTROL         "P&amatovat si volbu a nezobrazovat znovu tento dialog pro operaci se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,295,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_3,7,9,53,8
     EDITTEXT        IDE_SCRD_SRCPATH,64,9,281,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -815,7 +815,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,164,70,50,14
     PUSHBUTTON      "Nápověda",IDHELP,226,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,304,1
-    CONTROL         "P&amatovat si volbu a nezobrazovat znovu tento dialog pro operaci se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,295,12
     LTEXT           "&Cesta:",IDC_STATIC_3,7,9,63,8
     EDITTEXT        IDE_SCRD_SRCPATH,71,9,240,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -871,7 +871,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,143,46,50,14
     PUSHBUTTON      "Nápověda",IDHELP,205,46,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,260,1
-    CONTROL         "&Nyní použít pro operace se stejnou chybou",IDC_SCRD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SCRD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,155,12
     LTEXT           "&Cesta:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SCRD_SRCPATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -888,7 +888,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,164,46,50,14
     PUSHBUTTON      "Nápověda",IDHELP,226,46,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,303,1
-    CONTROL         "P&amatovat si volbu a nezobrazovat znovu tento dialog pro operaci se stejnou chybou",IDC_SISE_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SISE_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,295,12
     LTEXT           "&Cesta:",IDC_STATIC_3,7,9,27,8
     EDITTEXT        IDE_SISE_PATH,37,9,272,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -905,7 +905,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,143,82,50,14
     PUSHBUTTON      "Nápověda",IDHELP,205,82,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,260,1
-    CONTROL         "&Nyní použít pro operace se stejnou chybou",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,155,12
     LTEXT           "&Cesta:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -924,7 +924,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,148,106,50,14
     PUSHBUTTON      "Nápověda",IDHELP,210,106,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,271,1
-    CONTROL         "&Nyní použít pro operace se stejnou chybou",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,155,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_2,7,9,53,8
     EDITTEXT        IDE_SSCD_SRCPATH,64,9,214,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -949,7 +949,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,235,106,50,14
     PUSHBUTTON      "Nápověda",IDHELP,290,106,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,340,1
-    CONTROL         "&Nyní použít pro operace se stejnou chybou",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,156,12
     LTEXT           "&Zdrojová cesta:",IDC_STATIC_2,7,9,53,8
     EDITTEXT        IDE_SSCD_SRCPATH,64,9,284,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -972,7 +972,7 @@ BEGIN
     PUSHBUTTON      "Storno",IDCANCEL,143,70,50,14
     PUSHBUTTON      "Nápověda",IDHELP,205,70,50,14
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,260,1
-    CONTROL         "&Nyní použít pro operace se stejnou chybou",IDC_SSCD_APPLYTOALL,
+    CONTROL         "&Tato operace (3 pokusy, 1 s)",IDC_SSCD_APPLYTOALL,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,155,12
     LTEXT           "&Cesta:",IDC_STATIC_2,7,9,24,8
     EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
@@ -1629,11 +1629,13 @@ STRINGTABLE
  IDS_OPERSTOPPED, "zastavený"
  IDS_FTPINACTIVE, "nečinné spojení"
 
+ IDS_FSLOGUNAVAILABLE, "Protokol tohoto spojení není k dispozici. Protokolování je zapnuté; nový protokol zahájíte opětovným připojením."
+ IDS_ITEMRETRYPOLICYHINT, "Zvolíte-li s touto volbou Opakovat, zapamatuje se pouze pro stejné chyby v této operaci. Opakovat provede nejvýše 3 automatické pokusy pro každou položku a chybu s odstupem jedné sekundy. Poté zvolte další akci; ruční opakování obnoví počet pokusů."
  IDS_FSHAVENOLOG, "Toto spojení s FTP serverem nemá žádný log. Spojení bylo nejspíš spuštěno s vypnutým protokolováním (podívejte se na FTP Konfiguraci - stránka Logy)."
 
  IDS_CLEARLOGQUESTION, "Opravdu chcete vyčistit log ""%s""?"
  IDS_REMOVELOGQUESTION, "Opravdu chcete odstranit log ""%s""?"
- IDS_REMOVEALLLOGSQUESTION, "Opravdu chcete odstranit všechny logy?"
+ IDS_REMOVEALLLOGSQUESTION, "Odstranit všechny protokoly, které již nepatří spojení ani pracovnímu vláknu? Používané protokoly zůstanou zachovány."
  IDS_TEXTCOPIEDTOCLIPBOARD, "Text byl úspěšně zkopírován do schránky."
  IDS_COPYTOCLIPBOARDERROR, "Nelze zkopírovat text do schránky."
  IDS_SAVELOGFILTER, "Log soubory (*.log)|*.log|Všechny soubory (*.*)|*.*|"
@@ -2370,4 +2372,5 @@ STRINGTABLE
  IDS_NEWNAME_CANNOTENCODE, "Nový název obsahuje znaky, které nelze vyjádřit v kódování textu tohoto spojení, a proto jej nelze použít jako název souboru na serveru.\n\nPoložka zůstala v chybovém stavu."
  IDS_DIRNAME_CANNOTENCODE, "Název adresáře obsahuje znaky, které nelze vyjádřit v kódování textu tohoto spojení, a proto adresář nelze na serveru vytvořit."
  IDS_RENAMENAME_CANNOTENCODE, "Nový název obsahuje znaky, které nelze vyjádřit v kódování textu tohoto spojení, a proto položku nelze na serveru přejmenovat."
+ IDS_LOGSIZEOUTOFRANGE, "Limit velikosti protokolu musí být od 1 do %u KB."
 }

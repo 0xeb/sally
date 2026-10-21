@@ -81,15 +81,13 @@ protected:
 // CNewArchiveDialog
 //
 
-#define PASSWORD_LEN 128
-
 class CExtOptionsDialog : public CCommonDialog
 {
 private:
     std::wstring Archive;
 
-    char Password[PASSWORD_LEN];
-    char ConfirmedPassword[PASSWORD_LEN];
+    std::wstring Password;
+    std::wstring ConfirmedPassword;
     BOOL NotAgain;
     BOOL Encrypt;
 
@@ -109,7 +107,8 @@ public:
     BOOL CreateChilds();
 
     BOOL IsPasswordDefined() { return Encrypt; }
-    char* GetPassword() { return Password; }
+    const std::wstring& GetPassword() const { return Password; }
+    void TakePassword(std::wstring& password) noexcept { password.swap(Password); }
     BOOL GetNotAgain() { return NotAgain; }
     void SetArchiveName(const wchar_t* archiveName) { Archive = archiveName != NULL ? archiveName : L""; }
     void SetTitle(const wchar_t* title) { Title = title != NULL ? title : L""; }
@@ -126,15 +125,14 @@ protected:
 class CEnterPasswordDialog : public CCommonDialog
 {
 private:
-    //    char FileName[MAX_PATH];
-    char Password[PASSWORD_LEN];
+    std::wstring Password;
 
 public:
     CEnterPasswordDialog(HWND hParent);
     virtual void Transfer(CTransferInfo& ti);
 
-    char* GetPassword() { return Password; }
-    //    void SetFileName(const char *fileName) { lstrcpy(FileName, fileName); }
+    const std::wstring& GetPassword() const { return Password; }
+    void TakePassword(std::wstring& password) noexcept { password.swap(Password); }
 
 protected:
     INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

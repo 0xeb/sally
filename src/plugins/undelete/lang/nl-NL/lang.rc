@@ -210,4 +210,5 @@ STRINGTABLE
   IDS_PARTIALRECOVER, "Het volgende bstand kon niet compleet hersteld worden: %s\n\nWilt u het bestand gedeeltelijk herstellen?"
   IDS_PARTIALRECOVER_DONTASK, "Kies de volgende keer hetzelfde antwoord"
   IDS_ERRORRECOVER, "Fout bij herstellen bestand %s"
+    IDS_SELECTVOLUME, "Selecteer een volume of kies een schijfkopie."
 }

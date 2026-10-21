@@ -303,17 +303,33 @@ static QWORD GetDirSize(const std::wstring& parentPath, const wchar_t* dirname,
     return total;
 }
 
+BOOL PrepareRestoreDirectory(const wchar_t* targetPath, HWND parent)
+{
+    if (targetPath == NULL || targetPath[0] == L'\0' ||
+        wcsspn(targetPath, L" \t\r\n") == wcslen(targetPath))
+    {
+        SalamanderGeneral->SalMessageBox(parent, String<wchar_t>::LangStr(IDS_PATHNOTFOUND).c_str(),
+                                         String<wchar_t>::LangStr(IDS_RESTORE).c_str(), MB_OK | MB_ICONEXCLAMATION);
+        return FALSE;
+    }
+    return SalamanderGeneral->CheckAndCreateDirectory(targetPath, parent, FALSE);
+}
+
 BOOL RestoreEncryptedFiles(const wchar_t* targetPath, HWND parent)
 {
     CALL_STACK_MESSAGE2("RestoreEncryptedFiles(%ls, )", targetPath);
+
+    if (!PrepareRestoreDirectory(targetPath, parent))
+        return FALSE;
 
     // check EFS support on target path
     std::wstring resolvedPath;
     UndeleteGetResolvedRootPath(targetPath, resolvedPath);
 
-    DWORD flags;
-    if (!GetVolumeInformationW(resolvedPath.c_str(), NULL, 0, NULL, NULL, &flags, NULL, 0) ||
-        !(flags & FILE_SUPPORTS_ENCRYPTION))
+    DWORD flags = 0;
+    if (!GetVolumeInformationW(resolvedPath.c_str(), NULL, 0, NULL, NULL, &flags, NULL, 0))
+        return String<wchar_t>::SysError(IDS_RESTORE, IDS_ERROROPENINGVOLUME);
+    if (!(flags & FILE_SUPPORTS_ENCRYPTION))
     {
         return String<wchar_t>::Error(IDS_RESTORE, IDS_NOEFS);
     }

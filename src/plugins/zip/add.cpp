@@ -948,16 +948,22 @@ int CZipPack::EnumFiles2(SalEnumSelection2 next, void* param)
     BOOL isDir;
     CQuadWord size;
     int errorID = 0;
-    int errorOccured;
+    int errorOccured = SALENUM_SUCCESS;
 
     while ((nextNameW = next(SalamanderGeneral->GetMsgBoxParent(), 3, NULL, &isDir, &size, NULL, NULL, param, &errorOccured)) != NULL)
     {
-        // CAddInfo is the mature byte engine's UTF-8 owner. Skip only a name that cannot be
-        // encoded or fit instead of aborting selections already collected.
-        if (!TryWideToZipText(nextNameW, nextName))
+        // Selection must be complete before any archive changes or source removal.
+        const auto conversion = Win32EncodeText(CP_UTF8, nextNameW, wcslen(nextNameW), nextName);
+        if (!conversion)
         {
-            TRACE_E("CZipPack::EnumFiles2(): skipping a selected file whose UTF-8 name is too long or invalid.");
-            continue;
+            if (conversion.Error == Win32TextConversionError::OutOfMemory)
+                errorID = IDS_LOWMEM;
+            else
+            {
+                ProcessError(IDS_ERRACCESS, conversion.Win32Error, nextNameW, PE_NORETRY | PE_NOSKIP, NULL);
+                errorID = IDS_NODISPLAY;
+            }
+            break;
         }
         newFile = new CAddInfo;
         if (!newFile)
@@ -2841,43 +2847,6 @@ int CZipPack::CheckArchiveForSFXCompatibility()
     return ErrorID;
 }
 
-int CZipPack::SaveComment()
-{
-    CALL_STACK_MESSAGE1("CZipPack::SaveComment()");
-    if (ZipAttr & FILE_ATTRIBUTE_READONLY)
-        return IDS_READONLY;
-    // open it for writing
-    CloseCFile(ZipFile);
-    ZipFile = NULL;
-    int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
-                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
-                          true, false);
-    if (ret)
-    {
-        if (ret == ERR_LOWMEM)
-            ErrorID = IDS_LOWMEM;
-        else
-            ErrorID = IDS_NODISPLAY;
-    }
-
-    EONewCentrDir.CommentLen = (__UINT16)strlen(Comment);
-    ZipFile->FilePointer = EOCentrDirOffs;
-    if (Write(ZipFile, &EONewCentrDir, sizeof(CEOCentrDirRecord), NULL))
-    {
-        return IDS_NODISPLAY;
-    }
-    if (Write(ZipFile, Comment, EONewCentrDir.CommentLen, NULL))
-    {
-        return IDS_NODISPLAY;
-    }
-    if (Flush(ZipFile, ZipFile->OutputBuffer, ZipFile->BufferPosition, NULL))
-    {
-        return IDS_NODISPLAY;
-    }
-    SetEndOfFile(ZipFile->File);
-    return 0;
-}
-
 int CZipPack::FindNewestFile()
 {
     CALL_STACK_MESSAGE1("CZipPack::FindNewestFile()");
@@ -2949,7 +2918,7 @@ int CZipPack::WriteSFXECRec(QWORD offset)
         ret = IDS_NODISPLAY;
     }
     CloseCFile(file);
-    return 0;
+    return ret;
 }
 
 int CZipPack::WriteSFXCentralDir()

@@ -214,6 +214,7 @@ public:
     // in 'canRetry' (if not NULL) it returns TRUE if the "Retry" button makes sense
     // CAUTION: call only from the queue critical section
     BOOL HasErrorToSolve(BOOL* canSkip, BOOL* canRetry);
+    static BOOL GetErrorActions(CFTPQueueItemState state, DWORD problemID, BOOL* canSkip, BOOL* canRetry);
 
     // returns a dynamically owned semantic description of ProblemID + WinError + ErrAllocDescr;
     // local diagnostic bytes and negotiated server-reply bytes cross distinct adapters
@@ -509,6 +510,8 @@ public:
 // CFTPQueue
 //
 
+#include "ftp_retry_policy.h"
+
 class CFTPQueue
 {
 protected:
@@ -518,6 +521,10 @@ protected:
 
     TIndirectArray<CFTPQueueItem> Items; // queue items
     CFtpTextCodec TextCodec;             // decodes remote identity only for Unicode presentation
+    CFtpRetryPolicy RetryPolicy;
+    CFtpRetryClock RetryClock;
+    DWORD RetryNow() const { return RetryClock != NULL ? RetryClock() : GetTickCount(); }
+    CFTPQueueItemState PrepareRetryItemLocked(CFTPQueueItem* item, CFTPOperation* oper, BOOL resetBudget);
 
     // single-entry cache for speeding up FindItemWithUID() - beware: it may not be valid:
     int LastFoundUID;   // UID of the last found item
@@ -543,7 +550,7 @@ protected:
     DWORD LastFoundErrorOccurenceTime; // "time" of the last found item with an error or the "time" before which no item with an error exists anymore
 
 public:
-    explicit CFTPQueue(const CFtpTextCodec& textCodec);
+    explicit CFTPQueue(const CFtpTextCodec& textCodec, CFtpRetryClock retryClock = NULL);
     ~CFTPQueue();
 
     // Decode remote protocol identity only when presenting it to the user.
@@ -636,6 +643,8 @@ public:
     // sets the state of the item 'item'; 'errAllocDescr' is NULL or an allocated error description
     // (the caller passes a buffer allocated by malloc, after calling this method
     // the buffer is no longer valid for the caller)
+    DWORD GetRememberedRetryDelay(int UID);
+    void SuspendRememberedRetry(CFTPQueueItem* item, CFTPOperation* oper);
     void UpdateItemState(CFTPQueueItem* item, CFTPQueueItemState state, DWORD problemID,
                          DWORD winError, char* errAllocDescr, CFTPOperation* oper);
 
@@ -1256,6 +1265,8 @@ enum CUploadType
 #define WORKER_DELAYEDAUTORETRYTIMID 36 // timer ID for delaying auto-retry (e.g. Quick&Easy FTPD returns 426 for RETR and immediately 220 - if you retry immediately, responses shift (220 is taken as the response to the next command instead of this command and everything goes wrong))
 #define WORKER_LISTENTIMEOUTTIMID 37    // timer ID ensuring timeout detection when opening the "listen" port on the proxy server (when opening an active data connection)
 
+#define WORKER_ITEMRETRYTIMERID 38 // cancellable remembered item retry; distinct from protocol resynchronization
+
 #define WORKER_STATUSUPDATETIMEOUT 1000     // time in milliseconds after which the status in the worker (and the worker progress and overall progress in the operation dialog) is updated - NOTE: linked to OPERDLG_STATUSMINIDLETIME
 #define WORKER_DELAYEDAUTORETRYTIMEOUT 5000 // time in milliseconds after which auto-retry is performed (see WORKER_DELAYEDAUTORETRYTIMID)
 
@@ -1310,6 +1321,7 @@ protected:
     BOOL ShouldStop;     // TRUE as soon as the worker is expected to finish (after calling InformAboutStop())
     BOOL SocketClosed;   // TRUE/FALSE: the worker "control connection" socket is closed/open
     BOOL ShouldBePaused; // TRUE if the user wants to pause this worker (after calling InformAboutPause(TRUE))
+    BOOL ItemRetryTimerArmed;
 
     CFTPWorkerCmdState CommandState; // worker state related to sending commands (see CFTPWorkerCmdState)
     BOOL CommandTransfersData;       // TRUE = the sent command is used to transfer data (timeout is adjusted based on data-connection activity - WorkerDataCon+WorkerUploadDataCon)

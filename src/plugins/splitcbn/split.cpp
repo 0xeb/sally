@@ -12,6 +12,8 @@
 #include "split.h"
 #include "dialogs.h"
 #include "splitcbn_text.h"
+#include "split_plan.h"
+#include "split_part_controller.h"
 
 // *****************************************************************************
 //
@@ -91,10 +93,27 @@ static BOOL EnsureDiskInsertedEtc(const wchar_t* targetDir, CQuadWord& qwPartSiz
     return TRUE;
 }
 
-static BOOL SplitFile(const wchar_t* fileName, const wchar_t* targetDir, CQuadWord& qwPartSize,
+static CQuadWord SplitQuad(uint64_t value)
+{
+    CQuadWord result;
+    result.Value = value;
+    return result;
+}
+
+static BOOL SplitSystemError(DWORD error)
+{
+    SalamanderGeneral->ShowMessageBox(SPLGetErrorTextOwned(SalamanderGeneral, error).c_str(), LangStr(IDS_SPLIT).c_str(), MSGBOX_ERROR);
+    SetLastError(error);
+    return FALSE;
+}
+
+static BOOL SplitFile(const wchar_t* fileName, const wchar_t* targetDir, CQuadWord& qwPartSize, unsigned requestedParts,
                       HWND parent, CSalamanderForOperationsAbstract* salamander)
 {
     CALL_STACK_MESSAGE4("SplitFile(%ls, %ls, %I64u, , )", fileName, targetDir, qwPartSize.Value);
+
+    if (requestedParts == 0 && qwPartSize != SIZE_AUTODETECT && qwPartSize.Value == 0)
+        return SplitSystemError(ERROR_INVALID_PARAMETER);
 
     // create the target path
     DWORD silent = 0;
@@ -110,13 +129,34 @@ static BOOL SplitFile(const wchar_t* fileName, const wchar_t* targetDir, CQuadWo
     {
         return FALSE;
     }
-    // obtain the file size
+    struct InputOwner
+    {
+        SAFE_FILE& File;
+        bool Open = true;
+        void Close()
+        {
+            if (Open)
+            {
+                Open = false;
+                SalamanderSafeFile->SafeFileClose(&File);
+            }
+        }
+        ~InputOwner() { Close(); }
+    } inputOwner{file};
     CQuadWord bytesRemaining;
-    bytesRemaining.LoDWord = GetFileSize(file.HFile, &bytesRemaining.HiDWord);
-
-    // obtain the file timestamp
-    FILETIME ft;
-    GetFileTime(file.HFile, NULL, NULL, &ft);
+    DWORD sizeError = ERROR_SUCCESS;
+    if (!SalamanderGeneral->SalGetFileSize(file.HFile, bytesRemaining, sizeError))
+        return SplitSystemError(sizeError != ERROR_SUCCESS ? sizeError : ERROR_READ_FAULT);
+    const sally::split::Plan plan{requestedParts != 0             ? sally::split::Mode::Count
+                                  : qwPartSize == SIZE_AUTODETECT ? sally::split::Mode::Automatic
+                                                                  : sally::split::Mode::Size,
+                                  bytesRemaining.Value, qwPartSize.Value, requestedParts};
+    if (!plan.Valid())
+        return SplitSystemError(ERROR_INVALID_PARAMETER);
+    FILETIME ft{};
+    SYSTEMTIME st{};
+    if (configCreateBatchFile && (!GetFileTime(file.HFile, NULL, NULL, &ft) || !FileTimeToSystemTime(&ft, &st)))
+        return SplitSystemError(GetLastError());
 
     // obtain the base name of the files
     std::wstring name = SalamanderGeneral->SalPathFindFileName(fileName);
@@ -132,7 +172,7 @@ static BOOL SplitFile(const wchar_t* fileName, const wchar_t* targetDir, CQuadWo
     BOOL abort = FALSE;
 
     // check whether the user selected Autodetect on a fixed drive
-    if (driveType != DRIVE_REMOVABLE && qwPartSize == SIZE_AUTODETECT)
+    if (driveType != DRIVE_REMOVABLE && plan.Kind == sally::split::Mode::Automatic)
     {
         if (SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_FIXEDNOSENSE).c_str(),
                                              LangStr(IDS_SPLIT).c_str(), MB_YESNO | MB_ICONQUESTION) == IDNO)
@@ -140,7 +180,7 @@ static BOOL SplitFile(const wchar_t* fileName, const wchar_t* targetDir, CQuadWo
     }
 
     // check for more than 100 parts
-    if (!qwPartSize.Value || (bytesRemaining - CQuadWord(1, 0)) / qwPartSize + CQuadWord(1, 0) > CQuadWord(100, 0))
+    if (plan.PartCount() > 100)
     {
         if (SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_TOOMANYPARTS).c_str(),
                                              LangStr(IDS_SPLIT).c_str(), MB_YESNO | MB_ICONQUESTION) == IDNO)
@@ -154,126 +194,133 @@ static BOOL SplitFile(const wchar_t* fileName, const wchar_t* targetDir, CQuadWo
 
     if (abort)
     {
-        SalamanderSafeFile->SafeFileClose(&file);
+        inputOwner.Close();
         return TRUE;
     }
 
-    // allocate the buffer
-    DWORD dwBufSize = (driveType == DRIVE_REMOVABLE) ? BUFSIZE1 : BUFSIZE2;
-    char* pBuffer = new char[dwBufSize];
-    if (pBuffer == NULL)
-    {
-        SalamanderGeneral->ShowMessageBox(LangStr(IDS_OUTOFMEM).c_str(), LangStr(IDS_SPLIT).c_str(), MSGBOX_ERROR);
-        SalamanderSafeFile->SafeFileClose(&file);
-        return FALSE;
-    }
-
-    // init CRC
+    const DWORD dwBufSize = (driveType == DRIVE_REMOVABLE) ? BUFSIZE1 : BUFSIZE2;
     UINT32 Crc = 0;
-
-    // progress dialog
     salamander->OpenProgressDialog(LangStr(IDS_SPLIT).c_str(), TRUE, NULL, FALSE);
     salamander->ProgressSetTotalSize(CQuadWord(-1, -1), bytesRemaining);
-    BOOL delayed = (driveType != DRIVE_REMOVABLE); // splitting to floppies allegedly failed to repaint the dialog fast enough
-    salamander->ProgressSetSize(CQuadWord(-1, -1), CQuadWord(0, 0), delayed);
-    CQuadWord totalProgress = CQuadWord(0, 0), fileProgress;
-
-    // from now on the progress dialog is the parent
+    const BOOL delayed = driveType != DRIVE_REMOVABLE;
     parent = SalamanderGeneral->GetMsgBoxParent();
-
-    BOOL ret = TRUE;
-    int partNum = 1;
     std::wstring name2;
     CQuadWord thisPartSize;
     CQuadWord freeSpace;
 
-    while (bytesRemaining.Value)
+    class NativePartIo final : public sally::split::IPartIo
     {
-        if (!EnsureDiskInsertedEtc(targetDir, qwPartSize, &freeSpace, driveType, bytesRemaining, &thisPartSize, parent))
+        SAFE_FILE& Input;
+        SAFE_FILE Output{};
+        bool OutputOpen = false;
+        const wchar_t* Target;
+        const std::wstring& Name;
+        DWORD& Silent;
+        BOOL& Skipped;
+        CQuadWord& FreeSpace;
+        UINT32& Crc;
+        UINT DriveType;
+        HWND Parent;
+        CSalamanderForOperationsAbstract* Operations;
+        BOOL Delayed;
+        uint64_t CurrentBytes = 0;
+        std::wstring OutputPath;
+
+    public:
+        NativePartIo(SAFE_FILE& input, const wchar_t* target, const std::wstring& name, DWORD& silent, BOOL& skipped,
+                     CQuadWord& freeSpace, UINT32& crc, UINT driveType, HWND parent,
+                     CSalamanderForOperationsAbstract* operations, BOOL delayed)
+            : Input(input), Target(target), Name(name), Silent(silent), Skipped(skipped), FreeSpace(freeSpace),
+              Crc(crc), DriveType(driveType), Parent(parent), Operations(operations), Delayed(delayed) {}
+        ~NativePartIo() override
         {
-            ret = FALSE;
-            break;
+            if (OutputOpen)
+                ClosePart(false);
         }
-
-        // create the name of the target file
-        name2 = SPLFormatStringOwned(L"%s.%#03ld", name.c_str(), partNum++);
-        text = targetDir;
-        SPLSalPathAppendOwned(text, name2.c_str());
-
-        // create the file
-        const std::wstring info = GetInfo(thisPartSize);
-        SAFE_FILE outfile;
-        if (SalamanderSafeFile->SafeFileCreate(text.c_str(), GENERIC_WRITE, FILE_SHARE_READ, FILE_ATTRIBUTE_NORMAL,
-                                               FALSE, parent, name2.c_str(), info.c_str(), &silent, TRUE, &bSkip, NULL, 0, NULL, &outfile) == INVALID_HANDLE_VALUE &&
-            !bSkip)
+        bool Progress(uint64_t partDone, uint64_t totalDone) override
         {
-            ret = FALSE;
-            break;
+            return Operations->ProgressSetSize(SplitQuad(partDone), SplitQuad(totalDone), Delayed) != FALSE;
         }
-
-        // finally: copy thisPartSize bytes of the input file to the output file
-        salamander->ProgressSetTotalSize(thisPartSize, CQuadWord(-1, -1));
-        salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), delayed);
-        fileProgress = CQuadWord(0, 0);
-        if (!bSkip)
+        bool Prepare(uint64_t remaining, uint64_t wanted, bool automatic, uint64_t& actual) override
         {
-            const std::wstring text2 = SPLFormatStringOwned(
-                L"%s %s...", LangStr(IDS_WRITING).c_str(), name2.c_str());
-            salamander->ProgressDialogAddText(text2.c_str(), delayed);
-
-            CQuadWord numBytes = thisPartSize;
-            while (numBytes.Value)
-            {
-                DWORD toread = (numBytes > CQuadWord(dwBufSize, 0)) ? dwBufSize : numBytes.LoDWord;
-                DWORD numread, numwr;
-                if (!SalamanderSafeFile->SafeFileRead(&file, pBuffer, toread, &numread, parent, BUTTONS_RETRYCANCEL, NULL, NULL) ||
-                    !SalamanderSafeFile->SafeFileWrite(&outfile, pBuffer, numread, &numwr, parent, BUTTONS_RETRYCANCEL, NULL, NULL))
-                {
-                    ret = FALSE;
-                    break;
-                }
-                Crc = SalamanderGeneral->UpdateCrc32(pBuffer, numread, Crc);
-                CQuadWord qwnr(numread, 0);
-                numBytes -= qwnr;
-                fileProgress += qwnr;
-                if (!salamander->ProgressSetSize(fileProgress, totalProgress + fileProgress, delayed))
-                {
-                    ret = FALSE;
-                    break;
-                }
-            }
-            SalamanderSafeFile->SafeFileClose(&outfile);
-            if (ret == FALSE)
-            {
-                DeleteFileW(text.c_str());
-                break;
-            }
+            CQuadWord requested = automatic ? SIZE_AUTODETECT : SplitQuad(wanted);
+            CQuadWord left = SplitQuad(remaining);
+            CQuadWord part;
+            if (!EnsureDiskInsertedEtc(Target, requested, &FreeSpace, DriveType, left, &part, Parent))
+                return false;
+            actual = part.Value;
+            CurrentBytes = actual;
+            return true;
         }
-        else
+        void SetPartTotal(uint64_t bytes) override { Operations->ProgressSetTotalSize(SplitQuad(bytes), CQuadWord(-1, -1)); }
+        sally::split::PartDisposition OpenPart(unsigned ordinal, uint64_t bytes) override
         {
-            CQuadWord distance = thisPartSize; // 'thisPartSize' must not change (use 'distance' instead)
-            SalamanderSafeFile->SafeFileSeekMsg(&file, &distance, FILE_CURRENT, parent,
-                                                BUTTONS_RETRYCANCEL, NULL, NULL, TRUE);
+            const std::wstring partName = SPLFormatStringOwned(L"%s.%#03u", Name.c_str(), ordinal);
+            OutputPath = Target;
+            SPLSalPathAppendOwned(OutputPath, partName.c_str());
+            const std::wstring info = GetInfo(SplitQuad(bytes));
+            const std::wstring status = SPLFormatStringOwned(L"%s %s...", LangStr(IDS_WRITING).c_str(), partName.c_str());
+            Skipped = FALSE;
+            const HANDLE handle = SalamanderSafeFile->SafeFileCreate(OutputPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
+                                                                     FILE_ATTRIBUTE_NORMAL, FALSE, Parent, partName.c_str(), info.c_str(), &Silent, TRUE, &Skipped, NULL, 0, NULL, &Output);
+            if (handle == INVALID_HANDLE_VALUE)
+                return Skipped ? sally::split::PartDisposition::Skipped : sally::split::PartDisposition::Cancelled;
+            OutputOpen = true;
+            Operations->ProgressDialogAddText(status.c_str(), Delayed);
+            return sally::split::PartDisposition::Open;
         }
-
-        bytesRemaining -= thisPartSize;
-        totalProgress += thisPartSize;
-
-        // notify about inserting the next disk
-        if (bytesRemaining.Value && driveType == DRIVE_REMOVABLE &&
-            (qwPartSize == SIZE_AUTODETECT || freeSpace - qwPartSize < qwPartSize))
+        bool Read(BYTE* buffer, size_t requested, size_t& actual) override
         {
-            if (SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_INSERTNEXT).c_str(),
-                                                 LangStr(IDS_SPLIT).c_str(), MB_OKCANCEL | MB_ICONINFORMATION) == IDCANCEL)
-            {
-                ret = FALSE;
-                break;
-            }
+            DWORD count = 0;
+            const BOOL result = SalamanderSafeFile->SafeFileRead(&Input, buffer, static_cast<DWORD>(requested), &count,
+                                                                 Parent, BUTTONS_RETRYCANCEL, NULL, NULL);
+            actual = count;
+            return result != FALSE;
         }
-    }
+        bool Write(const BYTE* buffer, size_t requested, size_t& actual) override
+        {
+            DWORD count = 0;
+            // Frozen SDK declares the write input as LPVOID; the adapter does not modify it.
+            const BOOL result = SalamanderSafeFile->SafeFileWrite(&Output, const_cast<BYTE*>(buffer), static_cast<DWORD>(requested), &count,
+                                                                  Parent, BUTTONS_RETRYCANCEL, NULL, NULL);
+            actual = count;
+            return result != FALSE;
+        }
+        bool Skip(uint64_t bytes) override
+        {
+            CQuadWord distance = SplitQuad(bytes);
+            return SalamanderSafeFile->SafeFileSeekMsg(&Input, &distance, FILE_CURRENT, Parent,
+                                                       BUTTONS_RETRYCANCEL, NULL, NULL, TRUE) != FALSE;
+        }
+        void Checksum(const BYTE* buffer, size_t size) override
+        {
+            Crc = SalamanderGeneral->UpdateCrc32(buffer, static_cast<DWORD>(size), Crc);
+        }
+        void ClosePart(bool keep) override
+        {
+            if (!OutputOpen)
+                return;
+            OutputOpen = false;
+            SalamanderSafeFile->SafeFileClose(&Output);
+            if (!keep)
+                DeleteFileW(OutputPath.c_str());
+        }
+        bool AfterPart(uint64_t remaining, uint64_t nextWanted, bool automatic) override
+        {
+            if (remaining != 0 && DriveType == DRIVE_REMOVABLE &&
+                (automatic || (FreeSpace.Value >= CurrentBytes && FreeSpace.Value - CurrentBytes < nextWanted)))
+                return SalamanderGeneral->SalMessageBox(Parent, LangStr(IDS_INSERTNEXT).c_str(), LangStr(IDS_SPLIT).c_str(),
+                                                        MB_OKCANCEL | MB_ICONINFORMATION) != IDCANCEL;
+            return true;
+        }
+        void Error(DWORD error) override { SplitSystemError(error); }
+    } io(file, targetDir, name, silent, bSkip, freeSpace, Crc, driveType, parent, salamander, delayed);
 
-    delete[] pBuffer;
-    SalamanderSafeFile->SafeFileClose(&file);
+    const auto parts = sally::split::RunParts(plan, dwBufSize, configCreateBatchFile != FALSE, io);
+    BOOL ret = parts.Success;
+    const int partNum = static_cast<int>(parts.Parts) + 1;
+    bytesRemaining = SplitQuad(plan.Total - parts.Bytes);
+    inputOwner.Close();
 
     // create the batch file
 
@@ -301,13 +348,11 @@ static BOOL SplitFile(const wchar_t* fileName, const wchar_t* targetDir, CQuadWo
             !EscapeSplitBatchEchoText(origName, escapedOriginalName))
         {
             SalamanderGeneral->ShowMessageBox(LangStr(IDS_BATTOOLONG).c_str(),
-                                               LangStr(IDS_SPLIT).c_str(), MSGBOX_ERROR);
+                                              LangStr(IDS_SPLIT).c_str(), MSGBOX_ERROR);
             salamander->CloseProgressDialog();
             SalamanderGeneral->PostChangeOnPathNotification(targetDir, FALSE);
             return FALSE;
         }
-        SYSTEMTIME st;
-        FileTimeToSystemTime(&ft, &st);
         const std::string description = sally::bytes::Format(
             descriptionFormat.c_str(),
             escapedOriginalName.c_str());
@@ -414,7 +459,6 @@ static BOOL SplitFile(const wchar_t* fileName, const wchar_t* targetDir, CQuadWo
                     }
                 }
         }
-
     }
 
     salamander->CloseProgressDialog();
@@ -471,7 +515,8 @@ BOOL SplitCommand(HWND parent, CSalamanderForOperationsAbstract* salamander)
 
     // split dialog
     CQuadWord qwPartialSize;
-    if (!SplitDialog(pfd->Name, qwFileSize, targetdir, &qwPartialSize, parent))
+    unsigned requestedParts = 0;
+    if (!SplitDialog(pfd->Name, qwFileSize, targetdir, &qwPartialSize, &requestedParts, parent))
         return FALSE;
 
     // validation
@@ -482,5 +527,5 @@ BOOL SplitCommand(HWND parent, CSalamanderForOperationsAbstract* salamander)
         return FALSE;
 
     // split the file
-    return SplitFile(path.c_str(), targetdir.c_str(), qwPartialSize, parent, salamander);
+    return SplitFile(path.c_str(), targetdir.c_str(), qwPartialSize, requestedParts, parent, salamander);
 }

@@ -9,24 +9,36 @@
 #include "ui/IPrompter.h"
 #include "common/IRegistry.h"
 #include "common/reg_sz_safe_length.h"
+#include "common/configuration/RegistryWriteMonitor.h"
 
 CRegistryWorkerThread RegistryWorkerThread;
+
+namespace
+{
+thread_local RegistryResult LastRegistryWrite = RegistryResult::Ok();
+
+BOOL CompleteRegistryWrite(RegistryResult result, bool allowAbsent = false)
+{
+    LastRegistryWrite = result;
+    return sally::configuration::RegistryWriteMonitor::Record(result, allowAbsent);
+}
+}
 
 // ****************************************************************************
 
 BOOL ClearKeyAux(HKEY key)
 {
     std::vector<std::wstring> subKeys;
-    if (!gRegistry->EnumSubKeys(key, subKeys).success)
+    if (!CompleteRegistryWrite(gRegistry->EnumSubKeys(key, subKeys)))
         return FALSE;
     for (const std::wstring& name : subKeys)
     {
         HKEY subKey = NULL;
-        if (gRegistry->OpenKeyReadWrite(key, name.c_str(), subKey).success)
+        if (CompleteRegistryWrite(gRegistry->OpenKeyReadWrite(key, name.c_str(), subKey)))
         {
             BOOL ret = ClearKeyAux(subKey);
             gRegistry->CloseKey(subKey);
-            if (!ret || !gRegistry->DeleteKey(key, name.c_str()).success)
+            if (!ret || !CompleteRegistryWrite(gRegistry->DeleteKey(key, name.c_str())))
                 return FALSE;
         }
         else
@@ -34,10 +46,10 @@ BOOL ClearKeyAux(HKEY key)
     }
 
     std::vector<std::wstring> values;
-    if (!gRegistry->EnumValues(key, values).success)
+    if (!CompleteRegistryWrite(gRegistry->EnumValues(key, values)))
         return FALSE;
     for (const std::wstring& name : values)
-        if (!gRegistry->DeleteValue(key, name.c_str()).success)
+        if (!CompleteRegistryWrite(gRegistry->DeleteValue(key, name.c_str())))
         {
             TRACE_E("Unable to delete values in specified key (in registry).");
             return FALSE;
@@ -51,6 +63,7 @@ BOOL ClearKeyAux(HKEY key)
 BOOL CreateKeyAux(HWND parent, HKEY hKey, const wchar_t* name, HKEY& createdKey, BOOL quiet)
 {
     RegistryResult result = gRegistry->CreateKey(hKey, name, createdKey);
+    CompleteRegistryWrite(result);
     if (result.success)
         return TRUE;
     else
@@ -110,7 +123,7 @@ void CloseKeyAux(HKEY hKey)
 
 BOOL DeleteKeyAux(HKEY hKey, const wchar_t* name)
 {
-    return gRegistry->DeleteKey(hKey, name).success;
+    return CompleteRegistryWrite(gRegistry->DeleteKey(hKey, name), true);
 }
 
 // ****************************************************************************
@@ -241,11 +254,12 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const wchar_t* name, DWORD type,
             TRACE_EW(L"SetValueAux: REG_SZ value '" << name << L"' has no wide NUL "
                      L"terminator within the safe scan bound - refusing to write (narrow data "
                      L"passed where a wide string was required?)");
-            return FALSE;
+            return CompleteRegistryWrite(RegistryResult::Error(ERROR_INVALID_DATA));
         }
         dataSize = (DWORD)((len + 1) * sizeof(wchar_t));
     }
     RegistryResult result = gRegistry->WriteValue(hKey, name, static_cast<RegValueType>(type), data, dataSize);
+    CompleteRegistryWrite(result);
     if (result.success)
         return TRUE;
     else
@@ -270,7 +284,7 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const wchar_t* name, DWORD type,
 
 BOOL DeleteValueAux(HKEY hKey, const wchar_t* name)
 {
-    return gRegistry->DeleteValue(hKey, name).success;
+    return CompleteRegistryWrite(gRegistry->DeleteValue(hKey, name), true);
 }
 
 // ****************************************************************************
@@ -330,6 +344,8 @@ CRegistryWorkerThread::CRegistryWorkerThread()
 
     WorkType = rwtNone;
     LastWorkSuccess = FALSE;
+    LastWriteError = ERROR_SUCCESS;
+    QuietWrites = FALSE;
     Key = NULL;
     Name = NULL;
     OpenedKey = NULL;
@@ -468,7 +484,8 @@ BOOL CRegistryWorkerThread::ClearKey(HKEY key)
         Key = key;
 
         WaitForWorkDoneWithMessageLoop();
-        return LastWorkSuccess;
+        return sally::configuration::RegistryWriteMonitor::Record(
+            {LastWorkSuccess != FALSE, LastWriteError});
     }
     else
         return ClearKeyAux(key);
@@ -480,6 +497,7 @@ BOOL CRegistryWorkerThread::CreateKey(HKEY key, const wchar_t* name, HKEY& creat
     if (i.CanUseThread(this))
     {
         WorkType = rwtCreateKey;
+        QuietWrites = sally::configuration::RegistryWriteMonitor::SuppressesWriteErrors();
         LastWorkSuccess = FALSE;
         Key = key;
         Name = name;
@@ -487,10 +505,12 @@ BOOL CRegistryWorkerThread::CreateKey(HKEY key, const wchar_t* name, HKEY& creat
 
         WaitForWorkDoneWithMessageLoop();
         createdKey = OpenedKey;
-        return LastWorkSuccess;
+        return sally::configuration::RegistryWriteMonitor::Record(
+            {LastWorkSuccess != FALSE, LastWriteError});
     }
     else
-        return CreateKeyAux(MainWindow != NULL ? MainWindow->HWindow : NULL, key, name, createdKey, FALSE);
+        return CreateKeyAux(MainWindow != NULL ? MainWindow->HWindow : NULL, key, name, createdKey,
+                            sally::configuration::RegistryWriteMonitor::SuppressesWriteErrors());
 }
 
 BOOL CRegistryWorkerThread::OpenKey(HKEY key, const wchar_t* name, HKEY& openedKey)
@@ -540,7 +560,8 @@ BOOL CRegistryWorkerThread::DeleteKey(HKEY key, const wchar_t* name)
         Name = name;
 
         WaitForWorkDoneWithMessageLoop();
-        return LastWorkSuccess;
+        return sally::configuration::RegistryWriteMonitor::Record(
+            {LastWorkSuccess != FALSE, LastWriteError}, true);
     }
     else
         return DeleteKeyAux(key, name);
@@ -600,6 +621,7 @@ BOOL CRegistryWorkerThread::SetValue(HKEY key, const wchar_t* name, DWORD type, 
     if (i.CanUseThread(this))
     {
         WorkType = rwtSetValue;
+        QuietWrites = sally::configuration::RegistryWriteMonitor::SuppressesWriteErrors();
         LastWorkSuccess = FALSE;
         Key = key;
         Name = name;
@@ -608,10 +630,12 @@ BOOL CRegistryWorkerThread::SetValue(HKEY key, const wchar_t* name, DWORD type, 
         DataSize = dataSize;
 
         WaitForWorkDoneWithMessageLoop();
-        return LastWorkSuccess;
+        return sally::configuration::RegistryWriteMonitor::Record(
+            {LastWorkSuccess != FALSE, LastWriteError});
     }
     else
-        return SetValueAux(MainWindow != NULL ? MainWindow->HWindow : NULL, key, name, type, data, dataSize, FALSE);
+        return SetValueAux(MainWindow != NULL ? MainWindow->HWindow : NULL, key, name, type, data, dataSize,
+                           sally::configuration::RegistryWriteMonitor::SuppressesWriteErrors());
 }
 
 BOOL CRegistryWorkerThread::DeleteValue(HKEY key, const wchar_t* name)
@@ -625,7 +649,8 @@ BOOL CRegistryWorkerThread::DeleteValue(HKEY key, const wchar_t* name)
         Name = name;
 
         WaitForWorkDoneWithMessageLoop();
-        return LastWorkSuccess;
+        return sally::configuration::RegistryWriteMonitor::Record(
+            {LastWorkSuccess != FALSE, LastWriteError}, true);
     }
     else
         return DeleteValueAux(key, name);
@@ -667,6 +692,7 @@ CRegistryWorkerThread::Body()
         case WAIT_OBJECT_0 + 0: // WorkReady
         {
             loops++;
+            LastRegistryWrite = RegistryResult::Ok();
             switch (WorkType)
             {
             case rwtStopWorker:
@@ -682,7 +708,7 @@ CRegistryWorkerThread::Body()
                 LastWorkSuccess = ClearKeyAux(Key);
                 break;
             case rwtCreateKey:
-                LastWorkSuccess = CreateKeyAux(NULL, Key, Name, OpenedKey, FALSE);
+                LastWorkSuccess = CreateKeyAux(NULL, Key, Name, OpenedKey, QuietWrites);
                 break;
             case rwtOpenKey:
                 LastWorkSuccess = OpenKeyAux(NULL, Key, Name, OpenedKey, FALSE);
@@ -700,7 +726,7 @@ CRegistryWorkerThread::Body()
                 LastWorkSuccess = GetValue2Aux(NULL, Key, Name, ValueType, ValueType2, ReturnedValueType, Buffer, BufferSize);
                 break;
             case rwtSetValue:
-                LastWorkSuccess = SetValueAux(NULL, Key, Name, ValueType, Data, DataSize, FALSE);
+                LastWorkSuccess = SetValueAux(NULL, Key, Name, ValueType, Data, DataSize, QuietWrites);
                 break;
             case rwtDeleteValue:
                 LastWorkSuccess = DeleteValueAux(Key, Name);
@@ -709,6 +735,7 @@ CRegistryWorkerThread::Body()
                 LastWorkSuccess = GetSizeAux(NULL, Key, Name, ValueType, BufferSize);
                 break;
             }
+            LastWriteError = LastRegistryWrite.errorCode;
             WorkType = rwtNone;
             SetEvent(WorkDone);
             break;

@@ -6,6 +6,7 @@
 
 #include "names.h"
 #include "dlldefs.h"
+#include "tar_sparse.h"
 
 // possible return codes
 #define TAR_OK 0
@@ -255,7 +256,7 @@ struct SCommonHeader
     CQuadWord Checksum;
     BOOL IsDir;
     EArchiveFormat Format;
-    BOOL IsExtendedTar;
+    CTarSparseMap Sparse;
     BOOL Finished;
     BOOL Ignored;
     // temporary fields that will be converted to persistent ones

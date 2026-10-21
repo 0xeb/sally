@@ -91,6 +91,7 @@ struct CStartProgressDialogData
     CConvertData* ConvertData;
     CProgressDlgArrItem* NewDlg;
     BOOL OperationWasStarted;
+    DWORD StartupError;
     HANDLE ContEvent;
     RECT MainWndRectClipR; // coordinates used to center the parentless progress dialog (background operations)
     RECT MainWndRectByR;   // coordinates used to center the parentless progress dialog (background operations)
@@ -258,6 +259,8 @@ struct COperation
     FILETIME DirTime = {};               // ocCopyDirTime: directory lastWrite to restore
     CQuadWord SkippedDirSize = CQuadWord(0, 0); // ocLabelForSkipOfCreateDir: total file bytes in the skipped dir
     bool DeleteDirToRecycleBin = false;  // ocDeleteDir: never set today (vestige of the legacy TargetName==-1 marker)
+    int CopyRangeBegin = -1;             // paired source-directory removal: require this transfer subtree to complete
+    bool CopyCompleted = false;          // transfer/removal result, reset before each worker run
 
     // With only std::wstring members the special member functions
     // are all defaulted - move-only is retained to keep accidental copies out
@@ -329,6 +332,65 @@ public:
     COperation& At(int index) { return m_ops[index]; }
     const COperation& At(int index) const { return m_ops[index]; }
 
+    void ResetCopyCompletion()
+    {
+        for (auto& operation : m_ops)
+            operation.CopyCompleted = false;
+    }
+
+private:
+    bool CanRemoveCompletedDirectoryRange(int index, COperationCode removalCode, bool copiedLink) const
+    {
+        if (index < 0 || index >= Count)
+            return false;
+        const auto& removal = At(index);
+        if (removal.Opcode != removalCode)
+            return false;
+        const int begin = removal.CopyRangeBegin;
+        if (begin == -1)
+            return true; // an independent deletion, without a paired transfer
+        if (begin < 0 || begin >= index || At(begin).Opcode != ocCreateDir ||
+            At(begin).SourceNameW != removal.SourceNameW)
+            return false;
+        for (int i = begin; i < index; ++i)
+        {
+            const auto& operation = At(i);
+            switch (operation.Opcode)
+            {
+            case ocMoveFile:
+            case ocMoveDir:
+            case ocDeleteDir:
+            case ocDeleteDirLink:
+                if (copiedLink)
+                    return false; // followed-link contents must only have been copied
+                [[fallthrough]];
+            case ocCopyFile:
+            case ocCreateDir:
+            case ocCreateDirLink:
+                if (!operation.CopyCompleted)
+                    return false;
+                break;
+            case ocCopyDirTime:
+            case ocLabelForSkipOfCreateDir:
+                break;
+            default:
+                return false; // never authorize a destructive/unknown subtree
+            }
+        }
+        return true;
+    }
+
+public:
+    bool CanRemoveFollowedLink(int index) const
+    {
+        return CanRemoveCompletedDirectoryRange(index, ocDeleteDirLink, true);
+    }
+
+    bool CanRemoveMovedDirectory(int index) const
+    {
+        return CanRemoveCompletedDirectoryRange(index, ocDeleteDir, false);
+    }
+
     // Name-carrying opcodes MUST arrive with an explicit wide
     // name. The auto-widen that used to paper over a missing one is gone; a
     // producer that forgets is a bug, not a mojibake path.
@@ -337,7 +399,8 @@ public:
         return opcode != ocLabelForSkipOfCreateDir && opcode != ocCountSize;
     }
 
-    int Add(COperation& op) {
+    int Add(COperation& op)
+    {
         if (OpcodeCarriesName(op.Opcode) && op.SourceNameW.empty() && op.TargetNameW.empty())
         {
             TRACE_E("COperations::Add(): name-carrying opcode without a wide name! opcode=" << op.Opcode);
@@ -538,7 +601,8 @@ extern COperationsQueue OperationsQueue; // queue of disk Copy/Move operations
 
 HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
                    CConvertData* convertData, HANDLE wContinue, HANDLE workerNotSuspended,
-                   BOOL* cancelWorker, int* operationProgress, int* summaryProgress);
+                   BOOL* cancelWorker, int* operationProgress, int* summaryProgress,
+                   DWORD* startupError = NULL);
 
 // Headless worker execution — runs operations synchronously on the calling thread.
 // Uses the provided IWorkerObserver instead of the progress dialog.

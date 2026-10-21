@@ -114,16 +114,23 @@ void CRemoteComparator::RecieveMessage(const CMessage* message)
         return;
     CRCMessage* msg = (CRCMessage*)message;
 
-    std::wstring path1(msg->Path1);
-    std::wstring path2(msg->Path2);
+    const size_t firstLength = wcsnlen(msg->Path1, REMOTE_PATH_CAPACITY);
+    const size_t secondLength = wcsnlen(msg->Path2, REMOTE_PATH_CAPACITY);
+    const size_t directoryLength = wcsnlen(msg->CurrentDirectory, REMOTE_PATH_CAPACITY);
+    if (firstLength == REMOTE_PATH_CAPACITY || secondLength == REMOTE_PATH_CAPACITY || directoryLength == REMOTE_PATH_CAPACITY)
+        return;
+    std::wstring path1(msg->Path1, firstLength);
+    std::wstring path2(msg->Path2, secondLength);
+    const std::wstring directory(msg->CurrentDirectory, directoryLength);
 
     int errID;
-    SPLSalGetFullNameOwned(SG, path1, &errID, msg->CurrentDirectory);
-    SPLSalGetFullNameOwned(SG, path2, &errID, msg->CurrentDirectory);
+    SPLSalGetFullNameOwned(SG, path1, &errID, directory.c_str());
+    SPLSalGetFullNameOwned(SG, path2, &errID, directory.c_str());
 
+    const CFilecompPathContext pathContext = CaptureFilecompPathContext(*SG, *gPathService, directory);
     BOOL ok = FALSE;
     CFilecompThread* d = new CFilecompThread(
-        path1.c_str(), path2.c_str(), TRUE, msg->ReleaseEvent);
+        path1.c_str(), path2.c_str(), TRUE, msg->ReleaseEvent, &pathContext);
     if (!d)
     {
         Error((HWND)NULL, IDS_LOWMEM);

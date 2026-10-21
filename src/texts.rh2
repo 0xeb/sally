@@ -1042,6 +1042,9 @@
 #define IDS_EMAILFILES_SUBJECT        10818
 #define IDS_EMAILFILES_BODY           10819
 #define IDS_EMAILFILES_MAPIERROR      10820
+#define IDS_EMAILFILES_PATHERROR      10822
+#define IDS_EMAILFILES_SENDERROR      10823
+#define IDS_EMAILFILES_PROVIDERERROR  10824
 
 // Find Files/Ignore Directory: Reset confirmation
 #define IDS_FINDIGNORE_RESET          10821
@@ -1258,6 +1261,8 @@
 #define IDS_PACKERR_UNABLETOREN      11020
 // error using external archiver - This file name is invalid on Windows file systems. External archivers do not support unpacking to another file name so it's not possible to unpack this file.
 #define IDS_PACKERR_INVALIDNAME      11021
+// custom external commands cannot interpret Sally's excluded masks
+#define IDS_PACKERR_EXCLUSIONMASK    11022
 
 // Return codes of archivers
 // Message for displaying error number
@@ -1906,6 +1911,10 @@
 #define IDS_NOTDEFFULLPATHINACTIVE    12458
 #define IDS_TOOLONGLISTOFSELFULLNAMES 12459
 #define IDS_EMPTYLISTOFSELFULLNAMES   12460
+#define IDS_DIRECTORYTARGETINSOURCE  12461
+#define IDS_UNPACKERSELECTIONREQUIRED 12462
+#define IDS_EXECUTE_SHORTNAMEUNAVAILABLE 12463
+#define IDS_OPERATIONSTARTFAILED     12464
 
 #define IDS_USERMENUCOMPAREARGSTITLE  12465
 #define IDS_USERMENUCOMPAREARG1       12466
@@ -2741,6 +2750,21 @@
 
 #define IDS_MENU_EDIT_UNDO               14256
 #define IDS_UNDO_FAILED                  14257
+
+
+// Configuration navigation and explicit Apply/Save actions.
+#define IDS_CFG_SEARCH_LABEL               14258
+#define IDS_CFG_SEARCH_HINT                14259
+#define IDS_CFG_SEARCH_INVALID             14260
+#define IDS_CFG_SEARCH_EMPTY               14261
+#define IDS_CFG_SAVE                       14262
+#define IDS_CFG_APPLY                      14263
+#define IDS_CFG_SAVE_FAILED                14264
+
+#define IDS_MASTERPASSWORD_STORE_DAMAGED 14265
+#define IDS_CFG_SEARCH_CLEAR               14266
+#define IDS_CFG_SEARCH_OPEN                14267
+#define IDS_CFG_SEARCH_CLOSE               14268
 
 //#define CM_TEXTS_MAX                  18000    // maximal texts id
 

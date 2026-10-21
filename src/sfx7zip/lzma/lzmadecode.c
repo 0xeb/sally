@@ -150,7 +150,7 @@ int LzmaDecodeProperties(CLzmaProperties *propsRes, const unsigned char *propsDa
   return LZMA_RESULT_OK;
 }
 
-extern void RefreshProgress(unsigned long inend, unsigned long inptr, int diskSavePart);
+extern void RefreshProgress(unsigned long long inend, unsigned long long inptr, int diskSavePart);
 int LzmaShouldRefreshProgress = 0; // LzmaDecode is invoked before actual decompression, so keep the progress bar steady
 
 #define kLzmaStreamWasFinishedId (-1)

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "ftp_permission_choices.h"
 
 static BOOL FormatServerTypeDateTime(const SYSTEMTIME& value, BOOL date, std::wstring& output) noexcept
 {
@@ -1313,7 +1314,7 @@ void CCopyMoveDlg::Transfer(CTransferInfo& ti)
             }
         }
     }
-    ti.CheckBox(IDC_ADDTOQUEUE, Config.DownloadAddToQueue);
+    Config.DownloadAddToQueue = FALSE;
 }
 
 INT_PTR
@@ -1347,7 +1348,7 @@ CConfirmDeleteDlg::CConfirmDeleteDlg(HWND parent, const wchar_t* subject, HICON 
 
 void CConfirmDeleteDlg::Transfer(CTransferInfo& ti)
 {
-    ti.CheckBox(IDC_DELADDTOQUEUE, Config.DeleteAddToQueue);
+    Config.DeleteAddToQueue = FALSE;
 }
 
 INT_PTR
@@ -1371,6 +1372,11 @@ CConfirmDeleteDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // ****************************************************************************
 // CChangeAttrsDlg
 //
+
+static constexpr std::array<int, 9> ChangeAttrControls = {
+    IDC_READOWNER, IDC_WRITEOWNER, IDC_EXECUTEOWNER,
+    IDC_READGROUP, IDC_WRITEGROUP, IDC_EXECUTEGROUP,
+    IDC_READOTHERS, IDC_WRITEOTHERS, IDC_EXECUTEOTHERS};
 
 CChangeAttrsDlg::CChangeAttrsDlg(HWND parent, const wchar_t* subject, DWORD attr, DWORD attrDiff,
                                  BOOL selDirs)
@@ -1462,66 +1468,17 @@ void CChangeAttrsDlg::Validate(CTransferInfo& ti)
 
 void CChangeAttrsDlg::Transfer(CTransferInfo& ti)
 {
-    int userRead = (AttrDiff & 0400) ? 2 : ((Attr & 0400) != 0);
-    int groupRead = (AttrDiff & 0040) ? 2 : ((Attr & 0040) != 0);
-    int othersRead = (AttrDiff & 0004) ? 2 : ((Attr & 0004) != 0);
-    int userWrite = (AttrDiff & 0200) ? 2 : ((Attr & 0200) != 0);
-    int groupWrite = (AttrDiff & 0020) ? 2 : ((Attr & 0020) != 0);
-    int othersWrite = (AttrDiff & 0002) ? 2 : ((Attr & 0002) != 0);
-    int userExec = (AttrDiff & 0100) ? 2 : ((Attr & 0100) != 0);
-    int groupExec = (AttrDiff & 0010) ? 2 : ((Attr & 0010) != 0);
-    int othersExec = (AttrDiff & 0001) ? 2 : ((Attr & 0001) != 0);
-    ti.CheckBox(IDC_READOWNER, userRead);
-    ti.CheckBox(IDC_WRITEOWNER, userWrite);
-    ti.CheckBox(IDC_EXECUTEOWNER, userExec);
-    ti.CheckBox(IDC_READGROUP, groupRead);
-    ti.CheckBox(IDC_WRITEGROUP, groupWrite);
-    ti.CheckBox(IDC_EXECUTEGROUP, groupExec);
-    ti.CheckBox(IDC_READOTHERS, othersRead);
-    ti.CheckBox(IDC_WRITEOTHERS, othersWrite);
-    ti.CheckBox(IDC_EXECUTEOTHERS, othersExec);
+    sally::ftp::PermissionChoices choices(Attr, AttrDiff);
+    for (size_t i = 0; i < choices.States.size(); ++i)
+        ti.CheckBox(ChangeAttrControls[i], choices.States[i]);
+    if (!ti.IsGood())
+        return;
 
     if (ti.Type == ttDataFromWindow)
     {
-        AttrAndMask = 0777;
-        AttrOrMask = 0;
-        if (userRead == 0)
-            AttrAndMask &= ~0400;
-        if (groupRead == 0)
-            AttrAndMask &= ~0040;
-        if (othersRead == 0)
-            AttrAndMask &= ~0004;
-        if (userWrite == 0)
-            AttrAndMask &= ~0200;
-        if (groupWrite == 0)
-            AttrAndMask &= ~0020;
-        if (othersWrite == 0)
-            AttrAndMask &= ~0002;
-        if (userExec == 0)
-            AttrAndMask &= ~0100;
-        if (groupExec == 0)
-            AttrAndMask &= ~0010;
-        if (othersExec == 0)
-            AttrAndMask &= ~0001;
-
-        if (userRead == 1)
-            AttrOrMask |= 0400;
-        if (groupRead == 1)
-            AttrOrMask |= 0040;
-        if (othersRead == 1)
-            AttrOrMask |= 0004;
-        if (userWrite == 1)
-            AttrOrMask |= 0200;
-        if (groupWrite == 1)
-            AttrOrMask |= 0020;
-        if (othersWrite == 1)
-            AttrOrMask |= 0002;
-        if (userExec == 1)
-            AttrOrMask |= 0100;
-        if (groupExec == 1)
-            AttrOrMask |= 0010;
-        if (othersExec == 1)
-            AttrOrMask |= 0001;
+        const auto masks = choices.Masks();
+        AttrAndMask = masks.And;
+        AttrOrMask = masks.Or;
     }
     else
         RefreshNumValue();
@@ -1529,7 +1486,7 @@ void CChangeAttrsDlg::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_INCLUDESUBDIRS, IncludeSubdirs);
     ti.CheckBox(IDC_CHATTRSETFILES, SelFiles);
     ti.CheckBox(IDC_CHATTRSETDIRS, SelDirs);
-    ti.CheckBox(IDC_CHATTRADDTOQUEUE, Config.ChAttrAddToQueue);
+    Config.ChAttrAddToQueue = FALSE;
 }
 
 void UpdateCheckBox(HWND hWindow, int checkID, int value)
@@ -1593,24 +1550,9 @@ CChangeAttrsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         else
                             attrDiff |= 0007;
 
-                        int userRead = (attrDiff & 0400) ? 2 : ((attr & 0400) != 0);
-                        int groupRead = (attrDiff & 0040) ? 2 : ((attr & 0040) != 0);
-                        int othersRead = (attrDiff & 0004) ? 2 : ((attr & 0004) != 0);
-                        int userWrite = (attrDiff & 0200) ? 2 : ((attr & 0200) != 0);
-                        int groupWrite = (attrDiff & 0020) ? 2 : ((attr & 0020) != 0);
-                        int othersWrite = (attrDiff & 0002) ? 2 : ((attr & 0002) != 0);
-                        int userExec = (attrDiff & 0100) ? 2 : ((attr & 0100) != 0);
-                        int groupExec = (attrDiff & 0010) ? 2 : ((attr & 0010) != 0);
-                        int othersExec = (attrDiff & 0001) ? 2 : ((attr & 0001) != 0);
-                        UpdateCheckBox(HWindow, IDC_READOWNER, userRead);
-                        UpdateCheckBox(HWindow, IDC_WRITEOWNER, userWrite);
-                        UpdateCheckBox(HWindow, IDC_EXECUTEOWNER, userExec);
-                        UpdateCheckBox(HWindow, IDC_READGROUP, groupRead);
-                        UpdateCheckBox(HWindow, IDC_WRITEGROUP, groupWrite);
-                        UpdateCheckBox(HWindow, IDC_EXECUTEGROUP, groupExec);
-                        UpdateCheckBox(HWindow, IDC_READOTHERS, othersRead);
-                        UpdateCheckBox(HWindow, IDC_WRITEOTHERS, othersWrite);
-                        UpdateCheckBox(HWindow, IDC_EXECUTEOTHERS, othersExec);
+                        const sally::ftp::PermissionChoices choices(attr, attrDiff);
+                        for (size_t i = 0; i < choices.States.size(); ++i)
+                            UpdateCheckBox(HWindow, ChangeAttrControls[i], choices.States[i]);
 
                         RefreshNumValue();
                     }

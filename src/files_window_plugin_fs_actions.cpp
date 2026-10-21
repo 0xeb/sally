@@ -1136,8 +1136,8 @@ BOOL CCriteriaData::Load(HKEY hKey)
     // one also undid iteration 104's CCopyMoveMoreDialog fix on every restart, since
     // Criteria->Masks round-trips through this Load()/Save() pair.
     std::wstring nameMasks;
-    GetStringValueW(hKey, CRITERIADATA_NAMEMASKS_REG, nameMasks);
-    Masks.SetMasksString(nameMasks.c_str());
+    if (GetStringValueW(hKey, CRITERIADATA_NAMEMASKS_REG, nameMasks))
+        Masks.SetMasksString(nameMasks.c_str());
     GetValueW(hKey, CRITERIADATA_USESPEEDLIMIT_REG, REG_DWORD, &UseSpeedLimit, sizeof(DWORD));
     GetValueW(hKey, CRITERIADATA_SPEEDLIMIT_REG, REG_DWORD, &SpeedLimit, sizeof(DWORD));
     GetValueW(hKey, CRITERIADATA_USEADVANCED_REG, REG_DWORD, &UseAdvanced, sizeof(DWORD));

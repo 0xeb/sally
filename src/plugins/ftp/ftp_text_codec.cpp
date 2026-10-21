@@ -1199,3 +1199,132 @@ BOOL FTPAddHexEscapeSequencesW(std::wstring& text) noexcept
         return FALSE;
     }
 }
+
+namespace
+{
+    bool IsCommandPathSafe(std::string_view bytes) noexcept
+    {
+        return bytes.find_first_of(std::string_view("\0\r\n", 3)) == std::string_view::npos;
+    }
+    int WirePathHexDigit(wchar_t value) noexcept
+    {
+        if (value >= L'0' && value <= L'9')
+            return value - L'0';
+        if (value >= L'A' && value <= L'F')
+            return value - L'A' + 10;
+        if (value >= L'a' && value <= L'f')
+            return value - L'a' + 10;
+        return -1;
+    }
+} // namespace
+
+BOOL FtpFormatWirePath(const CFtpTextCodec& codec, std::string_view bytes,
+                       BOOL allowEscapes, std::wstring& text) noexcept
+{
+    if (!codec.IsValid() || !IsCommandPathSafe(bytes))
+        return FALSE;
+    try
+    {
+        std::wstring decoded;
+        std::string encoded;
+        const bool exact = codec.Decode(bytes.data(), bytes.size(), decoded) &&
+                           codec.Encode(decoded.data(), decoded.size(), encoded) && encoded == bytes;
+        if (!exact && !allowEscapes)
+            return FALSE;
+        std::wstring staged;
+        if (exact)
+        {
+            for (wchar_t c : decoded)
+                if (c == L'%' && allowEscapes)
+                    staged.append(L"%25");
+                else
+                    staged.push_back(c);
+        }
+        else
+        {
+            constexpr wchar_t hex[] = L"0123456789ABCDEF";
+            for (unsigned char c : bytes)
+            {
+                if (c < 0x20 || c >= 0x7f || c == '%')
+                {
+                    staged.push_back(L'%');
+                    staged.push_back(hex[c >> 4]);
+                    staged.push_back(hex[c & 15]);
+                }
+                else
+                    staged.push_back(c);
+            }
+        }
+        text.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+BOOL FtpParseWirePath(const CFtpTextCodec& codec, std::wstring_view text,
+                      BOOL consumeEscapes, std::string& bytes) noexcept
+{
+    if (!codec.IsValid())
+        return FALSE;
+    try
+    {
+        std::string staged;
+        size_t literal = 0;
+        const auto appendLiteral = [&](size_t end)
+        {
+            if (end == literal)
+                return true;
+            std::string part;
+            if (!codec.Encode(text.data() + literal, end - literal, part) || !IsCommandPathSafe(part))
+                return false;
+            staged.append(part);
+            return true;
+        };
+        for (size_t i = 0; i < text.size(); ++i)
+        {
+            if (consumeEscapes && text[i] == L'%' && text.size() - i >= 3)
+            {
+                const int high = WirePathHexDigit(text[i + 1]), low = WirePathHexDigit(text[i + 2]);
+                if (high >= 0 && low >= 0)
+                {
+                    if (!appendLiteral(i))
+                        return FALSE;
+                    const char value = static_cast<char>((high << 4) | low);
+                    if (value == 0 || value == '\r' || value == '\n')
+                        return FALSE;
+                    staged.push_back(value);
+                    i += 2;
+                    literal = i + 1;
+                }
+            }
+        }
+        if (!appendLiteral(text.size()))
+            return FALSE;
+        bytes.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+BOOL FtpParseStoredWirePath(const CFtpTextCodec& codec, std::wstring_view text,
+                            BOOL escapedRepresentation, BOOL allowRawEscapes,
+                            std::string& bytes) noexcept
+{
+    std::string staged;
+    if (!FtpParseWirePath(codec, text, escapedRepresentation, staged))
+        return FALSE;
+    if (escapedRepresentation && !allowRawEscapes)
+    {
+        std::wstring exact;
+        if (!FtpFormatWirePath(codec, staged, FALSE, exact))
+            return FALSE;
+    }
+    bytes.swap(staged);
+    return TRUE;
+}

@@ -12,8 +12,6 @@
 #include "unole2.rh2"
 #include "lang\lang.rh"
 
-#define BUF_SIZE 65536
-
 // ****************************************************************************
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
@@ -334,160 +332,6 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
     return ret;
 }
 
-BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
-                                                CPluginDataInterfaceAbstract* pluginData, const wchar_t* targetDir,
-                                                const wchar_t* archiveRoot, SalEnumSelection next, void* nextParam)
-{
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %ls, , %ls, %ls, ,)", fileName, targetDir, archiveRoot);
-
-    LPSTORAGE pStorage;
-    LPMALLOC pIMalloc;
-    BOOL ret = TRUE;
-
-    if (!OpenStorage(fileName, &pStorage, &pIMalloc))
-    {
-        return FALSE;
-    }
-
-    salamander->OpenProgressDialog(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_EXTRPROGTITLE).c_str(), TRUE, NULL, FALSE);
-
-    // unpack the files
-
-    pStorage->Release();
-    pIMalloc->Release();
-    salamander->CloseProgressDialog();
-
-    return ret;
-}
-
-BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* salamander,
-                                                const wchar_t* fileName, CPluginDataInterfaceAbstract* pluginData,
-                                                const wchar_t* nameInArchive, const CFileData* fileData,
-                                                const wchar_t* targetDir, const wchar_t* newFileName,
-                                                BOOL* renamingNotSupported)
-{
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %ls, , %ls, , %ls, ,)", fileName,
-                        nameInArchive, targetDir);
-
-    if (newFileName != NULL)
-    {
-        *renamingNotSupported = TRUE;
-        return FALSE;
-    }
-
-    LPSTORAGE pStorage;
-    LPMALLOC pIMalloc;
-    BOOL ret = TRUE;
-    LPSTREAM pStream;
-
-    if (!OpenStorage(fileName, &pStorage, &pIMalloc))
-    {
-        return FALSE;
-    }
-    // extract the file
-    if (!wcschr(nameInArchive, L'\\'))
-    {
-        HRESULT hr;
-        std::wstring targetFileName(targetDir);
-        char* pBuf;
-        HANDLE hFile;
-
-        pBuf = (char*)malloc(BUF_SIZE);
-        if (pBuf)
-        {
-            hr = pStorage->OpenStream(nameInArchive, NULL, STGM_DIRECT | STGM_READ | STGM_SHARE_EXCLUSIVE, NULL, &pStream);
-            if (SUCCEEDED(hr))
-            {
-                SPLSalPathAppendOwned(targetFileName, nameInArchive);
-                hFile = CreateFileW(targetFileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, 0, NULL);
-                if (hFile != INVALID_HANDLE_VALUE)
-                {
-                    for (;;)
-                    {
-                        ULONG nBytesRead;
-                        DWORD nBytesWritten;
-
-                        hr = pStream->Read(pBuf, BUF_SIZE, &nBytesRead);
-                        if (FAILED(hr))
-                        {
-                            Error(hr, IDS_CANNOT_READ, targetFileName.c_str());
-                            ret = FALSE;
-                            break;
-                        }
-                        if (!nBytesRead)
-                            break;
-                        WriteFile(hFile, pBuf, nBytesRead, &nBytesWritten, NULL);
-                        if (nBytesRead != nBytesWritten)
-                        {
-                            Error(GetLastError(), IDS_CANNOT_WRITE);
-                            ret = FALSE;
-                            break;
-                        }
-                    }
-                    CloseHandle(hFile);
-                }
-                else
-                {
-                    Error(GetLastError(), IDS_CANNOT_CREATE_FILE, targetFileName.c_str());
-                    ret = FALSE;
-                }
-                pStream->Release();
-            }
-            else
-            {
-                Error(hr, IDS_CANNOT_OPEN_STREAM, nameInArchive);
-                ret = FALSE;
-            }
-        }
-        else
-        {
-            SalamanderGeneral->ShowMessageBox(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_LOWMEM).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
-            ret = FALSE;
-        }
-        if (pBuf)
-            free(pBuf);
-    }
-    else
-    {
-        // not supported yet
-        _ASSERTE(wcschr(nameInArchive, L'\\'));
-    }
-    pStorage->Release();
-    pIMalloc->Release();
-
-    return ret;
-}
-
-BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
-                                                     const wchar_t* mask, const wchar_t* targetDir, BOOL delArchiveWhenDone,
-                                                     CDynamicString* archiveVolumes)
-{
-    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %ls, %ls, %ls, %d,)",
-                        fileName, mask, targetDir, delArchiveWhenDone);
-
-    LPSTORAGE pStorage;
-    LPMALLOC pIMalloc;
-    BOOL ret = TRUE;
-
-    if (!OpenStorage(fileName, &pStorage, &pIMalloc))
-    {
-        return FALSE;
-    }
-
-    if (delArchiveWhenDone)
-        archiveVolumes->Add(fileName, -2); // FIXME: once the plugin supports multi-volume archives, we must add all archive volumes here (so the entire archive is deleted)
-
-    salamander->OpenProgressDialog(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_EXTRPROGTITLE).c_str(), FALSE, NULL, TRUE);
-
-    // Unpack the compound file
-
-    pStorage->Release();
-    pIMalloc->Release();
-    salamander->CloseProgressDialog();
-
-    return ret;
-}
-
 BOOL Error(HRESULT hr, int error, ...)
 {
     CALL_STACK_MESSAGE_NONE
@@ -499,7 +343,11 @@ BOOL Error(HRESULT hr, int error, ...)
         SPLLoadStrOwned(SalamanderGeneral, HLanguage, error).c_str(), arglist);
     va_end(arglist);
     if (hr != S_OK)
+    {
+        if (!message.empty() && message.back() != L'\n')
+            message.append(L"\n\n");
         message.append(SPLGetErrorTextOwned(SalamanderGeneral, static_cast<DWORD>(hr)));
+    }
     SalamanderGeneral->ShowMessageBox(message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
 
     return FALSE;

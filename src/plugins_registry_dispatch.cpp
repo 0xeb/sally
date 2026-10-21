@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/configuration/RegistryWriteMonitor.h"
 
 #include "ui/IPrompter.h"
 #include "menu.h"
@@ -229,9 +230,10 @@ BOOL SaveIconList(HKEY hKey, const wchar_t* valueName, CIconList* iconList)
     if (iconList->SaveToPNG(&rawPNG, &rawPNGSize))
     {
         IRegistry* registry = GetPluginsRegistryService();
-        registry->SetBinary(hKey, valueName, rawPNG, rawPNGSize);
+        const bool saved = sally::configuration::RegistryWriteMonitor::Record(
+            registry->SetBinary(hKey, valueName, rawPNG, rawPNGSize));
         free(rawPNG);
-        return TRUE;
+        return saved;
     }
     else
         return FALSE;
@@ -1683,7 +1685,8 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                 }
                 if (p->PluginIcons != NULL) // store only if it exists
                 {
-                    SaveIconList(itemKey, SALAMANDER_PLUGINS_PLGICONLIST, p->PluginIcons);
+                    sally::configuration::RegistryWriteMonitor::Require(
+                        SaveIconList(itemKey, SALAMANDER_PLUGINS_PLGICONLIST, p->PluginIcons) != FALSE);
                 }
                 if (p->PluginIconIndex != -1) // store only if it is not -1
                 {
@@ -3490,20 +3493,18 @@ BOOL CPlugins::GetFirstNethoodPluginFSName(std::wstring* fsName, CPluginData** n
 
 // *********************************************************************************************
 
-void CPlugins::PasswordManagerEvent(HWND parent, int event)
+BOOL CPlugins::PasswordManagerEvent(HWND parent, int event)
 {
     CALL_STACK_MESSAGE2("CPlugins::PasswordManagerEvent(, %d)", event);
-
-    int i;
-    for (i = 0; i < Data.Count; i++)
+    BOOL success = TRUE;
+    for (int i = 0; i < Data.Count; ++i)
     {
         CPluginData* p = Data[i];
-        if (p->PluginUsesPasswordManager &&
-            p->InitDLL(parent, FALSE, TRUE, FALSE))
-        {
-            p->PasswordManagerEvent(parent, event);
-        }
+        if (!p->PluginUsesPasswordManager) continue;
+        if (!p->InitDLL(parent, FALSE, TRUE, FALSE)) success = FALSE;
+        else p->PasswordManagerEvent(parent, event);
     }
+    return success;
 }
 
 int CPlugins::GetNumOfPluginsToLoad()

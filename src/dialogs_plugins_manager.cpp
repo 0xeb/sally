@@ -661,7 +661,7 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             if (keys.Reset)
                             {
                                 UpdateWindow(HWindow); // let Plugins Manager update so the Shortcut Keys window doesn't remain visible
-                                p->Unload(HWindow, FALSE);
+                                keys.CompleteReset(p->Unload(HWindow, FALSE));
                                 goto AGAIN;
                             }
                         }
@@ -940,6 +940,15 @@ CPluginKeys::~CPluginKeys()
 BOOL CPluginKeys::IsGood()
 {
     return HotKeys != NULL;
+}
+
+void CPluginKeys::CompleteReset(BOOL pluginUnloaded)
+{
+    if (Reset && pluginUnloaded)
+    {
+        for (int i = 0; i < Plugin->MenuItems.Count; i++)
+            Plugin->MenuItems[i]->HotKey = 0; // the next Connect() restores defaults
+    }
 }
 
 void CPluginKeys::Transfer(CTransferInfo& ti)
@@ -1259,7 +1268,7 @@ CPluginKeys::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             int i;
             for (i = 0; i < Plugin->MenuItems.Count; i++)
                 if (HOTKEY_GET(HotKeys[i]) == hotKey)
-                    HotKeys[i] = 0;
+                    HotKeys[i] = (HotKeys[i] & ~HOTKEY_MASK) | HOTKEY_DIRTY;
             HotKeys[orgIndex] = (HotKeys[orgIndex] & ~HOTKEY_MASK) | HOTKEY_DIRTY; // protect this change from being overridden by the plugin's Connect()
             HotKeys[orgIndex] |= (DWORD)hotKey;
             SendDlgItemMessage(HWindow, IDC_PLUGINKEY, HKM_SETHOTKEY, 0, 0);
@@ -1289,9 +1298,6 @@ CPluginKeys::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINRESETKEYS), Plugin->Name.c_str());
             if (gPrompter->ConfirmError(LoadStrW(IDS_INFOTITLE), msg.c_str()).type == PromptResult::kOk)
             {
-                int i;
-                for (i = 0; i < Plugin->MenuItems.Count; i++)
-                    Plugin->MenuItems[i]->HotKey = 0; // clear hotkeys, the next Connect() will restore them
                 Reset = TRUE;
                 PostMessage(HWindow, WM_COMMAND, IDCANCEL, 0);
             }

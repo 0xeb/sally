@@ -790,7 +790,10 @@ BOOL CPluginFSInterface::CopyFileRecord(FILE_RECORD_I<wchar_t>* record, wchar_t*
         // fix name if needed
         const wchar_t* name = FixDamagedName(filename);
         if (name == NULL)
+        {
+            SourcePath.resize(oldlen);
             return FALSE;
+        }
         SourcePath.resize(namepos);
         SourcePath.append(name);
 
@@ -1065,7 +1068,10 @@ BOOL CPluginFSInterface::CopyDir(FILE_RECORD_I<wchar_t>* record, wchar_t* filena
     // fix name if needed
     const wchar_t* name = FixDamagedName(filename);
     if (name == NULL)
+    {
+        SourcePath.resize(oldlen);
         return FALSE;
+    }
 
     // make target path
     std::wstring path;
@@ -1194,7 +1200,7 @@ BOOL CPluginFSInterface::CopyFileList(CFileList& list, const wchar_t* targetPath
             ret = CopyFileRecord(item->Record, item->Name, targetPath, FALSE, &incompleteFileAnswer);
     }
 
-    return TRUE;
+    return ret;
 }
 
 void UndeleteGetResolvedRootPath(const wchar_t* path, std::wstring& resolvedPath)

@@ -188,11 +188,13 @@ STRINGTABLE
  IDS_OPERSTOPPED, "stopped"
  IDS_FTPINACTIVE, "connection inactive"
 
+ IDS_FSLOGUNAVAILABLE, "This connection's log is unavailable. Logging is enabled; reconnect to start a new log."
+ IDS_ITEMRETRYPOLICYHINT, "Choose Retry with this option to remember it for matching errors in this operation. Retry makes up to 3 automatic attempts per item and error, one second apart. After that, choose an action again; manual Retry starts a new budget."
  IDS_FSHAVENOLOG, "This connection to FTP server has no log. Most likely, connection was started with disabled logging (see Logs page in FTP Configuration)."
 
  IDS_CLEARLOGQUESTION, "Are you sure you want to clear log ""%s""?"
  IDS_REMOVELOGQUESTION, "Are you sure you want to remove log ""%s""?"
- IDS_REMOVEALLLOGSQUESTION, "Are you sure you want to remove all logs?"
+ IDS_REMOVEALLLOGSQUESTION, "Remove all logs that are no longer owned by a connection or worker? Logs still in use will be kept."
  IDS_TEXTCOPIEDTOCLIPBOARD, "Text was successfully copied to clipboard."
  IDS_COPYTOCLIPBOARDERROR, "Unable to copy text to clipboard."
  IDS_SAVELOGFILTER, "Log files (*.log)|*.log|All files (*.*)|*.*|"
@@ -929,4 +931,5 @@ STRINGTABLE
  IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state."
  IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server."
  IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server."
+ IDS_LOGSIZEOUTOFRANGE, "The log size limit must be between 1 and %u KB."
 }

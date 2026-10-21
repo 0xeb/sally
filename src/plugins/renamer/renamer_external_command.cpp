@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "filter_process.h"
 #include "precomp.h"
 
 #include <vector>
@@ -128,6 +129,36 @@ static std::wstring EscapeQuotes(const wchar_t* string)
     return escaped;
 }
 
+static sally::renamer::FilterResult RunFilterWithProgress(HWND parent, const std::wstring& title,
+                                                          const std::wstring& commandLine, const wchar_t* directory, HANDLE input, HANDLE output, HANDLE errors)
+{
+    CProgressDialog dialog(parent, ooStatic);
+    if (!dialog.Create())
+        return {sally::renamer::FilterState::Failed, GetLastError()};
+    struct WindowOwner
+    {
+        HWND Parent, Progress;
+        BOOL WasEnabled;
+        ~WindowOwner()
+        {
+            EnableWindow(Parent, WasEnabled);
+            DestroyWindow(Progress);
+        }
+    } owner{parent, dialog.HWindow, IsWindowEnabled(parent)};
+    EnableWindow(parent, FALSE);
+    dialog.SetText(title.c_str());
+    dialog.Update(0, TRUE);
+    class ProgressAdapter final : public sally::renamer::IFilterProgress
+    {
+        CProgressDialog& Dialog;
+
+    public:
+        explicit ProgressAdapter(CProgressDialog& dialog) : Dialog(dialog) {}
+        bool KeepRunning() override { return !Dialog.Update(0); }
+    } progress(dialog);
+    return sally::renamer::RunFilterProcess(commandLine, directory, input, output, errors, progress);
+}
+
 BOOL CRenamerDialog::ExecuteCommand(const char* command)
 {
     CALL_STACK_MESSAGE2("CRenamerDialog::ExecuteCommand(%s)", command);
@@ -136,7 +167,7 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
     if (!GetEnvironmentValueOwned(L"SHELL", shell))
     {
         if (!GetEnvironmentValueOwned(L"COMSPEC", shell))
-            return FALSE;
+            return ErrorL(ERROR_ENVVAR_NOT_FOUND, IDS_PROCESS);
     }
 
     const wchar_t* shellName = wcsrchr(shell.c_str(), L'\\');
@@ -153,22 +184,19 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
     }
     else
         cmdLine = L"\"" + shell + L"\" /C " + commandW;
-    constexpr size_t WindowsCommandLineLimit = 32767;
-    if (cmdLine.size() >= WindowsCommandLineLimit)
+    if (cmdLine.size() >= sally::renamer::WindowsCommandLineLimit)
         return Error(IDS_LONGDATA);
 
     std::wstring tempDir;
-    std::wstring outName, errName;
-    HANDLE inPipeWr = INVALID_HANDLE_VALUE;
-    HANDLE inPipeWrDup = INVALID_HANDLE_VALUE;
-    HANDLE inPipeRd = INVALID_HANDLE_VALUE;
+    std::wstring inName, outName, errName;
+    HANDLE inFile = INVALID_HANDLE_VALUE;
+    DWORD exitCode = 0;
     HANDLE outFile = INVALID_HANDLE_VALUE;
     HANDLE errFile = INVALID_HANDLE_VALUE;
     SECURITY_ATTRIBUTES saAttr;
     TBuffer<char> buffer;
     TBuffer<wchar_t> editBuffer;
     std::string inputText;
-    std::vector<wchar_t> mutableCmdLine;
     CQuadWord size;
     BOOL ret = TRUE;
 
@@ -180,34 +208,29 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
     // create names for the tmp files
     if (!SPLSalGetTempFileNameOwned(SG, NULL, L"SAL", tempDir, FALSE, NULL))
         return Error(IDS_CREATETEMP);
+    inName = tempDir;
+    SPLSalPathAppendOwned(inName, L"stdin");
     outName = tempDir;
     errName = tempDir;
     SPLSalPathAppendOwned(outName, L"stdout");
     SPLSalPathAppendOwned(errName, L"stderr");
 
-    // create the pipe for input
-    if (!CreatePipe(&inPipeRd, &inPipeWr, &saAttr, 0))
+    // A finite spool file cannot block on a child that refuses to read stdin.
+    inFile = CreateFileW(inName.c_str(), GENERIC_READ | GENERIC_WRITE,
+                        FILE_SHARE_READ, &saAttr, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+    if (inFile == INVALID_HANDLE_VALUE)
     {
-        inPipeWr = INVALID_HANDLE_VALUE;
-        inPipeRd = INVALID_HANDLE_VALUE;
-        ret = Error(IDS_CREATEPIPE);
+        ret = Error(IDS_CREATETEMP);
         goto LERROR;
     }
-    if (!DuplicateHandle(GetCurrentProcess(), inPipeWr,
-                         GetCurrentProcess(), &inPipeWrDup, 0,
-                         FALSE,
-                         DUPLICATE_SAME_ACCESS))
-        return FALSE;
-    CloseHandle(inPipeWr);
-    inPipeWr = INVALID_HANDLE_VALUE;
 
     // create/open tmp files for output
     outFile = CreateFileW(outName.c_str(), GENERIC_READ | GENERIC_WRITE,
-                         FILE_SHARE_READ | FILE_SHARE_WRITE, &saAttr, CREATE_ALWAYS,
-                         FILE_ATTRIBUTE_TEMPORARY, NULL);
+                          FILE_SHARE_READ | FILE_SHARE_WRITE, &saAttr, CREATE_ALWAYS,
+                          FILE_ATTRIBUTE_TEMPORARY, NULL);
     errFile = CreateFileW(errName.c_str(), GENERIC_READ | GENERIC_WRITE,
-                         FILE_SHARE_READ | FILE_SHARE_WRITE, &saAttr, CREATE_ALWAYS,
-                         FILE_ATTRIBUTE_TEMPORARY, NULL);
+                          FILE_SHARE_READ | FILE_SHARE_WRITE, &saAttr, CREATE_ALWAYS,
+                          FILE_ATTRIBUTE_TEMPORARY, NULL);
     if (outFile == INVALID_HANDLE_VALUE ||
         errFile == INVALID_HANDLE_VALUE)
     {
@@ -218,54 +241,42 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
     // nacteme text z controlu
     if (!editBuffer.Reserve(GetWindowTextLengthW(ManualEdit->HWindow) + 1))
     {
-        RemoveTemporaryFileDirectory(TempFile);
         ret = Error(IDS_LOWMEM);
         goto LERROR;
     }
     const int editChars = GetWindowTextW(ManualEdit->HWindow, editBuffer.Get(), (int)editBuffer.GetSize());
     inputText = WideToRenamerText(editBuffer.Get(), editChars);
 
-    STARTUPINFOW si;
-    PROCESS_INFORMATION pi;
-    memset(&si, 0, sizeof(STARTUPINFO));
-    si.cb = sizeof(STARTUPINFO);
-    si.lpTitle = &cmdLine[0];
-    si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-    si.wShowWindow = SW_SHOWMINIMIZED;
-    si.hStdInput = inPipeRd;
-    si.hStdOutput = outFile;
-    si.hStdError = errFile;
-
-    mutableCmdLine.assign(cmdLine.begin(), cmdLine.end());
-    mutableCmdLine.push_back(L'\0');
-    if (!CreateProcessW(NULL, mutableCmdLine.data(), NULL, NULL, TRUE,
-                       CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
-                       NULL, Root.empty() ? NULL : Root.c_str(), &si, &pi))
     {
-        ret = Error(IDS_PROCESS);
-        goto LERROR;
+        size_t position = 0;
+        while (position < inputText.size())
+        {
+            const DWORD count = static_cast<DWORD>((std::min)(inputText.size() - position, size_t{1024 * 1024}));
+            DWORD written = 0;
+            if (!WriteFile(inFile, inputText.data() + position, count, &written, NULL) || written != count)
+            {
+                ret = Error(IDS_WRITETEMP);
+                goto LERROR;
+            }
+            position += written;
+        }
+        CloseHandle(inFile);
+        inFile = CreateFileW(inName.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                             &saAttr, OPEN_EXISTING, FILE_ATTRIBUTE_TEMPORARY, NULL);
+        if (inFile == INVALID_HANDLE_VALUE)
+        {
+            ret = Error(IDS_READTEMP);
+            goto LERROR;
+        }
+        const auto execution = RunFilterWithProgress(HWindow, commandW, cmdLine,
+                                                     Root.empty() ? NULL : Root.c_str(), inFile, outFile, errFile);
+        if (execution.State != sally::renamer::FilterState::Completed)
+        {
+            ret = execution.State == sally::renamer::FilterState::Failed ? ErrorL(execution.Error, IDS_PROCESS) : FALSE;
+            goto LERROR;
+        }
+        exitCode = execution.ExitCode;
     }
-
-    CloseHandle(inPipeRd);
-    inPipeRd = INVALID_HANDLE_VALUE;
-
-    DWORD written;
-    if (!WriteFile(inPipeWrDup, inputText.data(), (DWORD)inputText.size(), &written, NULL) || written != inputText.size())
-    {
-        if (GetLastError() != ERROR_BROKEN_PIPE)
-            ret = Error(IDS_WRITEPIPE);
-    }
-
-    CloseHandle(inPipeWrDup);
-    inPipeWrDup = INVALID_HANDLE_VALUE;
-
-    WaitForSingleObject(pi.hProcess, INFINITE);
-
-    DWORD exitCode;
-    GetExitCodeProcess(pi.hProcess, &exitCode);
-
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
 
     // verify that no error occurred
     size.HiDWord = 0;
@@ -336,12 +347,8 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
     }
 
 LERROR:
-    if (inPipeWr != INVALID_HANDLE_VALUE)
-        CloseHandle(inPipeWr);
-    if (inPipeRd != INVALID_HANDLE_VALUE)
-        CloseHandle(inPipeRd);
-    if (inPipeWrDup != INVALID_HANDLE_VALUE)
-        CloseHandle(inPipeWrDup);
+    if (inFile != INVALID_HANDLE_VALUE)
+        CloseHandle(inFile);
     if (outFile != INVALID_HANDLE_VALUE)
         CloseHandle(outFile);
     if (errFile != INVALID_HANDLE_VALUE)

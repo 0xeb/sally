@@ -420,9 +420,10 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     {
         ArcFileName = fv;
     }
-    else
+    else if (!SwitchToFirstVol(fileName))
     {
-        SwitchToFirstVol(fileName);
+        Salamander = NULL;
+        return FALSE;
     }
 
     next(NULL, -1, NULL, NULL, NULL, nextParam, NULL);
@@ -611,9 +612,10 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     {
         ArcFileName = fv;
     }
-    else
+    else if (!SwitchToFirstVol(fileName))
     {
-        SwitchToFirstVol(fileName);
+        Salamander = NULL;
+        return FALSE;
     }
 
     PluginData->Silent &= SF_ALLENRYPT;
@@ -1406,12 +1408,31 @@ int CPluginInterfaceForArchiver::NeedPassword(wchar_t* password, int size)
     return 1;
 }
 
+// A volume-like filename is only a hint. A readable standalone archive owns
+// its identity even when an unrelated guessed first-volume neighbor exists.
+static bool IsStandaloneRarArchive(const std::wstring& path)
+{
+    RAROpenArchiveDataEx probe = {};
+    probe.ArcNameW = const_cast<wchar_t*>(path.c_str());
+    probe.OpenMode = RAR_OM_LIST;
+    HANDLE handle = RAROpenArchiveEx(&probe);
+    if (handle == NULL)
+        return false;
+    const bool standalone = (probe.Flags & AF_VOLUME) == 0;
+    RARCloseArchive(handle);
+    return standalone;
+}
+
 BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(const wchar_t* arcName, BOOL* saveFirstVolume)
 {
     CALL_STACK_MESSAGE1("CPluginInterfaceForArchiver::SwitchToFirstVol()");
-    if (arcName == NULL)
+    // Own the input before clearing state, including a possible self-reference.
+    std::wstring candidate(arcName != NULL ? arcName : L"");
+    ArcFileName.clear();
+    if (saveFirstVolume != NULL)
+        *saveFirstVolume = FALSE;
+    if (candidate.empty())
         return FALSE;
-    std::wstring candidate(arcName);
     wchar_t* ext = PathFindExtensionW(candidate.data());
     if (!ext)
     {
@@ -1421,6 +1442,11 @@ BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(const wchar_t* arcName, BOOL*
     if (lstrlenW(ext) > 3 &&
         iswdigit(ext[2]) && iswdigit(ext[3]))
     {
+        if (IsStandaloneRarArchive(candidate))
+        {
+            ArcFileName = candidate;
+            return TRUE;
+        }
         std::wstring oldExt(ext);
         if (iswdigit(ext[1]))
         {
@@ -1467,6 +1493,11 @@ BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(const wchar_t* arcName, BOOL*
         int digits = (int)(iterator - part - 5);
         if (digits && *iterator == L'.')
         {
+            if (IsStandaloneRarArchive(candidate))
+            {
+                ArcFileName = candidate;
+                return TRUE;
+            }
             // the file is named according to the new convention
             std::wstring firstVolume(candidate.c_str(), part - candidate.data());
             firstVolume += SPLFormatStringOwned(L".part%0*d.rar", digits, 1);

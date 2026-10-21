@@ -28,6 +28,47 @@ CSalamanderSafeFileAbstract* SalamanderSafeFile = NULL;
 // variable definition for "dbg.h"
 CSalamanderDebugAbstract* SalamanderDebug = NULL;
 
+// A pointer-sized SDK slot owns a full-width offset even in 32-bit builds.
+class CLhaPluginDataInterface : public CPluginDataInterfaceAbstract
+{
+public:
+    virtual BOOL WINAPI CallReleaseForFiles() { return TRUE; }
+    virtual BOOL WINAPI CallReleaseForDirs() { return TRUE; }
+    virtual void WINAPI ReleasePluginData(CFileData& file, BOOL)
+    {
+        free(reinterpret_cast<void*>(file.PluginData));
+        file.PluginData = 0;
+    }
+
+    virtual void WINAPI GetFileDataForUpDir(const wchar_t*, CFileData& upDir) { upDir.PluginData = 0; }
+    virtual BOOL WINAPI GetFileDataForNewDir(const wchar_t*, CFileData& dir)
+    {
+        dir.PluginData = 0;
+        return TRUE;
+    }
+
+    virtual HIMAGELIST WINAPI GetSimplePluginIcons(int iconSize) { return NULL; }
+    virtual BOOL WINAPI HasSimplePluginIcon(CFileData& file, BOOL isDir) { return FALSE; }
+    virtual HICON WINAPI GetPluginIcon(const CFileData* file, int iconSize, BOOL& destroyIcon) { return NULL; }
+    virtual int WINAPI CompareFilesFromFS(const CFileData* file1, const CFileData* file2) { return 0; }
+
+    virtual void WINAPI SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const wchar_t* archivePath,
+                                  const CFileData* upperDir) {}
+    virtual void WINAPI ColumnFixedWidthShouldChange(BOOL leftPanel, const CColumn* column, int newFixedWidth) {}
+    virtual void WINAPI ColumnWidthWasChanged(BOOL leftPanel, const CColumn* column, int newWidth) {}
+    virtual BOOL WINAPI GetInfoLineContent(int panel, const CFileData* file, BOOL isDir, int selectedFiles,
+                                           int selectedDirs, BOOL displaySize, const CQuadWord& selectedSize,
+                                           CSalamanderStringBuffer* buffer, CSalamanderTextRangeBuffer* hotTexts) { return FALSE; }
+
+    virtual BOOL WINAPI CanBeCopiedToClipboard() { return TRUE; }
+
+    virtual BOOL WINAPI GetByteSize(const CFileData* file, BOOL isDir, CQuadWord* size) { return FALSE; }
+    virtual BOOL WINAPI GetLastWriteDate(const CFileData* file, BOOL isDir, SYSTEMTIME* date) { return FALSE; }
+    virtual BOOL WINAPI GetLastWriteTime(const CFileData* file, BOOL isDir, SYSTEMTIME* time) { return FALSE; }
+};
+
+static CLhaPluginDataInterface LhaPluginData;
+
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
     if (fdwReason == DLL_PROCESS_ATTACH)
@@ -161,7 +202,14 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
     int ret = TRUE, gh;
     int count = 0;
     int symlinkinfo = 0, crcinfo = 0;
-    int currentOffset = ftell(f);
+    __int64 currentOffset = _ftelli64(f);
+    if (currentOffset < 0)
+    {
+        fclose(f);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_READERROR).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
+        return FALSE;
+    }
+    pluginData = &LhaPluginData;
 
     while ((gh = LHAGetHeader(f, &hdr)) == GH_SUCCESS)
     {
@@ -193,10 +241,20 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
             fd.Ext++; // ".cvspass" counts as an extension on Windows
         else
             fd.Ext = fd.Name + wcslen(fd.Name);
-        fd.Size = CQuadWord(hdr.original_size, 0);
+        fd.Size = CQuadWord().SetUI64(hdr.original_size);
         fd.Attr = hdr.attribute;
         fd.Hidden = fd.Attr & FILE_ATTRIBUTE_HIDDEN ? 1 : 0;
-        fd.PluginData = currentOffset;
+        __int64* position = static_cast<__int64*>(malloc(sizeof(__int64)));
+        if (position == NULL)
+        {
+            SalamanderGeneral->Free(fd.Name);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOWMEM).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
+            ret = FALSE;
+            break;
+        }
+        *position = currentOffset;
+        fd.PluginData = reinterpret_cast<DWORD_PTR>(position);
+        bool published = false;
         fd.LastWrite = hdr.last_modified_filetime;
         fd.DosName = NULL;
         fd.NameLen = (unsigned)wcslen(fd.Name);
@@ -206,7 +264,8 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
             hdr.method != LZHDIRS_METHOD_NUM)
         {
             fd.IsLink = SalamanderGeneral->IsFileLink(fd.Ext);
-            if (!dir->AddFile(path.c_str(), fd, NULL))
+            published = dir->AddFile(path.c_str(), fd, pluginData) != FALSE;
+            if (!published)
                 ret = FALSE;
         }
         else if ((hdr.unix_mode & UNIX_FILE_TYPEMASK) == UNIX_FILE_DIRECTORY ||
@@ -215,7 +274,8 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
             if (!sortByExtDirsAsFiles)
                 fd.Ext = fd.Name + fd.NameLen; // directories have no extensions
             fd.IsLink = 0;
-            if (!dir->AddDir(path.c_str(), fd, NULL))
+            published = dir->AddDir(path.c_str(), fd, pluginData) != FALSE;
+            if (!published)
                 ret = FALSE;
         }
         else if (!symlinkinfo && (hdr.unix_mode & UNIX_FILE_TYPEMASK) == UNIX_FILE_SYMLINK)
@@ -224,16 +284,24 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
             symlinkinfo = 1;
         }
 
+        if (!published)
+        {
+            LhaPluginData.ReleasePluginData(fd, FALSE);
+            SalamanderGeneral->Free(fd.Name);
+        }
         if (!ret)
         {
-            SalamanderGeneral->Free(fd.Name);
             SalamanderGeneral->ShowMessageBox(LangStr(IDS_LIST).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
             break;
         }
 
-        fseek(f, hdr.packed_size, SEEK_CUR);
+        if (_fseeki64(f, hdr.packed_size, SEEK_CUR) != 0 || (currentOffset = _ftelli64(f)) < 0)
+        {
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_READERROR).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
+            ret = FALSE;
+            break;
+        }
         count++;
-        currentOffset = ftell(f);
     }
 
     fclose(f);
@@ -251,13 +319,13 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
     return ret;
 }
 
-static BOOL ProgressCallback(int size) // callback invoked during decompression
+static BOOL ProgressCallback(unsigned __int64 size) // callback invoked during decompression
 {
     if (InterfaceForArchiver.UnpackWhole)
-        return InterfaceForArchiver.Salamander->ProgressSetSize(CQuadWord(size, 0), CQuadWord(-1, -1), TRUE);
+        return InterfaceForArchiver.Salamander->ProgressSetSize(CQuadWord().SetUI64(size), CQuadWord(-1, -1), TRUE);
     else
-        return InterfaceForArchiver.Salamander->ProgressSetSize(CQuadWord(size, 0),
-                                                                InterfaceForArchiver.currentProgress + CQuadWord(size, 0), TRUE);
+        return InterfaceForArchiver.Salamander->ProgressSetSize(CQuadWord().SetUI64(size),
+                                                                InterfaceForArchiver.currentProgress + CQuadWord().SetUI64(size), TRUE);
 }
 
 BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* salamander,
@@ -283,7 +351,13 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     }
 
     LHA_HEADER hdr;
-    fseek(f, (long)fileData->PluginData, SEEK_SET);
+    if (fileData == NULL || fileData->PluginData == 0 ||
+        _fseeki64(f, *reinterpret_cast<const __int64*>(fileData->PluginData), SEEK_SET) != 0)
+    {
+        fclose(f);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_READERROR).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
+        return FALSE;
+    }
     if (LHAGetHeader(f, &hdr) != GH_SUCCESS)
     {
         SalamanderGeneral->ShowMessageBox(LangStr(IDS_UNPACKERROR).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
@@ -361,7 +435,7 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     if (*normalizedRoot == L'\\')
         normalizedRoot++;
     RootLen = wcslen(normalizedRoot);
-    TDirectArray<int> offsets(256, 256);
+    TDirectArray<__int64> offsets(256, 256);
 
     if (!MakeFilesList(offsets, next, nextParam, targetDir))
         return FALSE;
@@ -387,14 +461,19 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     int i;
     for (i = 0; i < offsets.Count; i++)
     {
-        fseek(f, offsets[i], SEEK_SET);
+        if (_fseeki64(f, offsets[i], SEEK_SET) != 0)
+        {
+            Ret = FALSE;
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_READERROR).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
+            break;
+        }
         if (LHAGetHeader(f, &hdr) != GH_SUCCESS)
         {
             Ret = FALSE;
             break;
         }
 
-        Salamander->ProgressSetTotalSize(CQuadWord(hdr.original_size, 0), ProgressTotal);
+        Salamander->ProgressSetTotalSize(CQuadWord().SetUI64(hdr.original_size), ProgressTotal);
         if (!Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
         {
             Ret = FALSE;
@@ -405,8 +484,8 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
         if (Abort)
             break;
 
-        currentProgress += CQuadWord(hdr.original_size, 0);
-        Salamander->ProgressSetSize(CQuadWord(hdr.original_size, 0), currentProgress, TRUE);
+        currentProgress += CQuadWord().SetUI64(hdr.original_size);
+        Salamander->ProgressSetSize(CQuadWord().SetUI64(hdr.original_size), currentProgress, TRUE);
     }
 
     pfLHAProgress = NULL;
@@ -486,7 +565,7 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                 if (!bFile && !bDir)
                     break; // symlink...?
 
-                Salamander->ProgressSetTotalSize(CQuadWord(hdr.original_size, 0), CQuadWord(-1, -1));
+                Salamander->ProgressSetTotalSize(CQuadWord().SetUI64(hdr.original_size), CQuadWord(-1, -1));
                 if (!Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
                 {
                     Abort = TRUE;
@@ -497,13 +576,18 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                 UnpackInnerBody(f, targetDir, fileName, hdr, bDir);
 
                 if (!bDir)
-                    Salamander->ProgressSetSize(CQuadWord(hdr.original_size, 0), CQuadWord(-1, -1), TRUE);
+                    Salamander->ProgressSetSize(CQuadWord().SetUI64(hdr.original_size), CQuadWord(-1, -1), TRUE);
                 break;
             }
         }
 
         if (!unpacked)
-            fseek(f, hdr.packed_size, SEEK_CUR);
+            if (_fseeki64(f, hdr.packed_size, SEEK_CUR) != 0)
+            {
+                Ret = FALSE;
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_READERROR).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
+                break;
+            }
     }
 
     Salamander->CloseProgressDialog();
@@ -578,7 +662,10 @@ void CPluginInterfaceForArchiver::UnpackInnerBody(FILE* f, const wchar_t* target
         {
             DeleteFileW(targetName.c_str());
             if (bCanceled)
+            {
                 Abort = TRUE;
+                Ret = FALSE;
+            }
         }
         else
             SetFileAttributesW(targetName.c_str(), hdr.attribute);
@@ -638,9 +725,9 @@ static std::wstring FormatLocalDateOrTime(const SYSTEMTIME& time, bool date)
            L":" + (time.wSecond < 10 ? L"0" : L"") + std::to_wstring(time.wSecond);
 }
 
-std::wstring GetInfo(const FILETIME* lastWrite, unsigned size)
+std::wstring GetInfo(const FILETIME* lastWrite, unsigned __int64 size)
 {
-    CALL_STACK_MESSAGE2("GetInfo(, 0x%X)", size);
+    CALL_STACK_MESSAGE2("GetInfo(, 0x%I64X)", size);
     SYSTEMTIME st;
     FILETIME ft;
     FileTimeToLocalFileTime(lastWrite, &ft);
@@ -648,16 +735,19 @@ std::wstring GetInfo(const FILETIME* lastWrite, unsigned size)
 
     const std::wstring date = FormatLocalDateOrTime(st, true);
     const std::wstring time = FormatLocalDateOrTime(st, false);
-    const std::wstring number = SPLNumberToStrOwned(SalamanderGeneral, CQuadWord(size, 0));
+    const std::wstring number = SPLNumberToStrOwned(SalamanderGeneral, CQuadWord().SetUI64(size));
     return number + L", " + date + L", " + time;
 }
 
 static int __cdecl compare_offsets(const void* elem1, const void* elem2)
 {
-    return *((int*)elem1) - *((int*)elem2);
+    const auto left = *static_cast<const __int64*>(elem1);
+    const auto right = *static_cast<const __int64*>(elem2);
+    return left < right ? -1 : left > right ? 1
+                                            : 0;
 }
 
-BOOL CPluginInterfaceForArchiver::MakeFilesList(TDirectArray<int>& offsets, SalEnumSelection next, void* nextParam, const wchar_t* targetDir)
+BOOL CPluginInterfaceForArchiver::MakeFilesList(TDirectArray<__int64>& offsets, SalEnumSelection next, void* nextParam, const wchar_t* targetDir)
 {
     CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::MakeFilesList(, , , %ls)", targetDir);
     const wchar_t* nextName;
@@ -682,7 +772,9 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TDirectArray<int>& offsets, SalE
         }
         else
         {
-            offsets.Add((const int)pfd->PluginData);
+            if (pfd == NULL || pfd->PluginData == 0)
+                return FALSE;
+            offsets.Add(*reinterpret_cast<const __int64*>(pfd->PluginData));
             ProgressTotal += size;
         }
     }
@@ -690,7 +782,7 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TDirectArray<int>& offsets, SalE
     if (errorOccured == SALENUM_CANCEL)
         return FALSE;
 
-    qsort(offsets.GetData(), offsets.Count, sizeof(int), compare_offsets);
+    qsort(offsets.GetData(), offsets.Count, sizeof(__int64), compare_offsets);
     return SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(), targetDir, ProgressTotal, LangStr(IDS_PLUGINNAME).c_str());
 }
 

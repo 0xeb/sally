@@ -18,7 +18,7 @@ class CMainDialog : public CDialog
 protected:
     HFONT HBoldFont;
     BOOL Compressing;
-    BOOL Minidumping;
+    BOOL MinidumpPending;
     CCompressParams CompressParams;
     CMinidumpParams MinidumpParams;
     std::wstring CurrentProgressText;
@@ -34,6 +34,7 @@ public:
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
+    virtual void ShowMinidumpProblem(const std::wstring& message);
     void ShowChilds(CDialogTaskEnum task, BOOL enable);
     void CenterControl(int resID);
 

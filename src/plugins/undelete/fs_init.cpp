@@ -195,7 +195,12 @@ void WINAPI GetSzText()
                 break;
             }
             if (di->Record->Flags & FR_FLAGS_DELETED)
-                *TransferLen = swprintf(TransferBuffer, String<wchar_t>::LangStr(resID).c_str());
+            {
+                const std::wstring text = String<wchar_t>::LangStr(resID);
+                const size_t length = min(text.size(), static_cast<size_t>(TRANSFER_BUFFER_MAX));
+                wmemcpy(TransferBuffer, text.data(), length);
+                *TransferLen = static_cast<int>(length);
+            }
             else
                 *TransferLen = 0; // don't display "Good" for existing files
         }

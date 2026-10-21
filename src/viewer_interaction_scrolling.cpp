@@ -23,10 +23,166 @@
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
+#include "common/text/DecodedRegexLine.h"
+#include "common/text/RegexWordBoundary.h"
 
 BOOL ViewerActive(HWND hwnd)
 {
     return GetForegroundWindow() == hwnd;
+}
+
+BOOL CViewerWindow::FindDecodedRegex(BOOL forward, WORD flags, BOOL& foundMatch, BOOL& fatalErr, BOOL& escPressed)
+{
+    foundMatch = fatalErr = escPressed = FALSE;
+    const auto engineError = [&]() -> BOOL
+    {
+        const std::wstring error = sally::legacy_search::DecodeEngineAcp(RegExp.GetLastErrorText());
+        gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), error.c_str());
+        return FALSE;
+    };
+    // Backward navigation chooses the last eligible forward match; the byte
+    // engine must not reverse UTF-8 before applying its code-point case fold.
+    if (!RegExp.SetFlags((flags & sfCaseSensitive) | sfForward))
+        return engineError();
+    Sally::Viewer::ChunkedByteSource::Scope readScope(DecodedSource);
+    const auto alignStart = [&](__int64& offset) -> bool
+    {
+        offset = Sally::Unicode::AlignToCodeUnit(TextEncoding, max(offset, TextStartOffset()), TextStartOffset());
+        if (TextEncoding == Sally::Unicode::BomEncoding::Utf8)
+        {
+            // At most three continuation bytes can precede a UTF-8 scalar start.
+            for (unsigned i = 0; i < 3 && offset > TextStartOffset(); ++i)
+            {
+                std::uint8_t byte;
+                if (DecodedSource.Copy(offset, &byte, 1) != 1)
+                    return false;
+                if ((byte & 0xC0) != 0x80)
+                    break;
+                --offset;
+            }
+        }
+        else if (offset >= TextStartOffset() + 2)
+        {
+            // Two encoded UTF-16 units; this is codec look-behind, not text storage.
+            std::uint8_t units[4];
+            if (DecodedSource.Copy(offset - 2, units, sizeof(units)) == sizeof(units))
+            {
+                const bool big = TextEncoding == Sally::Unicode::BomEncoding::Utf16Be;
+                const unsigned first = big ? (units[0] << 8) | units[1] : units[0] | (units[1] << 8);
+                const unsigned second = big ? (units[2] << 8) | units[3] : units[2] | (units[3] << 8);
+                if (first >= 0xD800 && first <= 0xDBFF && second >= 0xDC00 && second <= 0xDFFF)
+                    offset -= 2;
+            }
+        }
+        return !DecodedSource.Failed();
+    };
+    __int64 cursor = max(TextStartOffset(), min(FindOffset, FileSize));
+    while (forward ? cursor < FileSize : cursor > TextStartOffset())
+    {
+        __int64 begin, end, adjacent;
+        BOOL endAtBoundary = FALSE;
+        if (forward)
+        {
+            if (!FindPreviousEOL(nullptr, cursor, cursor - FIND_LINE_LEN, begin, adjacent,
+                                 FALSE, TRUE, fatalErr, nullptr, nullptr, nullptr, FALSE, TRUE))
+                begin = cursor;
+            if (fatalErr)
+                return FALSE;
+            __int64 limit = min(FileSize, begin + FIND_LINE_LEN);
+            endAtBoundary = FindNextEOL(nullptr, begin, limit, end, adjacent, fatalErr, TRUE);
+            if (!endAtBoundary)
+            {
+                // A preceding window may have left a partial scalar unconsumed.
+                // Resume that scalar without repeatedly walking the same window.
+                if (!fatalErr && limit < FileSize && limit - cursor < 4)
+                {
+                    begin = cursor;
+                    limit = min(FileSize, begin + FIND_LINE_LEN);
+                    endAtBoundary = FindNextEOL(nullptr, begin, limit, end, adjacent, fatalErr, TRUE);
+                }
+                if (!endAtBoundary)
+                    end = adjacent = limit;
+            }
+        }
+        else
+        {
+            endAtBoundary = FindNextEOL(nullptr, cursor, min(FileSize, cursor + FIND_LINE_LEN), end, adjacent, fatalErr, TRUE);
+            if (!endAtBoundary)
+                end = cursor;
+            if (!fatalErr && !FindPreviousEOL(nullptr, end, end - FIND_LINE_LEN, begin, adjacent,
+                                              FALSE, TRUE, fatalErr, nullptr, nullptr, nullptr, FALSE, TRUE))
+                begin = adjacent = max(TextStartOffset(), end - FIND_LINE_LEN);
+        }
+        if (fatalErr)
+            return FALSE;
+        if (begin < end)
+        {
+            if (!alignStart(begin))
+            {
+                fatalErr = TRUE;
+                return FALSE;
+            }
+            Sally::Unicode::DecodedRun run;
+            if (!DecodeTextRange(nullptr, begin, end, run, fatalErr, endAtBoundary || end >= FileSize) || fatalErr)
+                return FALSE;
+            if (forward && !endAtBoundary && run.CellCount() != 0 && run.RawEnd.back() < end)
+                adjacent = run.RawEnd.back();
+            sally::text::DecodedRegexLine line;
+            DWORD error;
+            if (!line.Build(run, error))
+            {
+                gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), GetErrorTextOwned(error).c_str());
+                return FALSE;
+            }
+            if (!RegExp.SetLine(line.Text.data(), line.Text.data() + line.Text.size()))
+                return engineError();
+            int start = forward ? static_cast<int>(line.StartAt(FindOffset)) : 0;
+            sally::text::DecodedRegexLine::Match chosen;
+            bool haveMatch = false;
+            while (start <= static_cast<int>(line.Text.size()))
+            {
+                int length;
+                const int found = RegExp.SearchForward(start, length);
+                if (found == -1)
+                    break;
+                if (length == 0)
+                {
+                    gPrompter->ShowInfo(HWindow, LoadStrW(IDS_FINDTITLE), LoadStrW(IDS_EMPTYMATCH));
+                    return FALSE;
+                }
+                sally::text::DecodedRegexLine::Match match;
+                if (line.Map(found, length, match) &&
+                    (forward ? match.RawStart >= FindOffset : match.RawEnd <= FindOffset) &&
+                    (!FindDialog.WholeWords || sally::text::HasWideWordBoundariesUtf8(
+                                                   line.Text, match.ByteStart, match.ByteEnd - match.ByteStart)))
+                {
+                    chosen = match;
+                    haveMatch = true;
+                    if (forward)
+                        break;
+                }
+                start = found + 1; // includes overlapping candidates and always advances
+            }
+            if (haveMatch)
+            {
+                StartSelection = chosen.RawStart;
+                EndSelection = chosen.RawEnd;
+                FindOffset = forward ? EndSelection : StartSelection;
+                SelectionIsFindResult = TRUE;
+                foundMatch = TRUE;
+                return TRUE;
+            }
+        }
+        if (((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && ViewerActive(HWindow)) || GetSafeWaitWindowClosePressed())
+        {
+            escPressed = TRUE;
+            return TRUE;
+        }
+        if (forward ? adjacent <= cursor : adjacent >= cursor)
+            break;
+        cursor = FindOffset = adjacent;
+    }
+    return TRUE;
 }
 
 // proportional to the window width, it's just an "estimate"
@@ -1000,7 +1156,6 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     return 0;
                 else
                 {
-                    InitFindDialog(FindDialog);
                     if (FindDialog.Forward != forw)
                     {
                         FindOffset = SeekY;
@@ -1009,6 +1164,8 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                 }
             }
+            if (!InitFindDialog(FindDialog, TRUE))
+                return 0;
             BOOL forward = (LOWORD(wParam) != CM_FINDPREV) ^ (!FindDialog.Forward);
             WORD flags = (WORD)((FindDialog.CaseSensitive ? sfCaseSensitive : 0) |
                                 (forward ? sfForward : 0));
@@ -1039,18 +1196,21 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             BOOL fatalErr = FALSE;
             FindingSoDonotSwitchToHex = TRUE; // during searching disable switching to "hex" when a line has more than 10000 characters
-            if (HasDecodedTextMode() && !FindDialog.Regular && !FindDialog.HexMode)
+            if (HasDecodedTextMode() && !FindDialog.HexMode)
             {
                 BOOL foundMatch = FALSE;
-                if (FindDecodedLiteral(&hFile, forward, flags, foundMatch, fatalErr) && foundMatch)
+                const BOOL searched = FindDialog.Regular
+                                          ? FindDecodedRegex(forward, flags, foundMatch, fatalErr, escPressed)
+                                          : FindDecodedLiteral(&hFile, forward, flags, foundMatch, fatalErr);
+                if (searched && foundMatch)
                     found = 0;
+                else if (!searched)
+                    noNotFound = TRUE;
             }
             else if (FindDialog.Regular)
             {
                 if (RegExp.SetFlags(flags))
                 {
-                    BOOL oldConfigEOL_NULL = Configuration.EOL_NULL;
-                    Configuration.EOL_NULL = TRUE; // no regexp for binary strings :(
                     __int64 len;
                     __int64 lineEnd;
                     __int64 lineBegin;
@@ -1058,7 +1218,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         __int64 nextLineBegin;
                         if (!FindPreviousEOL(&hFile, FindOffset, FindOffset - FIND_LINE_LEN,
-                                             lineBegin, nextLineBegin /* dummy */, FALSE, TRUE, fatalErr, NULL))
+                                             lineBegin, nextLineBegin /* dummy */, FALSE, TRUE, fatalErr, NULL, NULL, NULL, FALSE, TRUE))
                         { // beginning nowhere in sight
                             lineBegin = FindOffset;
                         }
@@ -1068,7 +1228,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             while (lineBegin < FileSize)
                             {
                                 __int64 maxSeek = min(FileSize, lineBegin + FIND_LINE_LEN);
-                                if (!FindNextEOL(&hFile, lineBegin, maxSeek, lineEnd, nextLineBegin, fatalErr))
+                                if (!FindNextEOL(&hFile, lineBegin, maxSeek, lineEnd, nextLineBegin, fatalErr, TRUE))
                                 { // end nowhere in sight
                                     lineEnd = nextLineBegin = maxSeek;
                                 }
@@ -1169,7 +1329,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         __int64 previousLineEnd;
                         if (!FindNextEOL(&hFile, FindOffset, FindOffset + FIND_LINE_LEN,
-                                         lineEnd, previousLineEnd /* dummy */, fatalErr))
+                                         lineEnd, previousLineEnd /* dummy */, fatalErr, TRUE))
                         { // end nowhere in sight
                             lineEnd = FindOffset;
                         }
@@ -1179,7 +1339,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             while (lineEnd > TextStartOffset())
                             {
                                 if (!FindPreviousEOL(&hFile, lineEnd, lineEnd - FIND_LINE_LEN,
-                                                     lineBegin, previousLineEnd, FALSE, TRUE, fatalErr, NULL))
+                                                     lineBegin, previousLineEnd, FALSE, TRUE, fatalErr, NULL, NULL, NULL, FALSE, TRUE))
                                 { // beginning nowhere in sight
                                     lineBegin = previousLineEnd = lineEnd - FIND_LINE_LEN;
                                 }
@@ -1276,7 +1436,6 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             }
                         }
                     }
-                    Configuration.EOL_NULL = oldConfigEOL_NULL;
                 }
                 else
                 {

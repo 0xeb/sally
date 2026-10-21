@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
+#include "filecomp_input_paths.h"
 
 // menu ID definitions
 #define MID_COMPAREFILES 1
@@ -85,15 +86,18 @@ class CFilecompThread : public CThread
 public:
     std::wstring Path1;
     std::wstring Path2;
+    CFilecompPathContext PathContext;
     BOOL DontConfirmSelection;
     std::string ReleaseEvent;
 
     CFilecompThread(const wchar_t* file1, const wchar_t* file2,
-                    BOOL dontConfirmSelection, const char* releaseEvent)
+                    BOOL dontConfirmSelection, const char* releaseEvent,
+                    const CFilecompPathContext* pathContext = nullptr)
         : CThread(L"Filecomp Thread")
     {
         Path1 = file1 ? file1 : L"";
         Path2 = file2 ? file2 : L"";
+        PathContext = pathContext ? *pathContext : CaptureFilecompPathContext(*SG, *gPathService, FilecompInitialDirectory(Path1));
         DontConfirmSelection = dontConfirmSelection;
         ReleaseEvent = releaseEvent ? releaseEvent : "";
     }
@@ -102,4 +106,5 @@ public:
 };
 
 extern CWindowQueue MainWindowQueue; // list of all FileComp windows
+extern CWindowQueue CompareDialogHistoryQueue; // live initial and nested Compare Files dialogs
 extern CThreadQueue ThreadQueue;     // list of all FileComp windows, workers, and the remote control

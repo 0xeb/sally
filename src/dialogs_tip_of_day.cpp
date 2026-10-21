@@ -9,6 +9,7 @@
 #include "ui/IPrompter.h"
 #include "common/IFileEnumerator.h"
 #include "common/TipOfDayResource.h"
+#include "common/configuration/OverlayChoices.h"
 #include "common/unicode/helpers.h"
 #include "common/widepath.h"
 #include "common/fsutil.h" // GetRootPathW - the FREE function, not the CPluginFSInterfaceAbstract method
@@ -576,10 +577,21 @@ int CSharesDialog::GetFocusedIndex()
 
 void CSharesDialog::DeleteShare(const wchar_t* shareName)
 {
+    const DWORD status = RemoveShare(shareName);
+    if (status != ERROR_SUCCESS)
+    {
+        const std::wstring error = GetErrorTextOwned(status);
+        const std::wstring message = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), shareName, error.c_str());
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), message.c_str());
+    }
+}
+
+DWORD CSharesDialog::RemoveShare(const wchar_t* shareName)
+{
     // shareName is the exact wide name from NetShareEnum now - no ANSI
     // round trip before NetShareDel (a Unicode-only API to begin with), so a share
     // name CP_ACP cannot spell no longer gets narrowed, mangled, and rewidened wrong.
-    NetShareDel(NULL, const_cast<LPWSTR>(shareName), 0);
+    return NetShareDel(NULL, const_cast<LPWSTR>(shareName), 0);
 }
 
 void CSharesDialog::OnContextMenu(int x, int y)
@@ -1578,11 +1590,28 @@ void CCompareDirsDialog::Transfer(CTransferInfo& ti)
 
     if (ti.Type == ttDataToWindow)
     {
+        // WM_INITDIALOG collapses before the base class loads these settings.
+        // Keep hidden options off after that load, just as an explicit collapse.
+        if (!Expanded)
+        {
+            for (int id : {IDC_COMPARE_SUBDIRS_ATTR, IDC_COMPARE_ONE_PANEL_DIRS,
+                           IDC_COMPARE_IGNORE_FILES, IDC_COMPARE_IGNORE_DIRS})
+                CheckDlgButton(HWindow, id, BST_UNCHECKED);
+        }
         EnableControls();
     }
     else
     {
         Configuration.CompareMoreOptions = Expanded;
+        if (!Expanded)
+        {
+            // Unsupported panel capabilities can bypass individual checkbox
+            // transfers. A collapsed confirmation must still retire old flags.
+            Configuration.CompareSubdirsAttr = FALSE;
+            Configuration.CompareOnePanelDirs = FALSE;
+            Configuration.CompareIgnoreFiles = FALSE;
+            Configuration.CompareIgnoreDirs = FALSE;
+        }
     }
 }
 
@@ -1593,13 +1622,13 @@ void CCompareDirsDialog::EnableControls()
     EnableWindow(GetDlgItem(HWindow, IDC_COMPARE_BYATTR), EnableByAttrs);
     EnableWindow(GetDlgItem(HWindow, IDC_COMPARE_BYCONTENT), EnableByContent);
     EnableWindow(GetDlgItem(HWindow, IDC_COMPARE_SUBDIRS), EnableSubdirs);
-    BOOL subdirs = EnableCompAttrsOfSubdirs &&
-                   EnableSubdirs && IsDlgButtonChecked(HWindow, IDC_COMPARE_SUBDIRS) == BST_CHECKED;
+    BOOL subdirs = EnableSubdirs && IsDlgButtonChecked(HWindow, IDC_COMPARE_SUBDIRS) == BST_CHECKED;
     EnableWindow(GetDlgItem(HWindow, IDC_COMPARE_ONE_PANEL_DIRS), !subdirs);
     if (subdirs)
         CheckDlgButton(HWindow, IDC_COMPARE_ONE_PANEL_DIRS, BST_UNCHECKED);
-    EnableWindow(GetDlgItem(HWindow, IDC_COMPARE_SUBDIRS_ATTR), subdirs);
-    if (!subdirs)
+    BOOL subdirAttrs = subdirs && EnableCompAttrsOfSubdirs;
+    EnableWindow(GetDlgItem(HWindow, IDC_COMPARE_SUBDIRS_ATTR), subdirAttrs);
+    if (!subdirAttrs)
         CheckDlgButton(HWindow, IDC_COMPARE_SUBDIRS_ATTR, BST_UNCHECKED);
 
     BOOL ignoreFiles = IsDlgButtonChecked(HWindow, IDC_COMPARE_IGNORE_FILES);
@@ -2614,24 +2643,38 @@ void CCfgPageIconOvrls::Transfer(CTransferInfo& ti)
     }
     else
     {
-        wchar_t* oldDisabledCustomIconOverlays = Configuration.DisabledCustomIconOverlays;
-        Configuration.DisabledCustomIconOverlays = NULL;
-        int i;
-        for (i = 0; i < ListOfShellIconOverlays.Count; i++)
+        bool namesChanged = false;
+        try
         {
-            if (ListView_GetItemState(HListView, i, LVIS_STATEIMAGEMASK) == INDEXTOSTATEIMAGEMASK(1))
-            { // unchecked checkbox -> add the name to the list of disabled icon overlay handlers
-                AddToListOfDisabledCustomIconOverlays(ListOfShellIconOverlays[i]->IconOverlayName.c_str());
+            std::vector<sally::configuration::OverlayChoice> choices;
+            choices.reserve(ListOfShellIconOverlays.Count);
+            for (int i = 0; i < ListOfShellIconOverlays.Count; ++i)
+                choices.push_back({ListOfShellIconOverlays[i]->IconOverlayName,
+                                   ListView_GetItemState(HListView, i, LVIS_STATEIMAGEMASK) == INDEXTOSTATEIMAGEMASK(1)});
+            const std::wstring previous = Configuration.DisabledCustomIconOverlays != NULL
+                                              ? Configuration.DisabledCustomIconOverlays
+                                              : L"";
+            const std::wstring merged = sally::configuration::MergeDisabledOverlayNames(previous, choices);
+            namesChanged = merged != previous;
+            if (namesChanged)
+            {
+                wchar_t* replacement = merged.empty() ? NULL : _wcsdup(merged.c_str());
+                if (!merged.empty() && replacement == NULL)
+                    throw std::bad_alloc();
+                wchar_t* old = Configuration.DisabledCustomIconOverlays;
+                Configuration.DisabledCustomIconOverlays = replacement;
+                free(old);
             }
         }
-        if (oldEnableCustomIconOverlays != Configuration.EnableCustomIconOverlays ||
-            wcscmp(oldDisabledCustomIconOverlays != NULL ? oldDisabledCustomIconOverlays : L"",
-                   Configuration.DisabledCustomIconOverlays != NULL ? Configuration.DisabledCustomIconOverlays : L"") != 0)
-        { // configuration change -> notify that it takes effect after Salamander restarts
-            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_ICONOVRLS_CHANGE));
+        catch (const std::bad_alloc&)
+        {
+            Configuration.EnableCustomIconOverlays = oldEnableCustomIconOverlays;
+            ti.ErrorOn(IDC_ICONOVRLS_LIST);
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(ERROR_NOT_ENOUGH_MEMORY).c_str());
+            return;
         }
-        if (oldDisabledCustomIconOverlays != NULL)
-            free(oldDisabledCustomIconOverlays);
+        if (oldEnableCustomIconOverlays != Configuration.EnableCustomIconOverlays || namesChanged)
+            gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_ICONOVRLS_CHANGE));
     }
 }
 

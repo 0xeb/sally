@@ -5,20 +5,11 @@
 #pragma once
 
 #include "wrappers.h"
+#include "digest_parser.h"
 
 #include <string>
 
 #define SizeOf(x) (sizeof(x) / sizeof(x[0]))
-
-typedef enum eHASH_TYPE
-{
-    HT_CRC,
-    HT_MD5,
-    HT_SHA1,
-    HT_SHA256,
-    HT_SHA512,
-    HT_COUNT // Not a hash type but # of known hash types
-} eHASH_TYPE;
 
 typedef struct SHashInfo
 {

@@ -256,6 +256,39 @@ public:
     // following its target. Other reparse tags are rejected explicitly.
     virtual FileResult DeleteDirectoryReparseData(const wchar_t* path)
     { (void)path; return FileResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+
+    // Strict metadata-preserving replacement. A backup is mandatory: some
+    // ReplaceFile failures otherwise remove the original name without recovery.
+    // No ignore-ACL/merge-error flags and no rename-overwrite fallback.
+    virtual FileResult ReplaceFileWithBackup(const wchar_t* original, const wchar_t* replacement,
+                                             const wchar_t* backup)
+    {
+        (void)original;
+        (void)replacement;
+        (void)backup;
+        return FileResult::Error(ERROR_CALL_NOT_IMPLEMENTED);
+    }
+
+    // Files and directories, requiring only FILE_WRITE_ATTRIBUTES. NULL leaves
+    // a timestamp unchanged; opening, setting and closing errors are checked.
+    virtual FileResult SetPathFileTime(const wchar_t* path, const FILETIME* creation,
+                                       const FILETIME* access, const FILETIME* write)
+    {
+        (void)path;
+        (void)creation;
+        (void)access;
+        (void)write;
+        return FileResult::Error(ERROR_CALL_NOT_IMPLEMENTED);
+    }
+    // Advisory canonical comparison key, resolving existing ancestors/links and
+    // retaining nonexistent suffixes. The key is not an I/O path. Callers must
+    // preserve ordinary error handling if the filesystem cannot resolve it.
+    virtual FileResult ResolvePathForComparison(const wchar_t* path, std::wstring& key)
+    {
+        (void)path;
+        key.clear();
+        return FileResult::Error(ERROR_CALL_NOT_IMPLEMENTED);
+    }
 };
 
 // Global file system instance - default is Win32 implementation

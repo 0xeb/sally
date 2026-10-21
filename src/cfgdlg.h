@@ -4,6 +4,11 @@
 
 #pragma once
 
+#include "common/configuration/ConfigurationSearchIndex.h"
+#include "common/configuration/ConfigurationDraft.h"
+#include <functional>
+#include <utility>
+
 class CColorArrowButton;
 
 //****************************************************************************
@@ -48,6 +53,7 @@ public:
         : TIndirectArray<CHighlightMasksItem>(base, delta, dt) {}
 
     BOOL Load(CHighlightMasks& source);
+    void LoadFromRegistry(HKEY key);
 
     // searches all masks and if it finds a matching item, it returns a pointer to it
     // otherwise returns NULL; 'fileExt' is NULL for directories (the extension must be resolved)
@@ -499,6 +505,7 @@ public:
     void Init();
 
     void Enter();
+    BOOL TryEnter(); // checked acquisition for durable credential transactions
     void Leave();
 };
 
@@ -548,6 +555,7 @@ class CToolbarHeader;
 
 class CCfgPageView : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     BOOL Dirty;
     CToolbarHeader* Header;
@@ -555,6 +563,7 @@ protected:
     CToolbarHeader* Header2;
     HWND HListView2;
     CViewTemplates Config;
+    int OriginalTemplateIndex[VIEW_TEMPLATES_COUNT]; // draft slot -> slot at the last Apply
     BOOL DisableNotification;
     BOOL LabelEdit;
     int SelectIndex;
@@ -623,6 +632,7 @@ protected:
 
 class CCfgPageViewer : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     HFONT HFont;
     BOOL LocalUseCustomViewerFont;
@@ -669,6 +679,7 @@ class CSmallIconWindow : public CWindow
 
 class CCfgPageUserMenu : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 public:
     CCfgPageUserMenu(CUserMenuItems* userMenuItems);
     ~CCfgPageUserMenu();
@@ -700,6 +711,7 @@ class CHotPathItems;
 
 class CCfgPageHotPath : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     BOOL Dirty;
     CToolbarHeader* Header;
@@ -753,6 +765,7 @@ protected:
 
 class CCfgPageColors : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     CColorArrowButton* Items[CFG_COLORS_BUTTONS];
     CColorArrowButton* Masks[CFG_COLORS_BUTTONS];
@@ -852,6 +865,7 @@ public:
 
 class CCfgPageViewers : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     BOOL Alternative;
 
@@ -879,6 +893,7 @@ protected:
 
 class CCfgPageEditors : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 public:
     CCfgPageEditors();
 
@@ -943,6 +958,7 @@ class CPackerConfig;
 
 class CCfgPagePackers : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     CPackerConfig* Config;
     CEditListBox* EditLB;
@@ -969,6 +985,7 @@ class CUnpackerConfig;
 
 class CCfgPageUnpackers : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     CUnpackerConfig* Config;
     CEditListBox* EditLB;
@@ -995,6 +1012,7 @@ class CArchiverConfig;
 
 class CCfgPageExternalArchivers : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     CArchiverConfig* Config;
     BOOL DisableNotification;
@@ -1021,6 +1039,7 @@ class CPackerFormatConfig;
 
 class CCfgPageArchivesAssoc : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     CPackerFormatConfig* Config;
     CEditListBox* EditLB;
@@ -1067,6 +1086,7 @@ class CCfgPageShellExt: public CCommonPropSheetPage
 
 class CCfgPageAppearance : public CCommonPropSheetPage
 {
+    friend class CConfigurationDlg;
 protected:
     HIMAGELIST HIconsList;
     HFONT HPanelFont;
@@ -1173,6 +1193,7 @@ public:
     // mode: 0 - normal
     //       1 - hot paths
     CConfigurationDlg(HWND parent, CUserMenuItems* userMenuItems, int mode = 0, int param = 0);
+    void SetApplyHandler(std::function<void()> handler) { ApplyHandler = std::move(handler); }
 
 public:
     CCfgPageGeneral PageGeneral;
@@ -1209,6 +1230,41 @@ public:
     HWND HOldPluginMsgBoxParent;
 
 protected:
+    sally::configuration::DialogFont ConfigurationFont;
+    std::function<void()> ApplyHandler;
+    std::wstring ApplyCaption;
+    sally::configuration::SearchIndex ConfigurationSearch;
+    std::vector<sally::configuration::SearchResult> SearchResults;
+    HWND SearchOpen = NULL;
+    HWND SearchClose = NULL;
+    HWND SearchToolTip = NULL;
+    std::wstring SearchOpenCaption;
+    std::wstring SearchCloseCaption;
+    HWND SearchEdit = NULL;
+    HWND SearchClear = NULL;
+    HWND SearchList = NULL;
+    bool HasSearch = false;
+    bool SearchExpanded = false;
+    void UpdateSearch();
+    void ClearSearch();
+    void OpenSearch();
+    void CloseSearch();
+    void DrawSearchAction(const DRAWITEMSTRUCT& item);
+    std::vector<sally::configuration::DraftState> AppliedDrafts;
+    sally::configuration::DraftState CaptureDraft(int page);
+    void UpdateApplyState();
+    void ResetAppliedDrafts();
+    virtual void PageCreated(int page) override;
+
+    virtual bool PrepareDialogTemplate(const void* source, std::size_t size, std::vector<BYTE>& output) override;
+    virtual void IndexPageResource(int page, const void* source, std::size_t size) override;
+    virtual int NavigationHeaderHeight(HWND window) override;
+    virtual void LayoutNavigation(const RECT& area) override;
+    virtual bool HandleDialogMessage(UINT message, WPARAM wParam, LPARAM lParam) override;
+    virtual bool PreTranslateMessage(const MSG& message) override;
+    virtual const WCHAR* ApplyButtonCaption() const override { return ApplyCaption.c_str(); }
+    virtual bool AfterTransfer(bool save) override;
+    virtual bool ScrollablePages() const override { return true; }
     virtual void DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 

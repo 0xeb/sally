@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include "regedt_number_parse.h"
+#include "regedt_raw_value_io.h"
 
 TDirectArray<DWORD_PTR> DialogStack(4, 4);
 CCS DialogStackCS;
@@ -416,24 +417,11 @@ void CNewValDialog::Transfer(CTransferInfoEx& ti)
     HWND combo = GetDlgItem(HWindow, IDC_TYPE);
     if (ti.Type == ttDataToWindow)
     {
-        int sel = 0;
-        CRegTypeText* tt = RegTypeTexts;
-        while (tt->Text != NULL)
+        if (!PopulateRegistryTypeCombo(combo, RegTypeTexts, DlgType, *Type))
         {
-            if (DlgType == vdtNewValDialog && tt->CanCreate ||
-                DlgType == vdtEditValDialog && tt->CanEdit)
-            {
-                int ret = (int)SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)tt->Text);
-                if (ret != CB_ERR)
-                {
-                    SendMessage(combo, CB_SETITEMDATA, ret, (LPARAM)tt->Type);
-                    if (tt->Type == *Type)
-                        sel = ret;
-                }
-            }
-            tt++;
+            ti.ErrorOn(IDC_TYPE);
+            return;
         }
-        SendMessage(combo, CB_SETCURSEL, sel, 0);
     }
     else
     {
@@ -750,8 +738,8 @@ BOOL CRawEditValDialog::ExportToTempFile()
         return Error(IDS_CREATETEMP);
     }
 
-    DWORD written;
-    BOOL b = WriteFile(file, Data, Size, &written, NULL) || written != Size;
+    DWORD transferError;
+    BOOL b = sally::regedt::WriteRawValue(file, Data, Size, transferError);
 
     CloseHandle(file);
 
@@ -789,27 +777,13 @@ BOOL CRawEditValDialog::ImportFromTempFile()
         return Error(IDS_LONGDATA);
     }
 
-    LPBYTE newData = (LPBYTE)malloc(size.LoDWord);
-    if (!newData)
-    {
-        CloseHandle(file);
-        return Error(IDS_LOWMEM);
-    }
-
-    DWORD read;
-    BOOL b = ReadFile(file, newData, size.LoDWord, &read, NULL) || read != size.LoDWord;
+    DWORD transferError;
+    BOOL b = sally::regedt::ReadRawValue(file, size.LoDWord, Data, Size, Allocated, transferError);
 
     CloseHandle(file);
 
-    if (b)
-    {
-        if (Data)
-            free(Data);
-        Data = newData;
-        Size = Allocated = size.LoDWord;
-    }
-    else
-        Error(IDS_READTEMP);
+    if (!b)
+        Error(transferError == ERROR_NOT_ENOUGH_MEMORY ? IDS_LOWMEM : IDS_READTEMP);
 
     return b;
 }

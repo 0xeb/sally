@@ -853,7 +853,7 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
                 if (first != 0)
                     name.erase(0, first);
 
-                if (!name.empty())
+                if (!name.empty() && name != L"." && name != L"..")
                 {
                     if (!Add(FALSE, name.c_str()))
                         break;

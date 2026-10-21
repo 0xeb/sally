@@ -433,6 +433,12 @@ public:
         return false;
     }
 
+    RegistryResult FlushKey(HKEY key) override
+    {
+        const LONG result = RegFlushKey(key);
+        return result == ERROR_SUCCESS ? RegistryResult::Ok() : RegistryResult::Error(result);
+    }
+
     bool ValueExists(HKEY key, const wchar_t* valueName) override
     {
         LONG res = RegQueryValueExW(key, valueName, nullptr, nullptr, nullptr, nullptr);

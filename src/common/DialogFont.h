@@ -5,6 +5,39 @@
 
 namespace Sally::Appearance
 {
+inline SIZE DialogFontUnits(HWND window, HFONT font)
+{
+    HDC dc = GetDC(window);
+    if (dc == nullptr || font == nullptr)
+    {
+        if (dc != nullptr) ReleaseDC(window, dc);
+        return {};
+    }
+    HGDIOBJ previous = SelectObject(dc, font);
+    SIZE extent = {};
+    TEXTMETRICW metrics = {};
+    const bool measured = GetTextExtentPoint32W(dc, L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", 52, &extent) &&
+        GetTextMetricsW(dc, &metrics);
+    SelectObject(dc, previous);
+    ReleaseDC(window, dc);
+    return measured ? SIZE{(extent.cx / 26 + 1) / 2, metrics.tmHeight} : SIZE{};
+}
+
+inline void MapCurrentDialogRect(HWND window, RECT& rect)
+{
+    const HFONT font = reinterpret_cast<HFONT>(SendMessageW(window, WM_GETFONT, 0, 0));
+    const SIZE units = DialogFontUnits(window, font);
+    if (units.cx <= 0 || units.cy <= 0)
+    {
+        MapDialogRect(window, &rect);
+        return;
+    }
+    rect.left = MulDiv(rect.left, units.cx, 4);
+    rect.right = MulDiv(rect.right, units.cx, 4);
+    rect.top = MulDiv(rect.top, units.cy, 8);
+    rect.bottom = MulDiv(rect.bottom, units.cy, 8);
+}
+
 inline LOGFONTW SystemDialogFont(unsigned dpi)
 {
     HDC dc = GetDC(nullptr);

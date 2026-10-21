@@ -293,6 +293,59 @@ const char* RegExpErrorText(CRegExpErrors err)
 // CViewerWindow
 //
 
+BOOL CViewerWindow::InitFindDialog(CFindSetDialog& dlg, BOOL reportErrors)
+{
+    FindDialog = dlg;
+    SearchData.Clear();
+    RegExp.Clear();
+    if (FindDialog.Text.empty())
+        return FALSE;
+
+    const auto fail = [&](DWORD error) -> BOOL
+    {
+        if (reportErrors)
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), GetErrorTextOwned(error).c_str());
+        return FALSE;
+    };
+    if (!FindDialog.Regular && FindDialog.HexMode)
+    {
+        std::vector<std::uint8_t> bytes;
+        if (!Sally::Unicode::ParseHexPattern(FindDialog.Text.c_str(), bytes))
+            return fail(ERROR_INVALID_DATA);
+        // The byte engine requires an extra terminator even with an explicit length.
+        const std::string pattern(bytes.begin(), bytes.end());
+        SearchData.Set(pattern.c_str(), static_cast<int>(pattern.size()), 0);
+        return SearchData.IsGood() ? TRUE : fail(ERROR_NOT_ENOUGH_MEMORY);
+    }
+    if (!FindDialog.Regular && HasDecodedTextMode())
+        return TRUE; // FindDecodedLiteral consumes the original owned UTF-16 pattern.
+
+    const bool decodedRegex = FindDialog.Regular && HasDecodedTextMode();
+    std::string pattern;
+    const Win32TextConversionResult conversion = decodedRegex
+                                                     ? sally::legacy_search::EncodePatternUtf8(FindDialog.Text, pattern)
+                                                     : sally::legacy_search::EncodePatternAcpExact(FindDialog.Text, pattern);
+    if (!conversion.Succeeded())
+        return fail(conversion.Win32Error);
+    if (FindDialog.Regular)
+    {
+        RegExp.SetFoldEncoding(decodedRegex ? CRegularExpression::FoldEncoding::Utf8
+                                            : CRegularExpression::FoldEncoding::Acp);
+        const WORD flags = sfForward | (FindDialog.CaseSensitive ? sfCaseSensitive : 0);
+        if (RegExp.Set(pattern.c_str(), flags))
+            return TRUE;
+        if (reportErrors)
+        {
+            const std::wstring error = sally::legacy_search::DecodeEngineAcp(RegExp.GetLastErrorText());
+            const std::wstring message = FormatStrW(LoadStrW(IDS_INVALIDREGEXP), FindDialog.Text.c_str(), error.c_str());
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), message.c_str());
+        }
+        return FALSE;
+    }
+    SearchData.Set(pattern.c_str(), 0);
+    return SearchData.IsGood() ? TRUE : fail(ERROR_NOT_ENOUGH_MEMORY);
+}
+
 void CViewerWindow::ConfigHasChanged()
 {
     CALL_STACK_MESSAGE1("CViewerWindow::ConfigHasChanged()");
@@ -774,6 +827,12 @@ int CViewerWindow::SalMessageBoxViewerPaintBlocked(HWND hParent, const wchar_t* 
                   ? IDCANCEL
                   : IDOK;
     }
+    else if (buttons == MB_YESNO)
+    {
+        res = gPrompter->AskYesNo(captionW.c_str(), textW.c_str()).type == PromptResult::kYes
+                  ? IDYES
+                  : IDNO;
+    }
     else if (buttons == MB_YESNOCANCEL)
     {
         auto r = gPrompter->AskYesNoCancel(captionW.c_str(), textW.c_str());
@@ -1081,7 +1140,7 @@ void CViewerWindow::FatalFileErrorOccured(DWORD repeatCmd)
     PostMessage(HWindow, WM_USER_VIEWERREFRESH, 0, 0);
 }
 
-BOOL CViewerWindow::FindNextEOL(HANDLE* hFile, __int64 seek, __int64 maxSeek, __int64& lineEnd, __int64& nextLineBegin, BOOL& fatalErr)
+BOOL CViewerWindow::FindNextEOL(HANDLE* hFile, __int64 seek, __int64 maxSeek, __int64& lineEnd, __int64& nextLineBegin, BOOL& fatalErr, BOOL breakAtNul)
 {
     CALL_STACK_MESSAGE_NONE
     // CALL_STACK_MESSAGE3("CViewerWindow::FindNextEOL(%g, %g, , ,)", (double)seek, (double)maxSeek);
@@ -1092,7 +1151,9 @@ BOOL CViewerWindow::FindNextEOL(HANDLE* hFile, __int64 seek, __int64 maxSeek, __
     if (HasDecodedTextMode())
     {
         UNREFERENCED_PARAMETER(hFile);
-        Sally::Viewer::TextEngine engine(DecodedSource, DecodedLayoutConfig(0, FALSE));
+        auto layout = DecodedLayoutConfig(0, FALSE);
+        layout.Eol.Nul = layout.Eol.Nul || breakAtNul != FALSE;
+        Sally::Viewer::TextEngine engine(DecodedSource, layout);
         bool found = false;
         if (engine.FindLineEnd(seek, maxSeek, lineEnd, nextLineBegin, found) != Sally::Viewer::TextStatus::Ok)
         {
@@ -1148,7 +1209,7 @@ BOOL CViewerWindow::FindNextEOL(HANDLE* hFile, __int64 seek, __int64 maxSeek, __
                     }
                     else
                     {
-                        if (*s == 0 && Configuration.EOL_NULL)
+                        if (*s == 0 && (breakAtNul || Configuration.EOL_NULL))
                             break;
                     }
                 }
@@ -1189,7 +1250,7 @@ BOOL CViewerWindow::FindNextEOL(HANDLE* hFile, __int64 seek, __int64 maxSeek, __
 BOOL CViewerWindow::FindPreviousEOL(HANDLE* hFile, __int64 seek, __int64 minSeek, __int64& lineBegin,
                                     __int64& previousLineEnd, BOOL allowWrap, BOOL takeLineBegin,
                                     BOOL& fatalErr, int* lines, __int64* firstLineEndOff,
-                                    __int64* firstLineCharLen, BOOL addLineIfSeekIsWrap)
+                                    __int64* firstLineCharLen, BOOL addLineIfSeekIsWrap, BOOL breakAtNul)
 {
     SLOW_CALL_STACK_MESSAGE6("CViewerWindow::FindPreviousEOL(%g, %g, , , %d, %d, , , , , %d)",
                              (double)seek, (double)minSeek, allowWrap, takeLineBegin, addLineIfSeekIsWrap);
@@ -1202,7 +1263,7 @@ BOOL CViewerWindow::FindPreviousEOL(HANDLE* hFile, __int64 seek, __int64 minSeek
     {
         return FindPreviousDecodedEOL(hFile, seek, minSeek, lineBegin, previousLineEnd, allowWrap,
                                       takeLineBegin, fatalErr, lines, firstLineEndOff,
-                                      firstLineCharLen, addLineIfSeekIsWrap);
+                                      firstLineCharLen, addLineIfSeekIsWrap, breakAtNul);
     }
     BOOL collectTabs = allowWrap && WrapText || firstLineCharLen != NULL;
     unsigned char *s, *end;
@@ -1265,7 +1326,7 @@ BOOL CViewerWindow::FindPreviousEOL(HANDLE* hFile, __int64 seek, __int64 minSeek
                     }
                     else
                     {
-                        if (*s == 0 && Configuration.EOL_NULL)
+                        if (*s == 0 && (breakAtNul || Configuration.EOL_NULL))
                             break;
                         else
                         {
@@ -1432,7 +1493,7 @@ Sally::Viewer::TextLayoutConfig CViewerWindow::DecodedLayoutConfig(int wrapColum
 BOOL CViewerWindow::FindPreviousDecodedEOL(HANDLE* hFile, __int64 seek, __int64 minSeek, __int64& lineBegin,
                                            __int64& previousLineEnd, BOOL allowWrap, BOOL takeLineBegin,
                                            BOOL& fatalErr, int* lines, __int64* firstLineEndOff,
-                                           __int64* firstLineCharLen, BOOL addLineIfSeekIsWrap)
+                                           __int64* firstLineCharLen, BOOL addLineIfSeekIsWrap, BOOL breakAtNul)
 {
     UNREFERENCED_PARAMETER(hFile);
     fatalErr = FALSE;
@@ -1448,7 +1509,9 @@ BOOL CViewerWindow::FindPreviousDecodedEOL(HANDLE* hFile, __int64 seek, __int64 
     {
         const BOOL armLongLine = !FindingSoDonotSwitchToHex && CanSwitchToHex && !ForceTextMode &&
                                  minSeek <= TextStartOffset();
-        Sally::Viewer::TextEngine engine(DecodedSource, DecodedLayoutConfig(allowWrap ? DecodedWrapColumns() : 0, armLongLine));
+        auto layout = DecodedLayoutConfig(allowWrap ? DecodedWrapColumns() : 0, armLongLine);
+        layout.Eol.Nul = layout.Eol.Nul || breakAtNul != FALSE;
+        Sally::Viewer::TextEngine engine(DecodedSource, layout);
         Sally::Viewer::PreviousLineResult found;
         const Sally::Viewer::TextStatus status = engine.FindPreviousLine(query, found, lines);
         if (status == Sally::Viewer::TextStatus::LongLine)
@@ -2078,6 +2141,9 @@ CViewerWindow::GetSelectedText(BOOL& fatalErr)
                         return NULL;
                     }
                     memcpy(s, Buffer + (off - Seek), (int)len);
+                    // Clipboard and text drag formats are NUL-terminated. Preserve
+                    // the rest of the selection without changing the source bytes.
+                    std::replace(s, s + len, '\0', ' ');
                     s += len;
                     off += len;
                 }
@@ -2127,6 +2193,8 @@ CViewerWindow::GetSelectedTextW(BOOL& fatalErr, int* textLen)
     if (fatalErr)
         return NULL;
 
+    // This is a text-transfer projection; decoded search still sees the real NULs.
+    std::replace(run.Text.begin(), run.Text.end(), L'\0', L' ');
     SIZE_T bytes = (run.Text.size() + 1) * sizeof(wchar_t);
     HGLOBAL h = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, bytes));
     if (h == NULL)

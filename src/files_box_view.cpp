@@ -168,7 +168,7 @@ int CFilesBox::GetEntireItemsInColumn()
 
 int CFilesBox::GetColumnsCount()
 {
-    return 1;
+    return max(1, EntireColumnsCount);
 }
 
 void CFilesBox::PaintAllItems(HRGN hUpdateRgn, DWORD drawFlags)
@@ -2102,26 +2102,18 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             int maxTextWidth = ItemWidth - TILE_LEFT_MARGIN - IconSizes[ICONSIZE_48] - TILE_LEFT_MARGIN - 4;
             int widthNeeded = 0;
 
-            wchar_t buff[3 * 512]; // destination buffer for strings
-            wchar_t* out0 = buff;
-            int out0Len;
-            wchar_t* out1 = buff + 512;
-            int out1Len;
-            wchar_t* out2 = buff + 1024;
-            int out2Len;
             HDC hDC = ItemBitmap.HMemDC;
             HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
-            GetTileTexts(f, isDir, hDC, maxTextWidth, &widthNeeded,
-                         out0, &out0Len, out1, &out1Len, out2, &out2Len,
-                         Parent->ValidFileData, &Parent->PluginData,
-                         Parent->Is(ptDisk));
+            const CTileTexts texts = GetTileTexts(f, isDir, hDC, maxTextWidth,
+                                                 Parent->ValidFileData, &Parent->PluginData, Parent->Is(ptDisk));
+            widthNeeded = texts.Width;
             SelectObject(hDC, hOldFont);
             widthNeeded += 5;
 
             int visibleLines = 1; // the name is always visible
-            if (out1[0] != 0)
+            if (!texts.Size.empty())
                 visibleLines++;
-            if (out2[0] != 0)
+            if (!texts.DateTime.empty())
                 visibleLines++;
             int textH = visibleLines * FontCharHeight + 4;
 

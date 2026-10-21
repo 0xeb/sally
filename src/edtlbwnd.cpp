@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <algorithm>
 
 #include "edtlbwnd.h"
 #include "gui.h"
@@ -129,23 +130,7 @@ CEditListBox::CEditListBox(HWND hDlg, int ctrlID, DWORD flags, CObjectOrigin ori
     Dragging = FALSE;
     HMarkWindow = NULL;
 
-    HFONT hFont = (HFONT)SendMessage(HWindow, WM_GETFONT, 0, 0);
-
-    LOGFONT lf;
-    GetObject(hFont, sizeof(lf), &lf);
-    // construct two fonts
-    HNormalFont = HANDLES(CreateFontIndirect(&lf));
-    lf.lfWeight = FW_BOLD;
-    HBoldFont = HANDLES(CreateFontIndirect(&lf));
-
-    TEXTMETRIC tm;
-    HDC hdc = HANDLES(GetDC(HWindow));
-    HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
-    GetTextMetrics(hdc, &tm);
-    SelectObject(hdc, hOldFont);
-    HANDLES(ReleaseDC(HWindow, hdc));
-    int itemHeight = max(tm.tmHeight + 4, IconSizes[ICONSIZE_16]);
-    SendMessage(HWindow, LB_SETITEMHEIGHT, 0, MAKELPARAM(itemHeight, 0));
+    UpdateFonts((HFONT)SendMessage(HWindow, WM_GETFONT, 0, 0));
 
     // MakeDragList subclasses the list box and we stop receiving basic messages
     // such as WM_LBUTTONDOWN, WM_MOUSEMOVE, ect. That makes this function unusable,
@@ -160,6 +145,39 @@ CEditListBox::~CEditListBox()
         HANDLES(DeleteObject(HNormalFont));
     if (HBoldFont != NULL)
         HANDLES(DeleteObject(HBoldFont));
+}
+
+void CEditListBox::UpdateFonts(HFONT font)
+{
+    LOGFONTW lf = {};
+    if (font == NULL || GetObjectW(font, sizeof(lf), &lf) == 0)
+        return;
+    HFONT normal = HANDLES(CreateFontIndirectW(&lf));
+    lf.lfWeight = FW_BOLD;
+    HFONT bold = HANDLES(CreateFontIndirectW(&lf));
+    if (normal == NULL || bold == NULL)
+    {
+        if (normal != NULL)
+            HANDLES(DeleteObject(normal));
+        if (bold != NULL)
+            HANDLES(DeleteObject(bold));
+        return;
+    }
+    if (HNormalFont != NULL)
+        HANDLES(DeleteObject(HNormalFont));
+    if (HBoldFont != NULL)
+        HANDLES(DeleteObject(HBoldFont));
+    HNormalFont = normal;
+    HBoldFont = bold;
+    TEXTMETRICW metrics = {};
+    HDC dc = HANDLES(GetDC(HWindow));
+    HFONT previous = (HFONT)SelectObject(dc, font);
+    GetTextMetricsW(dc, &metrics);
+    SelectObject(dc, previous);
+    HANDLES(ReleaseDC(HWindow, dc));
+    SendMessageW(HWindow, LB_SETITEMHEIGHT, 0, (std::max)(metrics.tmHeight + 4, (LONG)IconSizes[ICONSIZE_16]));
+    if (EditLine != NULL)
+        SendMessageW(EditLine->HWindow, WM_SETFONT, (WPARAM)font, TRUE);
 }
 
 int CEditListBox::AddItem(INT_PTR itemID)
@@ -808,6 +826,9 @@ CEditListBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     CALL_STACK_MESSAGE4("CEditListBox::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
+    case WM_SETFONT:
+        UpdateFonts((HFONT)wParam);
+        break;
     case WM_ERASEBKGND:
     {
         HBRUSH hBrush = DarkMode_GetDialogCtlColorBrush(WM_CTLCOLORLISTBOX, (HDC)wParam, HWindow);

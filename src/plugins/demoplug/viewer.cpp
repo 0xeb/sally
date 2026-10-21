@@ -1129,6 +1129,8 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_VIEWER_CUT:
         {
+            if (!Enablers[vweCut])
+                break;
             SalamanderGeneral->SalMessageBox(HWindow, L"TODO: Cut", LangStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION | MB_OK);
             Enablers[vwePaste] = TRUE;
             UpdateEnablers();
@@ -1145,6 +1147,8 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_VIEWER_PASTE:
         {
+            if (!Enablers[vwePaste])
+                break;
             SalamanderGeneral->SalMessageBox(HWindow, L"TODO: Paste", LangStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION | MB_OK);
             Enablers[vwePaste] = FALSE; // it's OK only if it was Cut (Copy should not change it)
             UpdateEnablers();

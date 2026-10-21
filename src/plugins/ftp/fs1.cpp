@@ -658,7 +658,12 @@ void CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* p
                                         CFileData& file, int isDir)
 {
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
-    if (isDir || file.IsLink) // subdirectory or up-dir or link (it can target a file or directory - we currently prefer this test to see if it is a directory)
+    if (file.IsLink && isDir != 2)
+    {
+        fs->ActivateLink(panel, pluginFSName, file);
+        return;
+    }
+    if (isDir) // subdirectory or up-dir
     {
         try
         {
@@ -675,8 +680,10 @@ void CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* p
                 // change the path in the panel
                 std::wstring newUserPartText;
                 std::wstring cutDirText;
-                if (fs->BuildUserPartText(newUserPartText, newPath.c_str()) &&
-                    fs->DecodeSessionBytes(cutDir, cutDirText))
+                CControlConnectionSocket* connection = fs->GetControlConnection();
+                const CFtpTextCodec codec = connection != NULL ? connection->GetTextCodec() : FtpLocalTextCodec();
+                codec.DecodeName(cutDir.data(), cutDir.size(), cutDirText);
+                if (fs->BuildUserPartText(newUserPartText, newPath.c_str()))
                     SalamanderGeneral->ChangePanelPathToPluginFS(
                         panel, pluginFSName, newUserPartText.c_str(), NULL,
                         topIndex, cutDirText.c_str());
@@ -721,6 +728,7 @@ void CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* p
     }
     else // file
     {
+        fs->OpenFileCopy(panel, file);
     }
 }
 
@@ -756,21 +764,14 @@ BOOL CPluginInterfaceForFS::ConvertPathToInternal(const wchar_t* fsName, int fsN
         return FALSE;
     CALL_STACK_MESSAGE4("CPluginInterfaceForFS::ConvertPathToInternal(%ls, %d, %ls)",
                         fsName, fsNameIndex, value.c_str());
-    // The hex-escape mechanism is byte-oriented (percent-encoding always encodes bytes, not
-    // code points), but only the ESCAPED runs are bytes - the literal text around them is
-    // semantic UTF-16 and has no business being narrowed. FTPConvertHexEscapeSequencesW
-    // makes exactly that split: it collects each run of %XX into bytes, decodes the run
-    // through the explicit local-text boundary, and copies everything else through as wide.
-    //
-    // What stood here instead narrowed the WHOLE user part to the ACP first, exactly, and
-    // answered FALSE for any path the code page could not spell. Since the session decodes
-    // server bytes as UTF-8 whenever OPTS UTF8 ON succeeded, that is ordinary traffic on a
-    // modern server, and both callers of the FALSE - GetGeneralPath and
-    // CopyCurrentPathToClipboard - return it without a message, so Ctrl+C on a directory
-    // named in Chinese simply appeared to do nothing. The old narrow (v107) slot for this
-    // operation returned void; it never had a way to say no.
-    if (!FTPConvertHexEscapeSequencesW(value))
+    // Remote-path escapes remain bytes until the session codec is known. Only
+    // the inherited authority text uses the local configuration escape adapter.
+    const size_t pathOffset = static_cast<size_t>(FTPFindPathW(value.c_str(), 0) - value.c_str());
+    std::wstring authority(value, 0, pathOffset);
+    if (!FTPConvertHexEscapeSequencesW(authority))
         return FALSE;
+    authority.append(value, pathOffset, std::wstring::npos);
+    value.swap(authority);
     return sally::plugin_abi::WriteStringBuffer(*fsUserPart, value) ? TRUE : FALSE;
 }
 
@@ -783,12 +784,13 @@ BOOL CPluginInterfaceForFS::ConvertPathToExternal(const wchar_t* fsName, int fsN
         return FALSE;
     CALL_STACK_MESSAGE4("CPluginInterfaceForFS::ConvertPathToExternal(%ls, %d, %ls)",
                         fsName, fsNameIndex, value.c_str());
-    // Outbound needs no bytes at all. FTPAddHexEscapeSequences protects exactly one
-    // character, '%', by doubling it into "%25" - the whole escaping alphabet is ASCII.
-    // Narrowing the path to the ACP to perform an ASCII substitution is what made this
-    // refuse Unicode paths outright, and a refusal here is silent at both callers.
-    if (!FTPAddHexEscapeSequencesW(value))
+    // The remote path is already in its canonical wire-preserving representation.
+    const size_t pathOffset = static_cast<size_t>(FTPFindPathW(value.c_str(), 0) - value.c_str());
+    std::wstring authority(value, 0, pathOffset);
+    if (!FTPAddHexEscapeSequencesW(authority))
         return FALSE;
+    authority.append(value, pathOffset, std::wstring::npos);
+    value.swap(authority);
     return sally::plugin_abi::WriteStringBuffer(*fsUserPart, value) ? TRUE : FALSE;
 }
 

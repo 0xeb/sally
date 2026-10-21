@@ -122,7 +122,8 @@ BOOL CPluginFSInterface::BuildUserPartText(std::wstring& userPart, const char* p
                 ++remotePath;
             }
             std::wstring remotePathText;
-            if (!DecodeSessionBytes(std::string_view(remotePath, strlen(remotePath)), remotePathText))
+            const CFtpTextCodec codec = ControlConnection != NULL ? ControlConnection->GetTextCodec() : FtpLocalTextCodec();
+            if (!FtpFormatWirePath(codec, std::string_view(remotePath, strlen(remotePath)), Config.ConvertHexEscSeq, remotePathText))
                 return FALSE;
             result.push_back(separator);
             result.append(remotePathText);
@@ -173,6 +174,27 @@ BOOL CPluginFSInterface::EncodeSessionText(const wchar_t* text,
     if (ControlConnection != NULL)
         return ControlConnection->EncodeText(value, bytes);
     return FtpEncodeLocalText(value, bytes);
+}
+
+BOOL CPluginFSInterface::EncodeSessionUserPart(const wchar_t* text, std::string& bytes) const
+{
+    const wchar_t* value = text != NULL ? text : L"";
+    const wchar_t* path = FTPFindPathW(value, FTPGetUserLengthW(User.c_str()));
+    const CFtpTextCodec codec = ControlConnection != NULL ? ControlConnection->GetTextCodec() : FtpLocalTextCodec();
+    std::string authority, remote;
+    if (!codec.Encode(value, static_cast<size_t>(path - value), authority) ||
+        !FtpParseWirePath(codec, path, Config.ConvertHexEscSeq, remote))
+        return FALSE;
+    try
+    {
+        authority.append(remote);
+        bytes.swap(authority);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
 BOOL CPluginFSInterface::GetEncodedSessionUserLength(int& userLength) const
@@ -317,7 +339,8 @@ BOOL CPluginFSInterface::GetFullFSPath(HWND parent, const wchar_t* fsName,
         !sally::plugin_abi::ReadStringBuffer(*pathBuffer, pathText))
         return FALSE;
     std::string pathBytes;
-    if (!EncodeSessionText(pathText.c_str(), pathBytes))
+    const CFtpTextCodec pathCodec = ControlConnection != NULL ? ControlConnection->GetTextCodec() : FtpLocalTextCodec();
+    if (!FtpParseWirePath(pathCodec, pathText, Config.ConvertHexEscSeq, pathBytes))
         return FALSE;
     const BOOL handled = ResolveFullServerPathBytes(parent, pathBytes, success);
     if (!handled || !success)
@@ -348,7 +371,7 @@ BOOL CPluginFSInterface::GetFullName(CFileData& file, int isDir,
     else
     {
         std::string fileNameBytes;
-        if (ControlConnection == NULL || !ControlConnection->EncodeText(file.Name, fileNameBytes))
+        if (ControlConnection == NULL || !FtpGetListingWireName(file, ControlConnection->GetTextCodec(), fileNameBytes))
             return FALSE;
         if (!FTPPathAppend(type, remotePath, fileNameBytes.c_str(), isDir))
             return FALSE;
@@ -432,7 +455,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex,
         return FALSE;
 
     std::string userPartBytes;
-    if (ControlConnection != NULL && !EncodeSessionText(userPart, userPartBytes))
+    if (ControlConnection != NULL && !EncodeSessionUserPart(userPart, userPartBytes))
         return FALSE;
 
     std::wstring returnedFSName;
@@ -459,10 +482,11 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex,
         return FALSE;
 
     std::wstring returnedCutFileName;
-    if (cutFileName != NULL &&
-         !DecodeSessionBytes(returnedCutFileNameBytes,
-                              returnedCutFileName))
-        return FALSE;
+    if (cutFileName != NULL)
+    {
+        const CFtpTextCodec codec = ControlConnection != NULL ? ControlConnection->GetTextCodec() : FtpLocalTextCodec();
+        codec.DecodeName(returnedCutFileNameBytes.data(), returnedCutFileNameBytes.size(), returnedCutFileName);
+    }
 
     if (returnedFSName.size() >= (std::numeric_limits<DWORD>::max)() ||
         returnedCutFileName.size() >= (std::numeric_limits<DWORD>::max)())
@@ -534,6 +558,7 @@ BOOL CPluginFSInterface::ChangePathBytes(int currentFSNameIndex, std::wstring& f
 
         BOOL parsedPath = TRUE; // TRUE = path obtained from the user part; need to decide whether to trim '/' or '\\' at the start
         BOOL encodeInitialPathAfterLogin = FALSE;
+        BOOL initialPathIsEscaped = FALSE;
         std::wstring initialPathText;
         ControlConnection = new CControlConnectionSocket;
         if (ControlConnection == NULL || !ControlConnection->IsGood())
@@ -585,6 +610,7 @@ BOOL CPluginFSInterface::ChangePathBytes(int currentFSNameIndex, std::wstring& f
                 !FtpStoreWideText(server->TargetPanelPath, stagedTargetPanelPath))
                 return failOpeningConnection();
             encodeInitialPathAfterLogin = TRUE;
+            initialPathIsEscaped = server->InitialPathIsEscaped;
             parsedPath = FALSE; // path entered by the user (never trim '/' or '\\' at the beginning)
 
             BOOL useListingsCache = Config.UseListingsCache;
@@ -748,6 +774,7 @@ BOOL CPluginFSInterface::ChangePathBytes(int currentFSNameIndex, std::wstring& f
                     return failOpeningConnection();
                 }
                 encodeInitialPathAfterLogin = TRUE;
+                initialPathIsEscaped = Config.ConvertHexEscSeq;
             }
             else
                 Path.clear();
@@ -786,7 +813,8 @@ BOOL CPluginFSInterface::ChangePathBytes(int currentFSNameIndex, std::wstring& f
             return FALSE;
         }
         if (encodeInitialPathAfterLogin &&
-            !ControlConnection->EncodeText(initialPathText.c_str(), Path))
+            !FtpParseStoredWirePath(ControlConnection->GetTextCodec(), initialPathText,
+                                    initialPathIsEscaped, Config.ConvertHexEscSeq, Path))
         {
             SalamanderGeneral->ShowMessageBox(
                 SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_INVALIDPATH).c_str(),
@@ -1484,19 +1512,18 @@ BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                             err = TRUE;
                             break;
                         }
-                        wchar_t* row = (wchar_t*)malloc((rowText.size() + 1) * sizeof(wchar_t));
+                        CFtpListingItemData* row = FtpCreateSimpleListingItem(rowText);
                         if (row == NULL)
                         {
                             SalamanderGeneral->Free(file.Name);
                             err = TRUE;
                             break;
                         }
-                        memcpy(row, rowText.c_str(), (rowText.size() + 1) * sizeof(wchar_t));
-                        file.PluginData = (DWORD_PTR)row;
+                        file.PluginData = reinterpret_cast<DWORD_PTR>(row);
                         if (!dir->AddFile(NULL, file, NULL))
                         {
                             SalamanderGeneral->Free(file.Name);
-                            free(row);
+                            FtpDestroySimpleListingItem(row);
                             err = TRUE;
                             break;
                         }

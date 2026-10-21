@@ -248,6 +248,9 @@
 #define IDS_DEFAULTFONT            11522
 #define IDS_CUSTOMFONT             11523
 
+// CSV option validation
+#define IDS_CSV_SEPARATOR_REQUIRED 11524
+
 // help IDs
 
 #define IDH_INTRODUCTION 9000

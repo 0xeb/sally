@@ -11,6 +11,7 @@
 #include "SalamandConfiguration.h"
 #include "Salamander.rh"
 #include "SalamandText.h"
+#include "PasswordRewritePolicy.h"
 
 #include <Common.h>
 #include <Security.h>
@@ -24,6 +25,7 @@ const int ColumnDescs[] =
     {SAL_RIGHTS_DESC, SAL_OWNER_DESC, SAL_GROUP_DESC, SAL_LINK_TO_DESC};
 #define PWDMNGR_SIGNATURE_ENCRYPTED '\x02'
 #define PWDMNGR_SIGNATURE_UTF8_ENCRYPTED '\x04'
+#define PWDMNGR_SIGNATURE_UTF8_SCRAMBLED '\x03'
 
 static bool WidePasswordToAnsi(const wchar_t* Value, AnsiString& Result)
 {
@@ -50,6 +52,7 @@ __fastcall TSalamandConfiguration::TSalamandConfiguration(
     CPluginInterface* APlugin) : TCustomWinConfiguration()
 {
     FPlugin = APlugin;
+    FRecryptingPasswords = false;
     Default();
 }
 //---------------------------------------------------------------------------
@@ -235,8 +238,19 @@ void __fastcall TSalamandConfiguration::SetColumnsWidths(int Group, AnsiString V
 //---------------------------------------------------------------------------
 void __fastcall TSalamandConfiguration::RecryptPasswords()
 {
-    TCustomWinConfiguration::RecryptPasswords();
-    FPlugin->RecryptPasswords();
+    const bool Previous = FRecryptingPasswords;
+    FRecryptingPasswords = true;
+    try
+    {
+        TCustomWinConfiguration::RecryptPasswords();
+        FPlugin->RecryptPasswords();
+    }
+    catch (...)
+    {
+        FRecryptingPasswords = Previous;
+        throw;
+    }
+    FRecryptingPasswords = Previous;
 }
 //---------------------------------------------------------------------------
 bool __fastcall TSalamandConfiguration::GetUseMasterPassword()
@@ -249,29 +263,34 @@ AnsiString __fastcall TSalamandConfiguration::StronglyRecryptPassword(AnsiString
     AnsiString Dummy;
     AnsiString Result;
     CSalamanderPasswordManagerAbstract* PasswordManager = FPlugin->GetSalamanderGeneral()->GetSalamanderPasswordManager();
-    if (GetExternalEncryptedPassword(Password, Dummy) ||
-        !PasswordManager->IsMasterPasswordSet())
+    const sally_winscp::PasswordRewriteAction Action = sally_winscp::PasswordRewritePolicy(
+        GetExternalEncryptedPassword(Password, Dummy), PasswordManager->IsMasterPasswordSet(),
+        PasswordManager->IsUsingMasterPassword(), FRecryptingPasswords);
+    if (Action == sally_winscp::KeepPassword)
     {
-        // already-strongly encrypted
-        // or no master password set, so we cannot strongly-encrypt it
         Result = Password;
     }
     else
     {
-        Password = TCustomWinConfiguration::DecryptPassword(Password, Key);
+        Password = DecryptPassword(Password, Key);
         if (!Password.IsEmpty())
         {
             BYTE* Encrypted;
             int EncryptedSize;
-            if (!PasswordManager->EncryptPassword(SalWide(Password.c_str()).c_str(),
-                                                  &Encrypted, &EncryptedSize, TRUE))
+            std::wstring WidePassword = SalWide(Password.c_str());
+            const bool Strong = Action == sally_winscp::EncryptWithMaster;
+            const bool EncryptedOkay = PasswordManager->EncryptPassword(WidePassword.c_str(),
+                                                                       &Encrypted, &EncryptedSize, Strong);
+            SecureZeroMemory(WidePassword.data(), WidePassword.size() * sizeof(wchar_t));
+            SecureZeroMemory(Password.c_str(), Password.Length());
+            if (!EncryptedOkay)
             {
                 assert(false);
                 Abort();
             }
             Result = AnsiString(reinterpret_cast<char*>(Encrypted), EncryptedSize);
             assert(Result.Length() > 1);
-            assert(Result[1] == PWDMNGR_SIGNATURE_UTF8_ENCRYPTED);
+            assert(Result[1] == (Strong ? PWDMNGR_SIGNATURE_UTF8_ENCRYPTED : PWDMNGR_SIGNATURE_UTF8_SCRAMBLED));
             FPlugin->GetSalamanderGeneral()->Free(Encrypted);
             Result = SetExternalEncryptedPassword(Result, true);
         }

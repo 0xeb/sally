@@ -74,17 +74,19 @@ bool ParseEntry(const std::wstring& payloadW, Entry& outEntry, PluginFSPathDetec
     return true;
 }
 
-void WriteEntries(IRegistry* reg, HKEY historyKey, const std::vector<Entry>& entries)
+bool WriteEntries(IRegistry* reg, HKEY historyKey, const std::vector<Entry>& entries)
 {
     if (reg == nullptr || historyKey == nullptr)
-        return;
+        return false;
 
     for (size_t i = 0; i < entries.size(); ++i)
     {
         const std::wstring payload = SerializeEntry(entries[i]);
         const std::wstring name = IndexValueNameW(static_cast<int>(i) + 1);
-        reg->SetString(historyKey, name.c_str(), payload.c_str());
+        if (!reg->SetString(historyKey, name.c_str(), payload.c_str()).success)
+            return false;
     }
+    return true;
 }
 
 void ReadEntries(IRegistry* reg, HKEY historyKey, std::vector<Entry>& outEntries,

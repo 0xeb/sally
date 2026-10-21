@@ -61,6 +61,91 @@ public:
         return err != ERROR_SUCCESS ? err : fallback;
     }
 
+    FileResult ResolvePathForComparison(const wchar_t* path, std::wstring& key) override
+    {
+        key.clear();
+        try
+        {
+            LongPath prepared(path);
+            if (!prepared.IsValid())
+                return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+            std::wstring ancestor(prepared.Get()), suffix;
+            size_t rootLength = 0;
+            if (ancestor.size() >= 8 && _wcsnicmp(ancestor.c_str(), L"\\\\?\\UNC\\", 8) == 0)
+            {
+                const size_t server = ancestor.find(L'\\', 8);
+                const size_t share = server == std::wstring::npos ? server : ancestor.find(L'\\', server + 1);
+                rootLength = share == std::wstring::npos ? ancestor.size() : share + 1;
+            }
+            else if (ancestor.size() >= 7 && ancestor[5] == L':' && ancestor[6] == L'\\')
+                rootLength = 7;
+            else
+            {
+                const size_t root = ancestor.find(L'\\', ancestor.compare(0, 4, L"\\\\?\\") == 0 ? 4 : 0);
+                rootLength = root == std::wstring::npos ? ancestor.size() : root + 1;
+            }
+            while (ancestor.size() > rootLength && ancestor.back() == L'\\')
+                ancestor.pop_back();
+            for (;;)
+            {
+                HANDLE handle = ::CreateFileW(ancestor.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                              NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+                if (handle != INVALID_HANDLE_VALUE)
+                {
+                    struct CloseComparisonHandle
+                    {
+                        HANDLE Handle;
+                        ~CloseComparisonHandle() { ::CloseHandle(Handle); }
+                    } closer{handle};
+                    // NT volume identity also covers substituted/mounted drives.
+                    // This result is an opaque comparison key, never an I/O path.
+                    DWORD capacity = ::GetFinalPathNameByHandleW(handle, NULL, 0, FILE_NAME_NORMALIZED | VOLUME_NAME_NT);
+                    if (capacity == 0)
+                        return FileResult::Error(::GetLastError());
+                    for (;;)
+                    {
+                        std::wstring result(capacity, L'\0');
+                        const DWORD written = ::GetFinalPathNameByHandleW(handle, result.data(), capacity, FILE_NAME_NORMALIZED | VOLUME_NAME_NT);
+                        if (written == 0)
+                            return FileResult::Error(::GetLastError());
+                        if (written < capacity)
+                        {
+                            result.resize(written);
+                            if (!suffix.empty())
+                            {
+                                if (!result.empty() && result.back() != L'\\')
+                                    result.push_back(L'\\');
+                                result.append(suffix);
+                            }
+                            key.swap(result);
+                            return FileResult::Ok();
+                        }
+                        if (written == (std::numeric_limits<DWORD>::max)())
+                            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+                        capacity = written + 1;
+                    }
+                }
+                const DWORD error = ::GetLastError();
+                if ((error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND) || ancestor.size() <= rootLength)
+                    return FileResult::Error(error);
+                const size_t slash = ancestor.find_last_of(L'\\');
+                if (slash == std::wstring::npos || slash + 1 < rootLength)
+                    return FileResult::Error(error);
+                const std::wstring leaf = ancestor.substr(slash + 1);
+                suffix = suffix.empty() ? leaf : leaf + L"\\" + suffix;
+                ancestor.resize(slash + 1 == rootLength ? rootLength : slash);
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+        }
+        catch (const std::length_error&)
+        {
+            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+        }
+    }
+
     bool FileExists(const wchar_t* path) override
     {
         LongPath lp(path);
@@ -701,6 +786,34 @@ public:
     }
 
     // --- P2-a move + volume ----------------------------------------------
+
+    FileResult SetPathFileTime(const wchar_t* path, const FILETIME* creation,
+                               const FILETIME* access, const FILETIME* write) override
+    {
+        LongPath prepared(path);
+        if (!prepared.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+        HANDLE file = ::CreateFileW(prepared.Get(), FILE_WRITE_ATTRIBUTES,
+                                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+        if (file == INVALID_HANDLE_VALUE)
+            return FileResult::Error(::GetLastError());
+        DWORD error = ::SetFileTime(file, creation, access, write) ? ERROR_SUCCESS : ::GetLastError();
+        if (!::CloseHandle(file) && error == ERROR_SUCCESS)
+            error = ::GetLastError();
+        return error == ERROR_SUCCESS ? FileResult::Ok() : FileResult::Error(error);
+    }
+
+    FileResult ReplaceFileWithBackup(const wchar_t* original, const wchar_t* replacement, const wchar_t* backup) override
+    {
+        if (backup == NULL || *backup == L'\0')
+            return FileResult::Error(ERROR_INVALID_PARAMETER);
+        LongPath source(original), converted(replacement), recovery(backup);
+        if (!source.IsValid() || !converted.IsValid() || !recovery.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+        if (!::ReplaceFileW(source.Get(), converted.Get(), recovery.Get(), 0, NULL, NULL))
+            return FileResult::Error(::GetLastError());
+        return FileResult::Ok();
+    }
 
     FileResult MoveFileWithFlags(const wchar_t* source, const wchar_t* target, MoveFlags flags) override
     {

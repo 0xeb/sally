@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "toolbar_images.h"
+#include "copy_command.h"
 
 using namespace std;
 
@@ -52,11 +53,13 @@ static bool GetDroppedFilePath(HDROP drop, UINT index, std::wstring& path)
 }
 
 CMainWindow::CMainWindow(const wchar_t* path1, const wchar_t* path2,
-                         CCompareOptions* options, UINT showCmd)
+                         CCompareOptions* options, UINT showCmd,
+                         const CFilecompPathContext* pathContext)
 {
     CALL_STACK_MESSAGE1("CMainWindow::CMainWindow(, , )");
     Path1WStr = path1 ? path1 : L"";
     Path2WStr = path2 ? path2 : L"";
+    PathContext = pathContext ? *pathContext : CaptureFilecompPathContext(*SG, *gPathService, FilecompInitialDirectory(Path1WStr));
     FileView[fviLeft] = NULL;
     FileView[fviRight] = NULL;
     HToolbar = NULL;
@@ -862,9 +865,9 @@ void CMainWindow::ResetComboBox(BOOL* cancel)
             {
                 // insert
                 if (inserted > 1)
-                    text = SPLFormatStringOwned(LangStr(IDS_ADD2).c_str(), i, line1 + 1, line1 + inserted, path0, line0, path1);
+                    text = SPLFormatStringOwned(LangStr(IDS_ADD2).c_str(), i, line1 + 1, line1 + inserted, path1, line0, path0);
                 else
-                    text = SPLFormatStringOwned(LangStr(IDS_ADD1).c_str(), i, line1 + 1, path0, line0, path1);
+                    text = SPLFormatStringOwned(LangStr(IDS_ADD1).c_str(), i, line1 + 1, path1, line0, path0);
             }
 
             LRESULT ret = SendMessageW(ComboBox->HWindow, CB_ADDSTRING, 0,
@@ -954,7 +957,7 @@ void CMainWindow::SpawnWorker(const wchar_t* path1, const wchar_t* path2,
         MSG msg;
         while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
-            if (!TranslateAccelerator(HWindow, HAccels, &msg))
+            if (!filecomp::TranslateCopyAwareAccelerator(HWindow, HAccels, &msg, IDC_DIFFLIST))
             {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
@@ -1255,6 +1258,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_COPY:
         {
+            if (filecomp::CopyFocusedDifferenceText(ComboBox->HWindow, GetFocus()))
+                return 0;
             if (DataValid)
             {
                 FileView[Active]->CopySelection();
@@ -1330,7 +1335,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             std::wstring path2 = DataValid ? Path2WStr : std::wstring();
             BOOL succes = FALSE;
             CCompareOptions options = DefCompareOptions;
-            CCompareFilesDialog dlg(HWindow, path1, path2, succes, &options);
+            CCompareFilesDialog dlg(HWindow, path1, path2, succes, &options, &PathContext);
             dlg.Execute();
             if (succes)
             {
@@ -1572,6 +1577,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case CM_ABOUT:
         {
             PluginInterface.About(HWindow);
+            return 0;
         }
 
         case IDC_DIFFLIST:
@@ -1739,7 +1745,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (count > 2 || path2.empty())
             {
                 // let the user confirm it
-                CCompareFilesDialog dlg(HWindow, path1, path2, succes, &options);
+                CCompareFilesDialog dlg(HWindow, path1, path2, succes, &options, &PathContext);
                 dlg.Execute();
             }
             else
@@ -2421,7 +2427,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             MSG msg;
             while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
             {
-                if (!TranslateAccelerator(HWindow, HAccels, &msg))
+                if (!filecomp::TranslateCopyAwareAccelerator(HWindow, HAccels, &msg, IDC_DIFFLIST))
                 {
                     TranslateMessage(&msg);
                     DispatchMessageW(&msg);

@@ -478,6 +478,13 @@ HWND CDialog::Create()
                              (DLGPROC)CDialog::CDialogProc, (LPARAM)this);
 }
 
+HWND CDialog::CreateIndirect(const DLGTEMPLATE* dialogTemplate)
+{
+    Modal = FALSE;
+    return CreateDialogIndirectParamW(Modul, dialogTemplate, Parent,
+                                      (DLGPROC)CDialog::CDialogProc, (LPARAM)this);
+}
+
 INT_PTR
 CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {

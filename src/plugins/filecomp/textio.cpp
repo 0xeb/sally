@@ -3,14 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-#include "common/Win32TextCodec.h"
 
-static bool GetASCII8ConversionTable(char (&table)[256],
-                                     const char* encodedName) noexcept
+static bool GetASCII8ConversionTable(char (&table)[256], const std::wstring& name) noexcept
 {
-    std::wstring name;
-    if (!DecodeFileCompLegacyText(encodedName, strlen(encodedName), name))
-        return false;
     try
     {
         return SG->GetConversionTable(NULL, table, name.c_str()) != FALSE;
@@ -19,20 +14,6 @@ static bool GetASCII8ConversionTable(char (&table)[256],
     {
         return false;
     }
-}
-
-static bool ProjectWideCodePageNameForLegacyState(const wchar_t* text, char (&legacyName)[101])
-{
-    if (text == NULL)
-        return false;
-
-    std::string staged;
-    if (!EncodeFileCompLegacyText(text, wcslen(text), staged) ||
-        staged.size() >= _countof(legacyName))
-        return false;
-    memcpy(legacyName, staged.data(), staged.size());
-    legacyName[staged.size()] = 0;
-    return true;
 }
 
 using namespace std;
@@ -104,7 +85,7 @@ CTextFileReader::~CTextFileReader()
     Reset();
 }
 
-void CTextFileReader::Set(const wchar_t* name, HANDLE file, size_t size, int eolConversions, eEncoding encoding, eEndian endians, int performASCII8InputEnc, const char* parASCII8InputEncTableName, BOOL normalizationForm, bool needMD5)
+void CTextFileReader::Set(const wchar_t* name, HANDLE file, size_t size, int eolConversions, eEncoding encoding, eEndian endians, int performASCII8InputEnc, const std::wstring& parASCII8InputEncTableName, BOOL normalizationForm, bool needMD5)
 {
     Name = name ? name : L"";
     File = file;
@@ -118,7 +99,7 @@ void CTextFileReader::Set(const wchar_t* name, HANDLE file, size_t size, int eol
         Endian = endianLittle;
     }
     PerformASCII8InputEnc = performASCII8InputEnc;
-    strcpy(this->ASCII8InputEncTableName, parASCII8InputEncTableName);
+    ASCII8InputEncTableName = parASCII8InputEncTableName;
     NormalizationForm = normalizationForm;
     if (MD5)
     {
@@ -474,7 +455,7 @@ void CTextFileReader::EstimateFileType()
         Encoding == encUnknown || // text file, but unknown encoding
         // text file, known encoding, but unknown input-enc table
         (Encoding == encASCII8 && PerformASCII8InputEnc == 1 &&
-         ASCII8InputEncTableName[0] == 0))
+         ASCII8InputEncTableName.empty()))
     {
         FetchFilePrefix(); // ensure we have file prefix in the buffer
         std::wstring codePage;
@@ -484,7 +465,7 @@ void CTextFileReader::EstimateFileType()
         if (Type == ftText || isText)
         {
             Type = ftText;
-            if ((Encoding == encUnknown) || ((Encoding == encASCII8) && PerformASCII8InputEnc && !ASCII8InputEncTableName[0]))
+            if ((Encoding == encUnknown) || ((Encoding == encASCII8) && PerformASCII8InputEnc && ASCII8InputEncTableName.empty()))
             {
                 Encoding = encASCII8;
                 // estimated conversion
@@ -494,7 +475,8 @@ void CTextFileReader::EstimateFileType()
                     SG->StrICmp(codePage.c_str(), windowsCodePage.c_str()) != 0)
                 {
                     const std::wstring conversionName = codePage + L" - " + windowsCodePage;
-                    PerformASCII8InputEnc = ProjectWideCodePageNameForLegacyState(conversionName.c_str(), ASCII8InputEncTableName) ? 1 : 0;
+                    ASCII8InputEncTableName = conversionName;
+                    PerformASCII8InputEnc = 1;
                 }
                 else
                     PerformASCII8InputEnc = 0;
@@ -508,7 +490,7 @@ void CTextFileReader::EstimateFileType()
     TRACE_I("File encoding " << Encoding);
     TRACE_I("File endians " << Endian);
     TRACE_I("PerformASCII8InputEnc " << PerformASCII8InputEnc);
-    TRACE_I("ASCII8InputEncTableName " << ASCII8InputEncTableName);
+    TRACE_IW(L"ASCII8InputEncTableName " << ASCII8InputEncTableName);
 }
 
 int CTextFileReader::GetType()
@@ -531,12 +513,9 @@ void CTextFileReader::GetEncodingName(std::wstring& encoding) noexcept
     {
         if (Encoding == encASCII8)
         {
-            if (PerformASCII8InputEnc && *ASCII8InputEncTableName)
+            if (PerformASCII8InputEnc && !ASCII8InputEncTableName.empty())
             {
-                std::wstring tableName;
-                if (DecodeFileCompLegacyText(ASCII8InputEncTableName,
-                                             strlen(ASCII8InputEncTableName), tableName))
-                    staged = L"[" + tableName + L"] ";
+                staged = L"[" + ASCII8InputEncTableName + L"] ";
             }
         }
         else

@@ -562,6 +562,10 @@ STRINGTABLE
  IDS_CANNOTMOVEFILETOITSELF, "Cannot move a file to itself."
 
  IDS_CANNOTMOVEDIRTOITSELF, "Cannot move a directory to itself."
+ IDS_DIRECTORYTARGETINSOURCE, "A directory cannot be copied or moved into itself or one of its subdirectories."
+ IDS_UNPACKERSELECTIONREQUIRED, "Select an unpacker to continue. If the list is empty, add one in Configuration."
+ IDS_EXECUTE_SHORTNAMEUNAVAILABLE, "A DOS (8.3) path is not available for '%s'."
+ IDS_OPERATIONSTARTFAILED, "The file operation could not be started.\n\n%s"
 
  IDS_NOTENOUGHSPACE, "There doesn't seem to be enough space on target drive.\nDo you want to continue?\n\nRequired space: %s bytes.\nAvailable space: %s bytes."
 
@@ -1066,6 +1070,7 @@ STRINGTABLE
  IDS_PACKERR_NOOUTPUT, "Got no output from external packer, check your configuration."
  IDS_PACKERR_UNABLETOREN, "Unable to rename temporary archive file (%1) to archive name (%2)."
  IDS_PACKERR_INVALIDNAME, "This file name is invalid on Windows file systems. External archivers do not support unpacking to another file name so it's not possible to unpack this file."
+ IDS_PACKERR_EXCLUSIONMASK, "Exclusion masks ('|') are not supported by external unpackers. Choose an internal unpacker or remove the exclusions."
 
  IDS_PACKRET_GENERAL, "Exit code %d."
  IDS_PACKRET_WARNING, "Warning encountered."
@@ -1414,6 +1419,9 @@ IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Sall
  IDS_EMAILFILES_SUBJECT, "Emailing:"
  IDS_EMAILFILES_BODY, "Your files are attached and ready to send with this message."
  IDS_EMAILFILES_MAPIERROR, "Cannot send mail. No mail program is set up to send mail, MAPI32.DLL was not found."
+ IDS_EMAILFILES_PATHERROR, "The mail program cannot attach this file using its current name:\n\n%s"
+ IDS_EMAILFILES_SENDERROR, "The email message could not be created.\n\n%s"
+ IDS_EMAILFILES_PROVIDERERROR, "The mail program reported error %u."
 
  IDS_PLUGINSUFFIX, " (Plugin)"
 
@@ -1970,4 +1978,18 @@ IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Sall
  IDS_UPDATECHECK_STARTUP, "On every startup"
  IDS_UPDATER_CANNOT_START, "Sally's updater could not be started:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "A Master Password is used to protect sensitive information like FTP or WinSCP passwords by strong AES cipher. If you create a Master Password you will be asked to enter it once per session when Sally retrieves protected information."
+ // Configuration navigation
+ IDS_CFG_SEARCH_LABEL, "&Search settings:"
+ IDS_CFG_SEARCH_HINT, "Words, ""phrases"", AND, OR, NOT"
+ IDS_CFG_SEARCH_INVALID, "Invalid search. Check quotes and parentheses."
+ IDS_CFG_SEARCH_EMPTY, "No matching settings."
+ IDS_CFG_SEARCH_CLEAR, "Clear search (Esc)"
+ IDS_CFG_SEARCH_OPEN, "Search settings"
+ IDS_CFG_SEARCH_CLOSE, "Close search"
+ IDS_CFG_SAVE, "&Save"
+ IDS_CFG_APPLY, "&Apply"
+ IDS_CFG_SAVE_FAILED, "The configuration could not be saved. Your changes remain available in this window."
+
+ IDS_MASTERPASSWORD_STORE_DAMAGED, "Your saved master-password settings could not be read. Sally will preserve them and will not save configuration changes. Restore a known-good configuration backup before changing passwords."
+
 }

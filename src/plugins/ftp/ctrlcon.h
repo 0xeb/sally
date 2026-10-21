@@ -243,6 +243,9 @@ public:
     // in the Logs dialog)
     BOOL HasLogWithUID(int uid);
 
+    // Only ownerless logs may be removed. uid == -1 asks whether any such log exists.
+    BOOL CanRemoveLog(int uid);
+
     // called after logging parameters change in the configuration
     void ConfigChanged();
 
@@ -296,7 +299,7 @@ public:
     // copies all logs to the clipboard
     void CopyAllLogs(HWND parent);
 
-    // removes all logs
+    // removes only ownerless logs; live connections and workers retain their logs
     void RemoveAllLogs(HWND parent);
 
 protected:
@@ -715,6 +718,10 @@ public:
     DWORD GetTimeFromStart();
     // subtracts the time since the operation started from 'showTime', returns at least 0 ms (no negative numbers)
     DWORD GetWaitTime(DWORD showTime);
+
+    // Owned bookmark snapshot; excludes credentials and freezes live connection settings.
+    CFTPServer* CreateBookmark(const wchar_t* name, const wchar_t* path,
+                               CTransferMode transferMode, const char* serverType, BOOL pathIsEscaped = FALSE);
 
     int GetEncryptControlConnection() { return EncryptControlConnection; }
     int GetEncryptDataConnection() { return EncryptDataConnection; }

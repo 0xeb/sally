@@ -210,4 +210,5 @@ STRINGTABLE
   IDS_PARTIALRECOVER, "Následující soubor nelze kompletně obnovit: %s\n\nChcete obnovit aspoň část souboru?"
   IDS_PARTIALRECOVER_DONTASK, "Příště zvolit stejnou odpověď"
   IDS_ERRORRECOVER, "Chyba při obnovování souboru %s"
+    IDS_SELECTVOLUME, "Vyberte svazek nebo zvolte obraz disku."
 }

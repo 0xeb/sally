@@ -62,11 +62,13 @@ extern const wchar_t* EXECUTE_SUBMENUEND;   // end of a submenu (only one level 
 // the cursor is positioned after this text,
 // and the edit line receives focus.
 // The following flags modify this default behavior:
-#define EIF_REPLACE_ALL 0x01 // replace the entire contents of the edit line
-#define EIF_CURSOR_1 0x02    // place the cursor one character before the end of the inserted text
-#define EIF_CURSOR_2 0x04    // place the cursor two characters before the end of the inserted text
-#define EIF_VARIABLE 0x08    // wrap the inserted text in $(text)
-#define EIF_DONT_FOCUS 0x10  // do not move focus back to the edit line after the action
+#define EIF_REPLACE_ALL 0x01     // replace the entire contents of the edit line
+#define EIF_CURSOR_1 0x02        // place the cursor one character before the end of the inserted text
+#define EIF_CURSOR_2 0x04        // place the cursor two characters before the end of the inserted text
+#define EIF_VARIABLE 0x08        // wrap the inserted text in $(text)
+#define EIF_DONT_FOCUS 0x10      // do not move focus back to the edit line after the action
+#define EIF_BROWSE_TEMPLATE 0x20 // escape literal dollars when browsing into a variable template
+#define EIF_BROWSE_QUOTED 0x40   // quote the browsed executable in a command line
 
 struct CExecuteItem
 {
@@ -143,10 +145,13 @@ struct CUserMenuAdvancedData // additional data used only for the User Menu: arr
 const CExecuteItem* TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
                                      BOOL combobox, CExecuteItem* executeItems, int filterResID = 0);
 
-// Opens a FileOpen dialog for *.exe
-// Inserts the selected file into the edit line
-// Returns TRUE if the user chose a file; otherwise FALSE
-BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID);
+// Convert between literal picked paths and the destination edit syntax.
+// Template/command edits pass EIF_BROWSE_*; ordinary file/icon edits use zero.
+std::wstring FormatBrowsedFileName(std::wstring file, BYTE browseFlags);
+std::wstring DecodeBrowsedFileName(std::wstring text, BYTE browseFlags);
+// Opens FileOpen with the supplied filter and inserts the selected path.
+// Returns TRUE if the user chose a file; otherwise FALSE.
+BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID, BYTE browseFlags = 0);
 
 // validates varText containing variables from the UserMenuArgsExecutes array
 // msgParent - parent message box for errors; if NULL, errors are not shown

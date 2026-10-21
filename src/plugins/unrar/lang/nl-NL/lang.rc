@@ -132,7 +132,7 @@ STRINGTABLE
   IDS_ERROR, "Fout"
   IDS_NOTFOUND, "Bestand niet gevonden"
   IDS_BADDLL, "Verkeerde versie van unrar.dll. herinstalleer de UnRAR plugin."
-  IDS_SELECTFIRST, "Het schijnt dat deze een multi-volume archief is. Zo ja, selecteer het eerste archief volume en druk op OK.\n\nIndien het niet een multi-volume archief betreft, druk op Annuleer."
+  IDS_SELECTFIRST, "Selecteer het eerste archiefdeel om door te gaan. Druk op Annuleren om te stoppen."
   IDS_SELECTFIRSTTITLE, "Selecteer eerste volume"
   IDS_FILENOTFOUND "Bestand niet gevonden in het archief."
   IDS_LISTINFO_PAKEDSIZE      "Ingepakt"

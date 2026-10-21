@@ -210,4 +210,5 @@ STRINGTABLE
   IDS_PARTIALRECOVER, "Folgende Datei kann nicht völlig wiederhergestellt werden: %s\n\nMöchten Sie einen Teil der Datei wiederherstellen?"
   IDS_PARTIALRECOVER_DONTASK, "Beim nächsten Mal gleiche Antwort wählen"
   IDS_ERRORRECOVER, "Fehler beim Wiederherstellen der Datei %s"
+    IDS_SELECTVOLUME, "Wählen Sie ein Volume oder ein Datenträgerabbild aus."
 }

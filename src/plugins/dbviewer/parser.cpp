@@ -873,10 +873,12 @@ CParserInterfaceCSV::OpenFile(const wchar_t* fileName)
     if (Csv != NULL)
         CloseFile();
 
+    const CCSVConfig config = NormalizeCsvConfig(*Config);
+
     // open the file
     char separator = ','; // default value if auto-detection fails
     BOOL autoSeparator = FALSE;
-    switch (Config->ValueSeparator)
+    switch (config.ValueSeparator)
     {
     case 1:
         separator = '\t';
@@ -891,7 +893,7 @@ CParserInterfaceCSV::OpenFile(const wchar_t* fileName)
         separator = ' ';
         break;
     case 5:
-        separator = Config->ValueSeparatorChar;
+        separator = config.ValueSeparatorChar;
         break;
     default:
         autoSeparator = TRUE;
@@ -900,7 +902,7 @@ CParserInterfaceCSV::OpenFile(const wchar_t* fileName)
 
     CCSVParserTextQualifier qualifier = CSVTQ_QUOTE; // default value if auto-detection fails
     BOOL autoQualifier = FALSE;
-    switch (Config->TextQualifier)
+    switch (config.TextQualifier)
     {
     case 1:
         qualifier = CSVTQ_QUOTE;
@@ -918,7 +920,7 @@ CParserInterfaceCSV::OpenFile(const wchar_t* fileName)
 
     BOOL firstRowAsName = FALSE;
     BOOL autoFirstRowAsName = FALSE;
-    switch (Config->FirstRowAsName)
+    switch (config.FirstRowAsName)
     {
     case 1:
         firstRowAsName = TRUE;

@@ -1000,12 +1000,7 @@ int CFilesWindow::GetNextTemplateIndex(BOOL forward, BOOL wrap)
 BOOL CFilesWindow::IsViewTemplateValid(int templateIndex)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::IsViewTemplateValid(%d)", templateIndex);
-    if (templateIndex < 1) // tree is not supported yet
-        return FALSE;
-    CViewTemplate* newTemplate = &Parent->ViewTemplates.Items[templateIndex];
-    if (newTemplate->Name.empty())
-        return FALSE;
-    return TRUE;
+    return Parent->ViewTemplates.IsValidIndex(templateIndex);
 }
 
 BOOL CFilesWindow::SelectViewTemplate(int templateIndex, BOOL canRefreshPath,
@@ -1015,15 +1010,8 @@ BOOL CFilesWindow::SelectViewTemplate(int templateIndex, BOOL canRefreshPath,
     CALL_STACK_MESSAGE5("CFilesWindow::SelectViewTemplate(%d, %d, %d, 0x%X)", templateIndex,
                         canRefreshPath, calledFromPluginBeforeListing, columnValidMask);
 
-    if (templateIndex == 0)
-        return FALSE;
+    templateIndex = Parent->ViewTemplates.NormalizeIndex(templateIndex);
     CViewTemplate* newTemplate = &Parent->ViewTemplates.Items[templateIndex];
-    if (newTemplate->Name.empty())
-    {
-        // undefined view is not desired - we force the detailed view which always exists
-        templateIndex = 2;
-        newTemplate = &Parent->ViewTemplates.Items[templateIndex];
-    }
 
     CViewModeEnum oldViewMode = GetViewMode();
     if (!calledFromPluginBeforeListing || ViewTemplate != newTemplate)

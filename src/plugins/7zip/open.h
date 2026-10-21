@@ -37,9 +37,12 @@ public:
 
 private:
     UString& Password;
+    bool PasswordRequested = false;
+    bool PasswordDefined;
 
 public:
     // If entered, the password gets propagated towards password
     CArchiveOpenCallbackImp(UString& password);
     ~CArchiveOpenCallbackImp();
+    bool WasPasswordRequested() const { return PasswordRequested; }
 };

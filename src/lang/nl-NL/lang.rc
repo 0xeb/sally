@@ -2727,6 +2727,10 @@ STRINGTABLE
  IDS_CANNOTMOVEFILETOITSELF, "Kan bestand niet naar zichzelf verschuiven."
 
  IDS_CANNOTMOVEDIRTOITSELF, "Kan map niet naar zichzelf verschuiven."
+ IDS_DIRECTORYTARGETINSOURCE, "Een map kan niet naar zichzelf of een van de eigen submappen worden gekopieerd of verplaatst."
+ IDS_UNPACKERSELECTIONREQUIRED, "Selecteer een uitpakprogramma om door te gaan. Als de lijst leeg is, voeg er dan een toe in Configuratie."
+ IDS_EXECUTE_SHORTNAMEUNAVAILABLE, "Er is geen DOS-pad (8.3) beschikbaar voor '%s'."
+ IDS_OPERATIONSTARTFAILED, "De bestandsbewerking kon niet worden gestart.\n\n%s"
 
  IDS_NOTENOUGHSPACE, "Er is niet genoeg ruimte op de doelschijf.\nWilt u verdergaan?\n\nBenodigde ruimte: %s bytes.\nBeschikbare ruimte: %s bytes."
 
@@ -3231,6 +3235,7 @@ STRINGTABLE
  IDS_PACKERR_NOOUTPUT, "Geen resultaat van het externe archiveringsprogramma ontvangen, controleer de configuratie."
  IDS_PACKERR_UNABLETOREN, "Kan de naam van het tijdelijke archief bestand (%1) niet naar (%2) veranderen."
  IDS_PACKERR_INVALIDNAME, "Deze bestandsnaam is ongeldig op het Windows Bestands Systeem. Externe archiveringsprogramma's ondersteunen decomprimeren naar een andere bestandsnaam niet, dus is het niet mogelijk dit bestand te decomprimeren."
+ IDS_PACKERR_EXCLUSIONMASK, "Externe uitpakkers ondersteunen geen uitsluitingsmaskers ('|'). Kies een interne uitpakker of verwijder de uitsluitingen."
 
  IDS_PACKRET_GENERAL, "Afsluit code %d."
  IDS_PACKRET_WARNING, "Waarschuwingen gevonden."
@@ -3579,6 +3584,9 @@ IDS_OLDPLUGINVERSION2, "De plugin (%s) wordt niet door deze versie van Sally ond
  IDS_EMAILFILES_SUBJECT, "Email wordt verstuurd:"
  IDS_EMAILFILES_BODY, "Uw bestanden zijn aangehangen en klaar om met dit bericht verstuurd te worden."
  IDS_EMAILFILES_MAPIERROR, "Kan geen mail sturen. Er is geen mail programma gevonden waarmee mails verstuurd kunnen worden, MAPI32.DLL werd niet gevonden."
+ IDS_EMAILFILES_PATHERROR, "Het e-mailprogramma kan dit bestand niet met de huidige naam bijvoegen:\n\n%s"
+ IDS_EMAILFILES_SENDERROR, "Het e-mailbericht kon niet worden gemaakt.\n\n%s"
+ IDS_EMAILFILES_PROVIDERERROR, "Het e-mailprogramma heeft fout %u gemeld."
 
  IDS_PLUGINSUFFIX, " (Plugin)"
 
@@ -4135,4 +4143,18 @@ IDS_OLDPLUGINVERSION2, "De plugin (%s) wordt niet door deze versie van Sally ond
  IDS_UPDATECHECK_STARTUP, "Bij elke start"
  IDS_UPDATER_CANNOT_START, "Het updateprogramma van Sally kon niet worden gestart:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Een Hoofd Wachtwoord wordt gebruikt on gevoelige informatie zoals FTP of WinSCP wachtwoorden via AES cipher te beveiligen. Wanneer u een Hoofd Wachtwoord aanlegt, wordt u een keer per sessie naar dit wachtwoord gevraagd als Sally gevoelige informatie ophaalt."
+ // Configuration navigation
+ IDS_CFG_SEARCH_LABEL, "Instellingen &zoeken:"
+ IDS_CFG_SEARCH_HINT, "Woorden, ""zinnen"", AND, OR, NOT"
+ IDS_CFG_SEARCH_INVALID, "Ongeldige zoekopdracht. Controleer aanhalingstekens en haakjes."
+ IDS_CFG_SEARCH_EMPTY, "Geen overeenkomende instellingen."
+ IDS_CFG_SEARCH_CLEAR, "Zoekopdracht wissen (Esc)"
+ IDS_CFG_SEARCH_OPEN, "Instellingen zoeken"
+ IDS_CFG_SEARCH_CLOSE, "Zoeken sluiten"
+ IDS_CFG_SAVE, "&Opslaan"
+ IDS_CFG_APPLY, "&Toepassen"
+ IDS_CFG_SAVE_FAILED, "De instellingen konden niet worden opgeslagen. Uw wijzigingen blijven beschikbaar in dit venster."
+
+ IDS_MASTERPASSWORD_STORE_DAMAGED, "De opgeslagen hoofdwachtwoordinstellingen konden niet worden gelezen. Sally behoudt ze en slaat geen configuratiewijzigingen op. Herstel een geldige configuratieback-up voordat u wachtwoorden wijzigt."
+
 }

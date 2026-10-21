@@ -21,6 +21,7 @@ CFTPWorker::CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const wchar_t* hos
     : TextPolicy(FtpLocalTextCodePage())
 {
     ControlConnectionUID = -1;
+    ItemRetryTimerArmed = FALSE;
 
     HaveWorkingPath = FALSE;
     WorkingPath.clear();
@@ -131,6 +132,8 @@ CFTPWorker::CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const wchar_t* hos
 
 CFTPWorker::~CFTPWorker()
 {
+    if (ItemRetryTimerArmed && SocketsThread != NULL)
+        SocketsThread->DeleteTimer(UID, WORKER_ITEMRETRYTIMERID);
     if (UnverifiedCertificate != NULL)
         UnverifiedCertificate->Release();
     if (WorkerDataConState != wdcsDoesNotExist)
@@ -2140,6 +2143,15 @@ void CFTPWorker::ReceiveTimer(DWORD id, void* param)
     {
         HANDLES(EnterCriticalSection(&SocketCritSect));
         HandleEvent(fweDelayedAutoRetry, NULL, 0, 0);
+        HANDLES(LeaveCriticalSection(&SocketCritSect));
+        break;
+    }
+
+    case WORKER_ITEMRETRYTIMERID:
+    {
+        HANDLES(EnterCriticalSection(&SocketCritSect));
+        ItemRetryTimerArmed = FALSE;
+        HandleEvent(fweActivate, NULL, 0, 0);
         HANDLES(LeaveCriticalSection(&SocketCritSect));
         break;
     }

@@ -210,4 +210,5 @@ STRINGTABLE
   IDS_PARTIALRECOVER, "以下文件不能被完全恢复: %s\n\n你想只恢复文件的一部分吗?"
   IDS_PARTIALRECOVER_DONTASK, "下次选择相同答案"
   IDS_ERRORRECOVER, "恢复文件 %s 错误"
+    IDS_SELECTVOLUME, "请选择卷或磁盘映像。"
 }

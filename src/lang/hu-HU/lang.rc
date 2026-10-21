@@ -2727,6 +2727,10 @@ STRINGTABLE
  IDS_CANNOTMOVEFILETOITSELF, "Nem helyezhető át a fájl önmagába."
 
  IDS_CANNOTMOVEDIRTOITSELF, "Nem helyezhető át a mappa önmagába."
+ IDS_DIRECTORYTARGETINSOURCE, "A könyvtár nem másolható vagy helyezhető át saját magába vagy valamelyik alkönyvtárába."
+ IDS_UNPACKERSELECTIONREQUIRED, "A folytatáshoz válasszon kicsomagolót. Ha a lista üres, adjon hozzá egyet a Beállításokban."
+ IDS_EXECUTE_SHORTNAMEUNAVAILABLE, "A(z) „%s” fájlhoz nem érhető el DOS (8.3) elérési út."
+ IDS_OPERATIONSTARTFAILED, "A fájlműveletet nem sikerült elindítani.\n\n%s"
 
  IDS_NOTENOUGHSPACE, "Úgy látszik nincs elég szabad terület a célmeghajtón.\nAkarja folytatni?\n\nSzükséges hely: %s bájt.\nElérhető hely: %s bájt."
 
@@ -3231,6 +3235,7 @@ STRINGTABLE
  IDS_PACKERR_NOOUTPUT, "A külső tömörítő nem adott kimenetet, ellenőrizze a beállításokat."
  IDS_PACKERR_UNABLETOREN, "Az ideiglenes archív fájl (%1) nem nevezhető át az archívum nevére (%2)."
  IDS_PACKERR_INVALIDNAME, "Ez érvénytelen fájl Windows fájlrendszerben. A külső archiválók nem támogatnak egyéb fájlnevet, így ezt a fájlt nem lehet kitömöríteni."
+ IDS_PACKERR_EXCLUSIONMASK, "A külső kicsomagolók nem támogatják a kizárási maszkokat ('|'). Válasszon belső kicsomagolót, vagy távolítsa el a kizárásokat."
 
  IDS_PACKRET_GENERAL, "Kilépési kód %d."
  IDS_PACKRET_WARNING, "Ütközési figyelmeztetés."
@@ -3579,6 +3584,9 @@ IDS_OLDPLUGINVERSION2, "A plugint (%s) nem támogatja az Sally ezen verziója. S
  IDS_EMAILFILES_SUBJECT, "Email-ezés:"
  IDS_EMAILFILES_BODY, "A fájlja társítva, készen áll az üzenet elküldésére."
  IDS_EMAILFILES_MAPIERROR, "Levél nem küldhető el. Nincs levelező program az elküldéshez, MAPI32.DLL fájl nem található."
+ IDS_EMAILFILES_PATHERROR, "A levelezőprogram nem tudja csatolni ezt a fájlt a jelenlegi nevével:\n\n%s"
+ IDS_EMAILFILES_SENDERROR, "Az e-mail-üzenetet nem sikerült létrehozni.\n\n%s"
+ IDS_EMAILFILES_PROVIDERERROR, "A levelezőprogram a következő hibát jelezte: %u."
 
  IDS_PLUGINSUFFIX, " (Plugin)"
 
@@ -4135,4 +4143,18 @@ IDS_OLDPLUGINVERSION2, "A plugint (%s) nem támogatja az Sally ezen verziója. S
  IDS_UPDATECHECK_STARTUP, "Minden indításkor"
  IDS_UPDATER_CANNOT_START, "A Sally frissítőprogramja nem indítható el:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "A mester jelszó erős AES titkosítással védi le az olyan kényes információit, mint az FTP vagy WinSCP jelszavak. Ha létrehoz egy mester jelszót, hozzáférés előtt meg kell adnia, mikor az Sally védett információkhoz akar hozzáférni."
+ // Configuration navigation
+ IDS_CFG_SEARCH_LABEL, "Beállítások &keresése:"
+ IDS_CFG_SEARCH_HINT, "Szavak, ""kifejezések"", AND, OR, NOT"
+ IDS_CFG_SEARCH_INVALID, "Érvénytelen keresés. Ellenőrizze az idézőjeleket és a zárójeleket."
+ IDS_CFG_SEARCH_EMPTY, "Nincs megfelelő beállítás."
+ IDS_CFG_SEARCH_CLEAR, "Keresés törlése (Esc)"
+ IDS_CFG_SEARCH_OPEN, "Beállítások keresése"
+ IDS_CFG_SEARCH_CLOSE, "Keresés bezárása"
+ IDS_CFG_SAVE, "&Mentés"
+ IDS_CFG_APPLY, "&Alkalmaz"
+ IDS_CFG_SAVE_FAILED, "A beállításokat nem sikerült menteni. A módosítások továbbra is elérhetők ebben az ablakban."
+
+ IDS_MASTERPASSWORD_STORE_DAMAGED, "A mentett mesterjelszó-beállítások nem olvashatók. Sally megőrzi őket, és nem menti a konfiguráció módosításait. Jelszavak módosítása előtt állítson vissza egy hibátlan konfigurációs biztonsági másolatot."
+
 }

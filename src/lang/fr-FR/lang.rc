@@ -2727,6 +2727,10 @@ STRINGTABLE
  IDS_CANNOTMOVEFILETOITSELF, "Impossible de déplacer un fichier sur lui-même."
 
  IDS_CANNOTMOVEDIRTOITSELF, "Impossible de déplacer un répertoire sur lui-même."
+ IDS_DIRECTORYTARGETINSOURCE, "Un dossier ne peut pas être copié ou déplacé dans lui-même ou dans l'un de ses sous-dossiers."
+ IDS_UNPACKERSELECTIONREQUIRED, "Sélectionnez un programme de décompression. Si la liste est vide, ajoutez-en un dans la configuration."
+ IDS_EXECUTE_SHORTNAMEUNAVAILABLE, "Aucun chemin DOS (8.3) n’est disponible pour « %s »."
+ IDS_OPERATIONSTARTFAILED, "Impossible de démarrer l’opération sur les fichiers.\n\n%s"
 
  IDS_NOTENOUGHSPACE, "Pas assez d'espace sur le lecteur de destination.\nContinuer ?\n\nEspace nécessaire : %s bytes.\nEspace disponible : %s bytes."
 
@@ -3231,6 +3235,7 @@ STRINGTABLE
  IDS_PACKERR_NOOUTPUT, "Pas de sortie du compresseur externe, contrôler la configuration."
  IDS_PACKERR_UNABLETOREN, "Impossible de renommer le fichier d'archive temporaire (%1) avec le nom de l'archive (%2)."
  IDS_PACKERR_INVALIDNAME, "Nom de fichier incorrect pour les systèmes de fichiers Windows. Les archiveurs externes ne prennent pas en charge le dépaquetage avec changement au passage du nom des fichiers. Impossible donc de dépaqueter ce fichier."
+ IDS_PACKERR_EXCLUSIONMASK, "Les décompresseurs externes ne prennent pas en charge les masques d’exclusion ('|'). Choisissez un décompresseur interne ou supprimez les exclusions."
 
  IDS_PACKRET_GENERAL, "Code de sortie %d."
  IDS_PACKRET_WARNING, "Avertissement émis."
@@ -3579,6 +3584,9 @@ IDS_OLDPLUGINVERSION2, "Le module (%s) n'est pas pris en charge par cette versio
  IDS_EMAILFILES_SUBJECT, "Envoi de messagerie:"
  IDS_EMAILFILES_BODY, "Les fichiers sont joints et prêts à être envoyés avec le message."
  IDS_EMAILFILES_MAPIERROR, "Impossible d'envoyer un message. Aucun programme de messagerie n'est prêt, pas de MAPI32.DLL."
+ IDS_EMAILFILES_PATHERROR, "Le logiciel de messagerie ne peut pas joindre ce fichier avec son nom actuel :\n\n%s"
+ IDS_EMAILFILES_SENDERROR, "Impossible de créer le message électronique.\n\n%s"
+ IDS_EMAILFILES_PROVIDERERROR, "Le logiciel de messagerie a signalé l’erreur %u."
 
  IDS_PLUGINSUFFIX, " (Module)"
 
@@ -4135,4 +4143,18 @@ IDS_OLDPLUGINVERSION2, "Le module (%s) n'est pas pris en charge par cette versio
  IDS_UPDATECHECK_STARTUP, "À chaque démarrage"
  IDS_UPDATER_CANNOT_START, "Le programme de mise à jour de Sally n'a pas pu être lancé :\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "On utilise un mot de passe principal et un chiffre AES robuste pour protéger des données confidentielles comme des mots de passe FTP ou WinSCP. Si vous utilisez un mot de passe principal, il vous sera demandé à chaque fois qu'Sally devra aller chercher des données protégées."
+ // Configuration navigation
+ IDS_CFG_SEARCH_LABEL, "&Rechercher un réglage :"
+ IDS_CFG_SEARCH_HINT, "Mots, ""expressions"", AND, OR, NOT"
+ IDS_CFG_SEARCH_INVALID, "Recherche incorrecte. Vérifiez les guillemets et les parenthèses."
+ IDS_CFG_SEARCH_EMPTY, "Aucun réglage correspondant."
+ IDS_CFG_SEARCH_CLEAR, "Effacer la recherche (Échap)"
+ IDS_CFG_SEARCH_OPEN, "Rechercher un réglage"
+ IDS_CFG_SEARCH_CLOSE, "Fermer la recherche"
+ IDS_CFG_SAVE, "&Enregistrer"
+ IDS_CFG_APPLY, "&Appliquer"
+ IDS_CFG_SAVE_FAILED, "La configuration n’a pas pu être enregistrée. Vos modifications restent disponibles dans cette fenêtre."
+
+ IDS_MASTERPASSWORD_STORE_DAMAGED, "Les réglages enregistrés du mot de passe principal sont illisibles. Sally les conserve et n’enregistre aucune modification de configuration. Restaurez une sauvegarde valide avant de modifier les mots de passe."
+
 }

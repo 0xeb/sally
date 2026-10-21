@@ -24,7 +24,7 @@
 // TODO: review error messages and where they are used (TAR vs. CPIO)
 // TODO: fix error reporting when the stream fails (do not rely on its ErrorNumber, ensure there is always text)
 // TODO: handle multi-volume archives
-// TODO: support archives with sparse files
+// TODO: support newer PAX GNU sparse formats (old-GNU sparse maps are handled)
 // TODO: could links be turned into shortcuts?
 // TODO: add LZMA compression to RPM (see flex-32bit-2.5.35-43.88.s390x.rpm sample). It seems rather rarely used, so maybe add it when more people ask...
 

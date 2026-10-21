@@ -14,6 +14,43 @@
 void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
                                              BOOL& reportWorkerChange)
 {
+    if ((ShouldStop || ShouldBePaused) && ItemRetryTimerArmed)
+    {
+        if (SocketsThread != NULL)
+            SocketsThread->DeleteTimer(UID, WORKER_ITEMRETRYTIMERID);
+        ItemRetryTimerArmed = FALSE;
+    }
+    if (!ShouldStop && CurItem != NULL && SubState == fwssNone)
+    {
+        if (ShouldBePaused)
+            return;
+        const DWORD delay = Queue->GetRememberedRetryDelay(CurItem->UID);
+        if (delay != 0)
+        {
+            if (!ItemRetryTimerArmed)
+            {
+                if (SocketsThread != NULL &&
+                    SocketsThread->AddTimer(Msg, UID, GetTickCount() + delay, WORKER_ITEMRETRYTIMERID, NULL))
+                    ItemRetryTimerArmed = TRUE;
+                else
+                {
+                    Queue->SuspendRememberedRetry(CurItem, Oper);
+                    Oper->ReportItemChange(CurItem->UID);
+                    CurItem = NULL;
+                    State = fwsLookingForWork;
+                    reportWorkerChange = TRUE;
+                    postActivate = TRUE;
+                }
+            }
+            return; // no disk/network work before the operation-owned deadline
+        }
+        if (ItemRetryTimerArmed)
+        {
+            if (SocketsThread != NULL)
+                SocketsThread->DeleteTimer(UID, WORKER_ITEMRETRYTIMERID);
+            ItemRetryTimerArmed = FALSE;
+        }
+    }
     if ((!DiskWorkIsUsed || event == fweWorkerShouldStop) && ShouldStop) // we should terminate the worker
     {
         if (SubState != fwssPrepQuitSent && SubState != fwssPrepWaitForDiskAfterQuitSent && !SocketClosed)

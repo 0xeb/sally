@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -7,6 +8,7 @@
 
 #include "7zip.h"
 #include "extract.h"
+#include "progress.h"
 #include "resource.h"
 #include "extract.h"
 #include "7zip\archive\7zHeader.h"
@@ -179,11 +181,9 @@ DWORD WINAPI ExtractArchive(LPVOID cabinet)
     return ret;
 }
 
-void RefreshProgress(unsigned long inend, unsigned long inptr, int diskSavePart)
+void RefreshProgress(unsigned long long inend, unsigned long long inptr, int diskSavePart)
 {
-    unsigned long pos = inptr / (inend / 100);
-    if (diskSavePart != 0)
-        pos += 100;
+    unsigned long pos = SfxProgressPosition(inend, inptr, diskSavePart);
     if (ProgressPos != pos)
     {
         ProgressPos = pos;

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/IThreadStartup.h"
 #include "common/ApplicationAppearance.h"
 #include "SallyUrls.h"
 
@@ -315,8 +316,13 @@ unsigned ThreadProgressDlgBody(void* parameter)
 
     CProgressDialog dlg(NULL, data->Script, data->Caption, attrsData, convertData, TRUE, data);
     INT_PTR res = dlg.Execute();
-    if (res == 0 || res == -1 || res == IDABORT) // failed to open the dialog or worker thread
-        SetEvent(data->ContEvent);               // let the main thread continue (opening the dialog or starting the operation failed)
+    if (!dlg.WasOperationStarted())
+    {
+        // On success the waiting main thread returns, so 'data' is no longer
+        // alive. Only an unsuccessful startup may still access that handshake.
+        data->StartupError = res == IDCANCEL ? ERROR_CANCELLED : dlg.GetStartupError();
+        SetEvent(data->ContEvent);
+    }
 
     if (!workPath1W.empty())
         MainWindow->PostChangeOnPathNotificationW(workPath1W.c_str(), workPath1InclSubDirs);
@@ -355,8 +361,11 @@ BOOL StartProgressDialog(COperations* script, const wchar_t* caption,
                          CChangeAttrsData* attrsData, CConvertData* convertData)
 {
     BOOL ret = FALSE;
+    DWORD startupError = ERROR_GEN_FAILURE;
     ProgressDlgArray.RemoveFinishedDlgs();
-    HANDLE contEvent = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL)); // "nonsignaled" state, auto
+    const StartupHandleResult continuation = gThreadStartup->CreateSignalEvent(false, false);
+    HANDLE contEvent = continuation.Handle;
+    HANDLES_ADD_EX(__otQuiet, contEvent != NULL, __htEvent, __hoCreateEvent, contEvent, continuation.Error, TRUE); // "nonsignaled" state, auto
     if (contEvent != NULL)
     {
         CProgressDlgArrItem* newDlg = ProgressDlgArray.PrepareNewDlg();
@@ -369,6 +378,7 @@ BOOL StartProgressDialog(COperations* script, const wchar_t* caption,
             data.ConvertData = convertData;
             data.NewDlg = newDlg;
             data.OperationWasStarted = FALSE;
+            data.StartupError = ERROR_GEN_FAILURE;
             data.ContEvent = contEvent;
             MultiMonGetClipRectByWindow(MainWindow->HWindow, &data.MainWndRectClipR, NULL);
             if (!IsIconic(MainWindow->HWindow))
@@ -377,7 +387,9 @@ BOOL StartProgressDialog(COperations* script, const wchar_t* caption,
                 data.MainWndRectByR = data.MainWndRectClipR;
 
             DWORD threadID;
-            HANDLE dlgThread = HANDLES(CreateThread(NULL, 0, ThreadProgressDlg, &data, 0, &threadID));
+            const StartupHandleResult dialogThread = gThreadStartup->StartThread(ThreadProgressDlg, &data, &threadID);
+            HANDLE dlgThread = dialogThread.Handle;
+            HANDLES_ADD_EX(__otQuiet, dlgThread != NULL, __htThread, __hoCreateThread, dlgThread, dialogThread.Error, TRUE);
             if (dlgThread != NULL)
             {
                 // wait until the dialog thread takes the data, opens the dialog and starts the worker thread and
@@ -385,17 +397,29 @@ BOOL StartProgressDialog(COperations* script, const wchar_t* caption,
                 WaitForSingleObject(contEvent, INFINITE);
                 ProgressDlgArray.SetDlgData(newDlg, dlgThread, NULL);
                 ret = data.OperationWasStarted;
+                startupError = data.StartupError;
             }
             else
             {
+                startupError = dialogThread.Error;
                 TRACE_E("StartProgressDialog(): unable to start progress dialog thread!");
                 ProgressDlgArray.RemoveDlg(newDlg);
             }
         }
+        else
+            startupError = ERROR_NOT_ENOUGH_MEMORY;
         HANDLES(CloseHandle(contEvent));
     }
     else
+    {
+        startupError = continuation.Error;
         TRACE_E("StartProgressDialog(): unable to create 'contEvent' system event!");
+    }
+    if (!ret && startupError != ERROR_CANCELLED)
+    {
+        const std::wstring message = FormatStrW(LoadStrW(IDS_OPERATIONSTARTFAILED), FormatThreadStartupErrorW(startupError).c_str());
+        gPrompter->ShowError(MainWindow->HWindow, caption != NULL ? caption : LoadStrW(IDS_ERRORTITLE), message.c_str());
+    }
     return ret;
 }
 
@@ -405,6 +429,8 @@ CProgressDialog::CProgressDialog(HWND parent, COperations* script, const wchar_t
     : CCommonDialog(HLanguage, IDD_PROGRESSDLG, parent)
 {
     RunningInOwnThread = runningInOwnThread;
+    OperationWasStarted = FALSE;
+    StartupError = ERROR_GEN_FAILURE;
     ProgrDlgData = progrDlgData;
     Worker = NULL;
     WContinue = NULL;
@@ -443,6 +469,17 @@ CProgressDialog::~CProgressDialog()
 {
     if (Worker != NULL)
         TRACE_E("Unexpected situation in CProgressDialog::~CProgressDialog(): worker thread is still alive!");
+}
+
+void CProgressDialog::FailStartup(DWORD error)
+{
+    StartupError = error;
+    if (!RunningInOwnThread)
+    {
+        const std::wstring message = FormatStrW(LoadStrW(IDS_OPERATIONSTARTFAILED), FormatThreadStartupErrorW(error).c_str());
+        gPrompter->ShowError(HWindow, Caption.c_str(), message.c_str());
+    }
+    EndDialog(HWindow, IDABORT);
 }
 
 // COperations::RemapNameFrom/To are const wchar_t* (worker.h:384/386) and
@@ -630,20 +667,24 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_PROGRDLGSTART: // probably needless on W2K+: just a delayed worker thread start
     {
         //--- creation of synchronization objects
-        WContinue = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL));
+        const StartupHandleResult continuation = gThreadStartup->CreateSignalEvent(false, false);
+        WContinue = continuation.Handle;
+        HANDLES_ADD_EX(__otQuiet, WContinue != NULL, __htEvent, __hoCreateEvent, WContinue, continuation.Error, TRUE);
         if (WContinue == NULL)
         {
             TRACE_E("Unable to create WContinue event.");
-            EndDialog(HWindow, IDABORT); // fatal error
+            FailStartup(continuation.Error);
             break;
         }
-        WorkerNotSuspended = HANDLES(CreateEvent(NULL, TRUE, TRUE, NULL));
+        const StartupHandleResult suspension = gThreadStartup->CreateSignalEvent(true, true);
+        WorkerNotSuspended = suspension.Handle;
+        HANDLES_ADD_EX(__otQuiet, WorkerNotSuspended != NULL, __htEvent, __hoCreateEvent, WorkerNotSuspended, suspension.Error, TRUE);
         if (WorkerNotSuspended == NULL)
         {
             TRACE_E("Unable to create WorkerNotSuspended event.");
             HANDLES(CloseHandle(WContinue));
             WContinue = NULL;
-            EndDialog(HWindow, IDABORT); // fatal error
+            FailStartup(suspension.Error);
             break;
         }
         BOOL startPaused = FALSE;
@@ -673,7 +714,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         Worker = StartWorker(Script, HWindow, AttrsData, ConvertData, WContinue,
                              WorkerNotSuspended, &CancelWorker, &OperationProgress,
-                             &SummaryProgress);
+                             &SummaryProgress, &StartupError);
         if (Worker == NULL)
         {
             if (IsInQueue)
@@ -683,15 +724,17 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             WorkerNotSuspended = NULL;
             HANDLES(CloseHandle(WContinue));
             WContinue = NULL;
-            EndDialog(HWindow, IDABORT); // fatal error
+            FailStartup(StartupError);
         }
         else
         {
+            OperationWasStarted = TRUE;
             if (RunningInOwnThread)
             {
                 if (ProgrDlgData != NULL)
                 {
                     ProgressDlgArray.SetDlgData(ProgrDlgData->NewDlg, NULL, HWindow);
+                    ProgrDlgData->StartupError = ERROR_SUCCESS;
                     ProgrDlgData->OperationWasStarted = TRUE;
                     SetEvent(ProgrDlgData->ContEvent); // let the main thread continue (it waits for the dialog to open and the operation to start)
                     ProgrDlgData = NULL;

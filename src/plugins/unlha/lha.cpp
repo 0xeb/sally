@@ -100,9 +100,9 @@ static unsigned short get_word()
   put_byte(v >> 8);
 }*/
 
-static long get_longword()
+static DWORD get_longword()
 {
-    long b0, b1, b2, b3;
+    DWORD b0, b1, b2, b3;
 
     b0 = get_byte();
     b1 = get_byte();
@@ -186,6 +186,12 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
         return GH_EOF;
     }
 
+    if (header_size < I_NAME_LENGTH)
+    {
+        iLHAErrorStrId = IDS_FILECORRUPT;
+        return GH_ERROR;
+    }
+
     if ((int)fread(data + I_HEADER_CHECKSUM, sizeof(char), header_size - 1, fp) < header_size - 1)
     {
         iLHAErrorStrId = IDS_FILECORRUPT;
@@ -211,7 +217,14 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
 
     if (lpHeader->header_level >= 2)
     {
-        lpHeader->header_size = header_size + checksum * 256;
+        // This reader owns only the inline header bytes read above. Refuse
+        // larger level-2 headers rather than parsing uninitialized storage.
+        if (checksum != 0 || header_size < 26)
+        {
+            iLHAErrorStrId = IDS_FILECORRUPT;
+            return GH_ERROR;
+        }
+        lpHeader->header_size = header_size;
     }
     else
     {
@@ -233,6 +246,11 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
             return GH_ERROR;
         }
         name_length = get_byte();
+        if (name_length > header_size - (lpHeader->header_level == 1 ? 25 : 20))
+        {
+            iLHAErrorStrId = IDS_FILECORRUPT;
+            return GH_ERROR;
+        }
         lpHeader->name.resize(static_cast<size_t>(name_length));
         for (i = 0; i < name_length; i++)
             lpHeader->name[i] = (char)get_byte();
@@ -351,17 +369,26 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
         if (lpHeader->header_level == 1)
             setup_get(data + lpHeader->header_size);
         ptr = get_ptr;
-        while ((header_size = get_word()) != 0)
+        const char* extensionEnd = data + (lpHeader->header_level == 2 ? lpHeader->header_size : LZHEADER_STRAGE);
+        for (;;)
         {
-            if (header_size < 3 || header_size > 500 ||
+            if (extensionEnd - get_ptr < 2)
+            {
+                iLHAErrorStrId = IDS_FILECORRUPT;
+                return GH_ERROR;
+            }
+            header_size = get_word();
+            if (header_size == 0)
+                break;
+            if (header_size < 3 || header_size > 500 || extensionEnd - get_ptr < header_size ||
                 (lpHeader->header_level != 2 &&
-                 ((data + LZHEADER_STRAGE - get_ptr < header_size) ||
-                  (int)fread(get_ptr, sizeof(char), header_size, fp) < header_size)))
+                 (int)fread(get_ptr, sizeof(char), header_size, fp) < header_size))
             {
                 iLHAErrorStrId = IDS_FILECORRUPT;
                 return FALSE;
             }
 
+            char* nextExtension = get_ptr + header_size - 2;
             switch (get_byte())
             {
             case 1:
@@ -384,6 +411,11 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
                 dir_length = header_size - 3;
                 break;
             case 0x40:
+                if (header_size < 5)
+                {
+                    iLHAErrorStrId = IDS_FILECORRUPT;
+                    return GH_ERROR;
+                }
                 /*
            * MS-DOS attribute
            */
@@ -393,6 +425,11 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
                     lpHeader->attribute = (unsigned char)get_word();
                 break;
             case 0x41:
+                if (header_size < 27)
+                {
+                    iLHAErrorStrId = IDS_FILECORRUPT;
+                    return GH_ERROR;
+                }
                 /*
            * Windows time stamp header
            */
@@ -405,6 +442,11 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
                 }
                 break;
             case 0x50:
+                if (header_size < 5)
+                {
+                    iLHAErrorStrId = IDS_FILECORRUPT;
+                    return GH_ERROR;
+                }
                 /*
            * UNIX permission
            */
@@ -418,11 +460,18 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
                 setup_get(get_ptr + header_size - 3);
                 break;
             }
+            setup_get(nextExtension);
         }
         if (lpHeader->header_level == 1 && get_ptr - ptr != 2)
         {
-            lpHeader->packed_size -= (long)(get_ptr - ptr - 2);
-            lpHeader->header_size += (unsigned char)(get_ptr - ptr - 2);
+            const auto extensionBytes = static_cast<unsigned __int64>(get_ptr - ptr - 2);
+            if (extensionBytes > lpHeader->packed_size)
+            {
+                iLHAErrorStrId = IDS_FILECORRUPT;
+                return GH_ERROR;
+            }
+            lpHeader->packed_size -= extensionBytes;
+            lpHeader->header_size += (unsigned char)extensionBytes;
         }
     }
 
@@ -471,9 +520,9 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
 
 // PROGRESS ///////////////////////////////////////////////////////////////////////////
 
-BOOL (*pfLHAProgress)(int size) = NULL;
-static int iProgress;
-#define PROGRESS_MASK 0xffff8000 // progress meter position updates every 32 KB
+BOOL (*pfLHAProgress)(unsigned __int64 size) = NULL;
+static unsigned __int64 iProgress;
+#define PROGRESS_MASK (~0x7fffULL) // progress meter position updates every 32 KB
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // BUFFERED OUTPUT /////////////////////////////////////////////////////////////////////
@@ -621,18 +670,18 @@ struct interfacing
 {
     FILE* infile;
     HANDLE outfile;
-    unsigned long original;
-    unsigned long packed;
+    unsigned __int64 original;
+    unsigned __int64 packed;
     int dicbit;
     int method;
 };
 
 static struct interfacing iface;
 
-static unsigned long origsize, compsize;
+static unsigned __int64 origsize, compsize;
 static unsigned short dicbit;
 static unsigned short maxmatch;
-static unsigned long count;
+static unsigned __int64 count;
 static unsigned long loc;
 static unsigned char* text;
 static int prev_char;
@@ -640,7 +689,7 @@ static int prev_char;
 static FILE* infile;
 static HANDLE outfile;
 static unsigned short crc, bitbuf;
-static long reading_size;
+static unsigned __int64 reading_size;
 
 static unsigned int n_max;
 
@@ -1679,7 +1728,7 @@ exit:
 ////////////////////////////////////////////////////////////////////////////////////////
 // COPYFILE ////////////////////////////////////////////////////////////////////////////
 
-static int copyfile(FILE* infile2, HANDLE outfile2, int size)
+static int copyfile(FILE* infile2, HANDLE outfile2, unsigned __int64 size)
 {
     CALL_STACK_MESSAGE1("copyfile( , , )");
 
@@ -1693,7 +1742,7 @@ static int copyfile(FILE* infile2, HANDLE outfile2, int size)
     int ret = 1;
     while (size)
     {
-        int n = (size < BUFSIZE) ? size : BUFSIZE;
+        int n = (size < BUFSIZE) ? static_cast<int>(size) : BUFSIZE;
         if ((int)fread(buffer2, 1, n, infile2) < n)
         {
             iLHAErrorStrId = IDS_READERROR;
@@ -1817,13 +1866,15 @@ int LHAOpenArchive(FILE*& f, const wchar_t* lpName)
     LHA_HEADER hdr;
     if (LHAGetHeader(f, &hdr) != GH_ERROR)
     { // try to read one header
-        fseek(f, 0, SEEK_SET);
-        return TRUE; // everything is OK, the archive is LHZ
+        if (_fseeki64(f, 0, SEEK_SET) == 0)
+            return TRUE; // everything is OK, the archive is LHZ
+        fclose(f);
+        iLHAErrorStrId = IDS_READERROR;
+        return FALSE;
     }
 
     // failed to read the first header, check whether the archive is an SFX
     unsigned char* buffer2;
-    unsigned char *p, *q;
     int n;
 
     buffer2 = (unsigned char*)malloc(MAXSFXCODE);
@@ -1834,27 +1885,26 @@ int LHAOpenArchive(FILE*& f, const wchar_t* lpName)
         return FALSE;
     }
 
-    fseek(f, 0, SEEK_SET);
+    if (_fseeki64(f, 0, SEEK_SET) != 0)
+    {
+        free(buffer2);
+        fclose(f);
+        iLHAErrorStrId = IDS_READERROR;
+        return FALSE;
+    }
     n = (int)fread(buffer2, sizeof(char), MAXSFXCODE, f);
 
-    for (p = buffer2 + 2, q = buffer2 + n - /* 5 */ (I_HEADER_LEVEL + 1) - 2; p < q; p++)
+    for (int offset = 0; offset + I_HEADER_LEVEL < n; ++offset)
     {
-        /* found "-l??-" keyword (as METHOD type string) */
-        if (p[0] == '-' && p[1] == 'l' && p[4] == '-')
+        const unsigned char* candidate = buffer2 + offset;
+        if (candidate[I_METHOD] != '-' || candidate[I_METHOD + 1] != 'l' || candidate[I_METHOD + 4] != '-' ||
+            candidate[I_HEADER_LEVEL] > 2)
+            continue;
+        if (_fseeki64(f, offset, SEEK_SET) == 0 && LHAGetHeader(f, &hdr) == GH_SUCCESS &&
+            _fseeki64(f, offset, SEEK_SET) == 0)
         {
-            /* size and checksum validate check */
-            if ((p[I_HEADER_LEVEL - 2] == 0 || p[I_HEADER_LEVEL - 2] == 0) && p[I_HEADER_SIZE - 2] > 20 && p[I_HEADER_CHECKSUM - 2] == calc_sum((char*)p, p[-2]))
-            {
-                fseek(f, (long)((p - 2) - buffer2) - n, SEEK_CUR);
-                free(buffer2);
-                return TRUE;
-            }
-            else if (p[I_HEADER_LEVEL - 2] == 2 && p[I_HEADER_SIZE - 2] >= 24 && p[I_ATTRIBUTE - 2] == 0x20)
-            {
-                fseek(f, (long)((p - 2) - buffer2) - n, SEEK_CUR);
-                free(buffer2);
-                return TRUE;
-            }
+            free(buffer2);
+            return TRUE;
         }
     }
 

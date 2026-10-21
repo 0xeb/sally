@@ -8,6 +8,7 @@ BOOL SplitDialog(const wchar_t* fileName, // [in]     name of the file being spl
                  CQuadWord& fileSize,    // [in]     its size
                  std::wstring& targetDir, // [in/out] target directory
                  CQuadWord* partialSize, // [out]    size of a single part
+                 unsigned* requestedParts, // [out] exact count, or zero in size/autodetect mode
                  HWND hParent);
 
 BOOL CombineDialog(TIndirectArray<wchar_t>& files, // [in/out] array of partial file names

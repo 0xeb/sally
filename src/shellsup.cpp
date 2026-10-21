@@ -2545,6 +2545,11 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                         }
                     }
 
+                    if (onlyPanelMenu)
+                    {
+                        if (ShellMenuDiagRecord* record = ShellMenuDiag.Current())
+                            record->BackgroundFinalCount = GetMenuItemCount(h);
+                    }
                     if (GetMenuItemCount(h) > 0) // protection against completely stripped menu
                     {
                         CMenuPopup contextPopup;
@@ -3013,7 +3018,13 @@ void ExecuteAssociationW(HWND hWindow, const wchar_t* pathW, const wchar_t* name
             sei.lpFile = fullPathW.c_str();
             sei.lpDirectory = pathW;
             sei.nShow = SW_SHOWNORMAL;
-            ShellExecuteExW(&sei);
+            if (!ShellExecuteExW(&sei))
+            {
+                const DWORD error = GetLastError();
+                const std::wstring errorText = GetErrorTextOwned(error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE);
+                const std::wstring message = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), fullPathW.c_str(), errorText.c_str());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), message.c_str());
+            }
         }
 
         if (ExecuteAssociationTlsIndex != TLS_OUT_OF_INDEXES)

@@ -49,7 +49,7 @@
 #define CM_VIEWER_CUT            1521
 #define CM_VIEWER_COPY           1522
 #define CM_VIEWER_PASTE          1523
-#define CM_VIEWER_FILTER         1523
+#define CM_VIEWER_FILTER         1524
 
 #define CML_VIEWER_OPTIONS       1525
 #define CM_VIEWER_CFG            1526

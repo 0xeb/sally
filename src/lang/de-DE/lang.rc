@@ -2727,6 +2727,10 @@ STRINGTABLE
  IDS_CANNOTMOVEFILETOITSELF, "Kann die Datei nicht auf sich selbst verschieben."
 
  IDS_CANNOTMOVEDIRTOITSELF, "Kann das Verzeichnis nicht auf sich selbst verschieben."
+ IDS_DIRECTORYTARGETINSOURCE, "Ein Verzeichnis kann nicht in sich selbst oder eines seiner Unterverzeichnisse kopiert oder verschoben werden."
+ IDS_UNPACKERSELECTIONREQUIRED, "Wählen Sie einen Entpacker aus. Wenn die Liste leer ist, fügen Sie einen in der Konfiguration hinzu."
+ IDS_EXECUTE_SHORTNAMEUNAVAILABLE, "Für '%s' ist kein DOS-Pfad (8.3) verfügbar."
+ IDS_OPERATIONSTARTFAILED, "Der Dateivorgang konnte nicht gestartet werden.\n\n%s"
 
  IDS_NOTENOUGHSPACE, "Nicht genügend Speicherplatz auf dem Ziellaufwerk.\nMöchten Sie trotzdem fortfahren?\n\nBenötigter Speicher: %s Bytes.\nVerfügbarer Speicher: %s Bytes."
 
@@ -3231,6 +3235,7 @@ STRINGTABLE
  IDS_PACKERR_NOOUTPUT, "Keine Ausgabe vom externen Packer erhalten, kontollieren Sie die Konfiguration."
  IDS_PACKERR_UNABLETOREN, "Umbenennen der temporären Archivdatei (%1) zu Archivname (%2) nicht möglich."
  IDS_PACKERR_INVALIDNAME, "Dieser Dateiname wird vom Windows-Dateisystem nicht unterstützt. Externe Packprogramme unterstützen kein Entpacken unter einem anderen Dateinamen, somit ist es nicht möglich diese Datei zu entpacken."
+ IDS_PACKERR_EXCLUSIONMASK, "Externe Entpacker unterstützen keine Ausschlussmasken ('|'). Wählen Sie einen internen Entpacker oder entfernen Sie die Ausschlüsse."
 
  IDS_PACKRET_GENERAL, "Rückgabecode %d."
  IDS_PACKRET_WARNING, "Warnung aufgetreten."
@@ -3579,6 +3584,9 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_EMAILFILES_SUBJECT, "E-Mail senden:"
  IDS_EMAILFILES_BODY, "Ihre Dateien wurden angehängt und können mit der E-Mail versandt werden."
  IDS_EMAILFILES_MAPIERROR, "Senden der E-Mail nicht möglich. Kein Mailprogramm zum Versenden der Mail eingerichtet, MAPI32.DLL wurde nicht gefunden."
+ IDS_EMAILFILES_PATHERROR, "Das E-Mail-Programm kann diese Datei mit ihrem aktuellen Namen nicht anhängen:\n\n%s"
+ IDS_EMAILFILES_SENDERROR, "Die E-Mail-Nachricht konnte nicht erstellt werden.\n\n%s"
+ IDS_EMAILFILES_PROVIDERERROR, "Das E-Mail-Programm hat den Fehler %u gemeldet."
 
  IDS_PLUGINSUFFIX, " (Plugin)"
 
@@ -4135,4 +4143,18 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_UPDATECHECK_STARTUP, "Bei jedem Start"
  IDS_UPDATER_CANNOT_START, "Das Aktualisierungsprogramm von Sally konnte nicht gestartet werden:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Ein Master-Passwort wird verwendet um vertrauliche Informationen wie FTP oder WinSCP Passwörter durch den starken AES Cipher zu schützen. Wenn Sie ein Master-Passwort erstellen, werden Sie einmal pro Sitzung danach gefragt, sobald Sally geschützte Informationen abrufen muss."
+ // Configuration navigation
+ IDS_CFG_SEARCH_LABEL, "Einstellungen &suchen:"
+ IDS_CFG_SEARCH_HINT, "Wörter, ""Wortgruppen"", AND, OR, NOT"
+ IDS_CFG_SEARCH_INVALID, "Ungültige Suche. Anführungszeichen und Klammern prüfen."
+ IDS_CFG_SEARCH_EMPTY, "Keine passenden Einstellungen."
+ IDS_CFG_SEARCH_CLEAR, "Suche löschen (Esc)"
+ IDS_CFG_SEARCH_OPEN, "Einstellungen suchen"
+ IDS_CFG_SEARCH_CLOSE, "Suche schließen"
+ IDS_CFG_SAVE, "&Speichern"
+ IDS_CFG_APPLY, "Ü&bernehmen"
+ IDS_CFG_SAVE_FAILED, "Die Einstellungen konnten nicht gespeichert werden. Ihre Änderungen bleiben in diesem Fenster verfügbar."
+
+ IDS_MASTERPASSWORD_STORE_DAMAGED, "Die gespeicherten Master-Passwort-Einstellungen konnten nicht gelesen werden. Sally erhält sie und speichert keine Konfigurationsänderungen. Stellen Sie vor Passwortänderungen eine intakte Sicherung der Konfiguration wieder her."
+
 }

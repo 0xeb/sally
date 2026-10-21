@@ -660,7 +660,20 @@ BOOL CFATSnapshot<CHAR>::DecodeDirectoryClusters(BYTE* buffer, DWORD len, DIR_IT
             {
                 if ((entry->NTRes & 0x08) != 0)
                     _strlwr(name8_3);
-                fname->FNName = String<CHAR>::NewFromASCII(name8_3);
+                if (static_cast<BYTE>(entry->Name[0]) == 0xE5)
+                {
+                    // A deleted short name has lost its first character. Preserve
+                    // the marker separately: in a DBCS OEM encoding it could
+                    // otherwise consume the next byte as part of a character.
+                    std::unique_ptr<CHAR[]> tail(String<CHAR>::NewFromASCII(name8_3 + 1));
+                    if (!tail)
+                        goto lowmem;
+                    std::basic_string<CHAR> name(1, static_cast<CHAR>(0xE5));
+                    name.append(tail.get());
+                    fname->FNName = String<CHAR>::NewStr(name.c_str());
+                }
+                else
+                    fname->FNName = String<CHAR>::NewFromASCII(name8_3);
                 if (fname->FNName == NULL)
                     goto lowmem;
                 fname->DOSName = NULL;

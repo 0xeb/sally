@@ -210,4 +210,5 @@ STRINGTABLE
   IDS_PARTIALRECOVER, "Следующий файл не может быть полностью восстановлен: %s\n\nВы хотите восстановить его частично?"
   IDS_PARTIALRECOVER_DONTASK, "Применить ко всем последующим файлам"
   IDS_ERRORRECOVER, "Ошибка восстановления файла %s"
+    IDS_SELECTVOLUME, "Выберите том или образ диска."
 }

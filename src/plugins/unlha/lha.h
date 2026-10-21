@@ -42,8 +42,8 @@ struct LHA_HEADER
 {
     unsigned char header_size;
     int method;         // method; if LHA_UNKNOWNMETHOD the file must be skipped
-    long packed_size;   // size of compressed data immediately following the header
-    long original_size; // size of the original (uncompressed) file
+    unsigned __int64 packed_size;   // size of compressed data immediately following the header
+    unsigned __int64 original_size; // size of the original (uncompressed) file
     LHA_TIMESTAMP last_modified_stamp;
     FILETIME last_modified_filetime; // last_modified_stamp converted to FILETIME
     unsigned char attribute;
@@ -134,5 +134,5 @@ BOOL LHAUnpackFile(FILE* infile, HANDLE outfile, LHA_HEADER* lpHeader, int* CRC,
 //
 
 extern int iLHAErrorStrId;              // contains the ID of the error description string when a failure occurs
-extern BOOL (*pfLHAProgress)(int size); // pointer to the function that, during extraction,
+extern BOOL (*pfLHAProgress)(unsigned __int64 size); // pointer to the function that, during extraction,
                                         // receives a value in the range 0 .. hdr.original_size

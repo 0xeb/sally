@@ -7,6 +7,7 @@
 #include <string>
 
 #include "find_history.h"
+#include "csv_config.h"
 
 class CRendererWindow;
 
@@ -45,6 +46,8 @@ protected:
 public:
     CGoToDialog(HWND hParent, int* record, int recordCount);
 
+    virtual void Validate(CTransferInfo& ti);
+
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
@@ -55,8 +58,6 @@ protected:
 //
 // CCSVOptionsDialog
 //
-
-struct CCSVConfig;
 
 class CCSVOptionsDialog : public CCommonDialog
 {
@@ -105,6 +106,7 @@ protected:
     HFONT HFont;
     BOOL UseCustomFont;
     LOGFONT LogFont;
+    CCSVConfig CSVConfig;
 
 public:
     CConfigurationDialog(HWND hParent, BOOL enableCSVOptions);

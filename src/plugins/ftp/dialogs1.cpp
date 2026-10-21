@@ -83,43 +83,16 @@ BOOL ReadWindowLocalText(HWND window, std::string& bytes) noexcept
 
 CConfigPageGeneral::CConfigPageGeneral() : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGGENERAL, IDD_CFGGENERAL, PSP_HASHELP, NULL)
 {
-    LastTotSpeed = -1;
 }
 
-void CConfigPageGeneral::Validate(CTransferInfo& ti)
+void CConfigPageGeneral::Validate(CTransferInfo&)
 {
-    // test if "total speed limit" (if used) is valid number
-    int enableTotalSpeedLimit;
-    ti.CheckBox(IDC_ENABLETOTSPEEDLIM, enableTotalSpeedLimit);
-    double totalSpeedLimit;
-    if (enableTotalSpeedLimit)
-    {
-        const wchar_t buff[] = L"%g";
-        ti.EditLine(IDE_TOTALSPEEDLIMIT, totalSpeedLimit, buff);
-        if (ti.IsGood() && totalSpeedLimit <= 0)
-        {
-            ShowMessage(HWindow, LangStr(IDS_MUSTBEGRTHANZERO).c_str(),
-                                             LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
-            ti.ErrorOn(IDE_TOTALSPEEDLIMIT);
-        }
-    }
 }
 
 void CConfigPageGeneral::Transfer(CTransferInfo& ti)
 {
     ti.CheckBox(IDC_WELCOMEMESSAGE, Config.ShowWelcomeMessage);
     ti.CheckBox(IDC_PRIORITYTOPANELCON, Config.PriorityToPanelConnections);
-    ti.CheckBox(IDC_ENABLETOTSPEEDLIM, Config.EnableTotalSpeedLimit);
-
-    if (ti.Type == ttDataFromWindow && Config.EnableTotalSpeedLimit)
-    {
-        const wchar_t buff[] = L"%g";
-        ti.EditLine(IDE_TOTALSPEEDLIMIT, Config.TotalSpeedLimit, buff);
-        if (ti.Type == ttDataFromWindow &&
-            Config.TotalSpeedLimit < 0.001)
-            Config.TotalSpeedLimit = 0.001; // at least 1 byte per second
-    }
-
     ti.CheckBox(IDC_ACCEPTHEXESCSEQ, Config.ConvertHexEscSeq);
     ti.CheckBox(IDC_CLOSEOPERDLGIFSUCCESS, Config.CloseOperationDlgIfSuccessfullyFinished);
     ti.CheckBox(IDC_OPENSOLVEERRIFIDLE, Config.OpenSolveErrIfIdle);
@@ -200,37 +173,6 @@ void CheckboxEditLineDouble(HWND dlg, int checkboxID, int editID, int* lastCheck
                      0, checkedVal, globValUsed, 0, globVal);
 }
 
-void CConfigPageGeneral::EnableControls()
-{
-    CheckboxEditLineDouble(HWindow, IDC_ENABLETOTSPEEDLIM, IDE_TOTALSPEEDLIMIT, &LastTotSpeed, TotalSpeedText,
-                           Config.TotalSpeedLimit, 0, 0);
-}
-
-INT_PTR
-CConfigPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    CALL_STACK_MESSAGE4("CConfigPageGeneral::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
-    switch (uMsg)
-    {
-    case WM_INITDIALOG:
-    {
-        INT_PTR ret = CCommonPropSheetPage::DialogProc(uMsg, wParam, lParam);
-        EnableControls();
-        return ret;
-    }
-
-    case WM_COMMAND:
-    {
-        if (HIWORD(wParam) == BN_CLICKED && LOWORD(wParam) == IDC_ENABLETOTSPEEDLIM)
-        {
-            EnableControls();
-        }
-        break;
-    }
-    }
-    return CCommonPropSheetPage::DialogProc(uMsg, wParam, lParam);
-}
-
 //
 // ****************************************************************************
 // CConfigPageDefaults
@@ -239,7 +181,6 @@ CConfigPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CConfigPageDefaults::CConfigPageDefaults() : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGDEFAULTS, IDD_CFGDEFAULTS, PSP_HASHELP, NULL)
 {
     LastMaxCon = -1;
-    LastSrvSpeed = -1;
     TmpFTPProxyServerList = NULL;
 }
 
@@ -282,25 +223,6 @@ void CConfigPageDefaults::Validate(CTransferInfo& ti)
             ShowMessage(HWindow, LangStr(IDS_MUSTBEGRTHANZERO).c_str(),
                                              LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDE_MAXCONCURRENTCON);
-            return;
-        }
-    }
-
-    // test if "server speed limit" (if used) is valid number
-    int enableSrvSpeedLimit;
-    ti.CheckBox(IDC_SRVSPEEDLIMIT, enableSrvSpeedLimit);
-    double srvSpeedLimit;
-    if (enableSrvSpeedLimit)
-    {
-        const wchar_t buff[] = L"%g";
-        ti.EditLine(IDE_SRVSPEEDLIMIT, srvSpeedLimit, buff);
-        if (!ti.IsGood())
-            return; // an error has already occurred
-        if (ti.IsGood() && srvSpeedLimit <= 0)
-        {
-            ShowMessage(HWindow, LangStr(IDS_MUSTBEGRTHANZERO).c_str(),
-                                             LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
-            ti.ErrorOn(IDE_SRVSPEEDLIMIT);
             return;
         }
     }
@@ -412,16 +334,6 @@ void CConfigPageDefaults::Transfer(CTransferInfo& ti)
         ti.EditLine(IDE_MAXCONCURRENTCON, Config.MaxConcurrentConnections);
     }
 
-    ti.CheckBox(IDC_SRVSPEEDLIMIT, Config.UseServerSpeedLimit);
-    if (ti.Type == ttDataFromWindow && Config.UseServerSpeedLimit)
-    {
-        const wchar_t buff[] = L"%g";
-        ti.EditLine(IDE_SRVSPEEDLIMIT, Config.ServerSpeedLimit, buff);
-        if (ti.Type == ttDataFromWindow &&
-            Config.ServerSpeedLimit < 0.001)
-            Config.ServerSpeedLimit = 0.001; // at least 1 byte per second
-    }
-
     ti.CheckBox(IDC_USELISTINGSCACHE, Config.UseListingsCache);
 
     if (ti.Type == ttDataFromWindow)
@@ -508,8 +420,6 @@ void CConfigPageDefaults::EnableControls()
 
     CheckboxEditLineInteger(HWindow, IDC_MAXCONCURRENTCON, IDE_MAXCONCURRENTCON, &LastMaxCon, MaxConnectionsText,
                             Config.MaxConcurrentConnections, 0, 0);
-    CheckboxEditLineDouble(HWindow, IDC_SRVSPEEDLIMIT, IDE_SRVSPEEDLIMIT, &LastSrvSpeed, ServerSpeedText,
-                           Config.ServerSpeedLimit, 0, 0);
 }
 
 INT_PTR
@@ -1085,13 +995,6 @@ void CConnectDlg::SelChanged()
             appendFormatted(IDS_ADVSTRMAXCONCURCON, s->MaxConcurrentConnections);
         else
             appendResource(IDS_ADVSTRUNLIMITEDCON);
-    }
-    if (s->UseServerSpeedLimit != 2)
-    {
-        if (s->UseServerSpeedLimit == 1)
-            appendFormatted(IDS_ADVSTRSPEEDLIM, s->ServerSpeedLimit);
-        else
-            appendResource(IDS_ADVSTRUNLIMITEDSPEED);
     }
     if (!s->ServerType.empty())
     {
@@ -1672,7 +1575,7 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                                        s->KeepAliveCommand,
                                                        s->EncryptControlConnection,
                                                        s->EncryptDataConnection,
-                                                       s->CompressData);
+                                                       s->CompressData, s->InitialPathIsEscaped);
                         }
                         else
                             TmpFTPServerList.AddServer(name.c_str());
@@ -1747,9 +1650,20 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         }
                         parsedAddress.erase(0, start);
 
-                        if (Config.ConvertHexEscSeq &&
-                            !FTPConvertHexEscapeSequencesW(parsedAddress))
-                            ti.ErrorOn(IDE_HOSTADDRESS);
+                        // The authority uses local configuration text; remote path escapes
+                        // represent server bytes and must survive until codec negotiation.
+                        if (Config.ConvertHexEscSeq)
+                        {
+                            const size_t pathOffset = FTPFindPathW(parsedAddress.c_str(), 0) - parsedAddress.c_str();
+                            std::wstring authority = parsedAddress.substr(0, pathOffset);
+                            if (!FTPConvertHexEscapeSequencesW(authority))
+                                ti.ErrorOn(IDE_HOSTADDRESS);
+                            else
+                            {
+                                authority.append(parsedAddress.substr(pathOffset));
+                                parsedAddress.swap(authority);
+                            }
+                        }
 
                         if (ti.IsGood())
                         {
@@ -1839,6 +1753,7 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                         initialPath.append(path);
                                     }
                                     s->InitialPath.swap(initialPath);
+                                    s->InitialPathIsEscaped = Config.ConvertHexEscSeq;
                                 }
                                 catch (...)
                                 {
@@ -1877,6 +1792,7 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     s->InitialPath.swap(initialPath);
                     if (changed)
                     {
+                        s->InitialPathIsEscaped = FALSE;
                         SelChanged();
                         EnableControls();
                     }

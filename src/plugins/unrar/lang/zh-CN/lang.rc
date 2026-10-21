@@ -132,7 +132,7 @@ STRINGTABLE
   IDS_ERROR, "错误"
   IDS_NOTFOUND, "文件未找到"
   IDS_BADDLL, "unrar.dll 的版本错误。请重新安装 UnRAR 插件。"
-  IDS_SELECTFIRST, "这好像是一个多卷压缩包。如果是，请选择第一个压缩卷并点击""确定""。\n\n如果它不是多卷压缩包，点击""取消""。"
+  IDS_SELECTFIRST, "请选择压缩包的第一卷以继续。按“取消”停止操作。"
   IDS_SELECTFIRSTTITLE, "选择第一个卷"
   IDS_FILENOTFOUND "压缩包中没有找到文件。"
   IDS_LISTINFO_PAKEDSIZE      "压缩的"

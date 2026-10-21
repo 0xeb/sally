@@ -730,7 +730,7 @@ BOOL CFTPOperationsList::IsUploadingToServer(const wchar_t* user, const wchar_t*
 // CFTPQueue
 //
 
-CFTPQueue::CFTPQueue(const CFtpTextCodec& textCodec) : Items(100, 500), TextCodec(textCodec)
+CFTPQueue::CFTPQueue(const CFtpTextCodec& textCodec, CFtpRetryClock retryClock) : Items(100, 500), TextCodec(textCodec), RetryClock(retryClock)
 {
     HANDLES(InitializeCriticalSection(&QueueCritSect));
     LastFoundUID = -1;
@@ -1429,56 +1429,57 @@ int CFTPQueue::SkipItem(int UID, CFTPOperation* oper)
     return ret;
 }
 
+CFTPQueueItemState CFTPQueue::PrepareRetryItemLocked(CFTPQueueItem* found, CFTPOperation* oper, BOOL resetBudget)
+{
+    if (resetBudget)
+        RetryPolicy.ManualRetry(found->UID);
+    if (found->Type == fqitUploadCopyExploreDir || found->Type == fqitUploadMoveExploreDir ||
+        found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
+    {
+        const wchar_t* hostBuf = NULL;
+        const wchar_t* userBuf = NULL;
+        unsigned short portBuf;
+        oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
+        UploadListingCache.RemoveNotAccessibleListings(userBuf, hostBuf, portBuf);
+    }
+    CFTPQueueItemState newState = sqisWaiting;
+    if (found->Type == fqitDeleteDir || found->Type == fqitMoveDeleteDir ||
+        found->Type == fqitUploadMoveDeleteDir || found->Type == fqitMoveDeleteDirLink ||
+        found->Type == fqitChAttrsDir)
+    {
+        newState = ((CFTPQueueItemDir*)found)->GetStateFromCounters();
+    }
+    if (found->ProblemID == ITEMPR_UNABLETORESUME)
+        oper->SetResumeIsNotSupported(FALSE); // so Retry makes any sense at all
+    oper->SetSizeCmdIsSupported(TRUE);        // so that the SIZE command is tried again if needed
+    found->ProblemID = ITEMPR_OK;
+    found->WinError = NO_ERROR;
+    if (found->ErrAllocDescr != NULL)
+    {
+        SalamanderGeneral->Free(found->ErrAllocDescr);
+        found->ErrAllocDescr = NULL;
+    }
+    found->ForceAction = fqiaNone; // to ensure Autorename is not performed instead of Retry
+    return newState;
+}
+
 int CFTPQueue::RetryItem(int UID, CFTPOperation* oper)
 {
     CALL_STACK_MESSAGE1("CFTPQueue::RetryItem()");
-
     int ret = -1;
     HANDLES(EnterCriticalSection(&QueueCritSect));
     CFTPQueueItem* found = FindItemWithUID(UID);
+    BOOL canRetry = FALSE;
     if (found != NULL)
-    {
-        BOOL canRetry;
         found->HasErrorToSolve(NULL, &canRetry);
-        if (canRetry)
-        {
-            if (found->Type == fqitUploadCopyExploreDir || found->Type == fqitUploadMoveExploreDir ||
-                found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
-            {
-                const wchar_t* hostBuf = NULL;
-                const wchar_t* userBuf = NULL;
-                unsigned short portBuf;
-                oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
-                UploadListingCache.RemoveNotAccessibleListings(userBuf, hostBuf, portBuf);
-            }
-            CFTPQueueItemState newState = sqisWaiting;
-            if (found->Type == fqitDeleteDir || found->Type == fqitMoveDeleteDir ||
-                found->Type == fqitUploadMoveDeleteDir || found->Type == fqitMoveDeleteDirLink ||
-                found->Type == fqitChAttrsDir)
-            {
-                newState = ((CFTPQueueItemDir*)found)->GetStateFromCounters();
-            }
-            if (newState == sqisWaiting)
-                HandleFirstWaitingItemIndex(found->IsExploreOrResolveItem(), LastFoundIndex);
-            ret = LastFoundIndex;
-            found->ChangeStateAndCounters(newState, oper, this);
-            if (found->ProblemID == ITEMPR_UNABLETORESUME)
-                oper->SetResumeIsNotSupported(FALSE); // so Retry makes any sense at all
-            oper->SetSizeCmdIsSupported(TRUE);        // so that the SIZE command is tried again if needed
-            found->ProblemID = ITEMPR_OK;
-            found->WinError = NO_ERROR;
-            if (found->ErrAllocDescr != NULL)
-            {
-                SalamanderGeneral->Free(found->ErrAllocDescr);
-                found->ErrAllocDescr = NULL;
-            }
-            found->ForceAction = fqiaNone; // to ensure Autorename is not performed instead of Retry
-        }
-        else
-            TRACE_I("CFTPQueue::RetryItem(): cannot retry item because it's not in any of error states!");
+    if (canRetry)
+    {
+        ret = LastFoundIndex;
+        const CFTPQueueItemState state = PrepareRetryItemLocked(found, oper, TRUE);
+        if (state == sqisWaiting)
+            HandleFirstWaitingItemIndex(found->IsExploreOrResolveItem(), ret);
+        found->ChangeStateAndCounters(state, oper, this);
     }
-    else
-        TRACE_I("CFTPQueue::RetryItem(): cannot retry item because it's not found!");
     HANDLES(LeaveCriticalSection(&QueueCritSect));
     return ret;
 }
@@ -1546,6 +1547,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
         }
         if (found->HasErrorToSolve(NULL, NULL))
         {
+            applyToAll = RetryPolicy.IsRemembered(found->ProblemID);
             if (found->Type == fqitUploadCopyExploreDir || found->Type == fqitUploadMoveExploreDir)
             {
                 isUploadItem = TRUE;
@@ -2264,10 +2266,18 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                     int itemIndex = LastFoundIndex;
                     int enumIndex = 0;
                     DWORD wantedProblemID = found->ProblemID;
+                    const BOOL retryChoice = FtpIsItemRetryChoice(openDlgWithID, static_cast<int>(dlgResult));
+                    if (!RetryPolicy.Remember(wantedProblemID, retryChoice && applyToAll != FALSE))
+                    {
+                        TRACE_E(LOW_MEMORY);
+                        applyToAll = FALSE; // still perform the explicit manual Retry safely
+                    }
                     BOOL notAccessibleListingsRemoved = FALSE;
                     oper->SetSizeCmdIsSupported(TRUE); // so that the SIZE command is tried again if needed
                     while (1)
                     {
+                        if (retryChoice)
+                            RetryPolicy.ManualRetry(item->UID);
                         if (!notAccessibleListingsRemoved &&
                             (item->Type == fqitUploadCopyExploreDir || item->Type == fqitUploadMoveExploreDir ||
                              item->Type == fqitUploadCopyFile || item->Type == fqitUploadMoveFile))
@@ -2832,20 +2842,56 @@ void CFTPQueue::UpdateItemState(CFTPQueueItem* item, CFTPQueueItemState state, D
     HANDLES(EnterCriticalSection(&QueueCritSect));
     if (item != NULL)
     {
-        if (state == sqisWaiting && FindItemWithUID(item->UID) != NULL) // item found ("always true")
-            HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), LastFoundIndex);
-
-        item->ChangeStateAndCounters(state, oper, this); // item state change
+        // Decide the final state before publishing counters. A transient failed
+        // state could otherwise make the operation dialog finish/close while an
+        // automatic retry is already being scheduled.
         item->ProblemID = problemID;
         item->WinError = winError;
         if (item->ErrAllocDescr != NULL)
-            SalamanderGeneral->Free(item->ErrAllocDescr); // free any previous value
+            SalamanderGeneral->Free(item->ErrAllocDescr);
         item->ErrAllocDescr = errAllocDescr;
+        const BOOL indexed = FindItemWithUID(item->UID) == item;
+        const int index = LastFoundIndex;
+        BOOL canRetry = FALSE;
+        if (indexed && (state == sqisFailed || state == sqisUserInputNeeded) &&
+            CFTPQueueItem::GetErrorActions(state, problemID, NULL, &canRetry) && canRetry)
+        {
+            const CFtpRetryDecision decision = RetryPolicy.OnError(item->UID, problemID, RetryNow());
+            if (decision == CFtpRetryDecision::Scheduled)
+                state = PrepareRetryItemLocked(item, oper, FALSE);
+            else if (decision == CFtpRetryDecision::Exhausted || decision == CFtpRetryDecision::NoMemory)
+                state = sqisUserInputNeeded;
+        }
+        if (indexed && state == sqisWaiting)
+            HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), index);
+        item->ChangeStateAndCounters(state, oper, this);
     }
     else
     {
         if (errAllocDescr != NULL)
             free(errAllocDescr); // there is nowhere to store the value, so at least free it
+    }
+    HANDLES(LeaveCriticalSection(&QueueCritSect));
+}
+
+DWORD CFTPQueue::GetRememberedRetryDelay(int UID)
+{
+    HANDLES(EnterCriticalSection(&QueueCritSect));
+    const DWORD delay = RetryPolicy.RemainingDelay(UID, RetryNow());
+    HANDLES(LeaveCriticalSection(&QueueCritSect));
+    return delay;
+}
+
+void CFTPQueue::SuspendRememberedRetry(CFTPQueueItem* item, CFTPOperation* oper)
+{
+    HANDLES(EnterCriticalSection(&QueueCritSect));
+    if (item != NULL)
+    {
+        // Timer allocation failed: return control to the user without recursively
+        // scheduling another retry or leaving a claimed item asleep forever.
+        item->ProblemID = ITEMPR_LOWMEM;
+        item->WinError = ERROR_NOT_ENOUGH_MEMORY;
+        item->ChangeStateAndCounters(sqisUserInputNeeded, oper, this);
     }
     HANDLES(LeaveCriticalSection(&QueueCritSect));
 }

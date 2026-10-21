@@ -2727,6 +2727,10 @@ STRINGTABLE
  IDS_CANNOTMOVEFILETOITSELF, "Nie je možné presunúť súbor do seba samého."
 
  IDS_CANNOTMOVEDIRTOITSELF, "Nie je možné presunúť adresár do seba samého."
+ IDS_DIRECTORYTARGETINSOURCE, "Priečinok nemožno skopírovať ani presunúť do seba alebo do niektorého z jeho podpriečinkov."
+ IDS_UNPACKERSELECTIONREQUIRED, "Vyberte program na rozbalenie. Ak je zoznam prázdny, pridajte ho v konfigurácii."
+ IDS_EXECUTE_SHORTNAMEUNAVAILABLE, "Pre '%s' nie je k dispozícii cesta DOS (8.3)."
+ IDS_OPERATIONSTARTFAILED, "Operáciu so súbormi sa nepodarilo spustiť.\n\n%s"
 
  IDS_NOTENOUGHSPACE, "Na cieľovom disku pravdepodobne nie je dostatok miesta.\nChcete aj tak pokračovať?\n\nPotrebné miesto: %s bajtov.\nDostupné miesto: %s bajtov."
 
@@ -3231,6 +3235,7 @@ STRINGTABLE
  IDS_PACKERR_NOOUTPUT, "Nebol získaný výstup z externého komprimátora, skontrolujte konfiguráciu."
  IDS_PACKERR_UNABLETOREN, "Nie je možné premenovať dočasný súbor archívu (%1) na názov archívu (%2)."
  IDS_PACKERR_INVALIDNAME, "Tento názov súboru je neplatný na súborovom systéme Windows. Externé archivačné programy nepodporujú extrahovanie do iného názvu súboru, preto nie je možné extrahovať tento súbor."
+ IDS_PACKERR_EXCLUSIONMASK, "Externé rozbaľovacie programy nepodporujú vylučovacie masky ('|'). Vyberte interný rozbaľovací modul alebo odstráňte vylúčenia."
 
  IDS_PACKRET_GENERAL, "Kód dokončenia %d."
  IDS_PACKRET_WARNING, "Zistené varovanie."
@@ -3579,6 +3584,9 @@ IDS_OLDPLUGINVERSION2, "Tento plugin (%s) nie je podporovaný v tejto verzii Sal
  IDS_EMAILFILES_SUBJECT, "Odosielanie e-mailu:"
  IDS_EMAILFILES_BODY, "Vaše súbory sú pripojené a pripravené na odoslanie s touto správou."
  IDS_EMAILFILES_MAPIERROR, "Nie je možné poslať e-mail. Žiadny e-mailový klient nie je nastavený na odosielanie e-mailov, MAPI32.DLL nebol nájdený."
+ IDS_EMAILFILES_PATHERROR, "Poštový program nemôže pripojiť tento súbor s jeho aktuálnym názvom:\n\n%s"
+ IDS_EMAILFILES_SENDERROR, "E-mailovú správu sa nepodarilo vytvoriť.\n\n%s"
+ IDS_EMAILFILES_PROVIDERERROR, "Poštový program ohlásil chybu %u."
 
  IDS_PLUGINSUFFIX, " (Plugin)"
 
@@ -4135,4 +4143,18 @@ IDS_OLDPLUGINVERSION2, "Tento plugin (%s) nie je podporovaný v tejto verzii Sal
  IDS_UPDATECHECK_STARTUP, "Pri každom spustení"
  IDS_UPDATER_CANNOT_START, "Aktualizačný program Sally nemožno spustiť:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Hlavné heslo sa používa na zabezpečenie citlivých informácií, ako FTP alebo WinSCP hesiel silnou AES šifrou. Ak vytvoríte hlavné heslo, budete požiadaní o jeho zadanie jedenkrát za reláciu, keď Sally pristupuje k zabezpečeným informáciám."
+ // Configuration navigation
+ IDS_CFG_SEARCH_LABEL, "&Hľadať nastavenia:"
+ IDS_CFG_SEARCH_HINT, "Slová, ""frázy"", AND, OR, NOT"
+ IDS_CFG_SEARCH_INVALID, "Neplatné hľadanie. Skontrolujte úvodzovky a zátvorky."
+ IDS_CFG_SEARCH_EMPTY, "Žiadne zodpovedajúce nastavenia."
+ IDS_CFG_SEARCH_CLEAR, "Vymazať hľadanie (Esc)"
+ IDS_CFG_SEARCH_OPEN, "Hľadať nastavenia"
+ IDS_CFG_SEARCH_CLOSE, "Zavrieť hľadanie"
+ IDS_CFG_SAVE, "&Uložiť"
+ IDS_CFG_APPLY, "&Použiť"
+ IDS_CFG_SAVE_FAILED, "Nastavenia sa nepodarilo uložiť. Zmeny zostávajú dostupné v tomto okne."
+
+ IDS_MASTERPASSWORD_STORE_DAMAGED, "Uložené nastavenia hlavného hesla sa nedajú prečítať. Sally ich zachová a neuloží zmeny konfigurácie. Pred zmenou hesiel obnovte funkčnú zálohu konfigurácie."
+
 }

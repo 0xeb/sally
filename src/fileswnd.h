@@ -1744,13 +1744,13 @@ void SplitTextW(HDC hDC, const wchar_t* text, int textLen, int* maxWidth,
 BOOL CopyUNCPathToClipboardW(const wchar_t* path, const wchar_t* name, BOOL isDir,
                              HWND hMessageParent, int nestingLevel = 0);
 
-// From the file/directory 'f' creates three lines of text and fills out0/out0Len to out2/out2Len;
-// 'validFileData' specifies which parts of 'f' are valid
-void GetTileTexts(CFileData* f, int isDir,
-                  HDC hDC, int maxTextWidth, int* widthNeeded,
-                  wchar_t* out0, int* out0Len,
-                  wchar_t* out1, int* out1Len,
-                  wchar_t* out2, int* out2Len,
-                  DWORD validFileData,
-                  CPluginDataInterfaceEncapsulation* pluginData,
-                  BOOL isDisk);
+// Owned presentation text shared by paint, hit testing and tile sizing.
+struct CTileTexts
+{
+    std::wstring Name;
+    std::wstring Size;
+    std::wstring DateTime;
+    int Width = 0;
+};
+CTileTexts GetTileTexts(CFileData* file, int isDir, HDC dc, int maxTextWidth,
+                       DWORD validFileData, CPluginDataInterfaceEncapsulation* pluginData, BOOL isDisk);

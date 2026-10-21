@@ -210,4 +210,5 @@ STRINGTABLE
   IDS_PARTIALRECOVER, "Le fichier suivant n'a pas pu être entièrement récupéré: %s\n\nVoulez-vous en récupérer seulement une partie?"
   IDS_PARTIALRECOVER_DONTASK, "Choisir la même réponse la prochaine fois"
   IDS_ERRORRECOVER, "Erreur de récupération du fichier %s"
+    IDS_SELECTVOLUME, "Sélectionnez un volume ou une image disque."
 }

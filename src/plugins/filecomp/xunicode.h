@@ -152,11 +152,9 @@ BOOL CopyFileCompSelectionToClipboard(const wchar_t* text, size_t characterCount
 BOOL CopyFileCompByteCellsToClipboard(const char* bytes, size_t byteCount,
                                       BOOL showEcho, HWND echoParent) noexcept;
 
-// FileComp's legacy configuration names and byte-mode text are encoded in the
-// active Windows code page. Keep that byte boundary named and centralized.
+// Byte-mode file contents use the active Windows code page. Configuration
+// identifiers are independently owned UTF-16, never projected through this adapter.
 bool DecodeFileCompLegacyText(const char* bytes, size_t byteCount,
                               std::wstring& text) noexcept;
-bool EncodeFileCompLegacyText(const wchar_t* text, size_t characterCount,
-                              std::string& bytes) noexcept;
 
 void InitXUnicode();

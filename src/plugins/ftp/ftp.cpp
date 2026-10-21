@@ -8,6 +8,7 @@
 #include "retained_text.h"
 #include "reg_sz_narrow_bridge.h"
 #include "ftp_persisted_text_codec.h"
+#include "ftp_log_limit.h"
 
 // plugin interface object, its methods are called from Salamander
 CPluginInterface PluginInterface;
@@ -57,7 +58,7 @@ CPluginInterfaceForMenuExt InterfaceForMenuExt;
 
 int ConfigVersion = 0;
 #define CURRENT_CONFIG_VERSION 37
-#define RELOAD_PARSERS_BEFORE_CONFIG_VERSION 37 // parsers are not read from configurations before this version; defaults are used (primitive parser update for users)
+#define RELOAD_PARSERS_BEFORE_CONFIG_VERSION 37 // refresh built-ins from these older configurations while retaining user definitions
 
 // names of values in the configuration (in the registry)
 const wchar_t* CONFIG_VERSION = L"Version";
@@ -132,6 +133,7 @@ const wchar_t* CONFIG_FTPSERVERLIST = L"Bookmarks";
 const wchar_t* CONFIG_FTPSRVNAME = L"Name";
 const wchar_t* CONFIG_FTPSRVADDRESS = L"Address";
 const wchar_t* CONFIG_FTPSRVPATH = L"Initial Path";
+const wchar_t* CONFIG_FTPSRVPATHESCAPED = L"Escaped Initial Path";
 const wchar_t* CONFIG_FTPSRVANONYM = L"Anonymous";
 const wchar_t* CONFIG_FTPSRVUSER = L"User";
 const wchar_t* CONFIG_FTPSRVPASSWD_OLD = L"Password"; // import only, scrambled by FTP plugin
@@ -584,6 +586,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 {
     CALL_STACK_MESSAGE1("CPluginInterface::LoadConfiguration(, ,)");
 
+    Config.ResetUnsupportedOptions();
     if (regKey != NULL) // load from the registry
     {
         registry->GetValue(regKey, CONFIG_VERSION, REG_DWORD, &ConfigVersion, sizeof(DWORD));
@@ -591,12 +594,6 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         registry->GetValue(regKey, CONFIG_LASTCFGPAGE, REG_DWORD, &Config.LastCfgPage, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_SHOWWELCOMEMESSAGE, REG_DWORD, &Config.ShowWelcomeMessage, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_PRIORITYTOPANELCON, REG_DWORD, &Config.PriorityToPanelConnections, sizeof(DWORD));
-        registry->GetValue(regKey, CONFIG_ENABLETOTALSPEEDLIM, REG_DWORD, &Config.EnableTotalSpeedLimit, sizeof(DWORD));
-        std::string numberText;
-        if (GetValueSZ(registry, regKey, CONFIG_TOTALSPEEDLIMIT, numberText))
-        {
-            Config.TotalSpeedLimit = atof(numberText.c_str());
-        }
         std::wstring anonymousPassword;
         if (GetValueStringW(registry, regKey, CONFIG_ANONYMOUSPASSWD, anonymousPassword))
         {
@@ -617,14 +614,6 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         }
         else
             Config.UseMaxConcurrentConnections = FALSE;
-        if (GetValueSZ(registry, regKey, CONFIG_SPEEDLIM, numberText) &&
-            atof(numberText.c_str()) != -1)
-        {
-            Config.ServerSpeedLimit = atof(numberText.c_str());
-            Config.UseServerSpeedLimit = TRUE;
-        }
-        else
-            Config.UseServerSpeedLimit = FALSE;
         registry->GetValue(regKey, CONFIG_USELISTINGSCACHE, REG_DWORD, &Config.UseListingsCache, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_TRANSFERMODE, REG_DWORD, &Config.TransferMode, sizeof(DWORD));
         // Read the masks as the UTF-16 REG_SZ already holds - see the write side. An older build
@@ -664,10 +653,6 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             if (Config.CacheMaxSize < CQuadWord(100 * 1024, 0))
                 Config.CacheMaxSize = CQuadWord(100 * 1024, 0);
         }
-        registry->GetValue(regKey, CONFIG_DOWNLOADADDTOQUEUE, REG_DWORD, &Config.DownloadAddToQueue, sizeof(DWORD));
-        registry->GetValue(regKey, CONFIG_DELETEADDTOQUEUE, REG_DWORD, &Config.DeleteAddToQueue, sizeof(DWORD));
-        registry->GetValue(regKey, CONFIG_CHATTRADDTOQUEUE, REG_DWORD, &Config.ChAttrAddToQueue, sizeof(DWORD));
-
         if (ConfigVersion > 7) // older versions use default values
         {
             registry->GetValue(regKey, CONFIG_OPERCANNOTCREATEFILE, REG_DWORD, &Config.OperationsCannotCreateFile, sizeof(DWORD));
@@ -705,11 +690,9 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 
         if (ConfigVersion != 1) // when moving from version 1 to 2 the server-types and ftp-servers lists in the registry are ignored
         {
-            if (ConfigVersion < 2 || ConfigVersion >= RELOAD_PARSERS_BEFORE_CONFIG_VERSION)
-            { // when upgrading to the latest version the server-types list is adjusted (ignore the old one)
-                Config.LockServerTypeList()->Load(parent, regKey, registry);
-                Config.UnlockServerTypeList();
-            }
+            const BOOL refreshBuiltins = ConfigVersion >= 2 && ConfigVersion < RELOAD_PARSERS_BEFORE_CONFIG_VERSION;
+            Config.LockServerTypeList()->Load(parent, regKey, registry, refreshBuiltins);
+            Config.UnlockServerTypeList();
             Config.FTPProxyServerList.Load(parent, regKey, registry);
             Config.FTPServerList.Load(parent, regKey, registry);
         }
@@ -729,7 +712,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         {
             if (dw != -1)
             {
-                Config.LogMaxSize = dw;
+                Config.LogMaxSize = sally::ftp::NormalizeStoredLogKilobytes(dw);
                 Config.UseLogMaxSize = TRUE;
             }
             else
@@ -829,6 +812,7 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 {
     CALL_STACK_MESSAGE1("CPluginInterface::SaveConfiguration(, ,)");
 
+    Config.ResetUnsupportedOptions();
     DWORD v = CURRENT_CONFIG_VERSION;
     registry->SetValue(regKey, CONFIG_VERSION, REG_DWORD, &v, sizeof(DWORD));
 
@@ -1233,6 +1217,7 @@ void CFTPServer::Init()
     ItemName.clear();
     Address.clear();
     InitialPath.clear();
+    InitialPathIsEscaped = FALSE;
     AnonymousConnection = TRUE;
     UserName.clear();
     EncryptedPassword = NULL;
@@ -1250,7 +1235,7 @@ void CFTPServer::Init()
     KeepAliveCommand = Config.KeepAliveCommand;
     UseMaxConcurrentConnections = 2;
     MaxConcurrentConnections = 1;
-    UseServerSpeedLimit = 2;
+    UseServerSpeedLimit = 0;
     ServerSpeedLimit = 2;
     UseListingsCache = 2;
     InitFTPCommands.clear();
@@ -1478,7 +1463,7 @@ BOOL CFTPServer::Set(const wchar_t* itemName,
                      int keepAliveCommand,
                      int encryptControlConnection,
                      int encryptDataConnection,
-                     int compressData) noexcept
+                     int compressData, BOOL initialPathIsEscaped) noexcept
 {
     if (encryptedPassword != NULL && encryptedPasswordSize <= 0)
         return FALSE;
@@ -1515,6 +1500,7 @@ BOOL CFTPServer::Set(const wchar_t* itemName,
     ItemName.swap(stagedItemName);
     Address.swap(stagedAddress);
     InitialPath.swap(stagedInitialPath);
+    InitialPathIsEscaped = initialPathIsEscaped != FALSE;
     AnonymousConnection = anonymousConnection;
     UserName.swap(stagedUserName);
     EncryptedPassword = stagedEncryptedPassword;
@@ -1532,8 +1518,8 @@ BOOL CFTPServer::Set(const wchar_t* itemName,
     KeepAliveCommand = keepAliveCommand;
     UseMaxConcurrentConnections = useMaxConcurrentConnections;
     MaxConcurrentConnections = maxConcurrentConnections;
-    UseServerSpeedLimit = useServerSpeedLimit;
-    ServerSpeedLimit = serverSpeedLimit;
+    UseServerSpeedLimit = 0;
+    ServerSpeedLimit = 2;
     InitFTPCommands.swap(stagedInitFTPCommands);
     UseListingsCache = useListingsCache;
     ListCommand.swap(stagedListCommand);
@@ -1697,6 +1683,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     std::wstring itemName = ItemName;
     std::wstring address = Address;
     std::wstring initialPath = InitialPath;
+    DWORD initialPathIsEscaped = FALSE;
     int anonymousConnection;
     std::wstring userName = UserName;
     BYTE* encryptedPassword;
@@ -1748,6 +1735,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
         return FALSE; // the name is mandatory
     GetValueStringW(registry, regKey, CONFIG_FTPSRVADDRESS, address);
     GetValueStringW(registry, regKey, CONFIG_FTPSRVPATH, initialPath);
+    registry->GetValue(regKey, CONFIG_FTPSRVPATHESCAPED, REG_DWORD, &initialPathIsEscaped, sizeof(initialPathIsEscaped));
     registry->GetValue(regKey, CONFIG_FTPSRVANONYM, REG_DWORD, &anonymousConnection, sizeof(DWORD));
     GetValueStringW(registry, regKey, CONFIG_FTPSRVUSER, userName);
 
@@ -1776,14 +1764,6 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
         useMaxConcurrentConnections = (maxConcurrentConnections == -1 ? 0 : 1);
         if (maxConcurrentConnections == -1)
             maxConcurrentConnections = MaxConcurrentConnections; // do not leave -1 there -> use the default value
-    }
-    std::string speedLimitText;
-    if (GetValueSZ(registry, regKey, CONFIG_FTPSRVSPDLIM, speedLimitText))
-    {
-        serverSpeedLimit = atof(speedLimitText.c_str());
-        useServerSpeedLimit = (serverSpeedLimit == -1 ? 0 : 1);
-        if (serverSpeedLimit == -1)
-            serverSpeedLimit = ServerSpeedLimit; // do not leave -1 there -> use the default value
     }
     registry->GetValue(regKey, CONFIG_FTPSRVUSELISTINGSCACHE, REG_DWORD, &useListingsCache, sizeof(DWORD));
     GetValueSZ(registry, regKey, CONFIG_FTPSRVINITFTPCMDS, initFTPCommands);
@@ -1820,7 +1800,7 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
                    keepAliveCommand,
                    encryptControlConnection,
                    encryptDataConnection,
-                   compressData);
+                   compressData, initialPathIsEscaped != FALSE);
     if (encryptedPassword != NULL)
     {
         memset(encryptedPassword, 0, encryptedPasswordSize);
@@ -1876,6 +1856,7 @@ void CFTPServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
         SetValueStringW(registry, regKey, CONFIG_FTPSRVADDRESS, Address);
     if (!InitialPath.empty())
         SetValueStringW(registry, regKey, CONFIG_FTPSRVPATH, InitialPath);
+    registry->SetValue(regKey, CONFIG_FTPSRVPATHESCAPED, REG_DWORD, &InitialPathIsEscaped, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_FTPSRVANONYM, REG_DWORD, &AnonymousConnection, sizeof(DWORD));
     if (!AnonymousConnection)
     {
@@ -1923,13 +1904,8 @@ void CFTPServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
             dw = -1;
         registry->SetValue(regKey, CONFIG_FTPSRVUSEMAXCON, REG_DWORD, &dw, sizeof(DWORD));
     }
-    if (UseServerSpeedLimit != 2)
-    {
-        std::string speedLimitText;
-        if (FTPFormatString(speedLimitText, "%g",
-                            UseServerSpeedLimit == 1 ? ServerSpeedLimit : -1.0))
-            SetValueSZ(registry, regKey, CONFIG_FTPSRVSPDLIM, speedLimitText.c_str());
-    }
+    // Write the retired speed option disabled even when replacing an older bookmark.
+    SetValueSZ(registry, regKey, CONFIG_FTPSRVSPDLIM, "-1");
     if (UseListingsCache != 2)
         registry->SetValue(regKey, CONFIG_FTPSRVUSELISTINGSCACHE, REG_DWORD, &UseListingsCache, sizeof(DWORD));
     if (!InitFTPCommands.empty())

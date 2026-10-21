@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "splitcbn_text.h"
+#include "split_target_path.h"
 #include <tchar.h>
 #include "splitcbn.h"
 #include "splitcbn.rh"
@@ -530,11 +531,7 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
 
     if (!bName)
     { // set a default name
-        name1 = companionFile;
-        if (!name1.empty())
-            name1.pop_back();
-        if (name1.find_last_of(L'.') == std::wstring::npos)
-            name1.append(L".EXT");
+        name1 = sally::split::DefaultCombinedName(companionFile);
     }
 
     if (configCombineToOther)

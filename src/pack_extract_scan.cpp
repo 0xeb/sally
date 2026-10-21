@@ -15,6 +15,9 @@
 #include "common/ExternalToolRunner.h"
 #include "common/IFileSystem.h"
 #include "common/PackerCommandLinePolicy.h"
+#include "common/PackerListingOutput.h"
+#include "common/Win32PackerListing.h"
+#include <memory>
 #include "common/widepath.h"
 #include "common/unicode/helpers.h"
 #include "common/Win32TextCodec.h"
@@ -78,7 +81,7 @@ const SPackBrowseTable PackBrowseTable[] =
         {
             (TPackErrorTable*)&RARErrors, TRUE,
             L"$(ArchivePath)", L"$(Rar32bitExecutable) v -c- \"$(ArchiveFileName)\"",
-            NULL, "--------", 0, 0, 2, "--------", ' ', 1, 2, 6, 5, 7, 3, 2,                              // after RAR 5.0 we patch the indices at runtime; see variable 'RAR5AndLater'
+            NULL, "--------", 0, 0, 2, "--------", ' ', 1, 2, 6, 5, 7, 3, 2,                              // modern RAR banners select the single-line layout at runtime
             L"$(TargetPath)", L"$(Rar32bitExecutable) x -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"", // since version 5.0 we must enforce the -scol switch; version 4.20 is fine; appears elsewhere and in the registry
             L"$(TargetPath)", L"$(Rar32bitExecutable) e \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", FALSE},
         // ARJ 2.60 MS-DOS
@@ -730,56 +733,33 @@ BOOL PackList(CFilesWindow* panel, const wchar_t* archiveFileName, CSalamanderDi
     HANDLES(CloseHandle(StdOutWr));
     HANDLES(CloseHandle(StdErrWr));
 
-    // Pull all data from the pipe into an array of lines
-    char tmpbuff[1000];
-    DWORD read;
+    // The native adapter frames encoded byte lines; the legacy parser array
+    // retains ownership of its null-terminated line allocations.
     CPackLineArray lineArray(1000, 500);
-    int buffOffset = 0;
-    while (1)
-    {
-        // read a full buffer from the end of the unprocessed data
-        if (!ReadFile(StdOutRd, tmpbuff + buffOffset, 1000 - buffOffset, &read, NULL))
-            break;
-        // start at the beginning
-        char* start = tmpbuff;
-        // search the entire buffer for line ends
-        unsigned int i;
-        for (i = 0; i < read + buffOffset; i++)
+    const DWORD listingError = Win32ReadPackerListingLines(StdOutRd, [&](std::string_view line)
+                                                           {
+        auto owned = std::make_unique<char[]>(line.size() + 1);
+        memcpy(owned.get(), line.data(), line.size());
+        owned[line.size()] = '\0';
+        lineArray.Add(owned.get());
+        if (!lineArray.IsGood())
         {
-            if (tmpbuff[i] == '\n')
-            {
-                // length of the line
-                int lineLen = (int)(tmpbuff + i - start);
-                // remove \r, if it is present
-                if (lineLen > 0 && tmpbuff[i - 1] == '\r')
-                    lineLen--;
-                // allocate a new line
-                char* newLine = new char[lineLen + 2];
-                // fill it with data and terminate it
-                strncpy(newLine, start, lineLen);
-                newLine[lineLen] = '\n';
-                newLine[lineLen + 1] = '\0';
-                // add it to the array
-                lineArray.Add(newLine);
-                // and move past it
-                start = tmpbuff + i + 1;
-            }
+            lineArray.ResetState();
+            return false;
         }
-        // buffer processed; now find out how much is left and move it to the start of the buffer
-        buffOffset = (int)(tmpbuff + read + buffOffset - start);
-        if (buffOffset > 0)
-            memmove(tmpbuff, start, buffOffset);
-        // maximum line length is 990, hopefully that is enough :-)
-        if (buffOffset >= 990)
-        {
-            HANDLES(CloseHandle(StdOutRd));
-            HANDLES(CloseHandle(processHandle));
-            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
-        }
-    }
-
-    // done reading, we no longer need it
+        owned.release();
+        return true; });
     HANDLES(CloseHandle(StdOutRd));
+    if (listingError != ERROR_SUCCESS)
+    {
+        HANDLES(CloseHandle(processHandle));
+        if (listingError == ERROR_NOT_ENOUGH_MEMORY)
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_NOMEM);
+        if (listingError == ERROR_INVALID_DATA)
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
+        const std::string message = PackApiErrorPresentation("ReadFile: ", listingError);
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
+    }
 
     // Wait for the external program to finish (it should be done already but better be sure)
     if (WaitForSingleObject(processHandle, INFINITE) == WAIT_FAILED)
@@ -881,7 +861,7 @@ BOOL PackList(CFilesWindow* panel, const wchar_t* archiveFileName, CSalamanderDi
     int alwaysSkip = browseTable->AlwaysSkip;
     int linesPerFile = browseTable->LinesPerFile;
     BOOL ARJHack;
-    BOOL RAR5AndLater = FALSE; // starting with RAR 5.0 the listing format is new (commands 'v' and 'l'), the name is in the last column
+    SPackBrowseTable listingTable = *browseTable;
 
     int i;
     for (i = 0; i < lineArray.Count; i++)
@@ -894,11 +874,8 @@ BOOL PackList(CFilesWindow* panel, const wchar_t* archiveFileName, CSalamanderDi
             if (!strncmp(lineArray[i], browseTable->StartString,
                          strlen(browseTable->StartString)))
                 validData++;
-            if (i == 1 && strncmp(lineArray[i], "RAR ", 4) == 0 && lineArray[i][4] >= '5' && lineArray[i][4] <= '9')
-            {
-                RAR5AndLater = TRUE; // the test fails starting with RAR 10, which will be useful ;-)
-                linesPerFile = 1;
-            }
+            if (i == 1 && sally::pack::ApplyRarListingBanner(lineArray[i], listingTable))
+                linesPerFile = listingTable.LinesPerFile;
             // in any case this line does not interest us
             continue;
         case 2: // we are in the footer and we do not care about it
@@ -969,14 +946,7 @@ BOOL PackList(CFilesWindow* panel, const wchar_t* archiveFileName, CSalamanderDi
         strcat(line, lineArray[i]);
 
         // and we have everything for one item - process it
-        SPackBrowseTable browseTableRAR5;
-        if (RAR5AndLater)
-        {
-            memmove(&browseTableRAR5, browseTable, sizeof(SPackBrowseTable));
-            browseTableRAR5.NameIdx = 8;
-            browseTableRAR5.AttrIdx = 1;
-        }
-        BOOL ret = PackScanLine(line, dir, index, RAR5AndLater ? &browseTableRAR5 : browseTable, ARJHack);
+        BOOL ret = PackScanLine(line, dir, index, &listingTable, ARJHack);
         // we no longer need the buffer
         free(line);
         line = NULL;

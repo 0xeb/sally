@@ -59,6 +59,8 @@ protected:
 
     CRegistryWorkType WorkType;
     BOOL LastWorkSuccess;
+    LONG LastWriteError;
+    BOOL QuietWrites;
     HKEY Key;
     const wchar_t* Name;
     HKEY OpenedKey;

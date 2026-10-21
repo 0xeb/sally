@@ -466,7 +466,7 @@ CCtrlExampleDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (!CreateChilds())
         {
-            DestroyWindow(HWindow); // error -> do not open the dialog
+            EndDialog(HWindow, IDCANCEL); // cancel modal initialization when a control cannot attach
             return FALSE;           // stop processing
         }
         StringTemplate = SPLGetDlgItemTextOwned(HWindow, IDC_CE_ST);

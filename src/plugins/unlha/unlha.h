@@ -57,10 +57,10 @@ public:
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount) { return FALSE; }
 
     void UnpackInnerBody(FILE* f, const wchar_t* targetDir, const wchar_t* fileName, LHA_HEADER& hdr, BOOL bDir);
-    BOOL MakeFilesList(TDirectArray<int>& offsets, SalEnumSelection next, void* nextParam, const wchar_t* targetDir);
+    BOOL MakeFilesList(TDirectArray<__int64>& offsets, SalEnumSelection next, void* nextParam, const wchar_t* targetDir);
     BOOL ConstructMaskArray(TIndirectArray<std::wstring>& maskArray, const wchar_t* masks);
 
-    friend BOOL ProgressCallback(int);
+    friend BOOL ProgressCallback(unsigned __int64);
 };
 
 class CPluginInterface : public CPluginInterfaceAbstract
@@ -92,7 +92,7 @@ public:
 };
 
 std::wstring LangStr(int resID);
-std::wstring GetInfo(const FILETIME* lastWrite, unsigned size);
+std::wstring GetInfo(const FILETIME* lastWrite, unsigned __int64 size);
 
 #define DUMP_MEM_OBJECTS
 

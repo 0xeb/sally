@@ -3,35 +3,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "copy_command.h"
 #include "SallyUrls.h"
-#include "reg_sz_narrow_bridge.h"
 #include "common/LegacyLogFontImport.h" // ImportLegacyLogFont
 
 #pragma comment(lib, "uxtheme.lib")
-
-// Registry-corruption bug family (see 24-intree-plugins-wide.md):
-// CSalamanderRegistry::GetValue/SetValue's REG_SZ path is wide-only - reads
-// memcpy the stored UTF-16LE bytes straight into the caller's buffer, and
-// writes derive their length from wcslen() over 'data' regardless of the
-// dataSize argument. ASCII8InputEncTableName is genuinely narrow (char*) by design,
-// so it must bridge here rather than
-// round-trip through GetValue/SetValue directly. Same wiring as
-// plugins/ftp/ftp.cpp's SetValueSZ/GetValueSZ.
-static BOOL SetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, const char* narrowValue)
-{
-    std::wstring wide;
-    if (!EncodeRegSzFromNarrowOwned(narrowValue, wide))
-        return FALSE;
-    return SPLRegistrySetString(registry, regKey, name, wide);
-}
-
-static BOOL GetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, char* narrowBuf, int narrowBufSize)
-{
-    std::wstring wideBuf;
-    if (!SPLRegistryGetStringOwned(registry, regKey, name, wideBuf))
-        return FALSE;
-    return DecodeRegSzToNarrow(wideBuf.c_str(), narrowBuf, narrowBufSize);
-}
 
 // enables dumping blocks that remain allocated on the heap after the plugin finishes
 // #define DUMP_MEM
@@ -42,6 +18,7 @@ CPluginInterface PluginInterface;
 CPluginInterfaceForMenu InterfaceForMenu;
 
 CWindowQueue MainWindowQueue("FileComp Windows"); // list of all plugin windows
+CWindowQueue CompareDialogHistoryQueue("FileComp Compare Dialogs");
 CThreadQueue ThreadQueue("FileComp Windows, Workers, and Remote Control");
 CMappedFontFactory MappedFontFactory;
 HINSTANCE hNormalizDll = NULL;
@@ -331,8 +308,8 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
                 registry->GetValue(regKey, CONFIG_ENDIANS1, REG_DWORD, &DefCompareOptions.Endians[1], 4);
                 registry->GetValue(regKey, CONFIG_INPUTENC0, REG_DWORD, &DefCompareOptions.PerformASCII8InputEnc[0], 4);
                 registry->GetValue(regKey, CONFIG_INPUTENC1, REG_DWORD, &DefCompareOptions.PerformASCII8InputEnc[1], 4);
-                GetValueSZ(registry, regKey, CONFIG_INPUTENCTABLE0, DefCompareOptions.ASCII8InputEncTableName[0], 101);
-                GetValueSZ(registry, regKey, CONFIG_INPUTENCTABLE1, DefCompareOptions.ASCII8InputEncTableName[1], 101);
+                SPLRegistryGetStringOwned(registry, regKey, CONFIG_INPUTENCTABLE0, DefCompareOptions.ASCII8InputEncTableName[0]);
+                SPLRegistryGetStringOwned(registry, regKey, CONFIG_INPUTENCTABLE1, DefCompareOptions.ASCII8InputEncTableName[1]);
                 DWORD dw;
                 if (registry->GetValue(regKey, CONFIG_NORMALIZATION_FORM, REG_DWORD, &dw, sizeof(DWORD)))
                     DefCompareOptions.NormalizationForm = dw ? TRUE : FALSE;
@@ -422,8 +399,8 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_ENDIANS1, REG_DWORD, &DefCompareOptions.Endians[1], 4);
     registry->SetValue(regKey, CONFIG_INPUTENC0, REG_DWORD, &DefCompareOptions.PerformASCII8InputEnc[0], 4);
     registry->SetValue(regKey, CONFIG_INPUTENC1, REG_DWORD, &DefCompareOptions.PerformASCII8InputEnc[1], 4);
-    SetValueSZ(registry, regKey, CONFIG_INPUTENCTABLE0, DefCompareOptions.ASCII8InputEncTableName[0]);
-    SetValueSZ(registry, regKey, CONFIG_INPUTENCTABLE1, DefCompareOptions.ASCII8InputEncTableName[1]);
+    SPLRegistrySetString(registry, regKey, CONFIG_INPUTENCTABLE0, DefCompareOptions.ASCII8InputEncTableName[0]);
+    SPLRegistrySetString(registry, regKey, CONFIG_INPUTENCTABLE1, DefCompareOptions.ASCII8InputEncTableName[1]);
     dw = DefCompareOptions.NormalizationForm;
     registry->SetValue(regKey, CONFIG_NORMALIZATION_FORM, REG_DWORD, &dw, sizeof(DWORD));
     // history of recently used files
@@ -536,7 +513,7 @@ void CPluginInterface::Event(int event, DWORD param) // FIXME_X64 - is a 32-bit 
 void CPluginInterface::ClearHistory(HWND parent)
 {
     CALL_STACK_MESSAGE1("CPluginInterface::ClearHistory()");
-    MainWindowQueue.BroadcastMessage(WM_USER_CLEARHISTORY, 0, 0);
+    CompareDialogHistoryQueue.BroadcastMessage(WM_USER_CLEARHISTORY, 0, 0);
     CBHistory.clear();
 }
 
@@ -665,9 +642,10 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
         SG->GetConfigParameter(SALCFG_ALWAYSONTOP, &AlwaysOnTop, sizeof(AlwaysOnTop), NULL);
         const std::wstring& path1 = doNotSwapNames ? file1 : file2;
         const std::wstring& path2 = doNotSwapNames ? file2 : file1;
+        const CFilecompPathContext pathContext = CaptureFilecompSourceContext(*SG, *gPathService);
         CFilecompThread* d = new CFilecompThread(
             path1.empty() ? NULL : path1.c_str(),
-            path2.empty() ? NULL : path2.c_str(), FALSE, "");
+            path2.empty() ? NULL : path2.c_str(), FALSE, "", &pathContext);
         if (!d)
             return Error((HWND)-1, IDS_LOWMEM);
         if (!d->Create(ThreadQueue))
@@ -714,7 +692,7 @@ CFilecompThread::Body()
     if (Path1.empty() || Path2.empty() || !DontConfirmSelection && Configuration.ConfirmSelection)
     {
         CCompareFilesDialog* dlg = new CCompareFilesDialog(
-            0, Path1, Path2, succes, &options);
+            0, Path1, Path2, succes, &options, &PathContext);
         if (!dlg)
         {
             Error(HWND(NULL), IDS_LOWMEM);
@@ -747,7 +725,7 @@ CFilecompThread::Body()
         MSG msg;
         while (IsWindow(wnd) && GetMessageW(&msg, NULL, 0, 0))
         {
-            if (!dialogBox && !TranslateAccelerator(wnd, HAccels, &msg) ||
+            if (!dialogBox && !filecomp::TranslateCopyAwareAccelerator(wnd, HAccels, &msg, IDC_DIFFLIST) ||
                 dialogBox && !IsDialogMessage(wnd, &msg))
             {
                 TranslateMessage(&msg);
@@ -774,7 +752,7 @@ CFilecompThread::Body()
         // if the main window is minimized, keep the File Comparator restored instead
         CMainWindow* win = new CMainWindow(
             Path1.c_str(), Path2.c_str(), &options,
-            wp.showCmd == SW_SHOWMAXIMIZED ? SW_SHOWMAXIMIZED : SW_SHOW);
+            wp.showCmd == SW_SHOWMAXIMIZED ? SW_SHOWMAXIMIZED : SW_SHOW, &PathContext);
         if (!win)
         {
             Error(HWND(NULL), IDS_LOWMEM);

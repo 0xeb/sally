@@ -2272,22 +2272,28 @@ void CFTPQueueItem::SetLocalItem(int parentUID, CFTPQueueItemType type, CFTPQueu
 
 BOOL CFTPQueueItem::HasErrorToSolve(BOOL* canSkip, BOOL* canRetry)
 {
-    BOOL solvableErr = ProblemID != ITEMPR_INVALIDPATHTODIR && // not an unsolvable problem (no Retry can help)
-                       ProblemID != ITEMPR_DIREXPLENDLESSLOOP &&
-                       ProblemID != ITEMPR_INVALIDPATHTOLINK;
+    return GetErrorActions(GetItemState(), ProblemID, canSkip, canRetry);
+}
+
+BOOL CFTPQueueItem::GetErrorActions(CFTPQueueItemState state, DWORD problemID,
+                                    BOOL* canSkip, BOOL* canRetry)
+{
+    BOOL solvableErr = problemID != ITEMPR_INVALIDPATHTODIR && // not an unsolvable problem (no Retry can help)
+                       problemID != ITEMPR_DIREXPLENDLESSLOOP &&
+                       problemID != ITEMPR_INVALIDPATHTOLINK;
     if (canSkip != NULL)
     {
         *canSkip = solvableErr &&
-                   (GetItemState() == sqisWaiting || GetItemState() == sqisFailed ||
-                    GetItemState() == sqisUserInputNeeded);
+                   (state == sqisWaiting || state == sqisFailed ||
+                    state == sqisUserInputNeeded);
     }
-    if (GetItemState() >= sqisSkipped /* sqisSkipped, sqisFailed, sqisForcedToFail or sqisUserInputNeeded */ &&
-        GetItemState() != sqisForcedToFail /* cannot be solved directly, it must be handled through child items */ &&
+    if (state >= sqisSkipped /* sqisSkipped, sqisFailed, sqisForcedToFail or sqisUserInputNeeded */ &&
+        state != sqisForcedToFail /* cannot be solved directly, it must be handled through child items */ &&
         solvableErr)
     {
         if (canRetry != NULL)
             *canRetry = TRUE;
-        return ProblemID != ITEMPR_SKIPPEDBYUSER; // "Solve Error" for "skipped by user" makes no sense
+        return problemID != ITEMPR_SKIPPEDBYUSER; // "Solve Error" for "skipped by user" makes no sense
     }
     else
     {

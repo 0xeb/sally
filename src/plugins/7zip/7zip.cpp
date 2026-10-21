@@ -512,19 +512,30 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_SOLID_ARCHIVE, REG_DWORD, &Config.CompressParams.SolidArchive, sizeof(DWORD));
 }
 
-void CPluginInterface::Configuration(HWND parent)
+BOOL EditConfiguration(HWND parent, CConfig& draft)
 {
     CConfigurationDialog dlg(parent);
+    dlg.Cfg = draft;
+    if (dlg.Execute() != IDOK)
+        return FALSE;
+    draft = dlg.Cfg;
+    return TRUE;
+}
 
-    dlg.Cfg = Config;
-    if (dlg.Execute() == IDOK)
-    {
-        Config = dlg.Cfg;
-        if (SalamanderGeneral->GetPanelPluginData(PANEL_LEFT) != NULL)
-            SalamanderGeneral->PostRefreshPanelPath(PANEL_LEFT);
-        if (SalamanderGeneral->GetPanelPluginData(PANEL_RIGHT) != NULL)
-            SalamanderGeneral->PostRefreshPanelPath(PANEL_RIGHT);
-    }
+void ApplyConfiguration(const CConfig& accepted)
+{
+    Config = accepted;
+    if (SalamanderGeneral->GetPanelPluginData(PANEL_LEFT) != NULL)
+        SalamanderGeneral->PostRefreshPanelPath(PANEL_LEFT);
+    if (SalamanderGeneral->GetPanelPluginData(PANEL_RIGHT) != NULL)
+        SalamanderGeneral->PostRefreshPanelPath(PANEL_RIGHT);
+}
+
+void CPluginInterface::Configuration(HWND parent)
+{
+    CConfig draft = Config;
+    if (EditConfiguration(parent, draft))
+        ApplyConfiguration(draft);
 }
 
 void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
@@ -1010,7 +1021,7 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
 
     CCompressParams compressParams;
     bool passwordDefined = false;
-    char password[PASSWORD_LEN];
+    std::wstring password;
     if (Config.ShowExtendedOptions)
     {
         // show the extended options dialog box
@@ -1028,7 +1039,7 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
         if (res == IDOK)
         {
             passwordDefined = dlg.IsPasswordDefined() == TRUE;
-            strcpy(password, dlg.GetPassword());
+            dlg.TakePassword(password);
 
             Config.ShowExtendedOptions = dlg.GetNotAgain() == FALSE;
 
@@ -1103,7 +1114,7 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
     else
         salamander->ProgressDialogAddText(LangStr(IDS_UPDATING).c_str(), FALSE);
     BOOL ret = client.Update(salamander, fileName, sourcePath, isNewArchive, &fileList, &compressParams, passwordDefined,
-                             GetUnicodeString(password)) == OPER_OK;
+                             UString(password.c_str())) == OPER_OK;
 
     // delete files afterwards if we are moving them into the archive
     if (move && ret)
@@ -1212,7 +1223,6 @@ BOOL CPluginInterfaceForArchiver::DeleteFromArchive(CSalamanderForOperationsAbst
     CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::DeleteFromArchive(, %ls, , %ls, ,)",
                         fileName, archiveRoot);
 
-    //  char password[PASSWORD_LEN];
     bool passwordDefined = false;
 
     // open progress dialog

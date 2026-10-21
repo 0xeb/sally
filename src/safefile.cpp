@@ -539,7 +539,7 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
                         // SafeFileCreate entry points (the earlier comment describing them as
                         // "narrow BY CONSTRUCTION" is stale - both the ANSI and wide entry points
                         // now supply wide directly).
-                        ret = DialogOverwrite(hParent, allowSkip ? BUTTONS_YESALLSKIPCANCEL : BUTTONS_YESALLCANCEL,
+                        ret = DialogOverwrite(hParent, allowSkip ? BUTTONS_YESALLSKIPCANCEL : BUTTONS_YESNOCANCEL,
                                               path.WideNameW(), fibuffer,
                                               srcFileName, srcFileInfo);
                     }

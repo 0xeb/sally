@@ -132,7 +132,7 @@ STRINGTABLE
   IDS_ERROR, "Chyba"
   IDS_NOTFOUND, "Súbor nenájdený"
   IDS_BADDLL, "Neplatná verzia unrar.dll. Prosím preinštalujte UnRAR plugin."
-  IDS_SELECTFIRST, "Zdá sa, že je to viaczväzkový archív. Ak je to tak, prosím vyberte prvý zväzok archívu a stlačte OK.\n\nAk to nie je viaczväzkový archív stlačte Zrušiť."
+  IDS_SELECTFIRST, "Pokračujte výberom prvého zväzku archívu. Operáciu zrušíte tlačidlom Zrušiť."
   IDS_SELECTFIRSTTITLE, "Výber prvého zväzku"
   IDS_FILENOTFOUND "Súbor nebol v archíve nájdený."
   IDS_LISTINFO_PAKEDSIZE      "Komprimovaná"

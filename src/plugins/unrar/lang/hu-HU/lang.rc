@@ -132,7 +132,7 @@ STRINGTABLE
   IDS_ERROR, "Hiba"
   IDS_NOTFOUND, "A fájl nem található"
   IDS_BADDLL, "Helytelen verziós unrar.dll. Telepítse újra az UnRAR plugint."
-  IDS_SELECTFIRST, "Úgy tűnik ez egy több-kötetes archívum. Ha így van, válassza ki az első kötetet majd nyomjon OK gombot.\n\nHa mégsem az, akkor Mégse gombot."
+  IDS_SELECTFIRST, "A folytatáshoz válassza ki az archívum első kötetét. A leállításhoz kattintson a Mégse gombra."
   IDS_SELECTFIRSTTITLE, "Válasszon első kötetet"
   IDS_FILENOTFOUND "A fájl nem található az archívumban."
   IDS_LISTINFO_PAKEDSIZE      "Tömörített"

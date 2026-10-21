@@ -51,6 +51,11 @@ struct ShellMenuDiagRecord
 
     HRESULT QueryContextMenuHr = 0; // discarded today (ShellActionAux5 returns void)
     int MenuItemCount = 0;          // GetMenuItemCount(h) after QueryContextMenu
+    HRESULT BackgroundCreateHr = E_PENDING;
+    HRESULT BackgroundInterfaceHr = E_PENDING;
+    HRESULT BackgroundQueryHr = E_PENDING;
+    int BackgroundRawCount = -1;
+    int BackgroundFinalCount = -1;
 
     DWORD TrackedCmd = 0;           // what the tracker returned
     bool TopLevel = false;          // was that command a direct item of the root menu?

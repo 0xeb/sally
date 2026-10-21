@@ -133,41 +133,7 @@ public:
 
     virtual BOOL Is(int type) { return type == otViewerWindow || CWindow::Is(type); }
     BOOL IsGood() { return Buffer != NULL && ViewerFont != NULL; }
-    void InitFindDialog(CFindSetDialog& dlg)
-    {
-        FindDialog = dlg;
-        if (FindDialog.Text.empty())
-            return;
-        else
-        {
-            if (FindDialog.Regular)
-            {
-                std::string pattern;
-                if (sally::legacy_search::EncodePatternAcpLossy(FindDialog.Text, pattern))
-                    RegExp.Set(pattern.c_str(), 0);
-                else
-                    RegExp.Clear();
-            }
-            else
-            {
-                if (FindDialog.HexMode)
-                {
-                    std::vector<std::uint8_t> bytes;
-                    if (Sally::Unicode::ParseHexPattern(FindDialog.Text.c_str(), bytes))
-                        SearchData.Set(bytes.empty() ? "" : reinterpret_cast<const char*>(bytes.data()),
-                                       static_cast<int>(bytes.size()), 0);
-                }
-                else
-                {
-                    std::string pattern;
-                    if (sally::legacy_search::EncodePatternAcpLossy(FindDialog.Text, pattern))
-                        SearchData.Set(pattern.c_str(), 0);
-                    else
-                        SearchData.Clear();
-                }
-            }
-        }
-    }
+    BOOL InitFindDialog(CFindSetDialog& dlg, BOOL reportErrors = FALSE);
 
     HANDLE GetLockObject(); // object for the disk cache - viewing from a ZIP
     void CloseLockObject();
@@ -215,16 +181,16 @@ protected:
                            __int64* firstLineCharLen = NULL, BOOL addLineIfSeekIsWrap = FALSE);
     // 'hFile' parameter, see the comment for Prepare(); if a read error occurs, fatalErr == TRUE;
     // ExitTextMode does not arise here (it does not become TRUE)
-    BOOL FindNextEOL(HANDLE* hFile, __int64 seek, __int64 maxSeek, __int64& lineEnd, __int64& nextLineBegin, BOOL& fatalErr);
+    BOOL FindNextEOL(HANDLE* hFile, __int64 seek, __int64 maxSeek, __int64& lineEnd, __int64& nextLineBegin, BOOL& fatalErr, BOOL breakAtNul = FALSE);
     // if a read error occurs, fatalErr == TRUE; ExitTextMode is TRUE when switching to hex mode
     BOOL FindPreviousEOL(HANDLE* hFile, __int64 seek, __int64 minSeek, __int64& lineBegin,
                          __int64& previousLineEnd, BOOL allowWrap,
                          BOOL takeLineBegin, BOOL& fatalErr, int* lines, __int64* firstLineEndOff = NULL,
-                         __int64* firstLineCharLen = NULL, BOOL addLineIfSeekIsWrap = FALSE);
+                         __int64* firstLineCharLen = NULL, BOOL addLineIfSeekIsWrap = FALSE, BOOL breakAtNul = FALSE);
     BOOL FindPreviousDecodedEOL(HANDLE* hFile, __int64 seek, __int64 minSeek, __int64& lineBegin,
                                 __int64& previousLineEnd, BOOL allowWrap,
                                 BOOL takeLineBegin, BOOL& fatalErr, int* lines, __int64* firstLineEndOff = NULL,
-                                __int64* firstLineCharLen = NULL, BOOL addLineIfSeekIsWrap = FALSE);
+                                __int64* firstLineCharLen = NULL, BOOL addLineIfSeekIsWrap = FALSE, BOOL breakAtNul = FALSE);
 
     // if a read error occurs, fatalErr == TRUE; ExitTextMode is TRUE when switching to hex mode
     __int64 FindBegin(__int64 seek, BOOL& fatalErr);
@@ -323,6 +289,7 @@ protected:
     void PaintDecodedText(HDC dc, const RECT& fullLine, int lines, int columns, int clipFirstRow,
                           int clipLastRow, BOOL& fatalErr, BOOL& setFindOffset);
     BOOL FindDecodedLiteral(HANDLE* hFile, BOOL forward, WORD flags, BOOL& foundMatch, BOOL& fatalErr);
+    BOOL FindDecodedRegex(BOOL forward, WORD flags, BOOL& foundMatch, BOOL& fatalErr, BOOL& escPressed);
 
     void SetToolTipOffset(__int64 offset);
 

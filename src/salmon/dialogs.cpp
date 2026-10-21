@@ -194,7 +194,7 @@ CMainDialog::CMainDialog(HINSTANCE hInstance, int resID, BOOL minidumpOnOpen)
 {
     HBoldFont = NULL;
     Compressing = FALSE;
-    Minidumping = FALSE;
+    MinidumpPending = FALSE;
     MinidumpOnOpen = minidumpOnOpen;
 }
 
@@ -205,6 +205,11 @@ CMainDialog::~CMainDialog()
         DeleteObject(HBoldFont);
         HBoldFont = NULL;
     }
+}
+
+void CMainDialog::ShowMinidumpProblem(const std::wstring& message)
+{
+    MessageBoxW(HWindow, message.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
 }
 
 void CMainDialog::ShowChilds(CDialogTaskEnum task, BOOL show)
@@ -360,7 +365,9 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (MinidumpOnOpen)
         {
             MinidumpParams = {};
-            Minidumping = StartMinidumpThread(&MinidumpParams);
+            StartMinidumpThread(&MinidumpParams);
+            // The timer consumes either a completed dump or a startup failure.
+            MinidumpPending = TRUE;
             ShowChilds(dteMinidump, FALSE);
         }
 
@@ -387,7 +394,7 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (!AppIsBusy && wParam == 666) // skip updates while a message box is up; we do not want another one
         {
-            if (Compressing || Minidumping)
+            if (Compressing || MinidumpPending)
             {
                 static DWORD counter = 0;
                 counter++;
@@ -398,15 +405,15 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 SetWindowTextW(hChild, text.c_str());
             }
 
-            if (Minidumping && !IsMinidumpThreadRunning())
+            if (MinidumpPending && !IsMinidumpThreadRunning())
             {
-                Minidumping = FALSE;
+                MinidumpPending = FALSE;
 
                 // if minidump generation failed, just report the error but continue (some data may have been saved)
                 if (!MinidumpParams.Result)
                 {
                     const std::wstring msg = FormatText(LoadStrW(IDS_SALMON_BUGREPORT_PROBLEM, HLanguage).c_str(), MinidumpParams.ErrorMessage.c_str());
-                    MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+                    ShowMinidumpProblem(msg);
                 }
 
                 GetBugReportNames();
@@ -428,7 +435,7 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDOK:
         {
-            if (Compressing || Minidumping || !TransferData(ttDataFromWindow))
+            if (Compressing || MinidumpPending || !TransferData(ttDataFromWindow))
                 return TRUE;
             SaveDescription();
             IssueAddress = ComposeIssueAddress();
@@ -445,7 +452,7 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case IDCANCEL:
         {
-            if (Compressing || Minidumping)
+            if (Compressing || MinidumpPending)
             {
                 MessageBoxW(HWindow, LoadStrW(IDS_SALMON_WAIT, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
                 return 0;

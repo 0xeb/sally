@@ -14,7 +14,7 @@
 #include "Common/StringConvert.h"
 
 CArchiveOpenCallbackImp::CArchiveOpenCallbackImp(UString& password)
-    : Password(password)
+    : Password(password), PasswordDefined(!password.IsEmpty())
 {
 }
 
@@ -34,7 +34,8 @@ STDMETHODIMP CArchiveOpenCallbackImp::SetCompleted(const UInt64* /*files*/, cons
 
 STDMETHODIMP CArchiveOpenCallbackImp::CryptoGetTextPassword(BSTR* password)
 {
-    if (Password.IsEmpty())
+    PasswordRequested = true;
+    if (!PasswordDefined)
     {
         CEnterPasswordDialog dlg(SalamanderGeneral->GetMsgBoxParent());
         int res = (int)dlg.Execute();
@@ -42,7 +43,8 @@ STDMETHODIMP CArchiveOpenCallbackImp::CryptoGetTextPassword(BSTR* password)
         if (res != IDOK)
             return E_ABORT;
 
-        Password = GetUnicodeString(dlg.GetPassword());
+        Password = dlg.GetPassword().c_str();
+        PasswordDefined = true; // an explicitly accepted empty password is still defined
     }
     StringToBstr(Password, password);
 

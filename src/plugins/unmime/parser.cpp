@@ -1204,7 +1204,7 @@ BOOL ParseMailFile(const wchar_t* pszFileName, CParserOutput* pOutput, BOOL bApp
     cBoundaries = new char[MULTIPARTSTACK_MAX][200];
 
     BOOL goback, bEnd;
-    CStartMarker* pMultipartStart;
+    CStartMarker* pMultipartStart = NULL;
     BOOL bNextBlockIsAttachment;
     int iWeightSum;
 

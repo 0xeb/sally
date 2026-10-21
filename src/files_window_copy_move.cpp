@@ -275,8 +275,10 @@ BOOL DirectoryTreeNeedsLegacyADS(const std::wstring& sourcePathW, BOOL targetSup
 
     WIN32_FIND_DATAW data = {};
     HANDLE find = gFileSystem->FindFirstFile(searchPathW.c_str(), &data);
+    // Listing errors belong to the builder's existing Skip/Skip All/Cancel
+    // flow. This preliminary ADS scan must not turn them into a gate rejection.
     if (find == INVALID_HANDLE_VALUE)
-        return TRUE;
+        return FALSE;
 
     do
     {
@@ -311,9 +313,8 @@ BOOL DirectoryTreeNeedsLegacyADS(const std::wstring& sourcePathW, BOOL targetSup
         }
     } while (gFileSystem->FindNextFile(find, &data));
 
-    DWORD err = GetLastError();
     gFileSystem->CloseFind(find);
-    return err != ERROR_NO_MORE_FILES;
+    return FALSE; // The builder also owns incomplete (FindNextFile) listings.
 }
 
 // ShouldReportADSProbeError + NormalizeADSReadErrorResponse moved to
@@ -713,6 +714,9 @@ void ReportSnapshotBuildFailure(const CBuildScriptState& bsState, bool cancelled
     case CBuildScriptState::ESelfOpReject::MoveDirToItself:
         selfOpMsgId = IDS_CANNOTMOVEDIRTOITSELF;
         break;
+    case CBuildScriptState::ESelfOpReject::DirectoryTargetInsideSource:
+        selfOpMsgId = IDS_DIRECTORYTARGETINSOURCE;
+        break;
     case CBuildScriptState::ESelfOpReject::None:
         break;
     }
@@ -795,16 +799,6 @@ BOOL CanBuildFirstTrancheFromSnapshot(BOOL isDiskPanel, CActionType type,
 
     // Masked delete is absorbed (SnapshotDeleteMaskPredicate);
     // no default-mask requirement remains for atDelete.
-
-    for (const CSnapshotItem& item : snapshot.Items)
-    {
-        // Reparse dirs are absorbed for delete AND copy/move
-        // (copy-the-link; EnableReparseDelete/EnableReparseCopyMove).
-        // A dir under NON-recursive Convert rejects (mirrors the
-        // builder validate rule so the build never aborts the operation).
-        if (item.IsDir && type == atConvert)
-            return FALSE;
-    }
 
     // sourcePath is now the same wide data as sourcePathW's own source (both
     // ultimately come from the panel's wide path) - no conversion needed for
@@ -1187,37 +1181,43 @@ void CFilesWindow::Activate(BOOL shares)
 namespace
 {
 
-bool FileStartsWithUtf8Bom(HANDLE hFile)
-{
-    uint64_t original = 0;
-    if (!gFileSystem->SeekHandle(hFile, 0, FILE_CURRENT, &original).success)
-        return false;
-    gFileSystem->SeekHandle(hFile, 0, FILE_BEGIN, NULL);
-    BYTE bom[3] = {};
-    DWORD read = 0;
-    bool hasBom = gFileSystem->ReadFromHandle(hFile, bom, sizeof(bom), &read).success &&
-                  read == sizeof(bom) && bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF;
-    gFileSystem->SeekHandle(hFile, (int64_t)original, FILE_BEGIN, NULL);
-    return hasBom;
-}
-
-bool WriteAll(HANDLE hFile, const void* data, size_t len)
-{
-    const BYTE* next = static_cast<const BYTE*>(data);
-    while (len != 0)
+    FileResult FileStartsWithUtf8Bom(HANDLE hFile, uint64_t original, bool& hasBom)
     {
-        const DWORD chunk = static_cast<DWORD>(std::min<size_t>(len, MAXDWORD));
-        DWORD written = 0;
-        FileResult result = gFileSystem->WriteToHandle(hFile, next, chunk, &written);
-        if (!result.success)
-            SetLastError(result.errorCode);
-        if (!result.success || written != chunk)
-            return false;
-        next += written;
-        len -= written;
+        hasBom = false;
+        if (original > static_cast<uint64_t>((std::numeric_limits<int64_t>::max)()))
+            return FileResult::Error(ERROR_ARITHMETIC_OVERFLOW);
+        const FileResult seek = gFileSystem->SeekHandle(hFile, 0, FILE_BEGIN, NULL);
+        if (!seek.success)
+            return seek;
+        BYTE bom[3] = {};
+        DWORD read = 0;
+        const FileResult readResult = gFileSystem->ReadFromHandle(hFile, bom, sizeof(bom), &read);
+        const FileResult restored = gFileSystem->SeekHandle(hFile, static_cast<int64_t>(original), FILE_BEGIN, NULL);
+        if (!restored.success)
+            return restored;
+        if (!readResult.success)
+            return readResult;
+        hasBom = read == sizeof(bom) && bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF;
+        return FileResult::Ok();
     }
-    return true;
-}
+
+    bool WriteAll(HANDLE hFile, const void* data, size_t len)
+    {
+        const BYTE* next = static_cast<const BYTE*>(data);
+        while (len != 0)
+        {
+            const DWORD chunk = static_cast<DWORD>(std::min<size_t>(len, MAXDWORD));
+            DWORD written = 0;
+            FileResult result = gFileSystem->WriteToHandle(hFile, next, chunk, &written);
+            if (!result.success)
+                SetLastError(result.errorCode);
+            if (!result.success || written != chunk)
+                return false;
+            next += written;
+            len -= written;
+        }
+        return true;
+    }
 
 } // namespace
 
@@ -1297,8 +1297,25 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
                 }
             }
         }
-        const Win32TextConversionResult encodeResult =
-            sally::file_list::EncodeText(output, encodedOutput, outputEncoding);
+        uint64_t pos = 0;
+        const FileResult position = gFileSystem->SeekHandle(hFile, 0, FILE_CURRENT, &pos);
+        bool hasUtf8Bom = false;
+        const FileResult bomResult = position.success && pos > 0
+                                         ? FileStartsWithUtf8Bom(hFile, pos, hasUtf8Bom)
+                                         : position;
+        if (!bomResult.success)
+        {
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(bomResult.errorCode).c_str());
+            FilesActionInProgress = FALSE;
+            return FALSE;
+        }
+        // Appending follows the existing file's marked encoding even when this
+        // batch could also be represented in the system code page.
+        const Win32TextConversionResult encodeResult = hasUtf8Bom
+                                                           ? Win32EncodeText(CP_UTF8, output, encodedOutput)
+                                                           : sally::file_list::EncodeText(output, encodedOutput, outputEncoding);
+        if (hasUtf8Bom)
+            outputEncoding = sally::file_list::TextEncoding::Utf8;
         if (!encodeResult.Succeeded())
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
@@ -1306,8 +1323,6 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
             FilesActionInProgress = FALSE;
             return FALSE;
         }
-        uint64_t pos = 0;
-        gFileSystem->SeekHandle(hFile, 0, FILE_CURRENT, &pos);
         if (outputEncoding == sally::file_list::TextEncoding::LegacyAcp)
         {
             if (!WriteAll(hFile, encodedOutput.data(), encodedOutput.length()))
@@ -1319,7 +1334,6 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
         }
         else
         {
-            bool hasUtf8Bom = pos > 0 && FileStartsWithUtf8Bom(hFile);
             if (pos > 0 && !hasUtf8Bom)
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), L"Cannot append Unicode file-list output to a non-Unicode file.");

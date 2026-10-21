@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/Win32ShellBackgroundMenu.h"
+#include "shellsup_diag.h"
+#include "ui/IPrompter.h"
 
 // The owned STRRET normalization helper comes from shlwapi, already linked project-wide.
 #include <shlwapi.h>
@@ -2211,33 +2214,29 @@ IDropTarget* CreateIDropTargetW(HWND hOwnerWindow, const wchar_t* dirW)
 // OpenSpecFolder
 //
 
+namespace
+{
+    void ReportFolderOpenFailure(const wchar_t* path, DWORD error)
+    {
+        if (error == ERROR_CANCELLED || error == static_cast<DWORD>(HRESULT_FROM_WIN32(ERROR_CANCELLED)) ||
+            error == static_cast<DWORD>(E_ABORT))
+            return;
+        const std::wstring detail = GetErrorTextOwned(error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE);
+        const std::wstring message = path != NULL && *path != 0
+                                         ? FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), path, detail.c_str())
+                                         : detail;
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), message.c_str());
+    }
+} // namespace
+
 void OpenSpecFolder(HWND hOwnerWindow, int specFolder)
 {
     CALL_STACK_MESSAGE2("OpenSpecFolder(, %d)", specFolder);
-    ITEMIDLIST* pidl;
-    if (SHGetSpecialFolderLocation(NULL, specFolder, &pidl) == NOERROR && pidl != NULL)
-    {
-        CShellExecuteWnd shellExecuteWnd;
-        // Explicitly SHELLEXECUTEINFOA/ShellExecuteExA - se.lpVerb is a narrow literal and no
-        // path/argument field is set here, so the whole struct stays narrow.
-        SHELLEXECUTEINFOA se;
-        memset(&se, 0, sizeof(SHELLEXECUTEINFOA));
-        se.cbSize = sizeof(SHELLEXECUTEINFOA);
-        se.fMask = SEE_MASK_IDLIST;
-        se.lpVerb = "open";
-        se.hwnd = shellExecuteWnd.Create(hOwnerWindow, L"SEW: OpenSpecFolder specFolder=%d verb=%hs", specFolder, se.lpVerb);
-        se.nShow = SW_SHOWNORMAL;
-        se.lpIDList = pidl;
-        ShellExecuteExA(&se);
-
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (pidl != NULL && alloc->DidAlloc(pidl) == 1)
-                alloc->Free(pidl);
-            alloc->Release();
-        }
-    }
+    CShellExecuteWnd ownerShield;
+    const ShellResult result = gShell->OpenSpecialFolder(specFolder,
+                                                         ownerShield.Create(hOwnerWindow, L"SEW: OpenSpecFolder specFolder=%d", specFolder));
+    if (!result.success)
+        ReportFolderOpenFailure(NULL, result.errorCode);
 }
 
 //*****************************************************************************
@@ -2248,73 +2247,25 @@ void OpenSpecFolder(HWND hOwnerWindow, int specFolder)
 void OpenFolderAndFocusItemW(HWND hOwnerWindow, const wchar_t* dir, const wchar_t* item)
 {
     CALL_STACK_MESSAGE2("OpenFolder(, %ls)", dir);
-    // if path contains components ending with spaces/dots, shell won't return
-    // pidl for the requested path, but for the path created by trimming these
-    // spaces/dots, so we'd better give up on it early...
-    std::wstring mydir(dir);
-    if (item[0] != 0)
-        SalPathAppendW(mydir, item);
-    if (PathContainsValidComponents(mydir.c_str()))
+    if (dir == NULL || *dir == 0)
     {
-        BOOL useOldMethod = TRUE; // SHOpenFolderAndSelectItems is supported since XP and we still run on W2K and XP without SPx
-        if (item[0] != 0)         // if we don't have an item to select, we don't use SHOpenFolderAndSelectItems, because it would show parent directory, see MSDN
-        {
-            HMODULE hShell32 = LoadLibraryW(L"shell32.dll");
-            if (hShell32 != NULL)
-            {
-                typedef HRESULT(WINAPI * F_SHOpenFolderAndSelectItems)(PCIDLIST_ABSOLUTE pidlFolder, UINT cidl, PCUITEMID_CHILD_ARRAY apidl, DWORD dwFlags);
-                F_SHOpenFolderAndSelectItems mySHOpenFolderAndSelectItems = NULL;
-                mySHOpenFolderAndSelectItems = (F_SHOpenFolderAndSelectItems)GetProcAddress(hShell32, "SHOpenFolderAndSelectItems"); // Min: XP
-                if (mySHOpenFolderAndSelectItems != NULL)
-                {
-                    LPITEMIDLIST folderPidl = NULL;
-                    LPITEMIDLIST childPidl = NULL;
-                    IShellFolder* folder = BindShellFolderW(dir);
-                    std::wstring mutableItem(item);
-                    ULONG eaten = 0;
-                    if (folder != NULL &&
-                        SUCCEEDED(SHParseDisplayName(dir, NULL, &folderPidl, 0, NULL)) &&
-                        SUCCEEDED(folder->ParseDisplayName(NULL, NULL, &mutableItem[0], &eaten,
-                                                           &childPidl, NULL)) &&
-                        folderPidl != NULL && childPidl != NULL)
-                    {
-                        PCUITEMID_CHILD children[] = {childPidl};
-                        if (SUCCEEDED(mySHOpenFolderAndSelectItems(folderPidl, 1, children, 0)))
-                            useOldMethod = FALSE;
-                    }
-                    CoTaskMemFree(childPidl);
-                    CoTaskMemFree(folderPidl);
-                    if (folder != NULL)
-                        folder->Release();
-                }
-                FreeLibrary(hShell32);
-            }
-        }
-
-        if (useOldMethod)
-        {
-            LPITEMIDLIST pidl = NULL;
-            SHParseDisplayName(dir, NULL, &pidl, 0, NULL);
-
-            if (pidl != NULL)
-            {
-                CShellExecuteWnd shellExecuteWnd;
-                SHELLEXECUTEINFOW se;
-                memset(&se, 0, sizeof(SHELLEXECUTEINFOW));
-                se.cbSize = sizeof(SHELLEXECUTEINFOW);
-                se.fMask = SEE_MASK_IDLIST;
-                se.lpVerb = L"open";
-                se.hwnd = shellExecuteWnd.Create(hOwnerWindow, L"SEW: OpenFolderAndFocusItem verb=%ls", se.lpVerb);
-                se.nShow = SW_SHOWNORMAL;
-                se.lpIDList = pidl;
-                ShellExecuteExW(&se);
-
-                CoTaskMemFree(pidl);
-            }
-        }
+        ReportFolderOpenFailure(dir, ERROR_INVALID_PARAMETER);
+        return;
     }
-    else
-        TRACE_I("OpenFolderAndFocusItemW: unable to open folder for a path containing invalid components");
+    std::wstring requested(dir);
+    if (item != NULL && *item != 0)
+        SalPathAppendW(requested, item);
+    // The shell trims trailing dots/spaces and could open a different object.
+    if (!PathContainsValidComponents(requested.c_str()))
+    {
+        ReportFolderOpenFailure(requested.c_str(), ERROR_INVALID_NAME);
+        return;
+    }
+    CShellExecuteWnd ownerShield;
+    const ShellResult result = gShell->OpenFolderAndSelectItem(dir, item,
+                                                               ownerShield.Create(hOwnerWindow, L"SEW: OpenFolderAndFocusItem verb=open"));
+    if (!result.success)
+        ReportFolderOpenFailure(requested.c_str(), result.errorCode);
 }
 
 //*****************************************************************************
@@ -2451,7 +2402,7 @@ BOOL GetTargetDirectoryW(HWND parent, HWND hCenterWindow, const wchar_t* title, 
 // minCmd, maxCmd - range of possible command values in 'menu'
 // backgoundMenu - TRUE = we want complete view-background menu (right-click behind items in Explorer; not just New menu, but also e.g. Tortoise CVS, etc.)
 
-void GetMenuNewAux(IContextMenu2* contextMenu2, HMENU m, int minCmd, int maxCmd)
+HRESULT GetMenuNewAux(IContextMenu2* contextMenu2, HMENU m, UINT minCmd, UINT maxCmd, UINT flags)
 {
     CALL_STACK_MESSAGE_NONE
 
@@ -2460,23 +2411,19 @@ void GetMenuNewAux(IContextMenu2* contextMenu2, HMENU m, int minCmd, int maxCmd)
     int oldThreadPriority = GetThreadPriority(hThread);
     SetThreadPriority(hThread, THREAD_PRIORITY_NORMAL);
 
+    HRESULT result = E_UNEXPECTED;
     __try
     {
-        UINT flags = CMF_NORMAL | CMF_EXPLORE;
-        // handle pressed shift - extended context menu, under W2K for example Run as... is there
-#define CMF_EXTENDEDVERBS 0x00000100 // rarely used verbs
-        BOOL shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
-        if (shiftPressed)
-            flags |= CMF_EXTENDEDVERBS;
-
-        contextMenu2->QueryContextMenu(m, 0, minCmd, maxCmd, flags);
+        result = contextMenu2->QueryContextMenu(m, 0, minCmd, maxCmd, flags);
     }
     __except (CCallStack::HandleException(GetExceptionInformation(), 16))
     {
         QCMExceptionHasOccured++;
+        result = E_UNEXPECTED;
     }
 
     SetThreadPriority(hThread, oldThreadPriority);
+    return result;
 }
 
 // Shared body of both GetNewOrBackgroundMenu overloads: everything from the bound folder
@@ -2485,60 +2432,46 @@ void GetMenuNewAux(IContextMenu2* contextMenu2, HMENU m, int minCmd, int maxCmd)
 static void FillNewOrBackgroundMenu(HWND hOwnerWindow, IShellFolder* folder, CMenuNew* menu,
                                     int minCmd, int maxCmd, BOOL backgoundMenu)
 {
-    HRESULT ret;
-    IContextMenu* contextMenu;
-    if (SUCCEEDED((ret = folder->CreateViewObject(hOwnerWindow, IID_IContextMenu,
-                                                  (void**)&contextMenu))))
+    UINT flags = CMF_NORMAL | CMF_EXPLORE;
+    if ((GetKeyState(VK_SHIFT) & 0x8000) != 0)
+        flags |= CMF_EXTENDEDVERBS;
+    sally::shell::BackgroundMenu built;
+    sally::shell::BackgroundMenuDiagnostics diagnostics;
+    const HRESULT result = sally::shell::BuildBackgroundMenu(
+        hOwnerWindow, folder, minCmd, maxCmd, flags, built, diagnostics, GetMenuNewAux);
+    if (ShellMenuDiagRecord* record = ShellMenuDiag.Current())
     {
-        IContextMenu2* contextMenu2 = NULL;
-        if (SUCCEEDED((ret = contextMenu->QueryInterface(IID_IContextMenu2,
-                                                         (void**)&contextMenu2))))
-        {
-            HMENU m = CreatePopupMenu();
-            if (m != NULL)
-            {
-                GetMenuNewAux(contextMenu2, m, minCmd, maxCmd);
-                RemoveUselessSeparatorsFromMenu(m);
-
-                if (backgoundMenu) // we take entire background menu
-                {
-                    menu->Set(contextMenu2, m);
-                }
-                else // we cut out only New menu
-                {
-                    MENUITEMINFO mi;
-                    int index = 0;
-                    int foundIndex = -1;
-                    HMENU foundSubMenu = NULL;
-                    while (1)
-                    {
-                        mi.cbSize = sizeof(mi);
-                        mi.fMask = MIIM_SUBMENU;
-                        if (GetMenuItemInfo(m, index, TRUE, &mi))
-                        {
-                            if (mi.hSubMenu != NULL)
-                            { // looking for last submenu (user items hopefully only appear before Windows items, we'll see over time)
-                                foundIndex = index;
-                                foundSubMenu = mi.hSubMenu;
-                            }
-                        }
-                        else
-                            break;
-                        index++;
-                    }
-                    if (foundIndex != -1)
-                    {
-                        menu->Set(contextMenu2, foundSubMenu);
-                        RemoveMenu(m, foundIndex, MF_BYPOSITION);
-                    }
-                    DestroyMenu(m);
-                }
-            }
-            if (!menu->MenuIsAssigned())
-                contextMenu2->Release();
-        }
-        contextMenu->Release();
+        record->BackgroundCreateHr = diagnostics.CreateViewHr;
+        record->BackgroundInterfaceHr = diagnostics.InterfaceHr;
+        record->BackgroundQueryHr = diagnostics.QueryHr;
+        record->BackgroundRawCount = diagnostics.RawItemCount;
     }
+    if (FAILED(result))
+        return;
+    HMENU m = built.GetMenu();
+    RemoveUselessSeparatorsFromMenu(m);
+    if (backgoundMenu)
+    {
+        menu->Set(built.DetachInterface(), built.DetachMenu());
+        return;
+    }
+    int index = 0;
+    int foundIndex = -1;
+    HMENU foundSubMenu = NULL;
+    MENUITEMINFO mi = {};
+    mi.cbSize = sizeof(mi);
+    mi.fMask = MIIM_SUBMENU;
+    while (GetMenuItemInfo(m, index, TRUE, &mi))
+    {
+        if (mi.hSubMenu != NULL)
+        {
+            foundIndex = index;
+            foundSubMenu = mi.hSubMenu;
+        }
+        ++index;
+    }
+    if (foundIndex != -1 && RemoveMenu(m, foundIndex, MF_BYPOSITION))
+        menu->Set(built.DetachInterface(), foundSubMenu);
 }
 
 // The narrow GetNewOrBackgroundMenu stood here. Its last three callers

@@ -1619,7 +1619,7 @@ CPluginInterfaceForArchiver::Notify(FDINOTIFICATIONTYPE fdint, PFDINOTIFICATION 
             if (DoThisFile(partialName) && (Action != CA_UNPACK_WHOLE_ARCHIVE || FirstCAB))
             {
                 INT_PTR ret;
-                if (Silent & SF_CONTINUED)
+                if ((Options & OP_SKIPCONTINUED) || (Silent & SF_CONTINUED))
                     ret = IDSKIP;
                 else
                 {

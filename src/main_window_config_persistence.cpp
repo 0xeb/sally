@@ -13,6 +13,7 @@
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
 #include "common/IRegistry.h"
+#include "common/configuration/RegistryWriteMonitor.h"
 #include "common/update/UpdateSchedule.h"
 #include "common/fsutil.h"
 #include <shlwapi.h>
@@ -1547,7 +1548,7 @@ void CMainWindow::SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const w
         // is a wide constant now, so there is no conversion left to get wrong.
         if (gRegistry != NULL)
         {
-            gRegistry->SetString(actKey, PANEL_PATH_REG_W, panel->GetPathW());
+            SetValueW(actKey, PANEL_PATH_REG_W, REG_SZ, panel->GetPathW(), -1);
         }
         else
         {
@@ -1575,9 +1576,22 @@ void CMainWindow::SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const w
     }
 }
 
-void CMainWindow::SaveConfig(HWND parent)
+BOOL SaveCredentialConfiguration(HWND parent, LONG* error)
+{
+    if (MainWindow == NULL)
+    {
+        if (error != NULL) *error = ERROR_INVALID_WINDOW_HANDLE;
+        return FALSE;
+    }
+    return MainWindow->SaveConfig(parent, error);
+}
+
+BOOL CMainWindow::SaveConfig(HWND parent, LONG* error)
 {
     CALL_STACK_MESSAGE1("CMainWindow::SaveConfig()");
+    sally::configuration::RegistryWriteMonitor writes(true);
+    if (error != NULL)
+        *error = ERROR_SUCCESS;
 
     if (parent == NULL)
         parent = HWindow;
@@ -1585,7 +1599,16 @@ void CMainWindow::SaveConfig(HWND parent)
     if (SALAMANDER_ROOT_REG == NULL)
     {
         TRACE_E("SALAMANDER_ROOT_REG == NULL"); // not necessarily an error: during UPGRADE we may exit Salamander without saving the configuration (if not all plug-ins are installed and the user chooses Exit)
-        return;
+        if (error != NULL)
+            *error = ERROR_INVALID_HANDLE;
+        return FALSE;
+    }
+
+    if (!PasswordManager.IsPersistentStateValid())
+    {
+        if (error != NULL)
+            *error = ERROR_INVALID_DATA;
+        return FALSE;
     }
 
     HCURSOR hOldCursor = NULL;
@@ -1607,28 +1630,43 @@ void CMainWindow::SaveConfig(HWND parent)
 
     LoadSaveToRegistryMutex.Enter();
 
+    const BOOL credentialRevisionOK = PasswordManager.CheckCredentialRevision();
+    if (!credentialRevisionOK) writes.Require(false, GetLastError());
+
     HKEY salamander;
     if (CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
     {
         HKEY actKey;
 
-        BOOL cfgIsOK = TRUE;
-        BOOL deleteSALAMANDER_SAVE_IN_PROGRESS = !IsSetSALAMANDER_SAVE_IN_PROGRESS;
-        if (deleteSALAMANDER_SAVE_IN_PROGRESS)
+        BOOL cfgIsOK = credentialRevisionOK;
+        static std::wstring retryOwnRoot;
+        const bool retryOwnSave = retryOwnRoot == SALAMANDER_ROOT_REG;
+        BOOL deleteSALAMANDER_SAVE_IN_PROGRESS = !IsSetSALAMANDER_SAVE_IN_PROGRESS || retryOwnSave;
+        if (deleteSALAMANDER_SAVE_IN_PROGRESS && cfgIsOK)
         {
             IRegistry* registry = GetMainWindowRegistry();
             DWORD saveInProgress = 1;
-            if (registry != NULL &&
-                registry->GetDWord(salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
+            const RegistryResult marker = retryOwnSave ? RegistryResult::Error(ERROR_FILE_NOT_FOUND)
+                : registry != NULL ? registry->GetDWord(salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress)
+                                   : RegistryResult::Error(ERROR_INVALID_FUNCTION);
+            if (marker.success)
             {
                 cfgIsOK = FALSE; // the configuration is corrupted; saving won't fix it (it wasn't stored completely)
+                writes.Require(false, ERROR_BADDB);
                 TRACE_E("CMainWindow::SaveConfig(): unable to save configuration, configuration key in registry is corrupted");
+            }
+            else if (!marker.notFound())
+            {
+                writes.Record(marker);
+                cfgIsOK = FALSE;
             }
             else
             {
                 saveInProgress = 1;
-                SetValue(salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD));
-                IsSetSALAMANDER_SAVE_IN_PROGRESS = TRUE;
+                if (SetValue(salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
+                    IsSetSALAMANDER_SAVE_IN_PROGRESS = TRUE;
+                else
+                    cfgIsOK = FALSE;
             }
         }
 
@@ -1733,7 +1771,7 @@ void CMainWindow::SaveConfig(HWND parent)
 
             if (CreateKey(salamander, SALAMANDER_PWDMNGR_REG, actKey))
             {
-                PasswordManager.Save(actKey);
+                writes.Require(PasswordManager.Save(actKey) != FALSE);
                 CloseKey(actKey);
             }
 
@@ -1741,7 +1779,7 @@ void CMainWindow::SaveConfig(HWND parent)
 
             if (CreateKey(salamander, SALAMANDER_HOTPATHS_REG, actKey))
             {
-                HotPaths.Save(actKey);
+                writes.Require(HotPaths.Save(actKey) != FALSE);
                 CloseKey(actKey);
             }
 
@@ -1749,22 +1787,23 @@ void CMainWindow::SaveConfig(HWND parent)
 
             if (CreateKey(salamander, SALAMANDER_VIEWTEMPLATES_REG, actKey))
             {
-                ViewTemplates.Save(actKey);
+                writes.Require(ViewTemplates.Save(actKey) != FALSE);
                 CloseKey(actKey);
             }
 
             //---  Plugins
-            HKEY configKey;
-            HKEY orderKey;
+            HKEY configKey = NULL;
+            HKEY orderKey = NULL;
+            actKey = NULL;
             if (CreateKey(salamander, SALAMANDER_PLUGINS, actKey) &&
                 CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, configKey) &&
                 CreateKey(salamander, SALAMANDER_PLUGINSORDER, orderKey))
             {
                 Plugins.Save(parent, actKey, configKey, orderKey);
-                CloseKey(orderKey);
-                CloseKey(actKey);
-                CloseKey(configKey);
             }
+            if (orderKey != NULL) CloseKey(orderKey);
+            if (actKey != NULL) CloseKey(actKey);
+            if (configKey != NULL) CloseKey(configKey);
 
             if (GlobalSaveWaitWindow == NULL)
                 analysing.SetProgressPos(++savingProgress); // 1
@@ -1791,7 +1830,7 @@ void CMainWindow::SaveConfig(HWND parent)
                         _itow_s(i + 1, buf, _countof(buf), 10);
                         if (CreateKey(actSubKey, buf, itemKey))
                         {
-                            PackerConfig.Save(i, itemKey);
+                            writes.Require(PackerConfig.Save(i, itemKey) != FALSE);
                             CloseKey(itemKey);
                         }
                         else
@@ -1822,7 +1861,7 @@ void CMainWindow::SaveConfig(HWND parent)
                         _itow_s(i + 1, buf, _countof(buf), 10);
                         if (CreateKey(actSubKey, buf, itemKey))
                         {
-                            UnpackerConfig.Save(i, itemKey);
+                            writes.Require(UnpackerConfig.Save(i, itemKey) != FALSE);
                             CloseKey(itemKey);
                         }
                         else
@@ -1855,7 +1894,7 @@ void CMainWindow::SaveConfig(HWND parent)
                         _itow_s(i + 1, buf, _countof(buf), 10);
                         if (CreateKey(actSubKey, buf, itemKey))
                         {
-                            ArchiverConfig.Save(i, itemKey);
+                            writes.Require(ArchiverConfig.Save(i, itemKey) != FALSE);
                             CloseKey(itemKey);
                         }
                         else
@@ -1876,7 +1915,7 @@ void CMainWindow::SaveConfig(HWND parent)
                         _itow_s(i + 1, buf, _countof(buf), 10);
                         if (CreateKey(actSubKey, buf, itemKey))
                         {
-                            PackerFormatConfig.Save(i, itemKey);
+                            writes.Require(PackerFormatConfig.Save(i, itemKey) != FALSE);
                             CloseKey(itemKey);
                         }
                         else
@@ -1974,10 +2013,10 @@ void CMainWindow::SaveConfig(HWND parent)
                          &Configuration.CommandShellTargetKind, sizeof(DWORD));
                 if (gRegistry != NULL)
                 {
-                    gRegistry->SetString(actKey, CONFIG_COMMANDSHELL_PROFILE_GUID_REG_W,
-                                         Configuration.CommandShellProfileGuid.c_str());
-                    gRegistry->SetString(actKey, CONFIG_COMMANDSHELL_PROFILE_NAME_REG_W,
-                                         Configuration.CommandShellProfileName.c_str());
+                    SetValueW(actKey, CONFIG_COMMANDSHELL_PROFILE_GUID_REG_W, REG_SZ,
+                              Configuration.CommandShellProfileGuid.c_str(), -1);
+                    SetValueW(actKey, CONFIG_COMMANDSHELL_PROFILE_NAME_REG_W, REG_SZ,
+                              Configuration.CommandShellProfileName.c_str(), -1);
                 }
                 //      SetValue(actKey, CONFIG_FASTDIRMOVE_REG, REG_DWORD,
                 //               &Configuration.FastDirectoryMove, sizeof(DWORD));
@@ -2275,7 +2314,7 @@ void CMainWindow::SaveConfig(HWND parent)
                 SetValueW(actKey, CONFIG_CMDLFOCUS_REG_W, REG_DWORD, &EditMode, sizeof(DWORD));
 
                 SetValueW(actKey, CONFIG_USECUSTOMPANELFONT_REG_W, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
-                SaveLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont);
+                writes.Require(SaveLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont) != FALSE);
 
                 if (GlobalSaveWaitWindow == NULL)
                     analysing.SetProgressPos(++savingProgress); // 4
@@ -2283,20 +2322,20 @@ void CMainWindow::SaveConfig(HWND parent)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 4
                 //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
-                SaveHistory(actKey, CONFIG_NAMEDHISTORYW_REG, FindNamedHistory,
-                             FIND_NAMED_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_LOOKINHISTORYW_REG, FindLookInHistory,
-                             FIND_LOOKIN_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_GREPHISTORYW_REG, FindGrepHistory,
-                             FIND_GREP_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_SELECTHISTORYW_REG, Configuration.SelectHistory,
-                             SELECT_HISTORY_SIZE, !Configuration.SaveHistory);
+                writes.Require(SaveHistory(actKey, CONFIG_NAMEDHISTORYW_REG, FindNamedHistory,
+                             FIND_NAMED_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_LOOKINHISTORYW_REG, FindLookInHistory,
+                             FIND_LOOKIN_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_GREPHISTORYW_REG, FindGrepHistory,
+                             FIND_GREP_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_SELECTHISTORYW_REG, Configuration.SelectHistory,
+                             SELECT_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
                 // Standard histories have one UTF-16 owner. Keep writing the wide keys;
                 // the old narrow keys below are read only when importing old settings.
-                SaveHistory(actKey, CONFIG_COPYHISTORYW_REG, Configuration.CopyHistory,
-                             COPY_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_CHANGEDIRHISTORYW_REG, Configuration.ChangeDirHistory,
-                             CHANGEDIR_HISTORY_SIZE, !Configuration.SaveHistory);
+                writes.Require(SaveHistory(actKey, CONFIG_COPYHISTORYW_REG, Configuration.CopyHistory,
+                             COPY_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_CHANGEDIRHISTORYW_REG, Configuration.ChangeDirHistory,
+                             CHANGEDIR_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
 
                 if (GlobalSaveWaitWindow == NULL)
                     analysing.SetProgressPos(++savingProgress); // 5
@@ -2304,24 +2343,24 @@ void CMainWindow::SaveConfig(HWND parent)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 5
                 //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
-                SaveHistory(actKey, CONFIG_VIEWERHISTORYW_REG, ViewerHistory,
-                             VIEWER_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_COMMANDHISTORYW_REG, Configuration.EditHistory,
-                             EDIT_HISTORY_SIZE, !(Configuration.SaveHistory && Configuration.EnableCmdLineHistory && Configuration.SaveCmdLineHistory));
+                writes.Require(SaveHistory(actKey, CONFIG_VIEWERHISTORYW_REG, ViewerHistory,
+                             VIEWER_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_COMMANDHISTORYW_REG, Configuration.EditHistory,
+                             EDIT_HISTORY_SIZE, !(Configuration.SaveHistory && Configuration.EnableCmdLineHistory && Configuration.SaveCmdLineHistory)) != FALSE);
                 // FileListHistory: same shape, sole consumer is
                 // ExpandMakeFileListW's wide param (files_window_copy_move.cpp).
-                SaveHistory(actKey, CONFIG_FILELISTHISTORYW_REG, Configuration.FileListHistory,
-                             FILELIST_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_CREATEDIRHISTORYW_REG, Configuration.CreateDirHistory,
-                             CREATEDIR_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_QUICKRENAMEHISTORYW_REG, Configuration.QuickRenameHistory,
-                             QUICKRENAME_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_EDITNEWHISTORYW_REG, Configuration.EditNewHistory,
-                             EDITNEW_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_CONVERTHISTORYW_REG, Configuration.ConvertHistory,
-                             CONVERT_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_FILTERHISTORYW_REG, Configuration.FilterHistory,
-                             FILTER_HISTORY_SIZE, !Configuration.SaveHistory);
+                writes.Require(SaveHistory(actKey, CONFIG_FILELISTHISTORYW_REG, Configuration.FileListHistory,
+                             FILELIST_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_CREATEDIRHISTORYW_REG, Configuration.CreateDirHistory,
+                             CREATEDIR_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_QUICKRENAMEHISTORYW_REG, Configuration.QuickRenameHistory,
+                             QUICKRENAME_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_EDITNEWHISTORYW_REG, Configuration.EditNewHistory,
+                             EDITNEW_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_CONVERTHISTORYW_REG, Configuration.ConvertHistory,
+                             CONVERT_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
+                writes.Require(SaveHistory(actKey, CONFIG_FILTERHISTORYW_REG, Configuration.FilterHistory,
+                             FILTER_HISTORY_SIZE, !Configuration.SaveHistory) != FALSE);
 
                 // Retire the unsuffixed ACP keys now that the wide ones have been written.
                 //
@@ -2359,19 +2398,19 @@ void CMainWindow::SaveConfig(HWND parent)
 
                 if (CreateKey(actKey, CONFIG_COPYMOVEOPTIONS_REG, actSubKey))
                 {
-                    CopyMoveOptions.Save(actSubKey);
+                    writes.Require(CopyMoveOptions.Save(actSubKey) != FALSE);
                     CloseKey(actSubKey);
                 }
 
                 if (CreateKey(actKey, CONFIG_FINDOPTIONS_REG, actSubKey))
                 {
-                    FindOptions.Save(actSubKey);
+                    writes.Require(FindOptions.Save(actSubKey) != FALSE);
                     CloseKey(actSubKey);
                 }
 
                 if (CreateKey(actKey, CONFIG_FINDIGNORE_REG, actSubKey))
                 {
-                    FindIgnore.Save(actSubKey);
+                    writes.Require(FindIgnore.Save(actSubKey) != FALSE);
                     CloseKey(actSubKey);
                 }
 
@@ -2416,7 +2455,7 @@ void CMainWindow::SaveConfig(HWND parent)
                          Configuration.HexModeMasks.GetMasksString(), -1);
                 SetValueW(actKey, VIEWER_CONFIGUSECUSTOMFONT_REG_W, REG_DWORD,
                          &UseCustomViewerFont, sizeof(DWORD));
-                SaveLogFont(actKey, VIEWER_CONFIGFONT_REG, &ViewerLogFont);
+                writes.Require(SaveLogFont(actKey, VIEWER_CONFIGFONT_REG, &ViewerLogFont) != FALSE);
                 SetValueW(actKey, VIEWER_WRAPTEXT_REG_W, REG_DWORD,
                          &Configuration.WrapText, sizeof(DWORD));
                 SetValueW(actKey, VIEWER_CPAUTOSELECT_REG_W, REG_DWORD,
@@ -2499,12 +2538,12 @@ void CMainWindow::SaveConfig(HWND parent)
 
             //---  viewers
 
-            SaveViewers(salamander, SALAMANDER_VIEWERS_REG, ViewerMasks);
-            SaveViewers(salamander, SALAMANDER_ALTVIEWERS_REG, AltViewerMasks);
+            writes.Require(SaveViewers(salamander, SALAMANDER_VIEWERS_REG, ViewerMasks) != FALSE);
+            writes.Require(SaveViewers(salamander, SALAMANDER_ALTVIEWERS_REG, AltViewerMasks) != FALSE);
 
             //---  editors
 
-            SaveEditors(salamander, SALAMANDER_EDITORS_REG, EditorMasks);
+            writes.Require(SaveEditors(salamander, SALAMANDER_EDITORS_REG, EditorMasks) != FALSE);
 
             if (GlobalSaveWaitWindow == NULL)
                 analysing.SetProgressPos(++savingProgress); // 7
@@ -2520,7 +2559,7 @@ void CMainWindow::SaveConfig(HWND parent)
                 for (i = 0; i < NUMBER_OF_CUSTOMCOLORS; i++)
                 {
                     _itow_s(i + 1, buff, _countof(buff), 10);
-                    SaveRGB(actKey, buff, CustomColors[i]);
+                    writes.Require(SaveRGB(actKey, buff, CustomColors[i]) != FALSE);
                 }
 
                 CloseKey(actKey);
@@ -2539,52 +2578,52 @@ void CMainWindow::SaveConfig(HWND parent)
                     scheme = 3;
                 SetValueW(actKey, SALAMANDER_CLRSCHEME_REG_W, REG_DWORD, &scheme, sizeof(DWORD));
 
-                SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_ACTIVE_NORMAL_REG, UserColors[FOCUS_ACTIVE_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_ACTIVE_SELECTED_REG, UserColors[FOCUS_ACTIVE_SELECTED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_INACTIVE_NORMAL_REG, UserColors[FOCUS_FG_INACTIVE_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_INACTIVE_SELECTED_REG, UserColors[FOCUS_FG_INACTIVE_SELECTED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_BK_INACTIVE_NORMAL_REG, UserColors[FOCUS_BK_INACTIVE_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_BK_INACTIVE_SELECTED_REG, UserColors[FOCUS_BK_INACTIVE_SELECTED]);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_ACTIVE_NORMAL_REG, UserColors[FOCUS_ACTIVE_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_ACTIVE_SELECTED_REG, UserColors[FOCUS_ACTIVE_SELECTED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_INACTIVE_NORMAL_REG, UserColors[FOCUS_FG_INACTIVE_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_INACTIVE_SELECTED_REG, UserColors[FOCUS_FG_INACTIVE_SELECTED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_BK_INACTIVE_NORMAL_REG, UserColors[FOCUS_BK_INACTIVE_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_BK_INACTIVE_SELECTED_REG, UserColors[FOCUS_BK_INACTIVE_SELECTED]) != FALSE);
 
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_NORMAL_REG, UserColors[ITEM_FG_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_SELECTED_REG, UserColors[ITEM_FG_SELECTED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_FOCUSED_REG, UserColors[ITEM_FG_FOCUSED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_FOCSEL_REG, UserColors[ITEM_FG_FOCSEL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_HIGHLIGHT_REG, UserColors[ITEM_FG_HIGHLIGHT]);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_NORMAL_REG, UserColors[ITEM_FG_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_SELECTED_REG, UserColors[ITEM_FG_SELECTED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_FOCUSED_REG, UserColors[ITEM_FG_FOCUSED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_FOCSEL_REG, UserColors[ITEM_FG_FOCSEL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_FG_HIGHLIGHT_REG, UserColors[ITEM_FG_HIGHLIGHT]) != FALSE);
 
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_NORMAL_REG, UserColors[ITEM_BK_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_SELECTED_REG, UserColors[ITEM_BK_SELECTED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_FOCUSED_REG, UserColors[ITEM_BK_FOCUSED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_FOCSEL_REG, UserColors[ITEM_BK_FOCSEL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_HIGHLIGHT_REG, UserColors[ITEM_BK_HIGHLIGHT]);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_NORMAL_REG, UserColors[ITEM_BK_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_SELECTED_REG, UserColors[ITEM_BK_SELECTED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_FOCUSED_REG, UserColors[ITEM_BK_FOCUSED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_FOCSEL_REG, UserColors[ITEM_BK_FOCSEL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ITEM_BK_HIGHLIGHT_REG, UserColors[ITEM_BK_HIGHLIGHT]) != FALSE);
 
-                SaveRGBF(actKey, SALAMANDER_CLR_ICON_BLEND_SELECTED_REG, UserColors[ICON_BLEND_SELECTED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ICON_BLEND_FOCUSED_REG, UserColors[ICON_BLEND_FOCUSED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ICON_BLEND_FOCSEL_REG, UserColors[ICON_BLEND_FOCSEL]);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ICON_BLEND_SELECTED_REG, UserColors[ICON_BLEND_SELECTED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ICON_BLEND_FOCUSED_REG, UserColors[ICON_BLEND_FOCUSED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ICON_BLEND_FOCSEL_REG, UserColors[ICON_BLEND_FOCSEL]) != FALSE);
 
-                SaveRGBF(actKey, SALAMANDER_CLR_PROGRESS_FG_NORMAL_REG, UserColors[PROGRESS_FG_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_PROGRESS_FG_SELECTED_REG, UserColors[PROGRESS_FG_SELECTED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_PROGRESS_BK_NORMAL_REG, UserColors[PROGRESS_BK_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_PROGRESS_BK_SELECTED_REG, UserColors[PROGRESS_BK_SELECTED]);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_PROGRESS_FG_NORMAL_REG, UserColors[PROGRESS_FG_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_PROGRESS_FG_SELECTED_REG, UserColors[PROGRESS_FG_SELECTED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_PROGRESS_BK_NORMAL_REG, UserColors[PROGRESS_BK_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_PROGRESS_BK_SELECTED_REG, UserColors[PROGRESS_BK_SELECTED]) != FALSE);
 
-                SaveRGBF(actKey, SALAMANDER_CLR_HOT_PANEL_REG, UserColors[HOT_PANEL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_HOT_ACTIVE_REG, UserColors[HOT_ACTIVE]);
-                SaveRGBF(actKey, SALAMANDER_CLR_HOT_INACTIVE_REG, UserColors[HOT_INACTIVE]);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_HOT_PANEL_REG, UserColors[HOT_PANEL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_HOT_ACTIVE_REG, UserColors[HOT_ACTIVE]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_HOT_INACTIVE_REG, UserColors[HOT_INACTIVE]) != FALSE);
 
-                SaveRGBF(actKey, SALAMANDER_CLR_ACTIVE_CAPTION_FG_REG, UserColors[ACTIVE_CAPTION_FG]);
-                SaveRGBF(actKey, SALAMANDER_CLR_ACTIVE_CAPTION_BK_REG, UserColors[ACTIVE_CAPTION_BK]);
-                SaveRGBF(actKey, SALAMANDER_CLR_INACTIVE_CAPTION_FG_REG, UserColors[INACTIVE_CAPTION_FG]);
-                SaveRGBF(actKey, SALAMANDER_CLR_INACTIVE_CAPTION_BK_REG, UserColors[INACTIVE_CAPTION_BK]);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ACTIVE_CAPTION_FG_REG, UserColors[ACTIVE_CAPTION_FG]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_ACTIVE_CAPTION_BK_REG, UserColors[ACTIVE_CAPTION_BK]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_INACTIVE_CAPTION_FG_REG, UserColors[INACTIVE_CAPTION_FG]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_INACTIVE_CAPTION_BK_REG, UserColors[INACTIVE_CAPTION_BK]) != FALSE);
 
-                SaveRGBF(actKey, SALAMANDER_CLR_THUMBNAIL_FRAME_NORMAL_REG, UserColors[THUMBNAIL_FRAME_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_THUMBNAIL_FRAME_SELECTED_REG, UserColors[THUMBNAIL_FRAME_SELECTED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_THUMBNAIL_FRAME_FOCUSED_REG, UserColors[THUMBNAIL_FRAME_FOCUSED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_THUMBNAIL_FRAME_FOCSEL_REG, UserColors[THUMBNAIL_FRAME_FOCSEL]);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_THUMBNAIL_FRAME_NORMAL_REG, UserColors[THUMBNAIL_FRAME_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_THUMBNAIL_FRAME_SELECTED_REG, UserColors[THUMBNAIL_FRAME_SELECTED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_THUMBNAIL_FRAME_FOCUSED_REG, UserColors[THUMBNAIL_FRAME_FOCUSED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_THUMBNAIL_FRAME_FOCSEL_REG, UserColors[THUMBNAIL_FRAME_FOCSEL]) != FALSE);
 
-                SaveRGBF(actKey, SALAMANDER_CLR_VIEWER_FG_NORMAL_REG, ViewerColors[VIEWER_FG_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_VIEWER_BK_NORMAL_REG, ViewerColors[VIEWER_BK_NORMAL]);
-                SaveRGBF(actKey, SALAMANDER_CLR_VIEWER_FG_SELECTED_REG, ViewerColors[VIEWER_FG_SELECTED]);
-                SaveRGBF(actKey, SALAMANDER_CLR_VIEWER_BK_SELECTED_REG, ViewerColors[VIEWER_BK_SELECTED]);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_VIEWER_FG_NORMAL_REG, ViewerColors[VIEWER_FG_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_VIEWER_BK_NORMAL_REG, ViewerColors[VIEWER_BK_NORMAL]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_VIEWER_FG_SELECTED_REG, ViewerColors[VIEWER_FG_SELECTED]) != FALSE);
+                writes.Require(SaveRGBF(actKey, SALAMANDER_CLR_VIEWER_BK_SELECTED_REG, ViewerColors[VIEWER_BK_SELECTED]) != FALSE);
 
                 // save colors for file highlighting
                 HKEY hHltKey;
@@ -2604,17 +2643,17 @@ void CMainWindow::SaveConfig(HWND parent)
                             SetValue(hSubKey, SALAMANDER_HLT_ITEM_ATTR, REG_DWORD, &item->Attr, sizeof(DWORD));
                             SetValue(hSubKey, SALAMANDER_HLT_ITEM_VALIDATTR, REG_DWORD, &item->ValidAttr, sizeof(DWORD));
 
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_NORMAL_REG, item->NormalFg);
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_SELECTED_REG, item->SelectedFg);
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_FOCUSED_REG, item->FocusedFg);
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_FOCSEL_REG, item->FocSelFg);
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_HIGHLIGHT_REG, item->HighlightFg);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_NORMAL_REG, item->NormalFg) != FALSE);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_SELECTED_REG, item->SelectedFg) != FALSE);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_FOCUSED_REG, item->FocusedFg) != FALSE);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_FOCSEL_REG, item->FocSelFg) != FALSE);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_HIGHLIGHT_REG, item->HighlightFg) != FALSE);
 
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_NORMAL_REG, item->NormalBk);
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_SELECTED_REG, item->SelectedBk);
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_FOCUSED_REG, item->FocusedBk);
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_FOCSEL_REG, item->FocSelBk);
-                            SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_HIGHLIGHT_REG, item->HighlightBk);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_NORMAL_REG, item->NormalBk) != FALSE);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_SELECTED_REG, item->SelectedBk) != FALSE);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_FOCUSED_REG, item->FocusedBk) != FALSE);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_FOCSEL_REG, item->FocSelBk) != FALSE);
+                            writes.Require(SaveRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_HIGHLIGHT_REG, item->HighlightBk) != FALSE);
                             CloseKey(hSubKey);
                         }
                     }
@@ -2629,12 +2668,14 @@ void CMainWindow::SaveConfig(HWND parent)
                 GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 8
             //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
-            if (deleteSALAMANDER_SAVE_IN_PROGRESS)
+            if (deleteSALAMANDER_SAVE_IN_PROGRESS && writes.Succeeded())
             {
-                DeleteValue(salamander, SALAMANDER_SAVE_IN_PROGRESS);
-                IsSetSALAMANDER_SAVE_IN_PROGRESS = FALSE;
+                if (DeleteValue(salamander, SALAMANDER_SAVE_IN_PROGRESS))
+                    IsSetSALAMANDER_SAVE_IN_PROGRESS = FALSE;
             }
         }
+        if (cfgIsOK && deleteSALAMANDER_SAVE_IN_PROGRESS)
+            retryOwnRoot = writes.Succeeded() ? L"" : SALAMANDER_ROOT_REG;
         CloseKey(salamander);
     }
 
@@ -2647,6 +2688,11 @@ void CMainWindow::SaveConfig(HWND parent)
         DestroyWindow(analysing.HWindow);
         SetCursor(hOldCursor);
     }
+    if (error != NULL)
+        *error = writes.ErrorCode();
+    else if (!writes.Succeeded())
+        gPrompter->ShowError(parent, LoadStrW(IDS_ERRORSAVECONFIG), GetErrorTextOwned(writes.ErrorCode()).c_str());
+    return writes.Succeeded();
 }
 
 void CMainWindow::LoadPanelConfig(std::wstring& panelPath, CFilesWindow* panel, HKEY hSalamander, const wchar_t* reg)
@@ -2806,6 +2852,59 @@ static void ApplyStartupThemeToMainWindow(HWND hWindow)
     DarkMode_ApplyToThreadTopLevelWindows(GetCurrentThreadId());
 }
 
+void CHighlightMasks::LoadFromRegistry(HKEY key)
+{
+    DestroyMembers();
+    wchar_t name[30];
+    int index = 1;
+    _itow_s(index, name, _countof(name), 10);
+    HKEY row;
+    while (OpenKey(key, name, row))
+    {
+        CHighlightMasksItem* item = NULL;
+        std::wstring masks;
+        if (GetStringValueW(row, SALAMANDER_HLT_ITEM_MASKS, masks))
+        {
+            item = new CHighlightMasksItem();
+            if (item != NULL)
+            {
+                int errorPos = 0;
+                if (!item->Set(masks.c_str()) || !item->Masks->PrepareMasks(errorPos))
+                {
+                    delete item;
+                    item = NULL;
+                }
+            }
+        }
+        if (item != NULL)
+        {
+            GetValue(row, SALAMANDER_HLT_ITEM_ATTR, REG_DWORD, &item->Attr, sizeof(DWORD));
+            GetValue(row, SALAMANDER_HLT_ITEM_VALIDATTR, REG_DWORD, &item->ValidAttr, sizeof(DWORD));
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_FG_NORMAL_REG, item->NormalFg);
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_FG_SELECTED_REG, item->SelectedFg);
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_FG_FOCUSED_REG, item->FocusedFg);
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_FG_FOCSEL_REG, item->FocSelFg);
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_FG_HIGHLIGHT_REG, item->HighlightFg);
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_BK_NORMAL_REG, item->NormalBk);
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_BK_SELECTED_REG, item->SelectedBk);
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_BK_FOCUSED_REG, item->FocusedBk);
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_BK_FOCSEL_REG, item->FocSelBk);
+            LoadRGBF(row, SALAMANDER_HLT_ITEM_BK_HIGHLIGHT_REG, item->HighlightBk);
+        }
+        CloseKey(row);
+        _itow_s(++index, name, _countof(name), 10);
+        if (item != NULL)
+        {
+            Add(item);
+            if (!IsGood())
+            {
+                ResetState();
+                delete item;
+            }
+        }
+    }
+}
+
 BOOL CMainWindow::LoadConfig(
     BOOL importingOldConfig,
     const sally::cmdline::CommandLineRequest* cmdLineParams)
@@ -2934,51 +3033,7 @@ BOOL CMainWindow::LoadConfig(
             HKEY hHltKey;
             if (OpenKey(actKey, SALAMANDER_HLT, hHltKey))
             {
-                HKEY hSubKey;
-                wchar_t buf[30];
-                wcscpy_s(buf, L"1");
-                int i = 1;
-                HighlightMasks->DestroyMembers();
-                while (OpenKey(hHltKey, buf, hSubKey))
-                {
-                    std::wstring masks;
-                    if (GetStringValueW(hSubKey, SALAMANDER_HLT_ITEM_MASKS, masks))
-                    {
-                        CHighlightMasksItem* item = new CHighlightMasksItem();
-                        if (item == NULL || !item->Set(masks.c_str()))
-                        {
-                            TRACE_E(LOW_MEMORY);
-                            if (item != NULL)
-                                delete item;
-                            continue;
-                        }
-                        int errPos;
-                        item->Masks->PrepareMasks(errPos);
-
-                        GetValue(hSubKey, SALAMANDER_HLT_ITEM_ATTR, REG_DWORD, &item->Attr, sizeof(DWORD));
-                        GetValue(hSubKey, SALAMANDER_HLT_ITEM_VALIDATTR, REG_DWORD, &item->ValidAttr, sizeof(DWORD));
-
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_NORMAL_REG, item->NormalFg);
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_SELECTED_REG, item->SelectedFg);
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_FOCUSED_REG, item->FocusedFg);
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_FOCSEL_REG, item->FocSelFg);
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_FG_HIGHLIGHT_REG, item->HighlightFg);
-
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_NORMAL_REG, item->NormalBk);
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_SELECTED_REG, item->SelectedBk);
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_FOCUSED_REG, item->FocusedBk);
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_FOCSEL_REG, item->FocSelBk);
-                        LoadRGBF(hSubKey, SALAMANDER_HLT_ITEM_BK_HIGHLIGHT_REG, item->HighlightBk);
-                        HighlightMasks->Add(item);
-                        if (!HighlightMasks->IsGood())
-                        {
-                            HighlightMasks->ResetState();
-                            delete item;
-                        }
-                        _itow_s(++i, buf, _countof(buf), 10);
-                        CloseKey(hSubKey);
-                    }
-                }
+                HighlightMasks->LoadFromRegistry(hHltKey);
                 if (Configuration.ConfigVersion < 16) // add highlighting for encrypted files/directories
                 {
                     CHighlightMasksItem* hItem = new CHighlightMasksItem();
@@ -3057,13 +3112,10 @@ BOOL CMainWindow::LoadConfig(
                 }
                 useWinPlacement = TRUE;
             }
-            else
-                ret = FALSE;
-
             CloseKey(actKey);
         }
-        else
-            ret = FALSE;
+        // Placement is optional. The remaining configuration is still valid;
+        // reporting failure would replay startup's default visibility toggles.
 
         if (OpenKey(salamander, FINDDIALOG_WINDOW_REG, actKey))
         {
@@ -3151,7 +3203,8 @@ BOOL CMainWindow::LoadConfig(
 
         if (OpenKey(salamander, SALAMANDER_PWDMNGR_REG, actKey))
         {
-            PasswordManager.Load(actKey);
+            if (!PasswordManager.Load(actKey))
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_MASTERPASSWORD_STORE_DAMAGED));
             CloseKey(actKey);
         }
 
@@ -4329,6 +4382,12 @@ BOOL CMainWindow::LoadConfig(
             ApplyStartupThemeToMainWindow(HWindow);
             themeFinalized = TRUE;
             SetWindowPlacement(HWindow, &place);
+        }
+        else
+        {
+            ApplyStartupThemeToMainWindow(HWindow);
+            themeFinalized = TRUE;
+            ShowWindow(HWindow, CmdShow);
         }
         LeftPanel->SetupListBoxScrollBars();
         RightPanel->SetupListBoxScrollBars();

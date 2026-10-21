@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/IThreadStartup.h"
 
 #pragma warning(push)
 #pragma warning(disable : 4091) // disable typedef warning without variable declaration
@@ -241,10 +242,23 @@ HANDLE HMinidumpThread = NULL;
 
 BOOL StartMinidumpThread(CMinidumpParams* params)
 {
+    params->Result = FALSE;
+    params->ErrorMessage.clear();
     if (HMinidumpThread != NULL)
+    {
+        params->ErrorMessage = FormatThreadStartupErrorW(ERROR_BUSY);
         return FALSE;
+    }
     DWORD id;
-    HMinidumpThread = CreateThread(NULL, 0, MinidumpThreadF, params, 0, &id);
+    const StartupHandleResult started = gThreadStartup->StartThread(MinidumpThreadF, params, &id);
+    HMinidumpThread = started.Handle;
+    if (HMinidumpThread == NULL)
+    {
+        // No dump worker exists to release the crashed parent process.
+        if (SalmonSharedMemory != NULL && SalmonSharedMemory->Done != NULL)
+            SetEvent(SalmonSharedMemory->Done);
+        params->ErrorMessage = FormatThreadStartupErrorW(started.Error);
+    }
     return HMinidumpThread != NULL;
 }
 

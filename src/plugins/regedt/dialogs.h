@@ -120,12 +120,6 @@ public:
     virtual void Transfer(CTransferInfoEx& ti);
 };
 
-enum CValDlgType
-{
-    vdtNewValDialog,
-    vdtEditValDialog
-};
-
 class CNewValDialog : public CNewKeyDialog
 {
 protected:
@@ -192,6 +186,7 @@ public:
         DefaultValue = defaultValue;
         Allocated = Size;
         Edit = FALSE;
+        DlgType = vdtRawEditValDialog;
     }
 
     BOOL ExportToTempFile();

@@ -69,13 +69,26 @@ std::wstring GetInfo(const FILETIME* lastWrite, CQuadWord size)
 
 BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName, HWND parent)
 {
-    while (!WriteFile(hFile, lpBuffer, nBytesToWrite, pnBytesWritten, NULL))
+    *pnBytesWritten = 0;
+    while (*pnBytesWritten < nBytesToWrite)
     {
-        int lastErr = GetLastError();
+        DWORD written = 0;
+        const DWORD remaining = nBytesToWrite - *pnBytesWritten;
+        const BOOL success = WriteFile(hFile, static_cast<BYTE*>(lpBuffer) + *pnBytesWritten,
+                                       remaining, &written, NULL);
+        if (success && written != 0 && written <= remaining)
+        {
+            *pnBytesWritten += written;
+            continue;
+        }
+        const DWORD lastErr = success ? ERROR_WRITE_FAULT : GetLastError();
         const std::wstring error = SPLGetErrorTextOwned(SalamanderGeneral, lastErr);
         if (SalamanderGeneral->DialogError(parent == NULL ? SalamanderGeneral->GetMsgBoxParent() : parent, BUTTONS_RETRYCANCEL,
                                            fileName, error.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_WRITEERROR).c_str()) != DIALOG_RETRY)
+        {
+            SetLastError(lastErr);
             return FALSE;
+        }
     }
     return TRUE;
 }
@@ -90,6 +103,7 @@ CCHMFile::CCHMFile()
     CALL_STACK_MESSAGE1("CCHMFile::CCHMFile()");
 
     CHM = NULL;
+    ChmLibrary = NULL;
 
     ChmOpen = NULL;
     ChmClose = NULL;
@@ -108,57 +122,64 @@ CCHMFile::~CCHMFile()
 BOOL CCHMFile::Open(const wchar_t* fileName, BOOL quiet /* = FALSE*/)
 {
     CALL_STACK_MESSAGE3("CCHMFile::Open(%ls, %d)", fileName, quiet);
-
+    Close();
     std::wstring dllPath;
     if (!SPLGetModuleFileNameOwned(DLLInstance, dllPath) ||
         !SPLCutDirectoryOwned(SalamanderGeneral, dllPath))
-        return FALSE;
+        return Error(fileName, GetLastError(), quiet);
     SPLSalPathAppendOwned(dllPath, L"chmlib.dll");
+    ChmLibrary = LoadLibraryW(dllPath.c_str());
+    if (ChmLibrary == NULL)
+        return Error(dllPath.c_str(), GetLastError(), quiet);
 
-    HMODULE hDLL = LoadLibraryW(dllPath.c_str());
-    if (hDLL != NULL)
+    SalamanderDebug->AddModuleWithPossibleMemoryLeaks(dllPath.c_str());
+    ChmOpen = (CHM_OPEN_PROC)GetProcAddress(ChmLibrary, "chm_open_w");
+    ChmClose = (CHM_CLOSE_PROC)GetProcAddress(ChmLibrary, "chm_close");
+    ChmEnumerate = (CHM_ENUMERATE_PROC)GetProcAddress(ChmLibrary, "chm_enumerate");
+    ChmRetrieveObject = (CHM_RETRIEVE_OBJECT_PROC)GetProcAddress(ChmLibrary, "chm_retrieve_object");
+    if (ChmOpen == NULL || ChmClose == NULL || ChmEnumerate == NULL || ChmRetrieveObject == NULL)
     {
-        SalamanderDebug->AddModuleWithPossibleMemoryLeaks(dllPath.c_str());
-        ChmOpen = (CHM_OPEN_PROC)GetProcAddress(hDLL, "chm_open_w");
-        ChmClose = (CHM_CLOSE_PROC)GetProcAddress(hDLL, "chm_close");
-        ChmEnumerate = (CHM_ENUMERATE_PROC)GetProcAddress(hDLL, "chm_enumerate");
-        ChmRetrieveObject = (CHM_RETRIEVE_OBJECT_PROC)GetProcAddress(hDLL, "chm_retrieve_object");
+        Close();
+        return Error(dllPath.c_str(), ERROR_PROC_NOT_FOUND, quiet);
+    }
 
-        // get filetime (must go before chm_open)
-        HANDLE hCHM = CreateFileW(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hCHM != INVALID_HANDLE_VALUE)
-        {
-            GetFileTime(hCHM, NULL, NULL, &FileTime);
-            CloseHandle(hCHM);
-        }
-        else
-        {
-            // can not obtain last write, use current time
-            SYSTEMTIME st;
-            GetLocalTime(&st);
-            SystemTimeToFileTime(&st, &FileTime);
-        }
-
-        CHM = ChmOpen(fileName);
-        if (CHM == NULL)
-            return Error(IDS_CANT_OPEN_FILE, quiet);
-        else
-        {
-            FileName = fileName;
-            return TRUE;
-        }
+    // Get last write before opening the archive through chmlib.
+    HANDLE hCHM = CreateFileW(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hCHM != INVALID_HANDLE_VALUE)
+    {
+        GetFileTime(hCHM, NULL, NULL, &FileTime);
+        CloseHandle(hCHM);
     }
     else
-        return FALSE;
+        GetSystemTimeAsFileTime(&FileTime);
+    CHM = ChmOpen(fileName);
+    if (CHM == NULL)
+    {
+        Close();
+        return Error(IDS_CANT_OPEN_FILE, quiet);
+    }
+    FileName = fileName;
+    return TRUE;
 }
 
 BOOL CCHMFile::Close()
 {
-    CALL_STACK_MESSAGE1("CCHMFile::Close(, , ,)");
-
+    CALL_STACK_MESSAGE1("CCHMFile::Close()");
     if (CHM != NULL)
+    {
         ChmClose(CHM);
-
+        CHM = NULL;
+    }
+    ChmOpen = NULL;
+    ChmClose = NULL;
+    ChmEnumerate = NULL;
+    ChmRetrieveObject = NULL;
+    if (ChmLibrary != NULL)
+    {
+        FreeLibrary(ChmLibrary);
+        ChmLibrary = NULL;
+    }
+    FileName.clear();
     return TRUE;
 }
 
@@ -200,7 +221,7 @@ BOOL CCHMFile::AddFileDir(struct chmUnitInfo* ui, CSalamanderDirectoryAbstract* 
     std::wstring fileNameW;
     std::wstring pathW;
     if (!DecodeChmPathUtf8(fileName, fileNameW) || !DecodeChmPathUtf8(path, pathW))
-        return Error(IDS_ERROR);
+        return Error(FileName.c_str(), ERROR_NO_UNICODE_TRANSLATION);
     fd.Name = SalamanderGeneral->DupStr(fileNameW.c_str());
     if (fd.Name == NULL)
     {
@@ -241,8 +262,8 @@ BOOL CCHMFile::AddFileDir(struct chmUnitInfo* ui, CSalamanderDirectoryAbstract* 
     if (dir && !dir->AddFile(pathW.c_str(), fd, pluginData))
     {
         free(fd.Name);
-        dir->Clear(pluginData);
-        return Error(IDS_ERROR);
+        delete data;
+        return Error(FileName.c_str(), ERROR_NOT_ENOUGH_MEMORY);
     }
 
     return TRUE;
@@ -253,6 +274,7 @@ struct SEnumObjHelper
     CCHMFile* File;
     CSalamanderDirectoryAbstract* Dir;
     CPluginDataInterfaceAbstract*& PluginData;
+    BOOL Failed = FALSE;
 
     SEnumObjHelper(CCHMFile* file, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData) : PluginData(pluginData)
     {
@@ -269,19 +291,25 @@ int ChmEnumObjectsCallBack(struct chmFile* CHM, struct chmUnitInfo* ui, void* co
         return CHM_ENUMERATOR_CONTINUE;
     }
     else
+    {
+        helper->Failed = TRUE;
         return CHM_ENUMERATOR_FAILURE;
+    }
 }
 
 BOOL CCHMFile::EnumObjects(CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
     CALL_STACK_MESSAGE1("CCHMFile::EnumObjects( , ,)");
 
-    SEnumObjHelper* helper = new SEnumObjHelper(this, dir, pluginData);
-    ChmEnumerate(CHM, CHM_ENUMERATE_NORMAL, ChmEnumObjectsCallBack, (void*)helper);
-    // for DEBUG purposes
-    //  ChmEnumerate(CHM, CHM_ENUMERATE_ALL, ChmEnumObjectsCallBack, (void *) helper);
-    delete helper;
-
+    SEnumObjHelper helper(this, dir, pluginData);
+    if (!ChmEnumerate(CHM, CHM_ENUMERATE_NORMAL, ChmEnumObjectsCallBack, &helper))
+    {
+        if (dir != NULL)
+            dir->Clear(pluginData);
+        if (!helper.Failed)
+            Error(FileName.c_str(), ERROR_INVALID_DATA);
+        return FALSE;
+    }
     return TRUE;
 }
 
@@ -307,9 +335,6 @@ int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const 
                                                      SalamanderGeneral->GetMainWindowHWND(), nameInArc.c_str(), fileInfo.c_str(),
                                                      &silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
 
-    // set file time
-    SetFileTime(file, &ft, &ft, &ft);
-
     // the overall operation can continue; skip only
     if (toSkip)
         return UNPACK_ERROR;
@@ -318,6 +343,7 @@ int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const 
     if (file == INVALID_HANDLE_VALUE)
         return UNPACK_CANCEL;
 
+    SetFileTime(file, &ft, &ft, &ft);
     BOOL whole = TRUE;
 
     BOOL ret = UNPACK_OK;
@@ -338,7 +364,12 @@ int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const 
         if (len > 0)
         {
             ULONG written;
-            SafeWriteFile(file, buffer, (DWORD)len, &written, name.c_str(), SalamanderGeneral->GetMainWindowHWND());
+            if (!SafeWriteFile(file, buffer, (DWORD)len, &written, name.c_str(), SalamanderGeneral->GetMainWindowHWND()))
+            {
+                ret = UNPACK_CANCEL;
+                whole = FALSE;
+                break;
+            }
             offset += len;
             remain.Value -= len;
         }

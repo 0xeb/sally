@@ -82,6 +82,7 @@ protected:
     int DragAnchorIndex;
     HFONT HNormalFont;
     HFONT HBoldFont;
+    void UpdateFonts(HFONT font);
 
     RECT ButtonRect;
     BOOL ButtonPressed;

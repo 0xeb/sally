@@ -17,6 +17,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/unicode/PanelPathPolicy.h"
+#include "common/PanelCharacterRouting.h"
 
 //*****************************************************************************
 //
@@ -327,8 +328,9 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
         // and is already wide. shortNameW is the true wide filename captured above, closing
         // this function's own TODO for the invalid-shortcut message.
         std::wstring pathW = mountPoint ? junctionOrSymlinkTgt : shortNameW;
+        const std::wstring message = FormatStrW(LoadStrW(mountPoint ? IDS_DIRLINK_MOUNT_POINT : IDS_SHORTCUT_INVALID), pathW.c_str());
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
-            (pathW + L" - " + LoadStrW(mountPoint ? IDS_DIRLINK_MOUNT_POINT : IDS_SHORTCUT_INVALID)).c_str());
+            message.c_str());
     }
     if (wrongPath)
     {
@@ -607,6 +609,8 @@ void CFilesWindow::SetSel(BOOL select, int index, BOOL repaintDirtyItems)
 void CFilesWindow::SetSel(BOOL select, CFileData* data)
 {
     CALL_STACK_MESSAGE_NONE
+    if (select && Dirs->Count > 0 && data == &Dirs->At(0) && wcscmp(data->Name, L"..") == 0)
+        return;
     BYTE sel = select ? 1 : 0;
     if (data->Selected != sel)
     {
@@ -878,21 +882,16 @@ BOOL CFilesWindow::OnChar(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
     // Same widening as the quick-search gate below: wParam is a UTF-16 code unit, so a "< 256"
     // test dropped every non-Latin-1 character instead of forwarding it to the command line.
     // Surrogate halves are forwarded in order and reassembled by the edit control.
-    if (!controlPressed && !altPressed &&
-        !QuickSearchMode &&
-        wParam != L' ' &&
-        (sally::input::SurrogateAssembler::IsUsableInput((wchar_t)wParam) ||
-         IS_HIGH_SURROGATE((wchar_t)wParam) || IS_LOW_SURROGATE((wchar_t)wParam)) &&
-        Configuration.QuickSearchEnterAlt)
+    if (sally::input::ShouldForwardPanelCharacterToCommandLine((wchar_t)wParam, controlPressed != FALSE, altPressed != FALSE,
+                                                            QuickSearchMode != FALSE, Configuration.QuickSearchEnterAlt != FALSE,
+                                                            SystemPolicies.GetNoRun() != 0) &&
+        MainWindow->EditWindow != NULL && MainWindow->EditWindow->IsEnabled())
     {
-        if (MainWindow->EditWindow->IsEnabled())
-        {
-            SendMessage(MainWindow->HWindow, WM_COMMAND, CM_EDITLINE, 0);
-            // we send the character there
-            HWND hEditLine = MainWindow->GetEditLineHWND(TRUE);
-            if (hEditLine != NULL)
-                PostMessage(hEditLine, WM_CHAR, wParam, lParam);
-        }
+        SendMessage(MainWindow->HWindow, WM_COMMAND, CM_EDITLINE, 0);
+        // we send the character there
+        HWND hEditLine = MainWindow->GetEditLineHWND(TRUE);
+        if (hEditLine != NULL)
+            PostMessage(hEditLine, WM_CHAR, wParam, lParam);
         return FALSE;
     }
 
@@ -1017,8 +1016,8 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
     BOOL controlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
     BOOL altPressed = (GetKeyState(VK_MENU) & 0x8000) != 0;
 
-    if (((Configuration.QuickSearchEnterAlt &&
-          altPressed && !controlPressed)) &&
+    if (Configuration.QuickSearchEnterAlt && altPressed && !controlPressed &&
+        (shiftPressed || wParam < '0' || wParam > '9') &&
         wParam > 31 && wParam < 256 &&
         Dirs->Count + Files->Count > 0)
     {
@@ -2049,6 +2048,9 @@ void CFilesWindow::OnSetFocus(BOOL focusVisible)
     }
     MainWindow->CancelPanelsUI(); // cancel QuickSearch and QuickEdit
     FocusVisible = focusVisible;
+    // Shift may have been pressed while another panel owned keyboard focus.
+    if ((GetKeyState(VK_SHIFT) & 0x8000) != 0)
+        SelectItems = Dirs->Count + Files->Count == 0 || !GetSel(GetCaretIndex());
     // change: instead of immediate redrawing, we only invalidate the area;
     // the focus will not be so aggressive when switching to Salamander and will wait
     // until other items are drawn.
@@ -3277,25 +3279,17 @@ void CFilesWindow::SetQuickSearchCaretPos()
             int maxTextWidth = ListBox->ItemWidth - TILE_LEFT_MARGIN - IconSizes[ICONSIZE_48] - TILE_LEFT_MARGIN - 4;
             int widthNeeded = 0;
 
-            wchar_t buff[3 * 512]; // target buffer for strings
-            wchar_t* out0 = buff;
-            int out0Len;
-            wchar_t* out1 = buff + 512;
-            int out1Len;
-            wchar_t* out2 = buff + 1024;
-            int out2Len;
             HDC hDC2 = ItemBitmap.HMemDC;
             HFONT hOldFont2 = (HFONT)SelectObject(hDC2, Font);
-            GetTileTexts(file, isDir, hDC2, maxTextWidth, &widthNeeded,
-                         out0, &out0Len, out1, &out1Len, out2, &out2Len,
-                         ValidFileData, &PluginData, Is(ptDisk));
+            const CTileTexts texts = GetTileTexts(file, isDir, hDC2, maxTextWidth, ValidFileData, &PluginData, Is(ptDisk));
+            widthNeeded = texts.Width;
             SelectObject(hDC2, hOldFont2);
             widthNeeded += 5;
 
             int visibleLines = 1; // the name is definitely visible
-            if (out1[0] != 0)
+            if (!texts.Size.empty())
                 visibleLines++;
-            if (out2[0] != 0)
+            if (!texts.DateTime.empty())
                 visibleLines++;
             int textH = visibleLines * FontCharHeight + 4;
 

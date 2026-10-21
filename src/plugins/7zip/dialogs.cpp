@@ -524,8 +524,8 @@ CExtOptionsDialog::CExtOptionsDialog(HWND hParent)
     Encrypt = FALSE;
 
     Archive.clear();
-    Password[0] = '\0';
-    ConfirmedPassword[0] = '\0';
+    Password.clear();
+    ConfirmedPassword.clear();
 
     NotAgain = FALSE;
 
@@ -535,8 +535,8 @@ CExtOptionsDialog::CExtOptionsDialog(HWND hParent)
 void CExtOptionsDialog::Transfer(CTransferInfo& ti)
 {
     ti.CheckBox(IDC_NA_ENCRYPTFILES, Encrypt);
-    ti.EditLine(IDC_NA_PASSWORD, Password, PASSWORD_LEN);
-    ti.EditLine(IDC_NA_CONFIRMPASSWORD, ConfirmedPassword, PASSWORD_LEN);
+    ti.EditLine(IDC_NA_PASSWORD, Password);
+    ti.EditLine(IDC_NA_CONFIRMPASSWORD, ConfirmedPassword);
 
     ti.CheckBox(IDC_NA_NOTAGAIN, NotAgain);
 
@@ -592,7 +592,7 @@ CExtOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (TransferData(ttDataFromWindow))
                 if (Encrypt)
                 {
-                    if (lstrlenA(Password) <= 0)
+                    if (Password.empty())
                     {
                         SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_EMPTYPASSWORD).c_str(),
                                                          SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERROR).c_str(),
@@ -600,7 +600,7 @@ CExtOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         return TRUE;
                     }
 
-                    if (lstrcmpA(Password, ConfirmedPassword) != 0)
+                    if (Password != ConfirmedPassword)
                     {
                         SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PASSWORDSNOTMATCH).c_str(),
                                                          SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERROR).c_str(),
@@ -622,9 +622,15 @@ CExtOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (TransferData(ttDataFromWindow))
             {
-                Config.ShowExtendedOptions = !GetNotAgain();
-                PluginInterface.Configuration(HWindow);
-                NotAgain = !Config.ShowExtendedOptions;
+                CConfig draft = Config;
+                draft.ShowExtendedOptions = !GetNotAgain();
+                if (EditConfiguration(HWindow, draft))
+                {
+                    NotAgain = !draft.ShowExtendedOptions;
+                    // This flag belongs to the parent pack dialog until its OK.
+                    draft.ShowExtendedOptions = Config.ShowExtendedOptions;
+                    ApplyConfiguration(draft);
+                }
                 TransferData(ttDataToWindow);
             }
         }
@@ -645,13 +651,12 @@ CExtOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CEnterPasswordDialog::CEnterPasswordDialog(HWND hParent)
     : CCommonDialog(HLanguage, IDD_ENTERPASSWORD, hParent)
 {
-    Password[0] = '\0';
-    //  FileName[0] = '\0';
+    Password.clear();
 }
 
 void CEnterPasswordDialog::Transfer(CTransferInfo& ti)
 {
-    ti.EditLine(IDC_PASSWORD, Password, PASSWORD_LEN);
+    ti.EditLine(IDC_PASSWORD, Password);
 }
 
 INT_PTR

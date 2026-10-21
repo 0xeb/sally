@@ -32,9 +32,9 @@ CCompareOptions DefaultCompareOptions =
         {// int PerformASCII8InputEnc[2];
          0,
          0},
-        {// char ASCII8InputEncTableName[2][101];
-         "",
-         ""},
+        {// std::wstring ASCII8InputEncTableName[2];
+         L"",
+         L""},
         TRUE //  BOOL           NormalizationForm;
 };
 
@@ -238,7 +238,11 @@ void CFilecompWorker::GuardedBody()
         // NOTE: IntViewer can open such files, users wants FC to support them as well
         // See also CHexFileViewWindow::SetData()
         // Use CreateFileW with wide path to support Unicode/long path filenames
-        Files[i].File = CreateFileW(Files[i].Name.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        std::wstring ioName;
+        const PathResult prepared = gPathService->PrepareForIo(Files[i].Name.c_str(), ioName);
+        if (!prepared.success)
+            CException::Raise(IDS_OPEN, prepared.errorCode, Files[i].Name.c_str());
+        Files[i].File = CreateFileW(ioName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                     NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (Files[i].File == INVALID_HANDLE_VALUE)
             CException::Raise(IDS_OPEN, GetLastError(), Files[i].Name.c_str());
@@ -253,7 +257,7 @@ void CFilecompWorker::GuardedBody()
         {
             if (Options.ForceText)
                 CException::Raise(IDS_LARGEFILE, 0, Files[i].Name.c_str());
-            Options.ForceBinary;
+            Options.ForceBinary = TRUE;
         }
     }
 

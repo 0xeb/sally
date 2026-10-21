@@ -266,3 +266,14 @@ BOOL FTPConvertHexEscapeSequencesW(std::wstring& text) noexcept;
 // Doubles a '%' that would otherwise read as an escape introducer into "%25". The entire
 // escaping alphabet is ASCII, so this consults no code page and cannot refuse. Transactional.
 BOOL FTPAddHexEscapeSequencesW(std::wstring& text) noexcept;
+
+// Canonical remote paths preserve server bytes independently of the machine code page.
+// Literal Unicode uses the negotiated codec; percent escapes encode individual bytes once.
+// Conversion rejects NUL/CR/LF and changes output only on success.
+BOOL FtpFormatWirePath(const CFtpTextCodec& codec, std::string_view bytes,
+                       BOOL allowEscapes, std::wstring& text) noexcept;
+BOOL FtpParseWirePath(const CFtpTextCodec& codec, std::wstring_view text,
+                      BOOL consumeEscapes, std::string& bytes) noexcept;
+BOOL FtpParseStoredWirePath(const CFtpTextCodec& codec, std::wstring_view text,
+                            BOOL escapedRepresentation, BOOL allowRawEscapes,
+                            std::string& bytes) noexcept;

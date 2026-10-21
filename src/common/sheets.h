@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <cstddef>
+#include <vector>
+
 // ****************************************************************************
 
 class CPropertyDialog;
@@ -23,6 +26,7 @@ public:
     void AddResizeCtrl(int resID);
     // performs arrangement of controls
     void LayoutCtrls();
+    void Scale(int numeratorX, int denominatorX, int numeratorY, int denominatorY);
 
 protected:
     static BOOL CALLBACK FindMoveControls(HWND hChild, LPARAM lParam);
@@ -49,6 +53,8 @@ public:
     using CDialog::HWindow;         // HWindow remains also accessible
     using CDialog::SetObjectOrigin; // access to allowed methods of parent
     using CDialog::Transfer;
+
+    HWND CreateFromTemplate(const DLGTEMPLATE* dialogTemplate) { return CDialog::CreateIndirect(dialogTemplate); }
 
     CPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID,
                    DWORD flags /* = PSP_USETITLE*/, HICON icon,
@@ -170,6 +176,16 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+class CTPHPageViewport : public CWindow
+{
+    CTreePropHolderDlg* Holder;
+    int WheelRemainder = 0;
+public:
+    CTPHPageViewport(HWND parent, int id, CTreePropHolderDlg* holder);
+protected:
+    virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
+};
+
 // dialog that holds treeview, shaded title and current property sheet
 class CTreePropHolderDlg : public CDialog
 {
@@ -178,6 +194,12 @@ protected:
     HWND HTreeView;
     CTPHCaptionWindow* CaptionWindow;
     CTPHGripWindow* GripWindow;
+    HWND PageViewport = NULL;
+    SIZE NaturalPageSize = {};
+    SIZE MaximumPageSize = {};
+    std::vector<SIZE> PageSizes;
+    std::vector<HFONT> ReflowFonts;
+    HWND LastPageFocus = NULL;
     RECT ChildDialogRect;
     int CurrentPageIndex;
     CPropSheetPage* ChildDialog;
@@ -195,6 +217,7 @@ protected:
 
 public:
     CTreePropHolderDlg(HWND hParent, DWORD* windowHeight);
+    ~CTreePropHolderDlg();
 
     int ExecuteIndirect(LPCDLGTEMPLATE hDialogTemplate);
 
@@ -206,8 +229,13 @@ protected:
     int BuildAndMeasureTree();
     void EnableButtons();
     BOOL SelectPage(int pageIndex);
+    void LayoutPageViewport();
+    void ScrollPage(int bar, int command);
+    void EnsurePageFocusVisible();
+    bool ReflowFont(const LOGFONTW& font);
 
     friend class CTreePropDialog;
+    friend class CTPHPageViewport;
 };
 
 // data holder for pages in tree version of PropertyDialog
@@ -242,6 +270,25 @@ public:
                         const WCHAR* buttonHelp);
     virtual int GetCurSel();
     int Add(CPropSheetPage* page, CPropSheetPage* parent = NULL, BOOL* expanded = NULL);
+
+    // Optional customization before USER32 measures any dialog or page. Other
+    // tree property dialogs keep their original resource font and behavior.
+    virtual bool PrepareDialogTemplate(const void* source, std::size_t size, std::vector<BYTE>& output) { return false; }
+    virtual void IndexPageResource(int page, const void* source, std::size_t size) {}
+    virtual void PageCreated(int page) {}
+    void SetApplyButtonEnabled(bool enabled);
+    virtual int NavigationHeaderHeight(HWND window) { return 0; }
+    virtual void LayoutNavigation(const RECT& area) {}
+    virtual bool HandleDialogMessage(UINT message, WPARAM wParam, LPARAM lParam) { return false; }
+    virtual bool PreTranslateMessage(const MSG& message) { return false; }
+    virtual const WCHAR* ApplyButtonCaption() const { return NULL; }
+    virtual bool AfterTransfer(bool save) { return true; }
+    virtual bool ScrollablePages() const { return false; }
+    void RefreshLayout() { Dialog.LayoutControls(); }
+    bool ReflowFont(const LOGFONTW& font) { return Dialog.ReflowFont(font); }
+    bool NavigateToPage(int page, int control = 0);
+    HWND GetDialogWindow() const { return Dialog.HWindow; }
+    void ShowNavigationTree(bool visible) { ShowWindow(Dialog.HTreeView, visible ? SW_SHOW : SW_HIDE); }
 
 protected:
     WORD* lpdwAlign(WORD* lpIn);

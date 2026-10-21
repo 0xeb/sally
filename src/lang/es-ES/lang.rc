@@ -2727,6 +2727,10 @@ STRINGTABLE
  IDS_CANNOTMOVEFILETOITSELF, "Imposible trasladar un fichero a sí mismo."
 
  IDS_CANNOTMOVEDIRTOITSELF, "Imposible trasladar un directorio a sí mismo."
+ IDS_DIRECTORYTARGETINSOURCE, "No se puede copiar ni mover una carpeta a sí misma ni a una de sus subcarpetas."
+ IDS_UNPACKERSELECTIONREQUIRED, "Seleccione un descompresor para continuar. Si la lista está vacía, añada uno en Configuración."
+ IDS_EXECUTE_SHORTNAMEUNAVAILABLE, "No hay una ruta DOS (8.3) disponible para '%s'."
+ IDS_OPERATIONSTARTFAILED, "No se pudo iniciar la operación de archivos.\n\n%s"
 
  IDS_NOTENOUGHSPACE, "No parece haber suficiente espacio en la unidad destino.\n¿Desea continuar?\n\nEspacio necesario: %s bytes.\nEspacio disponible: %s bytes."
 
@@ -3231,6 +3235,7 @@ STRINGTABLE
  IDS_PACKERR_NOOUTPUT, "No hubo resultado del compresor externo, compruebe su configuración."
  IDS_PACKERR_UNABLETOREN, "Imposible cambiar nombre de fichero temporal de archivo (%1) hacia nombre de archivo (%2)."
  IDS_PACKERR_INVALIDNAME, "Este nombre de fichero es incorrecto en sistemas Windows. Los compresores externos no soportan descomprimir hacia otro nombre de fichero, por lo que no es posible descomprimir este fichero."
+ IDS_PACKERR_EXCLUSIONMASK, "Los descompresores externos no admiten máscaras de exclusión ('|'). Elija un descompresor interno o quite las exclusiones."
 
  IDS_PACKRET_GENERAL, "Código de salida %d."
  IDS_PACKRET_WARNING, "Se ha encontrado un aviso."
@@ -3579,6 +3584,9 @@ IDS_OLDPLUGINVERSION2, "El plugin (%s) no está soportado en esta versión de Sa
  IDS_EMAILFILES_SUBJECT, "Enviando correo:"
  IDS_EMAILFILES_BODY, "Sus ficheros han sido incorporados y preparados para ser enviados con este mensaje."
  IDS_EMAILFILES_MAPIERROR, "Imposible enviar correo. No hay programas preparados para enviar correo, MAPI32.DLL no fue encontrado."
+ IDS_EMAILFILES_PATHERROR, "El programa de correo no puede adjuntar este archivo con su nombre actual:\n\n%s"
+ IDS_EMAILFILES_SENDERROR, "No se pudo crear el mensaje de correo.\n\n%s"
+ IDS_EMAILFILES_PROVIDERERROR, "El programa de correo indicó el error %u."
 
  IDS_PLUGINSUFFIX, " (Plugin)"
 
@@ -4135,4 +4143,18 @@ IDS_OLDPLUGINVERSION2, "El plugin (%s) no está soportado en esta versión de Sa
  IDS_UPDATECHECK_STARTUP, "En cada inicio"
  IDS_UPDATER_CANNOT_START, "No se pudo iniciar el actualizador de Sally:\n%s\n\n%s"
  IDS_CFGSEC_MASTERPWD_INFO, "Una contraseña maestra se usa para proteger información confidencial como contraseñas de FTP o WinSCP mediante cifrado AES fuerte. Si genera una contraseña maestra se le pedirá que la escriba una vez por sesión cuando Sally vaya a recoger información protegida."
+ // Configuration navigation
+ IDS_CFG_SEARCH_LABEL, "&Buscar opciones:"
+ IDS_CFG_SEARCH_HINT, "Palabras, ""frases"", AND, OR, NOT"
+ IDS_CFG_SEARCH_INVALID, "Búsqueda no válida. Compruebe comillas y paréntesis."
+ IDS_CFG_SEARCH_EMPTY, "No hay opciones coincidentes."
+ IDS_CFG_SEARCH_CLEAR, "Borrar búsqueda (Esc)"
+ IDS_CFG_SEARCH_OPEN, "Buscar opciones"
+ IDS_CFG_SEARCH_CLOSE, "Cerrar búsqueda"
+ IDS_CFG_SAVE, "&Guardar"
+ IDS_CFG_APPLY, "&Aplicar"
+ IDS_CFG_SAVE_FAILED, "No se pudo guardar la configuración. Los cambios siguen disponibles en esta ventana."
+
+ IDS_MASTERPASSWORD_STORE_DAMAGED, "No se pudo leer la configuración de la contraseña maestra. Sally la conservará y no guardará cambios de configuración. Restaure una copia de seguridad válida antes de cambiar contraseñas."
+
 }

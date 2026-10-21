@@ -840,6 +840,7 @@ ARJProcessFile(int operation, LPDWORD size)
                 break;
 
             expectExtSize = ext_size + origsize;
+            const std::wstring previousVolume = ArcName;
             forceQuestion = FALSE;
 
         PF_NEXTVOL:
@@ -851,6 +852,8 @@ ARJProcessFile(int operation, LPDWORD size)
             {
                 if (!ErrorProc(AE_BADVOL, EF_RETRY))
                     throw 0;
+                // A rejected candidate must not advance the logical volume cursor.
+                ArcName = previousVolume;
                 forceQuestion = TRUE;
                 goto PF_NEXTVOL;
             }

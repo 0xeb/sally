@@ -849,6 +849,8 @@ void CSizeResultsDlg::UpdateEstimate()
         for (i = 0; i < Sizes->Count; i++)
         {
             s = Sizes->At(i);
+            if (s == CQuadWord(0, 0))
+                continue;
             estimated += s - ((s - CQuadWord(1, 0)) % CQuadWord(bytesPerCluster, 0)) +
                          CQuadWord(bytesPerCluster - 1, 0);
         }

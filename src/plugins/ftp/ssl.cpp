@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include <limits>
+#include "ftp_certificate_encoding.h"
 
 // Error codes returned by SSL_get_error()
 #define SSL_ERROR_NONE 0
@@ -657,10 +658,6 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
             char* ssl_version;
             char* cipher_name;
             int ssl_bits;
-            X509* peerCert;
-            STACK_OF(X509) * certStack;
-            BYTE *DERCert, *PKCS7Cert = NULL, *tmp;
-            int DERCertLen, PKCS7CertLen;
             int verRes = SSLLib.SSL_get_verify_result(Conn);
 
             LogSSLResource(logUID, IDS_SSL_LOG_OSSL_CERT_VERIFY, FALSE, verRes);
@@ -668,47 +665,68 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
             const char* str = SSLLib.X509_verify_cert_error_string(verRes);
 #endif
 
-            peerCert = SSLLib.SSL_get_peer_certificate(Conn);
+            auto certificateFailure = [&](DWORD error) -> BOOL
+            {
+                if (errorID != NULL)
+                    *errorID = IDS_SSL_ERR_CONNECT;
+                if (errorText != NULL && !FTPGetErrorText(error, *errorText))
+                    errorText->clear();
+                const std::wstring message = SPLGetErrorTextOwned(SalamanderGeneral, error);
+                LogSSLResource(logUID, IDS_SSL_ERR_CONNECT_LOG, TRUE, error, message.c_str());
+                SSLLib.SSL_shutdown(Conn);
+                SSLLib.SSL_free(Conn);
+                if (sslErrorOccured != NULL)
+                    *sslErrorOccured = SSLCONERR_DONOTRETRY;
+                SetLastError(error);
+                return FALSE;
+            };
+            struct PeerOwner
+            {
+                X509* Value;
+                ~PeerOwner()
+                {
+                    if (Value != NULL)
+                        SSLLib.X509_free(Value);
+                }
+            } peer{SSLLib.SSL_get_peer_certificate(Conn)};
+            FtpEncodedCertificates encoded;
+            const DWORD encodeError = EncodeFtpCertificates(SSLLib, peer.Value, SSLLib.SSL_get_peer_cert_chain(Conn), encoded);
+            if (encodeError != ERROR_SUCCESS)
+                return certificateFailure(encodeError);
+            X509* peerCert = peer.Value;
+            BYTE* DERCert = encoded.Leaf.data();
+            const int DERCertLen = static_cast<int>(encoded.Leaf.size());
+            BYTE* PKCS7Cert = encoded.Chain.empty() ? NULL : encoded.Chain.data();
+            const int PKCS7CertLen = static_cast<int>(encoded.Chain.size());
             std::string subjectBytes;
             std::wstring subject;
-            if (GetOpenSSLNameOneLine(peerCert->cert_info->subject, subjectBytes) &&
+            if (peerCert->cert_info != NULL && GetOpenSSLNameOneLine(peerCert->cert_info->subject, subjectBytes) &&
                 DecodeSSLLibraryText(subjectBytes.c_str(), subject))
                 LogSSLResource(logUID, IDS_SSL_LOG_SUBJECT, FALSE, subject.c_str());
             std::string issuerBytes;
             std::wstring issuer;
-            if (GetOpenSSLNameOneLine(peerCert->cert_info->issuer, issuerBytes) &&
+            if (peerCert->cert_info != NULL && GetOpenSSLNameOneLine(peerCert->cert_info->issuer, issuerBytes) &&
                 DecodeSSLLibraryText(issuerBytes.c_str(), issuer))
                 LogSSLResource(logUID, IDS_SSL_LOG_ISSUER, FALSE, issuer.c_str());
 
-            // Obtain entire certificate chain upto root certificate
-            certStack = SSLLib.SSL_get_peer_cert_chain(Conn);
-            if (certStack)
+            auto makeCertificate = [&](bool verified) -> CCertificate*
             {
-                PKCS7* p7 = SSLLib.PKCS7_new();
-                if (p7)
+                CCertificate* certificate = NULL;
+                try
                 {
-                    PKCS7_SIGNED* p7s = SSLLib.PKCS7_SIGNED_new();
-                    if (p7s)
-                    {
-                        p7->type = SSLLib.OBJ_nid2obj(NID_pkcs7_signed);
-                        p7->d.sign = p7s;
-                        p7s->contents->type = SSLLib.OBJ_nid2obj(NID_pkcs7_data);
-                        SSLLib.ASN1_INTEGER_set(p7s->version, 1);
-                        p7s->cert = certStack;
-                        p7s->crl = SSLLib.sk_new_null();
-                        PKCS7CertLen = SSLLib.i2d_PKCS7(p7, NULL);
-                        tmp = PKCS7Cert = (BYTE*)malloc(PKCS7CertLen);
-                        SSLLib.i2d_PKCS7(p7, &tmp);
-                    }
+                    certificate = new CCertificate(DERCert, DERCertLen, PKCS7Cert, PKCS7CertLen, verified, HostAddress.c_str());
                 }
-                p7->d.sign->cert = NULL; // Avoid freeing it
-                SSLLib.PKCS7_free(p7);
-            }
-
-            DERCertLen = SSLLib.i2d_X509(peerCert, NULL);
-            tmp = DERCert = (BYTE*)malloc(DERCertLen);
-            SSLLib.i2d_X509(peerCert, &tmp);
-            SSLLib.X509_free(peerCert);
+                catch (const std::bad_alloc&)
+                {
+                    return NULL;
+                }
+                if (certificate != NULL && !certificate->IsGood())
+                {
+                    certificate->Release();
+                    return NULL;
+                }
+                return certificate;
+            };
 
             ssl_version = SSLLib.SSL_CIPHER_get_version(SSLLib.SSL_get_current_cipher(Conn));
             ssl_cipher = SSLLib.SSL_get_current_cipher(Conn);
@@ -737,7 +755,8 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
                 if (CheckCertificate(DERCert, DERCertLen, certificateError, HostAddress.c_str()))
                 {
                     Logs.LogMessage(logUID, LangStr(IDS_SSL_LOG_CERTVERIFIED).c_str(), -1, TRUE);
-                    pCertificate = new CCertificate(DERCert, DERCertLen, PKCS7Cert, PKCS7CertLen, true, HostAddress.c_str());
+                    pCertificate = makeCertificate(true);
+                    if (pCertificate == NULL) return certificateFailure(ERROR_NOT_ENOUGH_MEMORY);
                     certAcceptedOrVerified = TRUE; // Passed
                 }
                 else
@@ -753,22 +772,19 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
                 // The certificate was not verified nor previously accepted by user, so user should accept
                 // it before further using of this socket.
                 if (unverifiedCert != NULL)
-                    *unverifiedCert = new CCertificate(DERCert, DERCertLen, PKCS7Cert, PKCS7CertLen, false, HostAddress.c_str());
+                {
+                    *unverifiedCert = makeCertificate(false);
+                    if (*unverifiedCert == NULL) return certificateFailure(ERROR_NOT_ENOUGH_MEMORY);
+                }
                 else
                 {
                     SSLLib.SSL_shutdown(Conn);
                     SSLLib.SSL_free(Conn);
-                    if (PKCS7Cert)
-                        free(PKCS7Cert);
-                    free(DERCert);
                     if (sslErrorOccured != NULL)
                         *sslErrorOccured = SSLCONERR_UNVERIFIEDCERT; // The certificate was not verified nor previously accepted by user.
                     return FALSE;
                 }
             }
-            if (PKCS7Cert)
-                free(PKCS7Cert);
-            free(DERCert);
             WSAAsyncSelect(Socket, hWnd, Msg, FD_READ | FD_CLOSE | FD_WRITE);
             SSLConn = Conn;
             if (sslErrorOccured != NULL)
@@ -1036,29 +1052,33 @@ INT_PTR CCertificateErrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lPara
 CCertificate::CCertificate(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen, bool bValid, const wchar_t* host)
 {
     CALL_STACK_MESSAGE7("CCertificate::ctor(0x%p, %d, 0x%p, %d, %d, %ls)", pDERCert, DERCertLen, pPKCS7Cert, PKCS7CertLen, bValid, host);
-    bVerified = bValid;
-    pDERData = (BYTE*)malloc(DERCertLen);
-    if (pDERData)
-    {
-        nDERDataLen = DERCertLen;
-        memcpy(pDERData, pDERCert, nDERDataLen);
-    }
-    else
-    {
-        nDERDataLen = 0;
-    }
-    pPKCS7Data = (BYTE*)malloc(PKCS7CertLen);
-    if (pPKCS7Data)
-    {
-        nPKCS7DataLen = PKCS7CertLen;
-        memcpy(pPKCS7Data, pPKCS7Cert, nPKCS7DataLen);
-    }
-    else
-    {
-        nPKCS7DataLen = 0;
-    }
-    FtpStoreWideText(host != NULL ? host : L"", Host);
+    pDERData = NULL;
+    pPKCS7Data = NULL;
+    nDERDataLen = 0;
+    nPKCS7DataLen = 0;
     nRefCount = 1;
+    bVerified = false;
+    bDataValid = false;
+    if (!FtpValidCertificateBytes(pDERCert, DERCertLen, pPKCS7Cert, PKCS7CertLen) ||
+        !FtpStoreWideText(host != NULL ? host : L"", Host))
+        return;
+    pDERData = (BYTE*)malloc(static_cast<size_t>(DERCertLen));
+    if (PKCS7CertLen > 0)
+        pPKCS7Data = (BYTE*)malloc(static_cast<size_t>(PKCS7CertLen));
+    if (pDERData == NULL || (PKCS7CertLen > 0 && pPKCS7Data == NULL))
+    {
+        free(pDERData);
+        free(pPKCS7Data);
+        pDERData = pPKCS7Data = NULL;
+        return;
+    }
+    memcpy(pDERData, pDERCert, static_cast<size_t>(DERCertLen));
+    if (PKCS7CertLen > 0)
+        memcpy(pPKCS7Data, pPKCS7Cert, static_cast<size_t>(PKCS7CertLen));
+    nDERDataLen = DERCertLen;
+    nPKCS7DataLen = PKCS7CertLen;
+    bDataValid = true;
+    bVerified = bValid;
 }
 
 CCertificate::~CCertificate()
@@ -1095,11 +1115,9 @@ bool CCertificate::CheckCertificate(std::wstring& errorText)
 
 bool CCertificate::IsSame(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen)
 {
-    if (DERCertLen != nDERDataLen)
+    if (!IsGood() || !FtpValidCertificateBytes(pDERCert, DERCertLen, pPKCS7Cert, PKCS7CertLen) ||
+        DERCertLen != nDERDataLen || PKCS7CertLen != nPKCS7DataLen)
         return false;
-    if (PKCS7CertLen != nPKCS7DataLen)
-        return false;
-    if (memcmp(pDERData, pDERCert, nDERDataLen))
-        return false;
-    return memcmp(pPKCS7Data, pPKCS7Cert, nPKCS7DataLen) ? false : true;
+    return memcmp(pDERData, pDERCert, static_cast<size_t>(nDERDataLen)) == 0 &&
+           (nPKCS7DataLen == 0 || memcmp(pPKCS7Data, pPKCS7Cert, static_cast<size_t>(nPKCS7DataLen)) == 0);
 }

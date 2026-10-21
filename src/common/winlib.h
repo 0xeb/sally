@@ -285,6 +285,7 @@ public:
     HWND GetParent() { return Parent; }
     INT_PTR Execute(); // modal dialog
     HWND Create();     // non-modal dialog
+    HWND CreateIndirect(const DLGTEMPLATE* dialogTemplate);
 
     static INT_PTR CALLBACK CDialogProc(HWND hwndDlg, UINT uMsg,
                                         WPARAM wParam, LPARAM lParam);
