@@ -2329,7 +2329,7 @@ STRINGTABLE
  IDS_MENU_RIGHT_CHANGEDRIVE, "&Cambiar unidad\tAlt+F2"
 
  IDS_MENU_HELP,              "&Ayuda"
- IDS_MENU_HELP_CONTENTS,     "&Contenidos\tF1"
+ IDS_MENU_HELP_CONTENTS,     "&Manual en línea\tF1"
  IDS_MENU_HELP_INDEX,        "&Indice..."
  IDS_MENU_HELP_SEARCH,       "&Buscar..."
  IDS_MENU_HELP_KEYBOARD,     "Atajos de &teclado"

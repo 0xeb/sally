@@ -1,0 +1,31 @@
+{
+  "announcements": [],
+  "notes_source_sha256": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+  "notes_titles": {
+    "cs-CZ": "Novinky",
+    "de-DE": "Was ist neu?",
+    "en-US": "What's new",
+    "es-ES": "Novedades",
+    "fr-FR": "Nouveautés",
+    "hu-HU": "Újdonságok",
+    "nl-NL": "Wat is er nieuw?",
+    "ro-RO": "Noutăți",
+    "ru-RU": "Что нового",
+    "sk-SK": "Novinky",
+    "zh-CN": "更新内容"
+  },
+  "notes_translation_source_sha256": {
+    "cs-CZ": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+    "de-DE": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+    "es-ES": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+    "fr-FR": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+    "hu-HU": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+    "nl-NL": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+    "ro-RO": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+    "ru-RU": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+    "sk-SK": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881",
+    "zh-CN": "b2b6caf35b5c5c942950d08b32816867781ddf6ac8ec1fa92c31f16873721881"
+  },
+  "release_version": "1.0.43",
+  "schema_version": 1
+}

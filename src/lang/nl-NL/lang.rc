@@ -2329,7 +2329,7 @@ STRINGTABLE
  IDS_MENU_RIGHT_CHANGEDRIVE, "S&tation Veranderen\tAlt+F2"
 
  IDS_MENU_HELP,              "&Help"
- IDS_MENU_HELP_CONTENTS,     "&Inhoud\tF1"
+ IDS_MENU_HELP_CONTENTS,     "Online &handleiding\tF1"
  IDS_MENU_HELP_INDEX,        "I&ndex..."
  IDS_MENU_HELP_SEARCH,       "&Zoeken..."
  IDS_MENU_HELP_KEYBOARD,     "&Toetsenbord Sneltoetseen"

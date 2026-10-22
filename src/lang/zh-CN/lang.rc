@@ -2329,7 +2329,7 @@ STRINGTABLE
  IDS_MENU_RIGHT_CHANGEDRIVE, "改变驱动器(&C)\tAlt+F2"
 
  IDS_MENU_HELP,              "帮助(&H)"
- IDS_MENU_HELP_CONTENTS,     "内容(&C)\tF1"
+ IDS_MENU_HELP_CONTENTS,     "在线手册(&M)\tF1"
  IDS_MENU_HELP_INDEX,        "索引(&I)..."
  IDS_MENU_HELP_SEARCH,       "搜索(&S)..."
  IDS_MENU_HELP_KEYBOARD,     "键盘快捷键(&K)"

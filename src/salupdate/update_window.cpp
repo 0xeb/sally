@@ -33,6 +33,7 @@
 #include "update/ReleaseChecksums.h"
 #include "update/ReleaseDownload.h"
 #include "update/ReleaseNotesText.h"
+#include "update/ReleaseNotesChoice.h"
 #include "update/UpdatePackage.h"
 #include "update/UpdateProcesses.h"
 #include "update/UpdaterCommand.h"
@@ -63,6 +64,7 @@ enum ControlId
     kIdStatus,
     kIdSupport = 211, kIdSupporter,
     kIdCheckUpdates = 214, kIdInvitation,
+    kIdNotesVersion, kIdNotesLabel,
 };
 
 enum : UINT
@@ -104,7 +106,8 @@ struct Session
     uint64_t NextContentTime = 0;
     std::wstring Profile;
     std::string Tag = "en-US";
-    DisplayContent Bundle;
+    DisplayContent Bundle; // Installed-version content is retained across network checks.
+    ReleaseNotesChoice NotesChoice;
     MarkdownDisplay NotesDisplay, MaintainerDisplay;
     ReadingDisplay Reading;
     std::shared_ptr<DisplayContentSession> Content;
@@ -418,9 +421,9 @@ int ButtonWidth(int id)
 void Place(int id, bool visible, int x, int y, int width, int height)
 {
     HWND control = Control(id);
-    ShowWindow(control, visible ? SW_SHOWNA : SW_HIDE);
     if (visible)
-        SetWindowPos(control, NULL, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(control, NULL, x, y, width, height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+    ShowWindow(control, visible ? SW_SHOWNA : SW_HIDE);
 }
 
 std::wstring T(UINT id) { return Sally::Supporter::SupporterText(id, Language); }
@@ -430,7 +433,8 @@ void Layout()
     Session& s = TheSession;
     if (s.LayingOut || !s.Window) return;
     s.LayingOut = true;
-    const bool release = (s.Current == View::Newer || s.Current == View::UpToDate) && !s.Installing && !s.InstallStopped;
+    const bool release = s.Current != View::Report && !s.Installing && !s.InstallStopped;
+    const bool checked = s.Current == View::Newer || s.Current == View::UpToDate;
     const bool readingVisible = release && s.Reading.Content.Visible;
     const int kind = s.SuccessfulReport && s.Current == View::Report ? 3 : release ? (readingVisible ? 2 : 1) : 0;
     const bool firstPlacement = !s.Placed;
@@ -442,13 +446,16 @@ void Layout()
         MONITORINFO monitor = {sizeof(monitor)};
         GetMonitorInfoW(MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY), &monitor);
         const RECT& area = monitor.rcWork;
-        int width = (std::min)(Px(kind == 3 ? 560 : 720), static_cast<int>(area.right - area.left) - Px(12));
-        int height = (std::min)(Px(kind == 2 ? 600 : kind == 3 ? 180 : 260), static_cast<int>(area.bottom - area.top) - Px(20));
+        const int fontLine = TextHeight(s.Font, L"Ag", 1000);
+        const int preferredWidth = (std::max)(Px(kind == 3 ? 560 : 720), fontLine * 32);
+        const int preferredHeight = kind == 2 ? (std::max)(Px(600), fontLine * 18) : Px(kind == 3 ? 180 : 260);
+        int width = (std::min)(preferredWidth, static_cast<int>(area.right - area.left) - Px(12));
+        int height = (std::min)(preferredHeight, static_cast<int>(area.bottom - area.top) - Px(20));
         s.LayoutKind = kind;
         RECT previous{}; GetWindowRect(s.Window, &previous);
         SetWindowPos(s.Window, nullptr, firstPlacement ? area.left + (area.right - area.left - width) / 2 : previous.left,
             firstPlacement ? area.top + (area.bottom - area.top - height) / 3 : previous.top,
-            firstPlacement ? width : previous.right - previous.left, height, SWP_NOZORDER | SWP_NOACTIVATE);
+            firstPlacement ? width : previous.right - previous.left, height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
         s.Placed = true;
     }
     RECT client{}; GetClientRect(s.Window, &client);
@@ -458,18 +465,28 @@ void Layout()
     int headline = TextHeight(s.Bold, GetText(Control(kIdHeadline)), width);
     Place(kIdHeadline, true, margin, y, width, headline); y += headline + Px(8);
     Place(kIdInstalled, release, margin, y, width, line); if (release) y += line + Px(3);
-    Place(kIdLatest, release && !s.Offline, margin, y, width, line); if (release && !s.Offline) y += line + Px(6);
+    Place(kIdLatest, release && checked && !s.Offline, margin, y, width, line);
+    if (release && checked && !s.Offline) y += line + Px(6);
+    const int gap = Px(8), labelWidth = ButtonWidth(kIdNotesLabel), checkWidth = ButtonWidth(kIdCheckUpdates);
+    const int notesWidth = (std::max)(Px(180), ButtonWidth(kIdNotesVersion));
+    const bool oneRow = labelWidth + notesWidth + checkWidth + 2 * gap <= width;
+    Place(kIdNotesLabel, release, margin, y + Px(5), oneRow ? labelWidth : width, line);
+    if (release && !oneRow) y += line + Px(6);
+    const int comboWidth = oneRow ? width - labelWidth - checkWidth - 2 * gap : width;
+    Place(kIdNotesVersion, release, oneRow ? margin + labelWidth + gap : margin, y, comboWidth, buttonHeight * 8);
+    if (release && !oneRow) y += buttonHeight + Px(6);
+    Place(kIdCheckUpdates, release, oneRow ? margin + width - checkWidth : margin, y, oneRow ? checkWidth : width, buttonHeight);
+    EnableWindow(Control(kIdCheckUpdates), s.Current != View::Checking && !s.Installing);
+    if (release) y += buttonHeight + Px(8);
     bool status = !GetText(Control(kIdStatus)).empty();
     int statusHeight = status ? TextHeight(s.Font, GetText(Control(kIdStatus)), width) + Px(4) : 0;
     const bool support = (release || (s.Current == View::Report && s.SuccessfulReport)) && s.SupportActions;
     const int invitationHeight = support ? TextHeight(s.Font, T(IDS_SUP_INVITATION), width) + Px(8) : 0;
-    const bool supportFits = ButtonWidth(kIdSupport) + ButtonWidth(kIdSupporter) + Px(8) <= width;
-    const int supportRows = support ? (supportFits ? 1 : 2) : 0;
+    const int supportRows = support ? 1 : 0;
     const bool install = s.Current == View::Newer && !s.Offline;
-    const bool page = s.Current != View::Checking && !(s.Current == View::Report && s.ReportPage.empty());
+    const bool page = !(s.Current == View::Report && s.ReportPage.empty());
     std::vector<int> footer;
-    if (release && s.Offline) footer.push_back(kIdCheckUpdates);
-    else if (install) footer.push_back(kIdInstall);
+    if (install) footer.push_back(kIdInstall);
     if (page) footer.push_back(kIdReleasePage);
     footer.push_back(IDCANCEL);
     int footerWidth = Px(8) * static_cast<int>(footer.size() - 1);
@@ -477,18 +494,33 @@ void Layout()
     const bool footerFits = footerWidth <= width;
     const int footerRows = footerFits ? 1 : static_cast<int>(footer.size());
     int reserved = invitationHeight + statusHeight + (supportRows + footerRows) * (buttonHeight + Px(6)) + margin;
+    // State/text changes can add rows without changing the reading-surface kind.
+    // Measure those rows before placing the content and footer, also after a resize.
+    RECT outer{}; GetWindowRect(s.Window, &outer);
+    MONITORINFO monitor = {sizeof(monitor)};
+    GetMonitorInfoW(MonitorFromWindow(s.Window, MONITOR_DEFAULTTONEAREST), &monitor);
+    const int chrome = static_cast<int>(outer.bottom - outer.top - client.bottom);
+    const int needed = y + reserved + Px(6) + (readingVisible ? (std::max)(Px(80), line * 3) : 0) + chrome;
+    const int minimum = (std::min)(needed, static_cast<int>(monitor.rcWork.bottom - monitor.rcWork.top) - Px(20));
+    s.MinimumHeight = MulDiv(minimum, 96, s.Dpi);
+    const int height = contentSizeChanged && (kind == 1 || kind == 3) ? minimum
+                       : (std::max)(minimum, static_cast<int>(outer.bottom - outer.top));
+    if (height != outer.bottom - outer.top)
+    {
+        SetWindowPos(s.Window, nullptr, 0, 0, outer.right - outer.left, height,
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+        GetClientRect(s.Window, &client);
+    }
     int reading = readingVisible ? (std::max)(0, static_cast<int>(client.bottom) - y - reserved - Px(6)) : 0;
     Place(kIdNotes, readingVisible, margin, y, width, reading);
     if (readingVisible) y += reading + Px(6);
     Place(kIdStatus, status, margin, y, width, statusHeight); y += statusHeight;
     Place(kIdInvitation, support, margin, y, width, invitationHeight > 0 ? invitationHeight - Px(8) : 0);
     y += invitationHeight;
-    const int supportWidth = ButtonWidth(kIdSupport);
-    Place(kIdSupport, support, margin, y, supportFits ? supportWidth : width, buttonHeight);
-    Place(kIdSupporter, support, supportFits ? margin + supportWidth + Px(8) : margin,
-        supportFits ? y : y + buttonHeight + Px(6), supportFits ? ButtonWidth(kIdSupporter) : width, buttonHeight);
+    Place(kIdSupport, support, margin, y, (std::min)(ButtonWidth(kIdSupport), width), buttonHeight);
+    ShowWindow(Control(kIdSupporter), SW_HIDE);
     y += supportRows * (buttonHeight + Px(6));
-    const int footerIds[] = {kIdInstall, kIdReleasePage, kIdCheckUpdates, IDCANCEL};
+    const int footerIds[] = {kIdInstall, kIdReleasePage, IDCANCEL};
     for (int id : footerIds)
         if (std::find(footer.begin(), footer.end(), id) == footer.end()) ShowWindow(Control(id), SW_HIDE);
     const int columns = static_cast<int>(footer.size());
@@ -500,24 +532,12 @@ void Layout()
             footerFits ? y : y + i * (buttonHeight + Px(6)), buttonWidth, buttonHeight);
         footerX += buttonWidth + Px(8);
     }
-    if (contentSizeChanged && (kind == 1 || kind == 3))
-    {
-        RECT outer{}; GetWindowRect(s.Window, &outer);
-        MONITORINFO monitor = {sizeof(monitor)};
-        GetMonitorInfoW(MonitorFromWindow(s.Window, MONITOR_DEFAULTTONEAREST), &monitor);
-        const int chrome = static_cast<int>(outer.bottom - outer.top - client.bottom);
-        const int needed = y + footerRows * (buttonHeight + Px(6)) + margin + chrome;
-        const int height = (std::min)((std::max)(Px(kind == 3 ? 80 : 220), needed), static_cast<int>(monitor.rcWork.bottom - monitor.rcWork.top) - Px(20));
-        s.MinimumHeight = MulDiv(height, 96, s.Dpi);
-        SetWindowPos(s.Window, nullptr, 0, 0, outer.right - outer.left, height,
-                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-    }
     EnableWindow(Control(kIdInstall), install && s.Release.CanInstall && !s.Installing);
     int defaultId = install && s.Release.CanInstall && !s.Installing ? kIdInstall : IDCANCEL;
     SendMessageW(Control(kIdInstall), BM_SETSTYLE, defaultId == kIdInstall ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON, TRUE);
     SendMessageW(Control(IDCANCEL), BM_SETSTYLE, defaultId == IDCANCEL ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON, TRUE);
     s.LayingOut = false;
-    InvalidateRect(s.Window, nullptr, TRUE);
+    RedrawWindow(s.Window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 }
 
 void Render(const ReadingDisplay& previous, const ReadingDisplay& current)
@@ -581,16 +601,19 @@ void RefreshContent()
 {
     Session& s = TheSession;
     const uint64_t now = Sally::Supporter::NowUtc();
-    DisplayContent release = s.HasBundle ? s.Bundle : DisplayContent{}, live;
+    const bool installed = s.NotesChoice.IsInstalled();
+    const bool checked = s.Current == View::Newer || s.Current == View::UpToDate;
+    const bool matchingRelease = checked && Sally::Supporter::CanonicalVersion(s.Release.LatestVersion) == Sally::Supporter::CanonicalVersion(Narrow(s.InstalledVersion));
+    DisplayContent release = (installed || matchingRelease) && s.HasBundle ? s.Bundle : DisplayContent{}, live;
     bool hasLive = false;
     if (s.Content)
     {
         std::lock_guard<std::mutex> lock(s.Content->Mutex);
-        if (s.Content->HasRelease) release = s.Content->Release;
+        if (s.Content->HasRelease && (!installed || matchingRelease)) release = s.Content->Release;
         if (s.Content->HasLive) { live = s.Content->Live; hasLive = true; }
     }
-    std::string target = Sally::Supporter::CanonicalVersion(s.Offline ? Narrow(s.InstalledVersion) : s.Release.LatestVersion);
-    auto notes = SelectReleaseNotes(release, s.Tag, s.Offline ? "" : s.Release.ReleaseNotes);
+    std::string target = Sally::Supporter::CanonicalVersion(installed ? Narrow(s.InstalledVersion) : s.Release.LatestVersion);
+    auto notes = SelectReleaseNotes(release, s.Tag, checked && (!installed || matchingRelease) ? s.Release.ReleaseNotes : "");
     s.NotesDisplay = BuildMarkdownDisplay(notes.Markdown);
     std::string maintainer;
     for (const auto& notice : ResolveNotices(release, hasLive ? &live : nullptr, target, s.Tag, now))
@@ -622,7 +645,7 @@ void RefreshContent()
     for (const auto* model : {&release, &live}) for (const auto& notice : model->Notices) { boundary(notice.From); boundary(notice.Until); }
     std::wstring status;
     if (!s.NotesDisplay.Visible && !s.MaintainerDisplay.Visible) status = T(IDS_SUP_NO_NOTES);
-    if (!s.Offline && s.Release.UpdateAvailable && !s.Release.CanInstall) status = Text(IDS_UPDATER_NOT_INSTALLABLE);
+    if (checked && s.Release.UpdateAvailable && !s.Release.CanInstall) status = Text(IDS_UPDATER_NOT_INSTALLABLE);
     SetText(kIdStatus, status);
     Layout();
 }
@@ -676,8 +699,17 @@ void ShowRelease()
     SetText(kIdHeadline, Text(release.UpdateAvailable ? IDS_UPDATER_NEWER : IDS_UPDATER_LATEST));
     SetText(kIdInstalled, Text(IDS_UPDATER_INSTALLED_VERSION, s.InstalledVersion.c_str()));
     SetText(kIdLatest, Text(IDS_UPDATER_RELEASE_VERSION, PlainVersion(release.LatestVersion).c_str()));
-    s.HasBundle = Sally::Supporter::CanonicalVersion(release.LatestVersion) == Sally::Supporter::CanonicalVersion(Narrow(s.InstalledVersion)) &&
-        ReadBundledDisplayContent(s.InstallRoot, Sally::Supporter::CanonicalVersion(release.LatestVersion), s.Bundle);
+    s.NotesChoice.CompleteCheck(release.UpdateAvailable);
+    SendMessageW(Control(kIdNotesVersion), CB_RESETCONTENT, 0, 0);
+    if (release.UpdateAvailable)
+    {
+        auto latest = T(IDS_SUP_NOTES_LATEST); latest.replace(latest.find(L"%s"), 2, PlainVersion(release.LatestVersion));
+        SendMessageW(Control(kIdNotesVersion), CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(latest.c_str()));
+    }
+    auto installed = T(IDS_SUP_NOTES_INSTALLED); installed.replace(installed.find(L"%s"), 2, s.InstalledVersion);
+    SendMessageW(Control(kIdNotesVersion), CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(installed.c_str()));
+    SendMessageW(Control(kIdNotesVersion), CB_SETCURSEL, 0, 0);
+    EnableWindow(Control(kIdNotesVersion), release.UpdateAvailable);
     SetStatus(release.UpdateAvailable && !release.CanInstall ? Text(IDS_UPDATER_NOT_INSTALLABLE) : std::wstring());
     RefreshContent();
     if (!s.Content)
@@ -694,7 +726,34 @@ void ShowCheckFailure()
     Session& s = TheSession;
     s.Current = View::CheckFailed;
     SetText(kIdHeadline, Text(IDS_UPDATER_CHECK_FAILED, FailureText(s.CheckFailure).c_str()));
-    Layout();
+    RefreshContent();
+}
+
+void BeginCheck()
+{
+    Session& s = TheSession;
+    if (s.Installing || s.Current == View::Checking) return;
+    if (s.Content) { s.Content->Cancel = true; s.Content.reset(); }
+    s.NotesChoice.BeginCheck();
+    s.Current = View::Checking;
+    s.InstallStopped = false;
+    s.Offline = false;
+    SetWindowTextW(s.Window, Text(IDS_UPDATER_TITLE).c_str());
+    SetText(kIdCheckUpdates, T(IDS_SUP_RECHECK));
+    SendMessageW(Control(kIdNotesVersion), CB_RESETCONTENT, 0, 0);
+    auto label = T(IDS_SUP_NOTES_INSTALLED); label.replace(label.find(L"%s"), 2, s.InstalledVersion);
+    SendMessageW(Control(kIdNotesVersion), CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+    SendMessageW(Control(kIdNotesVersion), CB_SETCURSEL, 0, 0);
+    EnableWindow(Control(kIdNotesVersion), FALSE);
+    SetText(kIdHeadline, Text(IDS_UPDATER_CHECKING));
+    SetText(kIdInstalled, Text(IDS_UPDATER_INSTALLED_VERSION, s.InstalledVersion.c_str()));
+    RefreshContent();
+    if (!StartWorker(CheckWorker))
+    {
+        s.CheckFailure.What = ReleaseFailure::Kind::Network;
+        s.CheckFailure.Network.Code = GetLastError();
+        ShowCheckFailure();
+    }
 }
 
 void StartInstall()
@@ -845,7 +904,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     case WM_ACTIVATE:
         if (LOWORD(wParam) != WA_INACTIVE && s.Current == View::Report && s.SuccessfulReport)
         { RefreshSupportState(); s.LayoutKind = -1; Layout(); }
-        if (LOWORD(wParam) != WA_INACTIVE && !s.Installing && !s.InstallStopped && (s.Current == View::Newer || s.Current == View::UpToDate)) RefreshContent();
+        if (LOWORD(wParam) != WA_INACTIVE && !s.Installing && !s.InstallStopped && s.Current != View::Report) RefreshContent();
         break;
     case WM_APP_CONTENT_READY:
         if (!s.Installing && !s.InstallStopped && s.Content && !s.Content->Cancel) RefreshContent();
@@ -870,18 +929,28 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     case WM_COMMAND:
         switch (LOWORD(wParam))
         {
-        case kIdSupport: Sally::Supporter::OpenSupportPage(window); return 0;
+        case kIdSupport:
+            Sally::Supporter::ShowSupportHub(window, Language, s.Profile, *GetWin32Registry());
+            if (s.Current == View::Report) { RefreshSupportState(); Layout(); } else RefreshContent();
+            return 0;
         case kIdSupporter:
             Sally::Supporter::ShowSupporterDialog(window, Language, s.Profile, *GetWin32Registry(), true);
             if (s.Current == View::Report) { RefreshSupportState(); s.LayoutKind = -1; Layout(); } else RefreshContent();
             return 0;
         case kIdCheckUpdates:
-        {
-            UpdaterCommand command; command.Mode = UpdaterMode::Check; command.InstallRoot = s.InstallRoot;
-            auto arguments = FormatUpdaterCommand(command);
-            if (reinterpret_cast<INT_PTR>(ShellExecuteW(window, L"open", ModulePath().c_str(), arguments.c_str(), nullptr, SW_SHOWNORMAL)) > 32) DestroyWindow(window);
+            BeginCheck();
             return 0;
-        }
+        case kIdNotesVersion:
+            if (HIWORD(wParam) == CBN_SELCHANGE && s.NotesChoice.CanSelectLatest())
+            {
+                s.NotesChoice.SelectInstalled(SendMessageW(Control(kIdNotesVersion), CB_GETCURSEL, 0, 0) == 1);
+                s.Reading = {};
+                RefreshContent();
+                SendMessageW(Control(kIdNotes), EM_SETSEL, 0, 0);
+                POINT origin{};
+                SendMessageW(Control(kIdNotes), EM_SETSCROLLPOS, 0, reinterpret_cast<LPARAM>(&origin));
+            }
+            return 0;
         case kIdInstall:
             StartInstall();
             return 0;
@@ -889,7 +958,8 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             if (s.Current == View::Report)
                 OpenPage(s.ReportPage);
             else
-                OpenPage(Widen(s.Release.ReleasePageUrl).empty() ? kReleasesPage : Widen(s.Release.ReleasePageUrl));
+                OpenPage(s.NotesChoice.IsInstalled() ? std::wstring(kReleasesPage) + L"/tag/v" + s.InstalledVersion
+                    : (Widen(s.Release.ReleasePageUrl).empty() ? kReleasesPage : Widen(s.Release.ReleasePageUrl)));
             return 0;
         case IDCANCEL:
             SendMessageW(window, WM_CLOSE, 0, 0);
@@ -1000,7 +1070,9 @@ bool CreateUpdateWindow()
     AddControl(L"STATIC", kIdInvitation, label, 0, T(IDS_SUP_INVITATION), s.Font);
     AddControl(L"BUTTON", kIdSupport, WS_TABSTOP, 0, T(IDS_SUP_SUPPORT), s.Font);
     AddControl(L"BUTTON", kIdSupporter, WS_TABSTOP, 0, T(IDS_SUP_ENTER), s.Font);
-    AddControl(L"BUTTON", kIdCheckUpdates, WS_TABSTOP, 0, T(IDS_SUP_CHECK_UPDATES), s.Font);
+    AddControl(L"STATIC", kIdNotesLabel, label, 0, T(IDS_SUP_RELEASE_NOTES), s.Font);
+    AddControl(WC_COMBOBOXW, kIdNotesVersion, WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, 0, L"", s.Font);
+    AddControl(L"BUTTON", kIdCheckUpdates, WS_TABSTOP, 0, T(s.Offline ? IDS_SUP_CHECK_UPDATES : IDS_SUP_RECHECK), s.Font);
     AddControl(L"STATIC", kIdStatus, label, 0, std::wstring(), s.Font);
     AddControl(L"BUTTON", kIdInstall, WS_TABSTOP | BS_PUSHBUTTON, 0, Text(IDS_UPDATER_INSTALL_BUTTON), s.Font);
     AddControl(L"BUTTON", kIdReleasePage, WS_TABSTOP | BS_PUSHBUTTON, 0, Text(IDS_UPDATER_RELEASE_PAGE_BUTTON),
@@ -1109,6 +1181,7 @@ int CheckForUpdates(const UpdaterCommand& command)
     ReadFileVersionText(s.InstallRoot + L"\\sally.exe", fileVersion);
     s.InstalledVersion = ReleaseVersion(fileVersion);
     s.FeedUrl = command.FeedUrl.empty() ? std::wstring(kDefaultReleaseFeedUrl) : command.FeedUrl;
+    s.HasBundle = ReadBundledDisplayContent(s.InstallRoot, Sally::Supporter::CanonicalVersion(Narrow(s.InstalledVersion)), s.Bundle);
     Log(std::wstring(s.Automatic ? L"scheduled check" : L"check") + L" of " + s.InstallRoot + L" (" +
         s.InstalledVersion + L") at " + s.FeedUrl);
 
@@ -1116,7 +1189,10 @@ int CheckForUpdates(const UpdaterCommand& command)
     {
         if (!CreateUpdateWindow()) return 2;
         s.Current = View::UpToDate;
-        s.HasBundle = ReadBundledDisplayContent(s.InstallRoot, Sally::Supporter::CanonicalVersion(Narrow(s.InstalledVersion)), s.Bundle);
+        auto label = T(IDS_SUP_NOTES_INSTALLED); label.replace(label.find(L"%s"), 2, s.InstalledVersion);
+        SendMessageW(Control(kIdNotesVersion), CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+        SendMessageW(Control(kIdNotesVersion), CB_SETCURSEL, 0, 0);
+        EnableWindow(Control(kIdNotesVersion), FALSE);
         SetWindowTextW(s.Window, (T(IDS_SUP_WHATS_NEW) + L" — Sally " + s.InstalledVersion).c_str());
         SetText(kIdHeadline, T(IDS_SUP_WHATS_NEW));
         SetText(kIdInstalled, Text(IDS_UPDATER_INSTALLED_VERSION, s.InstalledVersion.c_str()));
@@ -1145,16 +1221,9 @@ int CheckForUpdates(const UpdaterCommand& command)
 
     if (!CreateUpdateWindow())
         return 2;
-    s.Current = View::Checking;
-    SetText(kIdHeadline, Text(IDS_UPDATER_CHECKING));
-    Layout();
+    s.Current = View::CheckFailed; // BeginCheck owns the initial and retry transitions.
+    BeginCheck();
     ShowUpdateWindow(true);
-    if (!StartWorker(CheckWorker))
-    {
-        s.CheckFailure.What = ReleaseFailure::Kind::Network;
-        s.CheckFailure.Network.Code = GetLastError();
-        ShowCheckFailure();
-    }
     RunMessageLoop();
     return 0;
 }

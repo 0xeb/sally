@@ -2860,7 +2860,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             SetWindowTitle();
             return 0;
         case CM_HELP_SUPPORT:
-            Sally::Supporter::OpenSupportPage(HWindow);
+            Sally::Supporter::ShowSupportHub(HWindow, LanguageID, SALAMANDER_ROOT_REG, *gRegistry);
+            SetWindowTitle();
             return 0;
         case CM_HELP_CHECKNEWVERSION:
         {
@@ -2880,9 +2881,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             {
             case CM_HELP_CONTENTS:
             {
-                OpenHtmlHelp(NULL, HWindow, HHCDisplayTOC, 0, TRUE); // we don't want two message boxes in a row
-                command = HHCDisplayContext;
-                dwData = IDH_INTRODUCTION;
+                command = HHCDisplayTOC;
                 break;
             }
 
@@ -5004,24 +5003,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         case CML_COMMANDS:
         {
             UpdateWindowsTerminalCommandsMenu(popup);
-            break;
-        }
-
-        case CML_HELP:
-        {
-            // Check for New Versions, before About (the menu template does not have it).
-            if (popup->FindItemPosition(CM_HELP_CHECKNEWVERSION) == -1)
-            {
-                MENU_ITEM_INFO mii;
-                mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
-                mii.Type = MENU_TYPE_STRING;
-                mii.String = LoadStrW(IDS_MENU_HELP_CHECKNEWVERSION);
-                mii.ID = CM_HELP_CHECKNEWVERSION;
-
-                int aboutPos = popup->FindItemPosition(CM_HELP_WHATSNEW);
-                if (aboutPos == -1) aboutPos = popup->FindItemPosition(CM_HELP_ABOUT);
-                popup->InsertItem(aboutPos != -1 ? aboutPos : 0xFFFFFFFF, TRUE, &mii);
-            }
             break;
         }
 

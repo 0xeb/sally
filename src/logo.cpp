@@ -414,9 +414,8 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         const auto certificate = Sally::Supporter::VerifyCertificate(state.Token, Sally::Supporter::NowUtc(), Sally::Supporter::BuiltinPublicKeys());
         SetDlgItemTextW(HWindow, 62043, Sally::Supporter::SupporterSummary(certificate, LanguageID).c_str());
         SetDlgItemTextW(HWindow, 62044, Sally::Supporter::SupporterText(IDS_SUP_SUPPORT, LanguageID).c_str());
-        SetDlgItemTextW(HWindow, 62045, Sally::Supporter::SupporterText(certificate.Authentic() ? IDS_SUP_DETAILS : IDS_SUP_ENTER, LanguageID).c_str());
-        const bool offer = certificate.State != Sally::Supporter::Status::Active && certificate.State != Sally::Supporter::Status::NotYetValid;
-        ShowWindow(GetDlgItem(HWindow, 62044), offer ? SW_SHOWNA : SW_HIDE);
+        SetDlgItemTextW(HWindow, 62045, LoadStrW(IDS_MENU_HELP_ABOUTPLUGINS));
+        ShowWindow(GetDlgItem(HWindow, 62044), SW_SHOWNA);
         RECT client{}, close{}; GetClientRect(HWindow, &client); GetWindowRect(GetDlgItem(HWindow, IDOK), &close);
         MapWindowPoints(nullptr, HWindow, reinterpret_cast<POINT*>(&close), 2);
         HDC dc = GetDC(HWindow); const int dpi = GetDeviceCaps(dc, LOGPIXELSX);
@@ -425,7 +424,6 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         const int buttons[] = {IDOK, 62045, 62044};
         for (int id : buttons)
         {
-            if (id == 62044 && !offer) continue;
             HWND button = GetDlgItem(HWindow, id);
             std::wstring text(static_cast<size_t>(GetWindowTextLengthW(button)) + 1, L'\0');
             text.resize(static_cast<size_t>(GetWindowTextW(button, text.data(), static_cast<int>(text.size()))));
@@ -476,11 +474,27 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     }
 
     case WM_COMMAND:
-        if (LOWORD(wParam) == 62044) { Sally::Supporter::OpenSupportPage(HWindow); return TRUE; }
+        if (LOWORD(wParam) == 62044)
+        {
+            Sally::Supporter::ShowSupportHub(HWindow, LanguageID, SALAMANDER_ROOT_REG, *gRegistry);
+            refreshSupporter();
+            return TRUE;
+        }
         if (LOWORD(wParam) == 62045)
         {
-            Sally::Supporter::ShowSupporterDialog(HWindow, LanguageID, SALAMANDER_ROOT_REG, *gRegistry);
-            refreshSupporter();
+            HMENU menu = CreatePopupMenu();
+            if (!menu) return TRUE;
+            for (int i = 0; i < Plugins.GetCount(); ++i)
+            {
+                auto name = Plugins.Get(i)->Name;
+                for (size_t at = 0; (at = name.find(L'&', at)) != std::wstring::npos; at += 2) name.insert(at, 1, L'&');
+                AppendMenuW(menu, MF_STRING, i + 1, name.c_str());
+            }
+            RECT button{}; GetWindowRect(GetDlgItem(HWindow, 62045), &button);
+            const UINT item = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN,
+                button.left, button.bottom, 0, HWindow, nullptr);
+            DestroyMenu(menu);
+            if (item && item <= static_cast<UINT>(Plugins.GetCount())) Plugins.OnPluginAbout(HWindow, item - 1);
             return TRUE;
         }
         break;

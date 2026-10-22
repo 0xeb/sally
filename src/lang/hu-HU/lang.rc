@@ -2329,7 +2329,7 @@ STRINGTABLE
  IDS_MENU_RIGHT_CHANGEDRIVE, "Meghajtó &váltása\tAlt+F2"
 
  IDS_MENU_HELP,              "&Súgó"
- IDS_MENU_HELP_CONTENTS,     "&Tartalomjegyzék\tF1"
+ IDS_MENU_HELP_CONTENTS,     "Online &kézikönyv\tF1"
  IDS_MENU_HELP_INDEX,        "&Index..."
  IDS_MENU_HELP_SEARCH,       "Kere&sés..."
  IDS_MENU_HELP_KEYBOARD,     "Billentyűparancso&k"

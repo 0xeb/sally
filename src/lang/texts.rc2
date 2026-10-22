@@ -164,7 +164,7 @@ STRINGTABLE
  IDS_MENU_RIGHT_CHANGEDRIVE, "&Change Drive\tAlt+F2"
 
  IDS_MENU_HELP,              "&Help"
- IDS_MENU_HELP_CONTENTS,     "&Contents\tF1"
+ IDS_MENU_HELP_CONTENTS,     "Online &Manual\tF1"
  IDS_MENU_HELP_INDEX,        "&Index..."
  IDS_MENU_HELP_SEARCH,       "&Search..."
  IDS_MENU_HELP_KEYBOARD,     "&Keyboard Shortcuts"

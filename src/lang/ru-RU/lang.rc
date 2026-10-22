@@ -2329,7 +2329,7 @@ STRINGTABLE
  IDS_MENU_RIGHT_CHANGEDRIVE, "См&енить диск\tAlt+F2"
 
  IDS_MENU_HELP,              "&Справка"
- IDS_MENU_HELP_CONTENTS,     "&Вызов справки\tF1"
+ IDS_MENU_HELP_CONTENTS,     "Онлайн-&руководство\tF1"
  IDS_MENU_HELP_INDEX,        "&Указатель..."
  IDS_MENU_HELP_SEARCH,       "&Поиск..."
  IDS_MENU_HELP_KEYBOARD,     "&Клавиатурные сочетания"

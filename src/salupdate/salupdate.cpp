@@ -8,6 +8,7 @@
 // salupdate.log, next to the result file, keeps the details.
 
 #include <windows.h>
+#include <commctrl.h>
 #include <shellapi.h>
 
 #include <algorithm>
@@ -191,6 +192,49 @@ namespace
 {
 thread_local HFONT MessageFont = NULL;
 thread_local double MessageScaleX = 1, MessageScaleY = 1;
+constexpr wchar_t kStyledMessageBox[] = L"Sally.SalUpdate.MessageBoxStyled";
+
+void PaintMessageBackground(HWND window, HDC dc)
+{
+    RECT client{};
+    GetClientRect(window, &client);
+    FillRect(dc, &client, GetSysColorBrush(COLOR_WINDOW));
+    // The native message box caches its original footer rectangle. Derive the
+    // resized footer from the actual buttons instead of leaving that stale band.
+    LONG footer = client.bottom;
+    for (int id : {IDOK, IDCANCEL, IDYES, IDNO})
+    {
+        HWND button = GetDlgItem(window, id);
+        if (button == NULL)
+            continue;
+        RECT rect{};
+        GetWindowRect(button, &rect);
+        MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&rect), 2);
+        footer = (std::min)(footer, rect.top - (rect.bottom - rect.top) / 3);
+    }
+    client.top = (std::max)(0L, footer);
+    FillRect(dc, &client, GetSysColorBrush(COLOR_3DFACE));
+}
+
+LRESULT CALLBACK MessageBackground(HWND window, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR id, DWORD_PTR)
+{
+    if (message == WM_PAINT)
+    {
+        PAINTSTRUCT paint{};
+        HDC dc = BeginPaint(window, &paint);
+        PaintMessageBackground(window, dc);
+        EndPaint(window, &paint);
+        return 0;
+    }
+    if (message == WM_ERASEBKGND || message == WM_PRINTCLIENT)
+    {
+        PaintMessageBackground(window, reinterpret_cast<HDC>(wParam));
+        return 1;
+    }
+    if (message == WM_NCDESTROY)
+        RemoveWindowSubclass(window, MessageBackground, id);
+    return DefSubclassProc(window, message, wParam, lParam);
+}
 
 BOOL CALLBACK StyleMessageControl(HWND control, LPARAM)
 {
@@ -210,19 +254,30 @@ BOOL CALLBACK StyleMessageControl(HWND control, LPARAM)
 
 LRESULT CALLBACK StyleMessageBox(int code, WPARAM wParam, LPARAM lParam)
 {
-    if (code == HCBT_ACTIVATE)
+    if (code == HCBT_DESTROYWND)
+        RemovePropW(reinterpret_cast<HWND>(wParam), kStyledMessageBox);
+    else if (code == HCBT_ACTIVATE)
     {
         HWND window = reinterpret_cast<HWND>(wParam);
         wchar_t className[32] = {};
         GetClassNameW(window, className, _countof(className));
         if (lstrcmpW(className, L"#32770") != 0)
             return CallNextHookEx(NULL, code, wParam, lParam);
+        // Activation repeats after Alt+Tab or cancelling a screen capture. Scale the
+        // original layout once per window, including reentrant activation during styling.
+        if (GetPropW(window, kStyledMessageBox) != NULL || !SetPropW(window, kStyledMessageBox, reinterpret_cast<HANDLE>(1)))
+            return CallNextHookEx(NULL, code, wParam, lParam);
+        SetWindowSubclass(window, MessageBackground, 0, 0);
         const auto appearance = CurrentApplicationAppearance();
         Sally::Appearance::SetWindowIcon(window, GetModuleHandleW(nullptr), appearance.Icon);
         if (MessageFont != NULL)
         {
             HDC dc = GetDC(window);
-            HGDIOBJ previous = SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT));
+            // MessageBox already uses the system's DPI-scaled message font. The
+            // stock GUI font can be smaller and would scale the whole layout twice.
+            HWND message = GetDlgItem(window, 0xFFFF);
+            HFONT originalFont = reinterpret_cast<HFONT>(SendMessageW(message != NULL ? message : window, WM_GETFONT, 0, 0));
+            HGDIOBJ previous = SelectObject(dc, originalFont != NULL ? originalFont : GetStockObject(DEFAULT_GUI_FONT));
             TEXTMETRICW oldMetrics{}, newMetrics{};
             GetTextMetricsW(dc, &oldMetrics);
             SelectObject(dc, MessageFont); GetTextMetricsW(dc, &newMetrics);
@@ -235,6 +290,7 @@ LRESULT CALLBACK StyleMessageBox(int code, WPARAM wParam, LPARAM lParam)
             const int height = static_cast<int>(client.bottom * MessageScaleY) + outer.bottom - outer.top - client.bottom;
             SetWindowPos(window, nullptr, outer.left - (width - outer.right + outer.left) / 2,
                 outer.top - (height - outer.bottom + outer.top) / 2, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+            RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
         }
     }
     return CallNextHookEx(NULL, code, wParam, lParam);
@@ -272,14 +328,14 @@ public:
 void Tell(const std::wstring& text, UINT icon, HWND owner)
 {
     MessageBoxStyle style;
-    MessageBoxW(owner, text.c_str(), Text(IDS_UPDATER_TITLE).c_str(), MB_OK | icon | MB_SETFOREGROUND | MB_TOPMOST);
+    MessageBoxW(owner, text.c_str(), Text(IDS_UPDATER_TITLE).c_str(), MB_OK | icon | MB_SETFOREGROUND);
 }
 
 bool Ask(const std::wstring& text, HWND owner)
 {
     MessageBoxStyle style;
     return MessageBoxW(owner, text.c_str(), Text(IDS_UPDATER_TITLE).c_str(),
-                       MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2 | MB_SETFOREGROUND | MB_TOPMOST) == IDYES;
+                       MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2 | MB_SETFOREGROUND) == IDYES;
 }
 
 std::wstring FileNameOf(const std::wstring& path)

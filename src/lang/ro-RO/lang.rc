@@ -2329,7 +2329,7 @@ STRINGTABLE
  IDS_MENU_RIGHT_CHANGEDRIVE, "Schim&ba Drive\tAlt+F2"
 
  IDS_MENU_HELP,              "&Help"
- IDS_MENU_HELP_CONTENTS,     "C&ontinut\tF1"
+ IDS_MENU_HELP_CONTENTS,     "&Manual online\tF1"
  IDS_MENU_HELP_INDEX,        "I&ndex..."
  IDS_MENU_HELP_SEARCH,       "&Cauta..."
  IDS_MENU_HELP_KEYBOARD,     "Scurtaturi pe &Tastatura"

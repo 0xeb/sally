@@ -2329,7 +2329,7 @@ STRINGTABLE
  IDS_MENU_RIGHT_CHANGEDRIVE, "Zmeniť &jednotku\tAlt+F2"
 
  IDS_MENU_HELP,              "&Nápoveda"
- IDS_MENU_HELP_CONTENTS,     "&Obsah\tF1"
+ IDS_MENU_HELP_CONTENTS,     "Online &príručka\tF1"
  IDS_MENU_HELP_INDEX,        "R&egister..."
  IDS_MENU_HELP_SEARCH,       "&Hľadať..."
  IDS_MENU_HELP_KEYBOARD,     "&Klávesové skratky"

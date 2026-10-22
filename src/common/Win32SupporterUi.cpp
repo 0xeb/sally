@@ -398,6 +398,68 @@ namespace Sally::Supporter
         return result;
     }
     void OpenSupportPage(HWND parent) { ShellExecuteW(parent, L"open", Sally::Urls::Support, nullptr, nullptr, SW_SHOWNORMAL); }
+    bool ShowSupportHub(HWND parent, LANGID language, const std::wstring& profile, IRegistry& registry)
+    {
+        struct Hub
+        {
+            LANGID Language;
+            const std::wstring& Profile;
+            IRegistry& Registry;
+            bool Changed = false;
+            HWND Parent;
+            std::wstring Caption, Body, Online, Key, Close;
+            TASKDIALOG_BUTTON Buttons[3]{};
+            TASKDIALOGCONFIG Page()
+            {
+                Caption = SupporterText(IDS_SUP_SUPPORT, Language);
+                Body = Content();
+                Online = SupporterText(IDS_SUP_ONLINE, Language);
+                Key = KeyLabel();
+                Close = SupporterText(IDS_SUP_CLOSE, Language);
+                Buttons[0] = {100, Online.c_str()}; Buttons[1] = {101, Key.c_str()}; Buttons[2] = {IDCANCEL, Close.c_str()};
+                TASKDIALOGCONFIG config{sizeof(config)};
+                config.hwndParent = Parent;
+                config.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW | TDF_SIZE_TO_CONTENT;
+                config.pszWindowTitle = Caption.c_str(); config.pszMainInstruction = Caption.c_str(); config.pszContent = Body.c_str();
+                config.cButtons = ARRAYSIZE(Buttons); config.pButtons = Buttons; config.nDefaultButton = IDCANCEL;
+                config.pfCallback = Callback; config.lpCallbackData = reinterpret_cast<LONG_PTR>(this); config.cxWidth = 350;
+                return config;
+            }
+            std::wstring Content()
+            {
+                auto state = ReadSupporterState(Profile, Registry);
+                auto certificate = VerifyCertificate(state.Token, NowUtc(), BuiltinPublicKeys());
+                return SupporterText(IDS_SUP_INVITATION, Language) + L"\n\n" + SupporterSummary(certificate, Language);
+            }
+            std::wstring KeyLabel()
+            {
+                auto state = ReadSupporterState(Profile, Registry);
+                auto certificate = VerifyCertificate(state.Token, NowUtc(), BuiltinPublicKeys());
+                return SupporterText(certificate.Authentic() ? IDS_SUP_DETAILS : IDS_SUP_ENTER, Language);
+            }
+            static HRESULT CALLBACK Callback(HWND window, UINT message, WPARAM button, LPARAM, LONG_PTR context)
+            {
+                auto& hub = *reinterpret_cast<Hub*>(context);
+                if (message != TDN_BUTTON_CLICKED) return S_OK;
+                if (button == 100)
+                {
+                    OpenSupportPage(window);
+                    return S_FALSE;
+                }
+                if (button == 101)
+                {
+                    hub.Changed |= ShowSupporterDialog(window, hub.Language, hub.Profile, hub.Registry);
+                    auto page = hub.Page();
+                    SendMessageW(window, TDM_NAVIGATE_PAGE, 0, reinterpret_cast<LPARAM>(&page));
+                    return S_FALSE;
+                }
+                return S_OK;
+            }
+        } hub{language, profile, registry, false, parent};
+        auto config = hub.Page();
+        TaskDialogIndirect(&config, nullptr, nullptr, nullptr);
+        return hub.Changed;
+    }
     std::wstring SupporterTitleSuffix(const std::wstring& profile, IRegistry& registry, LANGID language)
     {
         const auto state = ReadSupporterState(profile, registry);

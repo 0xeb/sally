@@ -2329,7 +2329,7 @@ STRINGTABLE
  IDS_MENU_RIGHT_CHANGEDRIVE, "&Changer de lecteur\tAlt+F2"
 
  IDS_MENU_HELP,              "&Aide"
- IDS_MENU_HELP_CONTENTS,     "&Sommaire de l'aide\tF1"
+ IDS_MENU_HELP_CONTENTS,     "&Manuel en ligne\tF1"
  IDS_MENU_HELP_INDEX,        "&Index..."
  IDS_MENU_HELP_SEARCH,       "&Recherche..."
  IDS_MENU_HELP_KEYBOARD,     "Ra&ccourcis clavier"
@@ -2341,7 +2341,7 @@ STRINGTABLE
  IDS_MENU_HELP_FORUM,        "&Forum du service après-vente officiel"
  IDS_MENU_HELP_ABOUTPLUGINS, "À &propos du module"
  IDS_MENU_HELP_CHECKNEWVERSION, "&Vérifier les mises à jour..."
- IDS_MENU_HELP_ABOUT,        "À propos d'&Sally"
+ IDS_MENU_HELP_ABOUT,        "À propos de &Sally"
 
 //
 // find file menu
