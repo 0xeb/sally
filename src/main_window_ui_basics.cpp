@@ -1621,7 +1621,7 @@ void CMainWindow::SetEnvFont()
     }
 }
 
-void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max)
+void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max, BOOL submenu)
 {
     MENU_ITEM_INFO mii;
     int added = 0;
@@ -1666,14 +1666,18 @@ void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max)
             menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
             // recursion
             (*iterator)++;
-            FillUserMenu2(popup, iterator, max);
+            FillUserMenu2(popup, iterator, max, TRUE);
             added++;
             break;
         }
 
         case umitSubmenuEnd:
         {
-            goto ESCAPE;
+            // Retain orphan markers in the model, but do not let a saved
+            // malformed root marker hide all following commands.
+            if (submenu)
+                goto ESCAPE;
+            break;
         }
         }
     }

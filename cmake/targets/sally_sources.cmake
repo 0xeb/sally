@@ -1,4 +1,6 @@
 set(SALLY_SOURCES
+  "${SAL_SRC}/configuration_profiles.cpp"
+  "${SAL_SRC}/common/ConfigProfileStore.cpp"
   "${SAL_SRC}/bitmap.cpp"
   "${SAL_SRC}/bugreprt.cpp"
   "${SAL_SRC}/common/dep/bzip2/blocksort.c"

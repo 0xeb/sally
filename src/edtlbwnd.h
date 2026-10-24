@@ -149,6 +149,7 @@ public:
     // start editing the current item
     void OnBeginEdit(int start = 0, int end = -1);
     void OnEndEdit();
+    void LayoutEditLine();
     BOOL OnSaveEdit(); // returns TRUE if the user allows it
 
     // draws the button after the edit line

@@ -1817,6 +1817,21 @@ IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Sall
  IDS_SALAMANDERICON_GREEN, "Green"
  IDS_SALAMANDERICON_BLUE, "Classic (orange)"
  IDS_APPLICATIONICON_BLUE, "Blue"
+ IDS_APPLICATIONICON_GECKO, "Gecko 01"
+ IDS_SPLASH_TAGLINE, "Your friendly file manager"
+ IDS_IDENTITY_GROUP, "Splash and About"
+ IDS_IDENTITY_PALETTE, "Color family:"
+ IDS_IDENTITY_SHADE, "Shade (0–100):"
+ IDS_IDENTITY_LETTERING, "Sally lettering:"
+ IDS_IDENTITY_FONT, "Text font:"
+ IDS_IDENTITY_TONE, "Text color:"
+ IDS_IDENTITY_PREVIEW, "Preview…"
+ IDS_IDENTITY_VECTOR, "Original vector lettering"
+ IDS_IDENTITY_COORDINATED, "Coordinated color"
+ IDS_IDENTITY_SLATE, "Slate"
+ IDS_IDENTITY_BLACK, "Black"
+ IDS_IDENTITY_WEBSITE, "Website ↗"
+ IDS_IDENTITY_ORANGE, "Orange"
  
  IDS_PROGDLGHOURS, "%d hr"
  IDS_PROGDLGMINUTES, "%d min"
@@ -1993,3 +2008,12 @@ IDS_OLDPLUGINVERSION2, "The plugin (%s) is not supported by this version of Sall
  IDS_MASTERPASSWORD_STORE_DAMAGED, "Your saved master-password settings could not be read. Sally will preserve them and will not save configuration changes. Restore a known-good configuration backup before changing passwords."
 
 }
+
+
+STRINGTABLE
+BEGIN
+ IDS_PROFILE_DEFAULT, "(Default)"
+ IDS_PROFILE_MANAGER, "Configuration profiles"
+ IDS_PROFILE_NAME_RULE, "Use 1 to 64 letters (A-Z, a-z), digits, dots, underscores or hyphens; not . or .. ."
+ IDS_PROFILE_DELETE_CONFIRM, "Permanently delete this profile and its saved settings?"
+END

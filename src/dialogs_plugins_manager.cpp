@@ -2663,6 +2663,7 @@ CMainWindowIconItem MainWindowIcons[MAINWINDOWICONS_COUNT] =
         {IDI_SALAMANDER_GREEN, IDS_SALAMANDERICON_GREEN},
         {IDI_SALAMANDER_BLUE, IDS_SALAMANDERICON_BLUE},
         {IDI_APPLICATION_BLUE, IDS_APPLICATIONICON_BLUE},
+        {IDI_APPLICATION_GECKO, IDS_APPLICATIONICON_GECKO},
 };
 
 CCfgPageMainWindow::CCfgPageMainWindow()
@@ -2872,6 +2873,22 @@ void CCfgPageAppearance::Transfer(CTransferInfo& ti)
         for (int i = 0; i < 3; i++)
             SendDlgItemMessageW(HWindow, IDC_THEME_MODE, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(resIDs[i]).c_str());
         SendDlgItemMessage(HWindow, IDC_THEME_MODE, CB_SETCURSEL, Configuration.ThemeMode, 0);
+        auto fill = [&](int id, const std::vector<std::wstring>& labels) {
+            SendDlgItemMessageW(HWindow, id, CB_RESETCONTENT, 0, 0);
+            for (const auto& label : labels)
+                SendDlgItemMessageW(HWindow, id, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+        };
+        fill(IDC_IDENTITY_PALETTE, {LoadStrOwned(IDS_SALAMANDERICON_GREEN), LoadStrOwned(IDS_SALAMANDERICON_RED), LoadStrOwned(IDS_APPLICATIONICON_BLUE), LoadStrOwned(IDS_IDENTITY_ORANGE)});
+        fill(IDC_IDENTITY_LETTERING, {LoadStrOwned(IDS_IDENTITY_VECTOR), L"Candara", L"Bahnschrift", L"Corbel", L"Segoe UI", L"Georgia"});
+        fill(IDC_IDENTITY_FONT, {L"Segoe UI", L"Corbel", L"Candara", L"Tahoma"});
+        fill(IDC_IDENTITY_TONE, {LoadStrOwned(IDS_IDENTITY_COORDINATED), LoadStrOwned(IDS_IDENTITY_SLATE), LoadStrOwned(IDS_IDENTITY_BLACK)});
+        const auto& style = Configuration.Identity;
+        for (const auto& pair : {std::pair<int, int>{IDC_IDENTITY_PALETTE, style.Palette}, {IDC_IDENTITY_LETTERING, style.Lettering}, {IDC_IDENTITY_FONT, style.TextFont}, {IDC_IDENTITY_TONE, style.Tone}})
+            SendDlgItemMessageW(HWindow, pair.first, CB_SETCURSEL, pair.second, 0);
+        SetDlgItemInt(HWindow, IDC_IDENTITY_SHADE, style.Shade, FALSE);
+        SendDlgItemMessageW(HWindow, IDC_IDENTITY_SLIDER, TBM_SETRANGE, FALSE, MAKELPARAM(0, 100));
+        SendDlgItemMessageW(HWindow, IDC_IDENTITY_SLIDER, TBM_SETPOS, TRUE, style.Shade);
+        SendDlgItemMessageW(HWindow, IDC_IDENTITY_SHADE, EM_LIMITTEXT, 3, 0);
     }
 
     ti.CheckBox(IDC_FULLROWSELECT, Configuration.FullRowSelect);       // mutually exclusive with FullRowHighlight
@@ -2890,6 +2907,7 @@ void CCfgPageAppearance::Transfer(CTransferInfo& ti)
         if (themeMode < THEME_MODE_LIGHT || themeMode > THEME_MODE_SYSTEM)
             themeMode = THEME_MODE_LIGHT;
         Configuration.ThemeMode = themeMode;
+        Configuration.Identity = ReadIdentityControls();
     }
     else
         SendDlgItemMessage(HWindow, IDC_THUMBNAILSIZE, EM_LIMITTEXT, 4, 0);
@@ -2920,6 +2938,14 @@ void CCfgPageAppearance::Transfer(CTransferInfo& ti)
 void CCfgPageAppearance::Validate(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CCfgPageAppearance::Validate()");
+    int shade = 0;
+    ti.EditLine(IDC_IDENTITY_SHADE, shade);
+    if (!ti.IsGood()) return;
+    if (shade < 0 || shade > 100)
+    {
+        ti.ErrorOn(IDC_IDENTITY_SHADE);
+        return;
+    }
     HWND hWnd;
     if (ti.GetControl(hWnd, IDC_INFOLINECONTENT))
     {
@@ -2934,11 +2960,32 @@ void CCfgPageAppearance::Validate(CTransferInfo& ti)
     }
 }
 
+Sally::Artwork::IdentityStyle CCfgPageAppearance::ReadIdentityControls()
+{
+    Sally::Artwork::IdentityStyle style;
+    style.Palette = static_cast<int>(SendDlgItemMessageW(HWindow, IDC_IDENTITY_PALETTE, CB_GETCURSEL, 0, 0));
+    style.Lettering = static_cast<int>(SendDlgItemMessageW(HWindow, IDC_IDENTITY_LETTERING, CB_GETCURSEL, 0, 0));
+    style.TextFont = static_cast<int>(SendDlgItemMessageW(HWindow, IDC_IDENTITY_FONT, CB_GETCURSEL, 0, 0));
+    style.Tone = static_cast<int>(SendDlgItemMessageW(HWindow, IDC_IDENTITY_TONE, CB_GETCURSEL, 0, 0));
+    BOOL valid = FALSE;
+    const UINT shade = GetDlgItemInt(HWindow, IDC_IDENTITY_SHADE, &valid, FALSE);
+    if (valid && shade <= 100) style.Shade = static_cast<int>(shade);
+    Sally::Artwork::Normalize(style);
+    return style;
+}
+
 INT_PTR
 CCfgPageAppearance::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
+    case WM_HSCROLL:
+        if (reinterpret_cast<HWND>(lParam) == GetDlgItem(HWindow, IDC_IDENTITY_SLIDER))
+        {
+            SetDlgItemInt(HWindow, IDC_IDENTITY_SHADE, static_cast<UINT>(SendDlgItemMessageW(HWindow, IDC_IDENTITY_SLIDER, TBM_GETPOS, 0, 0)), FALSE);
+            return TRUE;
+        }
+        break;
     case WM_INITDIALOG:
     {
         InitIconCombobox();
@@ -2967,6 +3014,15 @@ CCfgPageAppearance::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_COMMAND:
     {
+        if (LOWORD(wParam) == IDC_IDENTITY_PREVIEW && HIWORD(wParam) == BN_CLICKED)
+        {
+            const auto draft = ReadIdentityControls();
+            CAboutDialog preview(HWindow, &draft);
+            preview.Execute();
+            return TRUE;
+        }
+        if (LOWORD(wParam) == IDC_IDENTITY_SHADE && HIWORD(wParam) == EN_CHANGE)
+            SendDlgItemMessageW(HWindow, IDC_IDENTITY_SLIDER, TBM_SETPOS, TRUE, ReadIdentityControls().Shade);
         if (HIWORD(wParam) == BN_CLICKED)
         {
             EnableControls();

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
@@ -56,40 +56,62 @@ BEGIN
     PUSHBUTTON      "Ayuda",IDHELP,135,50,50,14
 END
 
-IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 231
+IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 275
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "General"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         "&Guardar configuración al salir",IDC_AUTOSAVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,100,12
+    CONTROL         "&Guardar configuración al salir",IDC_AUTOSAVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,295,12
     CONTROL         "&Borrar atributo de sólo lectura tras copiar desde Compact Disc",IDC_CLEARREADONLY,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,209,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,295,12
     CONTROL         "&Permitir sólo una copia de Sally a la vez",IDC_ONLYONEINSTANCE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,182,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,295,12
     CONTROL         "&Usar altavoz para señalar fin de tarea en la ventana inactiva",IDC_MINBEEPWHENDONE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,238,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,295,12
     CONTROL         "&Cerrar ventana de sistema tras ejecución de comando (en Línea de comandos)",IDC_CLOSESHELL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,55,227,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,55,295,12
     CONTROL         "Co&mparar directorios: ignorar diferencias de hora hasta",IDC_TIMERESOLUTION,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,68,182,12
     EDITTEXT        IDE_TIMERESOLUTION,184,68,28,12,ES_AUTOHSCROLL
     LTEXT           "segundos",IDC_STATIC_2,216,70,6,8,NOT WS_GROUP
     CONTROL         "C&omparar directorios: ignorar diferencias de hora de justo una o dos horas",IDC_IGNOREDSTSHIFTS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,81,256,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,81,295,12
     CONTROL         "S&eleccionar también extensión de fichero en Cambio rápido de nombre y Comprimir",IDC_QUICKRENAME_SELALL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,94,243,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,94,295,12
     CONTROL         "Seleccionar también extensión de &fichero en comando Editar nuevo fichero",IDC_EDITNEW_SELALL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,107,202,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,107,295,12
     CONTROL         "Usar &traslado rápido de directorio en Novell Netware",IDC_NETWAREFASTDIRMOVE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,120,156,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,120,295,12
     CONTROL         "Copiar ficheros: usar algoritmo así&ncrono más rápido en red (Windows 7 y posterior)",IDC_ASYNCCOPYALG,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,295,12
     CONTROL         "Mantener las &variables de entorno actualizadas a los valores del sistema",IDC_RELOADENVVARS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,295,12
     CONTROL         "&Sugerir nombres de carpetas al escribir una ruta (F5, F6, Mayús+F7)",IDC_SUGGESTPATHNAMES,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,295,12
     LTEXT           "Buscar actuali&zaciones:",IDC_UPDATECHECK_LABEL,1,178,120,8
     COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    GROUPBOX        "Perfil de configuración",IDC_PROFILE_GROUP,1,197,295,76
+    LTEXT           "Perfil actual:",IDC_PROFILE_CURRENT_LABEL,8,210,94,10
+    EDITTEXT        IDC_PROFILE_CURRENT,105,207,182,14,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Próximo inicio:",IDC_PROFILE_STARTUP_LABEL,8,228,94,10
+    COMBOBOX        IDC_PROFILE_STARTUP,105,225,95,100,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Gestionar perfiles...",IDC_PROFILE_MANAGE,205,225,82,15
+    LTEXT           "Reinicie Sally para cambiar de perfil. La opción -profile tiene prioridad.",IDC_PROFILE_NOTE,8,247,279,24
+END
+
+
+IDD_PROFILE_MANAGER DIALOGEX 0, 0, 310, 200
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Perfiles de configuración"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDC_PROFILE_LIST,8,8,140,126,LBS_NOTIFY | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP | WS_BORDER
+    LTEXT           "Nombre del nuevo perfil:",IDC_PROFILE_NAME_LABEL,158,10,144,12
+    EDITTEXT        IDC_PROFILE_NAME,158,26,144,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Crear",IDC_PROFILE_CREATE,158,48,144,16
+    PUSHBUTTON      "Eliminar seleccionado...",IDC_PROFILE_DELETE,158,72,144,16
+    LTEXT           "Los perfiles nuevos usan valores predeterminados. Crear y Eliminar se aplican de inmediato. No se pueden eliminar perfiles en uso o elegidos para el inicio.",IDC_PROFILE_MANAGER_NOTE,8,142,294,30
+    DEFPUSHBUTTON   "Cerrar",IDOK,242,178,60,16
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -1091,7 +1113,7 @@ BEGIN
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 275
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 408
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Aspecto"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1121,9 +1143,22 @@ BEGIN
     GROUPBOX        " Apariencia de la aplicación ",IDC_STATIC_7,1,192,295,74
     LTEXT           "&Tema:",IDC_STATIC_8,8,206,62,8
     COMBOBOX        IDC_THEME_MODE,78,203,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "&Color del icono:",IDC_STATIC_9,8,225,62,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,78,223,150,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Icono de la apli&cación:",IDC_STATIC_9,8,225,84,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,223,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
     LTEXT           "Para cambiar el color del icono del atajo en su escritorio o en el menú inicio,\nhaga click derecho en el atajo > Propiedades > Cambiar icono.",IDC_STATIC_10,8,244,278,16
+    GROUPBOX " Pantalla de inicio y Acerca de ",IDC_IDENTITY_GROUP,1,272,295,128
+    LTEXT "Gama de colores:",IDC_IDENTITY_PALETTE_LABEL,8,286,90,8
+    COMBOBOX IDC_IDENTITY_PALETTE,100,283,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Tono (0–100):",IDC_IDENTITY_SHADE_LABEL,8,309,90,8
+    EDITTEXT IDC_IDENTITY_SHADE,100,306,30,14,ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,306,138,14
+    LTEXT "Rótulo Sally:",IDC_IDENTITY_LETTERING_LABEL,8,332,90,8
+    COMBOBOX IDC_IDENTITY_LETTERING,100,329,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Fuente del texto:",IDC_IDENTITY_FONT_LABEL,8,355,90,8
+    COMBOBOX IDC_IDENTITY_FONT,100,352,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Color del texto:",IDC_IDENTITY_TONE_LABEL,8,378,90,8
+    COMBOBOX IDC_IDENTITY_TONE,100,375,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    PUSHBUTTON "Vista previa…",IDC_IDENTITY_PREVIEW,206,375,68,14,WS_TABSTOP
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -3982,6 +4017,21 @@ IDS_OLDPLUGINVERSION2, "El plugin (%s) no está soportado en esta versión de Sa
  IDS_SALAMANDERICON_GREEN, "Verde"
  IDS_SALAMANDERICON_BLUE, "Clásico (naranja)"
  IDS_APPLICATIONICON_BLUE, "Azul"
+ IDS_APPLICATIONICON_GECKO, "Gecko 01"
+ IDS_SPLASH_TAGLINE, "Tu gestor de archivos amigable"
+ IDS_IDENTITY_GROUP, "Pantalla de inicio y Acerca de"
+ IDS_IDENTITY_PALETTE, "Gama de colores:"
+ IDS_IDENTITY_SHADE, "Tono (0–100):"
+ IDS_IDENTITY_LETTERING, "Rótulo Sally:"
+ IDS_IDENTITY_FONT, "Fuente del texto:"
+ IDS_IDENTITY_TONE, "Color del texto:"
+ IDS_IDENTITY_PREVIEW, "Vista previa…"
+ IDS_IDENTITY_VECTOR, "Rótulo vectorial original"
+ IDS_IDENTITY_COORDINATED, "Color coordinado"
+ IDS_IDENTITY_SLATE, "Gris pizarra"
+ IDS_IDENTITY_BLACK, "Negro"
+ IDS_IDENTITY_WEBSITE, "Sitio web ↗"
+ IDS_IDENTITY_ORANGE, "Naranja"
  
  IDS_PROGDLGHOURS, "%d h"
  IDS_PROGDLGMINUTES, "%d min"
@@ -4158,3 +4208,12 @@ IDS_OLDPLUGINVERSION2, "El plugin (%s) no está soportado en esta versión de Sa
  IDS_MASTERPASSWORD_STORE_DAMAGED, "No se pudo leer la configuración de la contraseña maestra. Sally la conservará y no guardará cambios de configuración. Restaure una copia de seguridad válida antes de cambiar contraseñas."
 
 }
+
+
+STRINGTABLE
+BEGIN
+ IDS_PROFILE_DEFAULT, "(Predeterminado)"
+ IDS_PROFILE_MANAGER, "Perfiles de configuración"
+ IDS_PROFILE_NAME_RULE, "Use de 1 a 64 letras (A-Z, a-z), dígitos, puntos, guiones bajos o guiones; no . ni .. ."
+ IDS_PROFILE_DELETE_CONFIRM, "¿Eliminar permanentemente este perfil y su configuración guardada?"
+END

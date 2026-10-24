@@ -13,6 +13,7 @@
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
 #include "common/IRegistry.h"
+#include "configuration_profiles.h"
 #include "common/configuration/RegistryWriteMonitor.h"
 #include "common/update/UpdateSchedule.h"
 #include "common/fsutil.h"
@@ -2127,6 +2128,8 @@ BOOL CMainWindow::SaveConfig(HWND parent, LONG* error)
                           Configuration.TitleBarPrefix.c_str(), -1);
                 SetValueW(actKey, CONFIG_MAINWINDOWICONINDEX_REG_W, REG_DWORD,
                          &Configuration.MainWindowIconIndex, sizeof(DWORD));
+                for (const auto& setting : Sally::Artwork::IdentitySettings(Configuration.Identity))
+                    SetValueW(actKey, setting.first, REG_DWORD, setting.second, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_CLICKQUICKRENAME_REG_W, REG_DWORD,
                          &Configuration.ClickQuickRename, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_VISIBLEDRIVES_REG_W, REG_DWORD,
@@ -2687,6 +2690,11 @@ BOOL CMainWindow::SaveConfig(HWND parent, LONG* error)
         PluginMsgBoxParent = oldPluginMsgBoxParent;
         DestroyWindow(analysing.HWindow);
         SetCursor(hOldCursor);
+    }
+    if (writes.Succeeded())
+    {
+        const LONG profileError = SaveConfigurationProfileChoice();
+        sally::configuration::RegistryWriteMonitor::Require(profileError == ERROR_SUCCESS, profileError);
     }
     if (error != NULL)
         *error = writes.ErrorCode();
@@ -3756,6 +3764,9 @@ BOOL CMainWindow::LoadConfig(
                      &Configuration.MainWindowIconIndex, sizeof(DWORD));
             if (Configuration.MainWindowIconIndex < 0 || Configuration.MainWindowIconIndex >= MAINWINDOWICONS_COUNT)
                 Configuration.MainWindowIconIndex = 0;
+            for (const auto& setting : Sally::Artwork::IdentitySettings(Configuration.Identity))
+                GetValueW(actKey, setting.first, REG_DWORD, setting.second, sizeof(DWORD));
+            Sally::Artwork::Normalize(Configuration.Identity);
             GetValueW(actKey, CONFIG_CLICKQUICKRENAME_REG_W, REG_DWORD,
                      &Configuration.ClickQuickRename, sizeof(DWORD));
             GetValueW(actKey, CONFIG_VISIBLEDRIVES_REG_W, REG_DWORD,

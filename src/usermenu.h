@@ -171,6 +171,9 @@ public:
     // if not found, returns -1
     int GetSubmenuEndIndex(int index);
 
+    // Finds the opening marker for a closing row; -1 means it is orphaned.
+    int GetSubmenuBeginIndex(int index);
+
     // Move an owned item (or complete submenu) one position without relocating its objects.
     int MoveItem(int index, int direction);
 };

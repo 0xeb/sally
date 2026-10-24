@@ -5,6 +5,7 @@
 
 #include <windows.h>
 #include <shlobj.h>
+#include <string>
 
 namespace sally::shell
 {
@@ -41,4 +42,20 @@ namespace sally::shell
     HRESULT BuildBackgroundMenu(HWND owner, IShellFolder* folder, UINT first, UINT last, UINT flags,
                                 BackgroundMenu& output, BackgroundMenuDiagnostics& diagnostics,
                                 BackgroundMenuQuery query);
+
+    using MenuVerbQuery = HRESULT (*)(IContextMenu2*, UINT, std::wstring&);
+    using MenuInitialize = HRESULT (*)(IContextMenu2*, HMENU, UINT);
+    struct SharingMenuOperations
+    {
+        decltype(&RemoveMenu) Remove = &RemoveMenu;
+        decltype(&SetMenuItemInfoW) Set = &SetMenuItemInfoW;
+    };
+    // The folder-item provider owns sharing commands that the background
+    // provider can advertise with an empty child. Keep its handles and IDs.
+    // The caller must discard folderMenu after copying any other needed rows:
+    // the donor row is consumed even if attaching its child subsequently fails.
+    bool PreferFolderSharingSubmenu(HMENU folderMenu, IContextMenu2* folderContext,
+                                    HMENU backgroundMenu, IContextMenu2* backgroundContext,
+                                    MenuVerbQuery queryVerb, MenuInitialize initialize,
+                                    const SharingMenuOperations& operations = SharingMenuOperations());
 } // namespace sally::shell

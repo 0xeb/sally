@@ -354,6 +354,7 @@
 #define IDI_DROPBOX         982
 #define IDI_ONEDRIVE        983
 #define IDI_APPLICATION_BLUE 984
+#define IDI_APPLICATION_GECKO 985
 
 // bitmaps
 #define IDB_LOCK            990
@@ -376,6 +377,7 @@
 #define IDC_COLORTABLE       1009
 
 #define IDB_ABOUT_GRAD     1010
+#define IDB_GECKO_SPLASH   1011
 
 #define IDV_ARROW_RIGHT    1020
 #define IDV_ARROW_DOWN     1021
@@ -657,3 +659,17 @@
 #define CM_HELP_WHATSNEW 62040
 #define CM_HELP_SUPPORTER 62041
 #define CM_HELP_SUPPORT 62042
+
+#define IDC_IDENTITY_PALETTE              62100
+#define IDC_IDENTITY_SHADE                62101
+#define IDC_IDENTITY_SLIDER               62102
+#define IDC_IDENTITY_LETTERING            62103
+#define IDC_IDENTITY_FONT                 62104
+#define IDC_IDENTITY_TONE                 62105
+#define IDC_IDENTITY_PREVIEW              62106
+#define IDC_IDENTITY_GROUP                62107
+#define IDC_IDENTITY_PALETTE_LABEL        62108
+#define IDC_IDENTITY_SHADE_LABEL          62109
+#define IDC_IDENTITY_LETTERING_LABEL      62110
+#define IDC_IDENTITY_FONT_LABEL           62111
+#define IDC_IDENTITY_TONE_LABEL           62112

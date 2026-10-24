@@ -594,7 +594,7 @@ public:
     // customize specifies whether the configuration option should be added
     void FillUserMenu(CMenuPopup* menu, BOOL customize = TRUE);
     // internal recursive function used for filling
-    void FillUserMenu2(CMenuPopup* menu, int* iterator, int max);
+    void FillUserMenu2(CMenuPopup* menu, int* iterator, int max, BOOL submenu = FALSE);
 
     // fills the View menu with modes
     // 'popup' is the popup we are going to be filling

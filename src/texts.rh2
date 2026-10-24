@@ -2445,6 +2445,21 @@
 #define IDS_SALAMANDERICON_GREEN        13778
 #define IDS_SALAMANDERICON_BLUE         13779
 #define IDS_APPLICATIONICON_BLUE         13780
+#define IDS_APPLICATIONICON_GECKO        13781
+#define IDS_SPLASH_TAGLINE               13782
+#define IDS_IDENTITY_GROUP                   13783
+#define IDS_IDENTITY_PALETTE                 13784
+#define IDS_IDENTITY_SHADE                   13785
+#define IDS_IDENTITY_LETTERING               13786
+#define IDS_IDENTITY_FONT                    13787
+#define IDS_IDENTITY_TONE                    13788
+#define IDS_IDENTITY_PREVIEW                 13789
+#define IDS_IDENTITY_VECTOR                  13790
+#define IDS_IDENTITY_COORDINATED             13791
+#define IDS_IDENTITY_SLATE                   13792
+#define IDS_IDENTITY_BLACK                   13793
+#define IDS_IDENTITY_WEBSITE                 13794
+#define IDS_IDENTITY_ORANGE                  13795
 
 // Copy/Move progress dialog: number of hours in "time left": %d hr
 #define IDS_PROGDLGHOURS                13800
@@ -2765,6 +2780,12 @@
 #define IDS_CFG_SEARCH_CLEAR               14266
 #define IDS_CFG_SEARCH_OPEN                14267
 #define IDS_CFG_SEARCH_CLOSE               14268
+
+
+#define IDS_PROFILE_DEFAULT                    14269
+#define IDS_PROFILE_MANAGER                    14270
+#define IDS_PROFILE_NAME_RULE                  14271
+#define IDS_PROFILE_DELETE_CONFIRM             14272
 
 //#define CM_TEXTS_MAX                  18000    // maximal texts id
 

@@ -42,6 +42,7 @@ const OptionSpec kOptions[] = {
     {L"p", Option::ActivatePanel, true},
     {L"run_notepad", Option::RunNotepad, true},
     {L"profile", Option::Profile, true},
+    {L"profile-default", Option::DefaultProfile, false},
     {L"do", Option::Do, true},
 };
 
@@ -96,6 +97,11 @@ CommandLineRequest Parse(const std::vector<std::wstring>& tokens)
         {
             if (option == Option::ForceOnlyOneInstance)
                 result.forceOnlyOneInstance = true;
+            if (option == Option::DefaultProfile)
+            {
+                result.profileSpecified = true;
+                result.profile.clear();
+            }
             continue;
         }
 
@@ -104,6 +110,7 @@ CommandLineRequest Parse(const std::vector<std::wstring>& tokens)
         // as a switch - only its absence is an error.
         if (i + 1 >= tokens.size())
         {
+            if (option == Option::Profile) result.profileSpecified = true;
             result.errors.push_back(L"option " + token + L" requires a value");
             continue;
         }
@@ -160,6 +167,7 @@ CommandLineRequest Parse(const std::vector<std::wstring>& tokens)
             break;
         }
         case Option::Profile:
+            result.profileSpecified = true;
             // Applied before anything reads the configuration (see common/ConfigProfile.h);
             // here only checked, so that a bad name is reported like any other bad argument.
             if (!sally::profile::IsValidProfileName(value))

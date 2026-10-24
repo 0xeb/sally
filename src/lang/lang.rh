@@ -696,3 +696,19 @@
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
+
+// Configuration profiles.
+#define IDD_PROFILE_MANAGER                    8300
+#define IDC_PROFILE_GROUP                      8301
+#define IDC_PROFILE_CURRENT_LABEL              8302
+#define IDC_PROFILE_CURRENT                    8303
+#define IDC_PROFILE_STARTUP_LABEL              8304
+#define IDC_PROFILE_STARTUP                    8305
+#define IDC_PROFILE_MANAGE                     8306
+#define IDC_PROFILE_NOTE                       8307
+#define IDC_PROFILE_LIST                       8308
+#define IDC_PROFILE_NAME_LABEL                 8309
+#define IDC_PROFILE_NAME                       8310
+#define IDC_PROFILE_CREATE                     8311
+#define IDC_PROFILE_DELETE                     8312
+#define IDC_PROFILE_MANAGER_NOTE               8313

@@ -2603,10 +2603,11 @@ void CColorArrowButton::PaintFace(HDC hdc, const RECT* rect, BOOL enabled)
 {
     RECT r = *rect;
     SIZE arrowSize;
+    CSVGSprite& arrow = LargeArrow ? SVGArrowRight : SVGArrowRightSmall;
 
     if (ShowArrow)
     {
-        SVGArrowRightSmall.GetSize(&arrowSize);
+        arrow.GetSize(&arrowSize);
         r.right -= (int)((double)arrowSize.cx * 2.5);
     }
 
@@ -2635,7 +2636,7 @@ void CColorArrowButton::PaintFace(HDC hdc, const RECT* rect, BOOL enabled)
 
     if (ShowArrow)
     {
-        SVGArrowRightSmall.AlphaBlend(hdc,
+        arrow.AlphaBlend(hdc,
                                       r.right + (rect->right - r.right - (int)((double)arrowSize.cx * 0.6)) / 2,
                                       r.top + (r.bottom - r.top - arrowSize.cy) / 2,
                                       -1, -1,
@@ -2834,12 +2835,13 @@ void CToolbarHeader::OnPaint(HDC hDC, BOOL hideAccel, BOOL prefixOnly)
     else
         DrawEdge(hDC, &r, BDR_SUNKENOUTER, BF_RECT);
     r.left += 5;
+    if (ToolBar != NULL) r.right = (std::max)(r.left, r.right - ToolBar->GetNeededWidth() - 4);
     wchar_t buff[100];
     GetWindowTextW(HWindow, buff, 100);
     SetBkMode(hDC, TRANSPARENT);
     COLORREF oldTextColor = SetTextColor(hDC, useDark ? colors.DialogText : GetSysColor(COLOR_WINDOWTEXT));
     HFONT hOldFont = (HFONT)SelectObject(hDC, (HFONT)SendMessage(HWindow, WM_GETFONT, 0, 0));
-    DWORD dtFlags = DT_SINGLELINE | DT_LEFT | DT_VCENTER;
+    DWORD dtFlags = DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_END_ELLIPSIS;
     if (hideAccel)
         dtFlags |= DT_HIDEPREFIX;
     if (prefixOnly)
@@ -2855,6 +2857,18 @@ CToolbarHeader::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     CALL_STACK_MESSAGE4("CToolbarHeader::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
+    case WM_SIZE:
+    {
+        if (ToolBar != NULL)
+        {
+            RECT client;
+            GetClientRect(HWindow, &client);
+            SetWindowPos(ToolBar->HWindow, NULL, (std::max)(0L, client.right - ToolBar->GetNeededWidth() - 1),
+                         1, ToolBar->GetNeededWidth(), ToolBar->GetNeededHeight(), SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        break;
+    }
+
     case WM_DESTROY:
     {
         if (ToolBar != NULL)

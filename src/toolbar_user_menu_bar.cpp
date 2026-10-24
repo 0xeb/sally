@@ -492,7 +492,8 @@ CUserMenuBar::CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin)
         {
         case umitSubmenuEnd:
         {
-            level--;
+            if (level > 0)
+                level--;
             break;
         }
 

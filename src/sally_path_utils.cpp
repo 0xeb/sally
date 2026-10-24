@@ -2253,6 +2253,21 @@ int CUserMenuItems::GetSubmenuEndIndex(int index)
     return -1;
 }
 
+int CUserMenuItems::GetSubmenuBeginIndex(int index)
+{
+    if (index < 0 || index >= Count || At(index)->Type != umitSubmenuEnd)
+        return -1;
+    int level = 1;
+    for (int i = index - 1; i >= 0; --i)
+    {
+        if (At(i)->Type == umitSubmenuEnd)
+            ++level;
+        else if (At(i)->Type == umitSubmenuBegin && --level == 0)
+            return i;
+    }
+    return -1;
+}
+
 int CUserMenuItems::MoveItem(int index, int direction)
 {
     if (index < 0 || index >= Count || (direction != -1 && direction != 1))

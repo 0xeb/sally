@@ -24,6 +24,7 @@
 #include "multimon.h"
 #include "sheets.h"
 #include "configuration/ConfigurationLayout.h"
+#include "configuration/ResponsiveLayout.h"
 #include "DialogFont.h"
 #ifndef __TRACESERVER
 #include "darkmode.h"
@@ -316,7 +317,7 @@ CPropSheetPage::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         ParentDialog->HWindow = Parent;
         TransferData(ttDataToWindow);
-        if (ElasticLayout != NULL)
+        if (ElasticLayout != NULL && !ResponsiveLayout)
             ElasticLayout->LayoutCtrls();
 #ifndef __TRACESERVER
         if (DarkModeGroupBoxThemeEnabled)
@@ -327,7 +328,7 @@ CPropSheetPage::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_SIZE:
     {
-        if (ElasticLayout != NULL)
+        if (ElasticLayout != NULL && !ResponsiveLayout)
             ElasticLayout->LayoutCtrls();
         break;
     }
@@ -652,6 +653,11 @@ CTPHCaptionWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
+    case WM_SIZE:
+        // The gradient depends on the full width, not only the newly exposed strip.
+        InvalidateRect(HWindow, NULL, TRUE);
+        break;
+
     case WM_PAINT:
     {
         PAINTSTRUCT ps;
@@ -749,8 +755,10 @@ CTPHGripWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_SETCURSOR:
     {
-        // we want only north-south cursor
-        SetCursor(LoadCursor(NULL, IDC_SIZENS));
+        // Configuration uses the normal corner cursor; legacy sheets retain
+        // their vertical-only behavior.
+        const bool horizontal = GetPropW(::GetParent(HWindow), L"Sally.ResizableConfiguration") != NULL;
+        SetCursor(LoadCursor(NULL, horizontal ? IDC_SIZENWSE : IDC_SIZENS));
         return TRUE;
     }
     }
@@ -804,13 +812,28 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         NaturalPageSize = {w, h};
         MaximumPageSize = NaturalPageSize;
         PageSizes.resize(TPD->Count);
+        PageControls.resize(TPD->Count);
+        if (TPD->ResizablePages()) SetPropW(HWindow, L"Sally.ResizableConfiguration", reinterpret_cast<HANDLE>(1));
         if (TPD->ScrollablePages())
         {
-            PageViewport = hwnd;
-            SetWindowLongPtrW(hwnd, GWL_STYLE, GetWindowLongPtrW(hwnd, GWL_STYLE) |
-                WS_VISIBLE | WS_CLIPCHILDREN | WS_VSCROLL | WS_HSCROLL);
-            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_CONTROLPARENT);
-            new CTPHPageViewport(HWindow, _TPD_IDC_RECT, this);
+            // Parent erase must not overwrite the viewport or navigation controls.
+            SetWindowLongPtrW(HWindow, GWL_STYLE, GetWindowLongPtrW(HWindow, GWL_STYLE) | WS_CLIPCHILDREN);
+            // Static controls pass nonclient mouse input through. A real window
+            // owns standard scrollbar hit testing, tracking and mouse capture.
+            DestroyWindow(hwnd);
+            auto* viewport = new CTPHPageViewport(this);
+            PageViewport = viewport->CreateEx(WS_EX_CONTROLPARENT | WS_EX_COMPOSITED, CWINDOW_CLASSNAME2, L"",
+                WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN, p.x, p.y, w, h, HWindow,
+                reinterpret_cast<HMENU>(_TPD_IDC_RECT), TPD->Modul, viewport);
+            if (PageViewport == NULL)
+            {
+                delete viewport;
+                ExitButton = IDCANCEL;
+                return TRUE;
+            }
+            // Join the same guarded theme walk as native list boxes. Keep the
+            // generic window's nonclient input; do not force classic white bars.
+            SetPropW(PageViewport, L"Sally.ConfigurationViewport", reinterpret_cast<HANDLE>(1));
         }
         else
             DestroyWindow(hwnd);
@@ -866,19 +889,28 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                            ButtonSize.cy + MarginSize.cy + marginH;
 
         // set user window size and perform element layout
-        int height = (int)*WindowHeight;
+        int height;
         RECT clipR; // we do not want to be larger than screen height
         MultiMonGetClipRectByWindow(HWindow, &clipR, NULL);
+        int preferredHeight = MinWindowSize.cy;
         if (TPD->ScrollablePages())
         {
             MinWindowSize.cx = (std::min)(MinWindowSize.cx, clipR.right - clipR.left);
             MinWindowSize.cy = (std::min)(MinWindowSize.cy, clipR.bottom - clipR.top);
         }
-        if (height > clipR.bottom - clipR.top)
-            height = clipR.bottom - clipR.top;
-        if (height < MinWindowSize.cy)
-            height = MinWindowSize.cy;
-        SetWindowPos(HWindow, NULL, 0, 0, MinWindowSize.cx, height,
+        const int initialWidth = MinWindowSize.cx;
+        if (TPD->ResizablePages())
+        {
+            // Keep the former Configuration viewport height. Adding controls to
+            // a scrollable page must not enlarge every page's opening window.
+            RECT preferred = {0, 0, 0, 275};
+            Sally::Appearance::MapCurrentDialogRect(HWindow, preferred);
+            preferredHeight += preferred.bottom - h;
+        }
+        SetMinimumSize(marginW, marginH, clipR);
+        height = sally::configuration::FitOpeningHeight(*WindowHeight, preferredHeight,
+            MinWindowSize.cy, clipR.bottom - clipR.top);
+        SetWindowPos(HWindow, NULL, 0, 0, initialWidth, height,
                      SWP_NOZORDER | SWP_NOMOVE);
 
         LayoutControls();
@@ -1021,6 +1053,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_NCHITTEST:
     {
+        if (TPD->ResizablePages()) break;
         // Resize only in vertical direction
         LRESULT ht = DefWindowProcW(HWindow, uMsg, wParam, lParam);
         switch (ht)
@@ -1053,7 +1086,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // Resize only in vertical direction
         LPMINMAXINFO lpmmi = (LPMINMAXINFO)lParam;
         lpmmi->ptMinTrackSize.x = MinWindowSize.cx;
-        lpmmi->ptMaxTrackSize.x = MinWindowSize.cx;
+        if (!TPD->ResizablePages()) lpmmi->ptMaxTrackSize.x = MinWindowSize.cx;
         lpmmi->ptMinTrackSize.y = MinWindowSize.cy;
 
         // Adjust the height: https://blogs.msdn.microsoft.com/oldnewthing/20150504-00/?p=44944
@@ -1072,8 +1105,14 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         GetWindowRect(HWindow, &r);
         *WindowHeight = r.bottom - r.top;
         LayoutControls();
+        LastPageFocus = NULL;
+        EnsurePageFocusVisible();
         break;
     }
+
+    case WM_DESTROY:
+        RemovePropW(HWindow, L"Sally.ResizableConfiguration");
+        break;
 
     case WM_SYSCOLORCHANGE:
     {
@@ -1086,8 +1125,8 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     return CDialog::DialogProc(uMsg, wParam, lParam);
 }
 
-CTPHPageViewport::CTPHPageViewport(HWND parent, int id, CTreePropHolderDlg* holder)
-    : CWindow(parent, id, ooAllocated), Holder(holder)
+CTPHPageViewport::CTPHPageViewport(CTreePropHolderDlg* holder)
+    : CWindow(ooAllocated), Holder(holder)
 {
 }
 
@@ -1095,7 +1134,11 @@ LRESULT CTPHPageViewport::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 {
     if (message == WM_VSCROLL || message == WM_HSCROLL)
     {
+        const HWND window = HWindow;
         Holder->ScrollPage(message == WM_VSCROLL ? SB_VERT : SB_HORZ, LOWORD(wParam));
+#ifndef __TRACESERVER
+        if (IsWindow(window)) DarkMode_PaintConfigurationScrollbarArrows(window);
+#endif
         return 0;
     }
     if (message == WM_MOUSEWHEEL)
@@ -1109,65 +1152,234 @@ LRESULT CTPHPageViewport::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
             if (lines == WHEEL_PAGESCROLL)
                 Holder->ScrollPage(SB_VERT, up ? SB_PAGEUP : SB_PAGEDOWN);
             else
-                for (UINT i = 0; i < lines; ++i) Holder->ScrollPage(SB_VERT, up ? SB_LINEUP : SB_LINEDOWN);
+                Holder->ScrollPage(SB_VERT, up ? SB_LINEUP : SB_LINEDOWN, lines);
             WheelRemainder += up ? -WHEEL_DELTA : WHEEL_DELTA;
         }
         return 0;
     }
-    return CWindow::WindowProc(message, wParam, lParam);
+    if (message == WM_DESTROY)
+        RemovePropW(HWindow, L"Sally.ConfigurationViewport");
+    if (message == WM_ERASEBKGND)
+    {
+        RECT client;
+        GetClientRect(HWindow, &client);
+        HBRUSH brush = reinterpret_cast<HBRUSH>(SendMessageW(::GetParent(HWindow), WM_CTLCOLORDLG, wParam, reinterpret_cast<LPARAM>(HWindow)));
+        FillRect(reinterpret_cast<HDC>(wParam), &client, brush != NULL ? brush : GetSysColorBrush(COLOR_3DFACE));
+        return 1;
+    }
+    // Native NC tracking runs a modal loop which can dispatch destruction.
+    // Do not read this object after returning from the original window proc.
+    const HWND window = HWindow;
+    const LRESULT result = CWindow::WindowProc(message, wParam, lParam);
+#ifndef __TRACESERVER
+    if (IsWindow(window) && (message == WM_NCPAINT || message == WM_NCACTIVATE || message == WM_NCMOUSEMOVE ||
+        message == WM_NCMOUSELEAVE || message == WM_NCLBUTTONDOWN || message == WM_NCLBUTTONUP ||
+        message == WM_THEMECHANGED || message == WM_SIZE || message == WM_ENABLE))
+        DarkMode_PaintConfigurationScrollbarArrows(window);
+#endif
+    return result;
+}
+
+void CTreePropHolderDlg::SetMinimumSize(int borderX, int borderY, const RECT& workArea)
+{
+    if (!TPD->ResizablePages()) return;
+    // Enlargement is supported, but the former Configuration minimum must
+    // remain intact. Oversized new pages scroll inside that legacy viewport.
+    RECT page = {0, 0, 0, 275};
+    Sally::Appearance::MapCurrentDialogRect(HWindow, page);
+    MinWindowSize.cx = (std::min)(TreeWidth + MaximumPageSize.cx + 3 * MarginSize.cx + borderX,
+                                 workArea.right - workArea.left);
+    MinWindowSize.cy = (std::min)(page.bottom + CaptionHeight + ButtonSize.cy + 5 * MarginSize.cy + 1 + borderY,
+                                 workArea.bottom - workArea.top);
+}
+
+void CTreePropHolderDlg::CapturePageControls(int page)
+{
+    if (!TPD->ResizablePages()) return;
+    auto* item = TPD->At(page);
+    auto& controls = PageControls[page];
+    controls.clear();
+    const int width = PageSizes[page].cx;
+    for (HWND child = GetWindow(item->HWindow, GW_CHILD); child != NULL; child = GetWindow(child, GW_HWNDNEXT))
+    {
+        RECT r;
+        GetWindowRect(child, &r);
+        MapWindowPoints(NULL, item->HWindow, reinterpret_cast<POINT*>(&r), 2);
+        wchar_t name[32] = {};
+        GetClassNameW(child, name, ARRAYSIZE(name));
+        const LONG_PTR style = GetWindowLongPtrW(child, GWL_STYLE);
+        const bool field = _wcsicmp(name, L"edit") == 0 || _wcsicmp(name, L"combobox") == 0 ||
+            _wcsicmp(name, L"listbox") == 0 || wcscmp(name, WC_LISTVIEWW) == 0 || wcscmp(name, WC_TREEVIEWW) == 0;
+        const bool edge = r.right >= width * 9 / 10;
+        const bool line = _wcsicmp(name, L"static") == 0 && (style & SS_TYPEMASK) == SS_ETCHEDHORZ;
+        const bool group = _wcsicmp(name, L"button") == 0 && (style & BS_TYPEMASK) == BS_GROUPBOX;
+        const bool header = _wcsicmp(name, L"static") == 0 && r.right - r.left > width / 2;
+        const bool fullCheck = TPD->StretchFullRowCheckboxes(item->HWindow) &&
+            _wcsicmp(name, L"button") == 0 && (style & BS_TYPEMASK) == BS_AUTOCHECKBOX;
+        const bool stretch = (field || line || group || header || fullCheck) && edge;
+        const bool right = !stretch && r.left > width * 2 / 3;
+        bool grow = false, below = false;
+        if (item->ElasticLayout != NULL)
+        {
+            for (int index = 0; index < item->ElasticLayout->ResizeCtrls.Count; ++index)
+                grow |= item->ElasticLayout->ResizeCtrls[index].HCtrl == child;
+            below = !grow && r.top >= item->ElasticLayout->SplitY;
+        }
+        controls.push_back({child, r, stretch, right, grow, below});
+    }
+    RECT unitGap = {0, 0, 8, 0};
+    Sally::Appearance::MapCurrentDialogRect(item->HWindow, unitGap);
+    for (auto& control : controls)
+    {
+        wchar_t name[32] = {};
+        GetClassNameW(control.Window, name, ARRAYSIZE(name));
+        const LONG_PTR style = GetWindowLongPtrW(control.Window, GWL_STYLE);
+        if (_wcsicmp(name, L"button") == 0 && (style & BS_TYPEMASK) == BS_GROUPBOX)
+        {
+            // Group boxes are decorations behind their sibling controls. The
+            // composited viewport paints in Z order; a box above a caption radio
+            // would erase half its glyph and text.
+            SetWindowLongPtrW(control.Window, GWL_STYLE, style | WS_CLIPSIBLINGS);
+            // Named boxes can route mnemonics, and WS_GROUP marks a keyboard
+            // boundary. Only an unlabelled, non-interactive decoration can move.
+            const int length = GetWindowTextLengthW(control.Window);
+            std::wstring caption(static_cast<std::size_t>(length) + 1, L'\0');
+            const int copied = GetWindowTextW(control.Window, caption.data(), static_cast<int>(caption.size()));
+            caption.resize(copied);
+            if ((style & (WS_GROUP | WS_TABSTOP)) == 0 && caption.find_first_not_of(L" \t\r\n") == std::wstring::npos)
+                SetWindowPos(control.Window, HWND_BOTTOM, 0, 0, 0, 0,
+                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+        if (_wcsicmp(name, L"static") != 0 || control.Stretch || !control.Right) continue;
+        for (const auto& field : controls)
+        {
+            wchar_t fieldName[32] = {};
+            GetClassNameW(field.Window, fieldName, ARRAYSIZE(fieldName));
+            if (_wcsicmp(fieldName, L"edit") != 0 && _wcsicmp(fieldName, L"combobox") != 0) continue;
+            const int gap = control.Bounds.left - field.Bounds.right;
+            if (gap >= 0 && gap <= unitGap.right && control.Bounds.top < field.Bounds.bottom && field.Bounds.top < control.Bounds.bottom)
+            {
+                // A unit label follows its adjacent field, not the far edge.
+                control.Right = field.Right || field.Stretch;
+                break;
+            }
+        }
+    }
+}
+
+void CTreePropHolderDlg::RestorePageControls()
+{
+    if (!TPD->ResizablePages()) return;
+    for (int page = 0; page < TPD->Count; ++page)
+        if (TPD->At(page)->HWindow != NULL)
+        {
+            SetWindowPos(TPD->At(page)->HWindow, NULL, 0, 0, PageSizes[page].cx, PageSizes[page].cy,
+                         SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+            for (const auto& control : PageControls[page])
+            {
+                const auto& r = control.Bounds;
+                SetWindowPos(control.Window, NULL, r.left, r.top, r.right - r.left, r.bottom - r.top,
+                             SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+        }
 }
 
 void CTreePropHolderDlg::LayoutPageViewport()
 {
     if (PageViewport == NULL || ChildDialog == NULL || ChildDialog->HWindow == NULL)
         return;
-    RECT client;
-    // Each scrollbar can make the other necessary; recompute after the client
-    // area changes instead of assuming a particular font or monitor DPI.
-    for (int pass = 0; pass != 3; ++pass)
+    RECT outer;
+    GetWindowRect(PageViewport, &outer);
+    const int readableWidth = TPD->MinimumPageContentWidth(ChildDialog->HWindow, NaturalPageSize.cx);
+    const auto layout = sally::configuration::FitPageViewport(
+        sally::configuration::PageExtent{outer.right - outer.left, outer.bottom - outer.top},
+        sally::configuration::PageExtent{GetSystemMetrics(SM_CXVSCROLL), GetSystemMetrics(SM_CYHSCROLL)},
+        [&](sally::configuration::PageExtent view)
+        {
+            SIZE content = NaturalPageSize;
+            if (!TPD->ResizablePages() || !TPD->LayoutPage(ChildDialog->HWindow, {view.Width, view.Height}, content, false))
+                content = {(std::max)(static_cast<LONG>(readableWidth), static_cast<LONG>(view.Width)),
+                           (std::max)(NaturalPageSize.cy, static_cast<LONG>(view.Height))};
+            return sally::configuration::PageExtent{content.cx, content.cy};
+        });
+    const HWND pageWindow = ChildDialog->HWindow;
+    // Apply each range once, preserving/clamping the offset. Never hide a live
+    // scrollbar as a measurement technique or while it is tracking the mouse.
+    SCROLLINFO horizontal = {sizeof(horizontal), SIF_RANGE | SIF_PAGE | SIF_POS};
+    horizontal.nMax = (std::max)(0, layout.Content.Width - 1);
+    horizontal.nPage = layout.View.Width;
+    horizontal.nPos = GetScrollPos(PageViewport, SB_HORZ);
+    SetScrollInfo(PageViewport, SB_HORZ, &horizontal, TRUE);
+    SCROLLINFO vertical = {sizeof(vertical), SIF_RANGE | SIF_PAGE | SIF_POS};
+    vertical.nMax = (std::max)(0, layout.Content.Height - 1);
+    vertical.nPage = layout.View.Height;
+    vertical.nPos = GetScrollPos(PageViewport, SB_VERT);
+    SetScrollInfo(PageViewport, SB_VERT, &vertical, TRUE);
+    SetWindowPos(pageWindow, NULL, -GetScrollPos(PageViewport, SB_HORZ), -GetScrollPos(PageViewport, SB_VERT),
+                 layout.Content.Width, layout.Content.Height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW);
+    if (TPD->ResizablePages())
     {
-        GetClientRect(PageViewport, &client);
-        SCROLLINFO horizontal = {sizeof(horizontal), SIF_RANGE | SIF_PAGE};
-        horizontal.nMax = (std::max)(0L, NaturalPageSize.cx - 1);
-        horizontal.nPage = (std::max)(0L, client.right);
-        SetScrollInfo(PageViewport, SB_HORZ, &horizontal, TRUE);
-        SCROLLINFO vertical = {sizeof(vertical), SIF_RANGE | SIF_PAGE};
-        vertical.nMax = (std::max)(0L, NaturalPageSize.cy - 1);
-        vertical.nPage = (std::max)(0L, client.bottom);
-        SetScrollInfo(PageViewport, SB_VERT, &vertical, TRUE);
+        SIZE content = {layout.Content.Width, layout.Content.Height};
+        if (!TPD->LayoutPage(pageWindow, {layout.View.Width, layout.View.Height}, content))
+        {
+            int page = 0;
+            while (page < TPD->Count && TPD->At(page) != ChildDialog) ++page;
+            if (page < TPD->Count)
+                for (const auto& control : PageControls[page])
+                {
+                    const auto& r = control.Bounds;
+                    const auto placed = sally::configuration::AnchorControl(
+                        {r.left, r.top, r.right - r.left, r.bottom - r.top}, layout.Content.Width - NaturalPageSize.cx,
+                        layout.Content.Height - NaturalPageSize.cy, control.Stretch, control.Right, control.Grow, control.Below);
+                    SetWindowPos(control.Window, NULL, placed.X, placed.Y, placed.Width, placed.Height,
+                                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW);
+                }
+        }
     }
-    GetClientRect(PageViewport, &client);
-    SetWindowPos(ChildDialog->HWindow, NULL,
-                  -GetScrollPos(PageViewport, SB_HORZ), -GetScrollPos(PageViewport, SB_VERT),
-                  (std::max)(NaturalPageSize.cx, client.right), (std::max)(NaturalPageSize.cy, client.bottom),
-                  SWP_NOZORDER | SWP_NOACTIVATE);
+    PositionPage();
 }
 
-void CTreePropHolderDlg::ScrollPage(int bar, int command)
+void CTreePropHolderDlg::PositionPage()
 {
-    if (PageViewport == NULL)
+    // Scrolling changes only the page origin. Replanning/repositioning every
+    // control here causes incomplete frames and interrupts native bar tracking.
+    SetWindowPos(ChildDialog->HWindow, NULL, -GetScrollPos(PageViewport, SB_HORZ), -GetScrollPos(PageViewport, SB_VERT),
+                 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW | SWP_NOCOPYBITS);
+    RedrawWindow(PageViewport, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+#ifndef __TRACESERVER
+    DarkMode_PaintConfigurationScrollbarArrows(PageViewport);
+#endif
+}
+
+void CTreePropHolderDlg::ScrollPage(int bar, int command, UINT lines)
+{
+    if (PageViewport == NULL || ChildDialog == NULL || ChildDialog->HWindow == NULL)
         return;
     SCROLLINFO info = {sizeof(info), SIF_ALL};
     if (!GetScrollInfo(PageViewport, bar, &info))
         return;
     RECT line = {0, 0, 0, 10};
-    MapDialogRect(HWindow, &line);
+    Sally::Appearance::MapCurrentDialogRect(HWindow, line);
     const int step = (std::max)(1L, line.bottom);
+    const int distance = step * (std::min)(lines, static_cast<UINT>(INT_MAX / step));
+    const int maximum = (std::max)(info.nMin, info.nMax - static_cast<int>(info.nPage) + 1);
     int position = info.nPos;
     switch (command)
     {
-    case SB_LINEUP: position -= step; break;
-    case SB_LINEDOWN: position += step; break;
-    case SB_PAGEUP: position -= static_cast<int>(info.nPage); break;
-    case SB_PAGEDOWN: position += static_cast<int>(info.nPage); break;
+    case SB_LINEUP: position -= (std::min)(distance, position - info.nMin); break;
+    case SB_LINEDOWN: position += (std::min)(distance, maximum - position); break;
+    case SB_PAGEUP: position -= (std::min)(static_cast<int>(info.nPage), position - info.nMin); break;
+    case SB_PAGEDOWN: position += (std::min)(static_cast<int>(info.nPage), maximum - position); break;
     case SB_TOP: position = info.nMin; break;
-    case SB_BOTTOM: position = info.nMax; break;
+    case SB_BOTTOM: position = maximum; break;
     case SB_THUMBTRACK:
     case SB_THUMBPOSITION: position = info.nTrackPos; break;
     default: return;
     }
+    position = (std::max)(info.nMin, (std::min)(position, maximum));
+    if (position == info.nPos) return;
     SetScrollPos(PageViewport, bar, position, TRUE);
-    LayoutPageViewport();
+    PositionPage();
 }
 
 void CTreePropHolderDlg::EnsurePageFocusVisible()
@@ -1188,7 +1400,7 @@ void CTreePropHolderDlg::EnsurePageFocusVisible()
     const int dy = control.top < 0 ? control.top : control.bottom > client.bottom ? control.bottom - client.bottom : 0;
     if (dx != 0) SetScrollPos(PageViewport, SB_HORZ, GetScrollPos(PageViewport, SB_HORZ) + dx, TRUE);
     if (dy != 0) SetScrollPos(PageViewport, SB_VERT, GetScrollPos(PageViewport, SB_VERT) + dy, TRUE);
-    if (dx != 0 || dy != 0) LayoutPageViewport();
+    if (dx != 0 || dy != 0) PositionPage();
 }
 
 namespace
@@ -1235,6 +1447,7 @@ bool CTreePropHolderDlg::ReflowFont(const LOGFONTW& requested)
         return false;
     }
     ReflowFonts.push_back(font);
+    RestorePageControls();
     std::vector<FontReflowControl> controls;
     EnumChildWindows(HWindow, [](HWND window, LPARAM context) -> BOOL
                      {
@@ -1334,6 +1547,8 @@ bool CTreePropHolderDlg::ReflowFont(const LOGFONTW& requested)
                          MulDiv(client.bottom, newUnits.cy, oldUnits.cy), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         }
     }
+    for (int page = 0; page < TPD->Count; ++page)
+        if (TPD->At(page)->HWindow != NULL) CapturePageControls(page);
     RECT outer, client, workArea;
     GetWindowRect(HWindow, &outer);
     GetClientRect(HWindow, &client);
@@ -1342,9 +1557,12 @@ bool CTreePropHolderDlg::ReflowFont(const LOGFONTW& requested)
     const int borderY = outer.bottom - outer.top - client.bottom;
     MinWindowSize.cx = (std::min)(TreeWidth + MaximumPageSize.cx + 3 * MarginSize.cx + borderX, workArea.right - workArea.left);
     MinWindowSize.cy = (std::min)(MaximumPageSize.cy + CaptionHeight + ButtonSize.cy + 6 * MarginSize.cy + borderY, workArea.bottom - workArea.top);
+    SetMinimumSize(borderX, borderY, workArea);
+    const int width = TPD->ResizablePages() ? (std::max<int>)(MinWindowSize.cx,
+        (std::min<int>)(MulDiv(client.right, newUnits.cx, oldUnits.cx) + borderX, workArea.right - workArea.left)) : MinWindowSize.cx;
     const int height = (std::max)(MinWindowSize.cy, (std::min<LONG>)(MulDiv(client.bottom, newUnits.cy, oldUnits.cy) + borderY, workArea.bottom - workArea.top));
-    SetWindowPos(HWindow, NULL, (std::max)(workArea.left, (std::min)(outer.left, workArea.right - MinWindowSize.cx)),
-                 (std::max)(workArea.top, (std::min)(outer.top, workArea.bottom - height)), MinWindowSize.cx, height, SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(HWindow, NULL, (std::max)(workArea.left, (std::min)(outer.left, workArea.right - width)),
+                 (std::max)(workArea.top, (std::min)(outer.top, workArea.bottom - height)), width, height, SWP_NOZORDER | SWP_NOACTIVATE);
     LastPageFocus = NULL;
     LayoutControls();
     SendMessageW(HWindow, WM_SETREDRAW, TRUE, 0);
@@ -1375,6 +1593,16 @@ void CTreePropHolderDlg::LayoutControls()
     const int buttonHeight = scrollable ? fitted.ButtonHeight : ButtonSize.cy;
     const int footerHeight = scrollable ? fitted.FooterHeight : 2 * MarginSize.cy + ButtonSize.cy;
     int sepY = cRect.bottom - footerHeight - 1;
+    RECT footerPaint = {0, sepY, cRect.right, cRect.bottom};
+    if (scrollable)
+    {
+        RECT oldSeparator;
+        if (GetWindowRect(GetDlgItem(HWindow, _TPD_IDC_SEP), &oldSeparator))
+        {
+            MapWindowPoints(NULL, HWindow, reinterpret_cast<POINT*>(&oldSeparator), 2);
+            footerPaint.top = (std::min)(footerPaint.top, oldSeparator.top);
+        }
+    }
 
     HDWP hdwp = HANDLES(BeginDeferWindowPos(8));
     if (hdwp != NULL)
@@ -1419,7 +1647,8 @@ void CTreePropHolderDlg::LayoutControls()
                                       cRect.right - 2 * MarginSize.cx,
                                       1,
                                       SWP_NOZORDER));
-        const int buttons[] = {_TPD_IDC_OK, _TPD_IDC_APPLY, IDCANCEL, _TPD_IDC_HELP};
+        const int buttons[] = {_TPD_IDC_APPLY, IDCANCEL, _TPD_IDC_OK, _TPD_IDC_HELP};
+        const int legacyButtons[] = {_TPD_IDC_OK, IDCANCEL, _TPD_IDC_HELP};
         for (int index = 0; index < buttonCount; ++index)
         {
             const int row = index / buttonColumns;
@@ -1427,7 +1656,7 @@ void CTreePropHolderDlg::LayoutControls()
             const int rowCount = (std::min)(buttonColumns, buttonCount - row * buttonColumns);
             const int buttonsX = cRect.right - MarginSize.cx - GripSize.cx / 2 -
                                  rowCount * buttonWidth - (rowCount - 1) * ButtonMargin;
-            const int id = buttons[apply || index == 0 ? index : index + 1];
+            const int id = apply ? buttons[index] : legacyButtons[index];
             hdwp = HANDLES(DeferWindowPos(hdwp, GetDlgItem(HWindow, id), NULL,
                                           buttonsX + column * (buttonWidth + ButtonMargin),
                                           sepY + 1 + MarginSize.cy + row * (buttonHeight + ButtonMargin),
@@ -1449,7 +1678,14 @@ void CTreePropHolderDlg::LayoutControls()
         // hack: there seems to be a bug in treeview/common controls: if a scrollbar appears due to content,
         // the selected item is not redrawn, so it is cropped on the right; it may be related to full row
         // select and still aero look; anyway redrawing under W7 does not flicker, we can probably afford it
-        InvalidateRect(HTreeView, NULL, false);
+        RedrawWindow(HTreeView, NULL, NULL, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW);
+        if (scrollable)
+        {
+            // The moved separator can leave copied lines in the old footer.
+            // Erase its old/new region during live resize, including the actions.
+            RedrawWindow(HWindow, &footerPaint, NULL,
+                         RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+        }
     }
 }
 
@@ -1551,6 +1787,8 @@ BOOL CTreePropHolderDlg::SelectPage(int pageIndex)
                 if (bottom > 0) natural.bottom = (std::min)(natural.bottom, bottom + margin.bottom);
             }
             PageSizes[pageIndex] = {natural.right, natural.bottom};
+            ChildDialog->ResponsiveLayout = TPD->ResizablePages();
+            CapturePageControls(pageIndex);
             TPD->PageCreated(pageIndex);
         }
 
@@ -1567,11 +1805,33 @@ BOOL CTreePropHolderDlg::SelectPage(int pageIndex)
 
         if (PageViewport != NULL)
         {
+            bool nativeListBuffering = false;
+            for (const auto& control : PageControls[pageIndex])
+            {
+                wchar_t name[32] = {};
+                GetClassNameW(control.Window, name, ARRAYSIZE(name));
+                if (_wcsicmp(name, WC_LISTVIEWW) == 0)
+                {
+                    // SysListView32/header painting can remain invalid beneath
+                    // WS_EX_COMPOSITED. Use the control's own supported buffer.
+                    nativeListBuffering = true;
+                    ListView_SetExtendedListViewStyleEx(control.Window, LVS_EX_DOUBLEBUFFER, LVS_EX_DOUBLEBUFFER);
+                }
+            }
+            const LONG_PTR oldStyle = GetWindowLongPtrW(PageViewport, GWL_EXSTYLE);
+            const LONG_PTR newStyle = nativeListBuffering ? oldStyle & ~WS_EX_COMPOSITED : oldStyle | WS_EX_COMPOSITED;
+            if (newStyle != oldStyle)
+            {
+                SetWindowLongPtrW(PageViewport, GWL_EXSTYLE, newStyle);
+                SetWindowPos(PageViewport, NULL, 0, 0, 0, 0,
+                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_NOREDRAW);
+            }
             NaturalPageSize = PageSizes[pageIndex];
             SetScrollPos(PageViewport, SB_HORZ, 0, TRUE);
             SetScrollPos(PageViewport, SB_VERT, 0, TRUE);
             LayoutPageViewport();
             ShowWindow(ChildDialog->HWindow, SW_SHOW);
+            PositionPage(); // Paint the newly visible page, not only its hidden layout.
         }
         else
             SetWindowPos(ChildDialog->HWindow, HTreeView,
@@ -1841,15 +2101,19 @@ int CTreePropDialog::Execute(const WCHAR* buttonOK,
                   0, 0, 0, 0,
                   WS_GROUP | WS_CHILD | WS_VISIBLE | SS_ETCHEDHORZ, 0, NULL);
         // Bottom row of buttons
+        if (ApplyButtonCaption() != NULL)
+        {
+            AddItemEx(lpw, L"button", _TPD_IDC_APPLY, 0, 0, 0, 0,
+                      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, ApplyButtonCaption());
+            AddItemEx(lpw, L"button", IDCANCEL, 0, 0, 0, 0,
+                      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, buttonCancel);
+        }
         AddItemEx(lpw, L"button", _TPD_IDC_OK,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 0, buttonOK);
-        if (ApplyButtonCaption() != NULL)
-            AddItemEx(lpw, L"button", _TPD_IDC_APPLY, 0, 0, 0, 0,
-                      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, ApplyButtonCaption());
-        AddItemEx(lpw, L"button", IDCANCEL,
-                  0, 0, 0, 0,
-                  WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, buttonCancel);
+        if (ApplyButtonCaption() == NULL)
+            AddItemEx(lpw, L"button", IDCANCEL, 0, 0, 0, 0,
+                      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, buttonCancel);
         AddItemEx(lpw, L"button", _TPD_IDC_HELP,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, buttonHelp);

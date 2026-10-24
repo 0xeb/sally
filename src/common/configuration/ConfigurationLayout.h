@@ -33,6 +33,42 @@ namespace sally::configuration
                 rows * buttonHeight + (rows - 1) * buttonGap + 2 * marginY};
     }
 
+    // Saved heights are outer pixels. A preferred viewport is independent of
+    // oversized page content; only the true drag minimum constrains a saved size.
+    inline int FitOpeningHeight(unsigned long saved, int preferred, int minimum, int workArea)
+    {
+        const auto requested = saved == 0 ? static_cast<unsigned long>((std::max)(0, preferred)) : saved;
+        return (std::max)(0, (std::min)(workArea,
+            (std::max)(minimum, static_cast<int>((std::min)(requested, static_cast<unsigned long>((std::max)(0, workArea)))))));
+    }
+
+    struct PageExtent { int Width, Height; };
+    struct ViewportLayout
+    {
+        PageExtent View, Content;
+        bool Horizontal, Vertical;
+    };
+
+    // Measure without moving controls or changing live scrollbar ranges. Starting
+    // with no bars finds the least fixed point, including after a narrow->wide resize.
+    template<class Measure>
+    ViewportLayout FitPageViewport(PageExtent outer, PageExtent bars, Measure measure)
+    {
+        ViewportLayout result = {outer, outer, false, false};
+        for (int pass = 0; pass != 4; ++pass)
+        {
+            result.View = {(std::max)(1, outer.Width - (result.Vertical ? bars.Width : 0)),
+                           (std::max)(1, outer.Height - (result.Horizontal ? bars.Height : 0))};
+            result.Content = measure(result.View);
+            const bool horizontal = result.Horizontal || result.Content.Width > result.View.Width;
+            const bool vertical = result.Vertical || result.Content.Height > result.View.Height;
+            if (horizontal == result.Horizontal && vertical == result.Vertical) break;
+            result.Horizontal = horizontal;
+            result.Vertical = vertical;
+        }
+        return result;
+    }
+
     inline int FitNavigationHeader(int preferred, int available)
     {
         return (std::max)(0, (std::min)(preferred, (std::max)(0, available) * 2 / 3));

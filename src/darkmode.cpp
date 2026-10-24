@@ -6,6 +6,7 @@
 #include "darkmode.h"
 #include "combo_dark_paint.h"
 #include "common/IRegistry.h"
+#include "common/LightSurfacePolicy.h"
 
 #include <commctrl.h>
 #include <uxtheme.h>
@@ -1278,6 +1279,15 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
     if (DarkMode_IsLightSurface(hwnd))
         return;
 
+    if (GetPropW(hwnd, L"Sally.ConfigurationViewport") != NULL)
+    {
+        // The viewport owns ordinary nonclient scrollbars, just like list boxes.
+        // Scope this to it: other generic WinLib windows keep their own themes.
+        ApplyWindowTheme(hwnd, useDark, UXTHEME_EXPLORER);
+        RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_FRAME);
+        return;
+    }
+
     wchar_t className[64] = {0};
     if (GetClassNameW(hwnd, className, _countof(className)) == 0)
         return;
@@ -1540,12 +1550,7 @@ void DarkMode_SetLightSurface(HWND hwnd, BOOL enable)
 
 BOOL DarkMode_IsLightSurface(HWND hwnd)
 {
-    for (HWND current = hwnd; current != NULL; current = GetParent(current))
-    {
-        if (GetPropW(current, LIGHT_SURFACE_PROP) != NULL)
-            return TRUE;
-    }
-    return FALSE;
+    return Sally::Ui::IsLightSurface(hwnd, LIGHT_SURFACE_PROP);
 }
 
 HBRUSH DarkMode_GetDialogCtlColorBrush(UINT msg, HDC hdc, HWND hCtrl)
@@ -1755,4 +1760,74 @@ void DarkMode_ApplyGroupBoxThemeRecursive(HWND root)
     ApplyGroupBoxThemeToControl(root);
     EnumChildWindows(root, ApplyGroupBoxThemeEnumProc, 0);
     GroupBoxThemeApplyDepth--;
+}
+
+// Windows 11's active Explorer scrollbars may collapse their arrow artwork,
+// unlike the disabled ListBox bars. Keep explicit arrows in the native hit
+// regions; USER32 continues to own all range, capture and tracking behavior.
+void DarkMode_PaintConfigurationScrollbarArrows(HWND window)
+{
+    if (GetPropW(window, L"Sally.ConfigurationViewport") == NULL) return;
+    DarkModeColors colors;
+    DarkMode_GetColors(&colors);
+    RECT outer;
+    GetWindowRect(window, &outer);
+    POINT cursor;
+    GetCursorPos(&cursor);
+    HDC dc = GetWindowDC(window);
+    if (dc == NULL) return;
+    HGDIOBJ oldBrush = SelectObject(dc, GetStockObject(DC_BRUSH));
+    HGDIOBJ oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
+    for (int axis = 0; axis != 2; ++axis)
+    {
+        SCROLLBARINFO bar = {sizeof(bar)};
+        if (!GetScrollBarInfo(window, axis == 0 ? OBJID_HSCROLL : OBJID_VSCROLL, &bar) ||
+            (bar.rgstate[0] & (STATE_SYSTEM_INVISIBLE | STATE_SYSTEM_OFFSCREEN)) != 0) continue;
+        for (int end = 0; end != 2; ++end)
+        {
+            RECT rect = bar.rcScrollBar;
+            if (axis == 1)
+            {
+                if (end == 0) rect.bottom = rect.top + bar.dxyLineButton;
+                else rect.top = rect.bottom - bar.dxyLineButton;
+            }
+            else
+            {
+                if (end == 0) rect.right = rect.left + bar.dxyLineButton;
+                else rect.left = rect.right - bar.dxyLineButton;
+            }
+            if (bar.dxyLineButton <= 0 || rect.right <= rect.left || rect.bottom <= rect.top) continue;
+            const bool disabled = (bar.rgstate[end == 0 ? 1 : 5] & STATE_SYSTEM_UNAVAILABLE) != 0;
+            const bool hot = PtInRect(&rect, cursor) != FALSE && !disabled;
+            OffsetRect(&rect, -outer.left, -outer.top);
+            const int saved = SaveDC(dc);
+            if (saved == 0)
+                continue;
+            IntersectClipRect(dc, rect.left, rect.top, rect.right, rect.bottom);
+            SetDCBrushColor(dc, hot ? colors.InactiveSelection : colors.InputBackground);
+            FillRect(dc, &rect, static_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
+            const int x = (rect.left + rect.right) / 2, y = (rect.top + rect.bottom) / 2;
+            const int half = (std::max)(2L, (std::min)(rect.right - rect.left, rect.bottom - rect.top) * 3 / 16);
+            const int sign = end == 0 ? -1 : 1;
+            POINT triangle[3];
+            if (axis == 1)
+            {
+                triangle[0] = {x - half, y - sign * half / 2};
+                triangle[1] = {x + half, y - sign * half / 2};
+                triangle[2] = {x, y + sign * half / 2};
+            }
+            else
+            {
+                triangle[0] = {x - sign * half / 2, y - half};
+                triangle[1] = {x - sign * half / 2, y + half};
+                triangle[2] = {x + sign * half / 2, y};
+            }
+            SetDCBrushColor(dc, disabled ? colors.DisabledText : colors.InputText);
+            Polygon(dc, triangle, 3);
+            if (saved != 0) RestoreDC(dc, saved);
+        }
+    }
+    SelectObject(dc, oldPen);
+    SelectObject(dc, oldBrush);
+    ReleaseDC(window, dc);
 }

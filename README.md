@@ -80,6 +80,8 @@ Sally adds early dark-mode support without turning the app into a different prod
 - Windows High Contrast remains authoritative and disables custom dark painting.
 - Recent releases polished common dialogs, Find controls, About, size results, file panels, and bundled plugin surfaces.
 
+Configuration can be resized in both directions. Appearance includes a Gecko application icon and independent Splash/About color, shade, lettering and font choices, with a preview before applying changes.
+
 ### Modern Viewing
 
 The viewer stack has moved away from legacy Internet Explorer-era assumptions.
@@ -107,6 +109,12 @@ A panel path can name a file, so a shortcut can open a picture immediately:
 ```text
 sally.exe -profile preview -l "C:\Pictures\beach.jpg" -p 1 -do view
 ```
+
+Configuration > General > Configuration profile manages named profiles and chooses
+the profile for the next normal startup. Save the choice and restart Sally.
+An explicit `-profile name` overrides that choice; `-profile-default` selects the
+usual configuration without changing the saved startup preference. Single-instance
+activation routes to a window using the same profile.
 
 See [Starting Sally with Parameters](https://get-sally.app/manual/sally/othertask_param.html)
 for the full syntax and single-instance limitations.
@@ -173,7 +181,7 @@ a launcher wrapper, and troubleshooting.
 
 Sally is free, with no ads, no telemetry and no paid edition. If it saves you time, a donation pays for the next fix, and a star helps a small Windows project get found.
 
-An optional supporter key acknowledges your contribution locally. Import or paste it through **Help → Enter supporter key**; verification works offline. Your name and support dates are available in About, with an optional title-bar acknowledgement. Every feature and update remains free when the support term ends. See [Support Sally](https://get-sally.app/support-sally/) for contribution and key-delivery details.
+An optional supporter key acknowledges your contribution locally. Import or paste it through **Help → Support Sally → Enter supporter key**; verification works offline. Your name and support dates are available in About, with an optional title-bar acknowledgement. Every feature and update remains free when the support term ends. See [Support Sally](https://get-sally.app/support-sally/) for contribution and key-delivery details.
 
 <p>
   <a href="https://paypal.me/EliasBachaalany"><img alt="Donate with PayPal" src="https://img.shields.io/badge/Donate-PayPal-0070e0?style=for-the-badge&logo=paypal&logoColor=white"></a>

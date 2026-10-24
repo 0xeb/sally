@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
@@ -56,40 +56,62 @@ BEGIN
     PUSHBUTTON      "Help",IDHELP,135,50,50,14
 END
 
-IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 231
+IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 275
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Algemeen"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         "&Configuratie bij afsluiten bewaren",IDC_AUTOSAVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,100,12
+    CONTROL         "&Configuratie bij afsluiten bewaren",IDC_AUTOSAVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,295,12
     CONTROL         "&Read-only attribuut wissen bij kopiëren van Compact Disc",IDC_CLEARREADONLY,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,209,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,295,12
     CONTROL         "&Maar één instantie van Sally tegelijk toelaten",IDC_ONLYONEINSTANCE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,182,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,295,12
     CONTROL         "&Pieptoon gebruiken om voltooiing in inactief venster te melden",IDC_MINBEEPWHENDONE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,238,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,295,12
     CONTROL         "&Shell venster sluiten na voltooiing van opdracht in de opdrachtregel",IDC_CLOSESHELL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,55,227,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,55,295,12
     CONTROL         "M&appen vergelijken: tijdverschillen negeren tot",IDC_TIMERESOLUTION,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,68,182,12
     EDITTEXT        IDE_TIMERESOLUTION,184,68,28,12,ES_AUTOHSCROLL
     LTEXT           "s",IDC_STATIC_2,216,70,6,8,NOT WS_GROUP
     CONTROL         "Mapp&en vergelijken: tijdverschillen van precies een of twee uur negeren",IDC_IGNOREDSTSHIFTS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,81,256,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,81,295,12
     CONTROL         "Bestand e&xtensie ook selecteren bij Snel Naam Veranderen en Inpakken opdrachten",IDC_QUICKRENAME_SELALL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,94,243,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,94,295,12
     CONTROL         "Bestand ex&tensie ook selecteren in Bewerken Nieuw Bestand opdracht",IDC_EDITNEW_SELALL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,107,202,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,107,295,12
     CONTROL         "Map snel verplaatsen gebruiken bij Novell Net&Ware",IDC_NETWAREFASTDIRMOVE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,120,156,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,120,295,12
     CONTROL         "Bestanden kopiëren: sneller asy&nchroon algoritme bij netwerk (Windows 7 en later)",IDC_ASYNCCOPYALG,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,295,12
     CONTROL         "&Houd omgevingsvariabelen bijgewerkt op systeem waarden",IDC_RELOADENVVARS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,295,12
     CONTROL         "Mapnamen &voorstellen tijdens het typen van een pad (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,295,12
     LTEXT           "Controleren op &updates:",IDC_UPDATECHECK_LABEL,1,178,120,8
     COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    GROUPBOX        "Configuratieprofiel",IDC_PROFILE_GROUP,1,197,295,76
+    LTEXT           "Huidig profiel:",IDC_PROFILE_CURRENT_LABEL,8,210,94,10
+    EDITTEXT        IDC_PROFILE_CURRENT,105,207,182,14,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Volgende start:",IDC_PROFILE_STARTUP_LABEL,8,228,94,10
+    COMBOBOX        IDC_PROFILE_STARTUP,105,225,95,100,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Profielen beheren...",IDC_PROFILE_MANAGE,205,225,82,15
+    LTEXT           "Herstart Sally om dit profiel te gebruiken. De optie -profile heeft voorrang.",IDC_PROFILE_NOTE,8,247,279,24
+END
+
+
+IDD_PROFILE_MANAGER DIALOGEX 0, 0, 310, 200
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Configuratieprofielen"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDC_PROFILE_LIST,8,8,140,126,LBS_NOTIFY | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP | WS_BORDER
+    LTEXT           "Naam van nieuw profiel:",IDC_PROFILE_NAME_LABEL,158,10,144,12
+    EDITTEXT        IDC_PROFILE_NAME,158,26,144,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Maken",IDC_PROFILE_CREATE,158,48,144,16
+    PUSHBUTTON      "Selectie verwijderen...",IDC_PROFILE_DELETE,158,72,144,16
+    LTEXT           "Nieuwe profielen gebruiken standaardinstellingen. Maken en Verwijderen werken direct. Profielen die in gebruik zijn of voor opstarten zijn gekozen, kunnen niet worden verwijderd.",IDC_PROFILE_MANAGER_NOTE,8,142,294,30
+    DEFPUSHBUTTON   "Sluiten",IDOK,242,178,60,16
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -1091,7 +1113,7 @@ BEGIN
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 275
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 408
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Weergave"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1121,9 +1143,22 @@ BEGIN
     GROUPBOX        " Uiterlijk van toepassing ",IDC_STATIC_7,1,192,295,74
     LTEXT           "&Thema:",IDC_STATIC_8,8,206,62,8
     COMBOBOX        IDC_THEME_MODE,78,203,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Pict&ogram kleur:",IDC_STATIC_9,8,225,62,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,78,223,150,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Toepassings&pictogram:",IDC_STATIC_9,8,225,84,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,223,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
     LTEXT           "Rechts klikken en afkortingen > eigenschappen > pictogram veranderen om de\nkleur van het pictogram op de desktop of start menu te veranderen.",IDC_STATIC_10,8,244,278,16
+    GROUPBOX " Opstartscherm en Over Sally ",IDC_IDENTITY_GROUP,1,272,295,128
+    LTEXT "Kleurenfamilie:",IDC_IDENTITY_PALETTE_LABEL,8,286,90,8
+    COMBOBOX IDC_IDENTITY_PALETTE,100,283,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Tint (0–100):",IDC_IDENTITY_SHADE_LABEL,8,309,90,8
+    EDITTEXT IDC_IDENTITY_SHADE,100,306,30,14,ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,306,138,14
+    LTEXT "Sally-belettering:",IDC_IDENTITY_LETTERING_LABEL,8,332,90,8
+    COMBOBOX IDC_IDENTITY_LETTERING,100,329,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Tekstlettertype:",IDC_IDENTITY_FONT_LABEL,8,355,90,8
+    COMBOBOX IDC_IDENTITY_FONT,100,352,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Tekstkleur:",IDC_IDENTITY_TONE_LABEL,8,378,90,8
+    COMBOBOX IDC_IDENTITY_TONE,100,375,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    PUSHBUTTON "Voorbeeld…",IDC_IDENTITY_PREVIEW,206,375,68,14,WS_TABSTOP
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -3982,6 +4017,21 @@ IDS_OLDPLUGINVERSION2, "De plugin (%s) wordt niet door deze versie van Sally ond
  IDS_SALAMANDERICON_GREEN, "Groen"
  IDS_SALAMANDERICON_BLUE, "Klassiek (oranje)"
  IDS_APPLICATIONICON_BLUE, "Blauw"
+ IDS_APPLICATIONICON_GECKO, "Gecko 01"
+ IDS_SPLASH_TAGLINE, "Uw vriendelijke bestandsbeheerder"
+ IDS_IDENTITY_GROUP, "Opstartscherm en Over Sally"
+ IDS_IDENTITY_PALETTE, "Kleurenfamilie:"
+ IDS_IDENTITY_SHADE, "Tint (0–100):"
+ IDS_IDENTITY_LETTERING, "Sally-belettering:"
+ IDS_IDENTITY_FONT, "Tekstlettertype:"
+ IDS_IDENTITY_TONE, "Tekstkleur:"
+ IDS_IDENTITY_PREVIEW, "Voorbeeld…"
+ IDS_IDENTITY_VECTOR, "Oorspronkelijke vectorbelettering"
+ IDS_IDENTITY_COORDINATED, "Afgestemde kleur"
+ IDS_IDENTITY_SLATE, "Leigrijs"
+ IDS_IDENTITY_BLACK, "Zwart"
+ IDS_IDENTITY_WEBSITE, "Website ↗"
+ IDS_IDENTITY_ORANGE, "Oranje"
  
  IDS_PROGDLGHOURS, "%d uur"
  IDS_PROGDLGMINUTES, "%d min"
@@ -4158,3 +4208,12 @@ IDS_OLDPLUGINVERSION2, "De plugin (%s) wordt niet door deze versie van Sally ond
  IDS_MASTERPASSWORD_STORE_DAMAGED, "De opgeslagen hoofdwachtwoordinstellingen konden niet worden gelezen. Sally behoudt ze en slaat geen configuratiewijzigingen op. Herstel een geldige configuratieback-up voordat u wachtwoorden wijzigt."
 
 }
+
+
+STRINGTABLE
+BEGIN
+ IDS_PROFILE_DEFAULT, "(Standaard)"
+ IDS_PROFILE_MANAGER, "Configuratieprofielen"
+ IDS_PROFILE_NAME_RULE, "Gebruik 1 tot 64 letters (A-Z, a-z), cijfers, punten, onderstrepingstekens of koppeltekens; niet . of .. ."
+ IDS_PROFILE_DELETE_CONFIRM, "Dit profiel en de opgeslagen instellingen definitief verwijderen?"
+END

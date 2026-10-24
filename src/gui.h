@@ -293,10 +293,12 @@ protected:
     COLORREF TextColor;
     COLORREF BkgndColor;
     BOOL ShowArrow;
+    bool LargeArrow = false;
 
 public:
     CColorArrowButton(HWND hDlg, int ctrlID, BOOL showArrow, CObjectOrigin origin = ooAllocated);
 
+    void SetLargeArrow(bool large) { LargeArrow = large; }
     void SetColor(COLORREF textColor, COLORREF bkgndColor);
     //    void     SetColor(COLORREF color);
 

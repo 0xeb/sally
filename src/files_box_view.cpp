@@ -1580,10 +1580,12 @@ CFilesBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             IContextMenu3* contextMenu3 = NULL;
             if (SUCCEEDED(Parent->ContextMenu->QueryInterface(IID_IContextMenu3, (void**)&contextMenu3)))
             {
-                LRESULT lResult;
-                contextMenu3->HandleMenuMsg2(uMsg, wParam, lParam, &lResult);
+                LRESULT lResult = 0;
+                HRESULT result = contextMenu3->HandleMenuMsg2(uMsg, wParam, lParam, &lResult);
                 contextMenu3->Release();
-                if (uMsg == WM_MENUCHAR)
+                // This menu combines item and background providers. A declined
+                // or ignored mnemonic must still reach the background owner.
+                if (uMsg == WM_MENUCHAR && result == S_OK && HIWORD(lResult) != MNC_IGNORE)
                     return lResult;
                 // for other messages, fall through so ContextSubmenuNew also gets a chance
             }
@@ -1596,7 +1598,7 @@ CFilesBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (Parent->ContextSubmenuNew != NULL && Parent->ContextSubmenuNew->MenuIsAssigned())
         {
             CALL_STACK_MESSAGE1("CFilesBox::WindowProc::SafeHandleMenuNewMsg2");
-            LRESULT lResult;
+            LRESULT lResult = 0;
             Parent->SafeHandleMenuNewMsg2(uMsg, wParam, lParam, &lResult);
             return lResult;
         }

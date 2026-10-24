@@ -1700,9 +1700,13 @@ void CMenuPopup::OnChar(wchar_t key, BOOL* leaveMenu, DWORD* retValue)
         // http://msdn.microsoft.com/en-us/library/windows/desktop/ms646349%28v=vs.85%29.aspx
         // (it should return 0 because nothing in the menu starts with H)
         // in any case, we were getting RTCs, so we mask to the lower DWORD
-        DWORD ret = (DWORD)(SendMessage(SharedRes->HParent, WM_MENUCHAR, MF_POPUP, (LPARAM)hMenu) & 0xffffffff);
-        if (HIWORD(ret) == MNC_SELECT)
+        DWORD ret = (DWORD)(SendMessage(SharedRes->HParent, WM_MENUCHAR, MAKEWPARAM(key, MF_POPUP), (LPARAM)hMenu) & 0xffffffff);
+        if ((HIWORD(ret) == MNC_SELECT || HIWORD(ret) == MNC_EXECUTE) && LOWORD(ret) < Items.Count)
+        {
             SelectNewItemIndex(LOWORD(ret), FALSE);
+            if (HIWORD(ret) == MNC_EXECUTE)
+                OnKeyReturn(leaveMenu, retValue);
+        }
         return;
     }
     int nextIndex = FindNextItemIndex(firstIndex, key); // is there another one?

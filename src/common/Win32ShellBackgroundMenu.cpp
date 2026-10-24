@@ -6,6 +6,102 @@
 
 namespace sally::shell
 {
+    namespace
+    {
+        struct SharingRow
+        {
+            UINT Position = 0;
+            UINT Command = 0;
+            HMENU Child = nullptr;
+        };
+
+        bool FindSharingRow(HMENU menu, IContextMenu2* context, UINT first, UINT last,
+                            MenuVerbQuery queryVerb, SharingRow& row)
+        {
+            for (int position = 0; position < GetMenuItemCount(menu); ++position)
+            {
+                MENUITEMINFOW item = {sizeof(item)};
+                item.fMask = MIIM_ID | MIIM_SUBMENU | MIIM_FTYPE;
+                if (!GetMenuItemInfoW(menu, position, TRUE, &item) || item.hSubMenu == nullptr ||
+                    (item.fType & MFT_SEPARATOR) != 0 || item.wID < first || item.wID > last)
+                    continue;
+                std::wstring verb;
+                if (queryVerb(context, item.wID - first, verb) == S_OK &&
+                    _wcsicmp(verb.c_str(), L"Windows.Share") == 0)
+                {
+                    row = {static_cast<UINT>(position), item.wID, item.hSubMenu};
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        class ContextReference
+        {
+        public:
+            explicit ContextReference(IContextMenu2* context) : Context(context) { Context->AddRef(); }
+            ~ContextReference() { Context->Release(); }
+            ContextReference(const ContextReference&) = delete;
+            ContextReference& operator=(const ContextReference&) = delete;
+        private:
+            IContextMenu2* Context;
+        };
+
+        bool RowStillMatches(HMENU menu, const SharingRow& row)
+        {
+            MENUITEMINFOW item = {sizeof(item)};
+            item.fMask = MIIM_ID | MIIM_SUBMENU;
+            return GetMenuItemInfoW(menu, row.Position, TRUE, &item) &&
+                   item.wID == row.Command && item.hSubMenu == row.Child;
+        }
+    }
+
+    bool PreferFolderSharingSubmenu(HMENU folderMenu, IContextMenu2* folderContext,
+                                    HMENU backgroundMenu, IContextMenu2* backgroundContext,
+                                    MenuVerbQuery queryVerb, MenuInitialize initialize,
+                                    const SharingMenuOperations& operations)
+    {
+        if (folderContext == nullptr || backgroundContext == nullptr || queryVerb == nullptr ||
+            initialize == nullptr || operations.Remove == nullptr || operations.Set == nullptr ||
+            folderMenu == backgroundMenu || !IsMenu(folderMenu) || !IsMenu(backgroundMenu))
+            return false;
+        ContextReference folderReference(folderContext), backgroundReference(backgroundContext);
+        SharingRow folder, background;
+        if (!FindSharingRow(backgroundMenu, backgroundContext, 5000, 6000, queryVerb, background))
+            return false;
+        if (FAILED(initialize(backgroundContext, background.Child, background.Position)))
+            return false;
+        if (!FindSharingRow(backgroundMenu, backgroundContext, 5000, 6000, queryVerb, background) ||
+            GetMenuItemCount(background.Child) != 0 ||
+            !FindSharingRow(folderMenu, folderContext, 0, 4999, queryVerb, folder))
+            return false;
+        if (GetMenuItemCount(folder.Child) == 0 && FAILED(initialize(folderContext, folder.Child, folder.Position)))
+            return false;
+
+        // Initialization can change either tree. Re-read both identities before
+        // transferring ownership, without further callbacks between mutations.
+        if (!FindSharingRow(folderMenu, folderContext, 0, 4999, queryVerb, folder) ||
+            !FindSharingRow(backgroundMenu, backgroundContext, 5000, 6000, queryVerb, background) ||
+            !RowStillMatches(folderMenu, folder) || !RowStillMatches(backgroundMenu, background) ||
+            folder.Child == background.Child || GetMenuItemCount(folder.Child) <= 0 ||
+            GetMenuItemCount(background.Child) != 0)
+            return false;
+        if (!operations.Remove(folderMenu, folder.Position, MF_BYPOSITION))
+            return false;
+        MENUITEMINFOW replacement = {sizeof(replacement)};
+        replacement.fMask = MIIM_SUBMENU;
+        replacement.hSubMenu = folder.Child;
+        if (!operations.Set(backgroundMenu, background.Position, TRUE, &replacement))
+        {
+            // This source row was about to be discarded with the folder root;
+            // failure leaves the original background tree unchanged.
+            DestroyMenu(folder.Child);
+            return false;
+        }
+        DestroyMenu(background.Child);
+        return true;
+    }
+
     BackgroundMenu::~BackgroundMenu()
     {
         Reset();

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
+#include "common/artwork/IdentityStyle.h"
 
 #include <string>
 
@@ -861,7 +862,7 @@ public:
     CSplashScreen();
     ~CSplashScreen();
 
-    BOOL PaintText(const wchar_t* text, int x, int y, BOOL bold, COLORREF clr); // wide (DrawTextW)
+    BOOL PaintText(const wchar_t* text, const RECT& bounds, HFONT font, COLORREF clr, bool wrap = false, bool ellipsis = false);
     void SetText(const wchar_t* text); // wide
     int GetWidth() { return Width; }
     int GetHeight() { return Height; }
@@ -877,27 +878,36 @@ protected:
     CBitmap* OriginalBitmap; // graphics only, without text
     HFONT HNormalFont;
     HFONT HBoldFont;
-    RECT OpenSalR;
+    HFONT HTaglineFont;
+    RECT TaglineR;
     RECT VersionR;
     RECT CopyrightR;
     RECT StatusR;
-    int GradientY;
     int Width;
     int Height;
+    Sally::Artwork::IdentityStyle Identity;
+    COLORREF StatusColor;
 };
 
 //
 // ****************************************************************************
 
+class CIdentityHyperLink;
 class CAboutDialog : public CCommonDialog
 {
 protected:
     HFONT HSmallFont;
     HBRUSH HGradientBkBrush;
     CBitmap* BackgroundBitmap;
+    Sally::Artwork::IdentityStyle Identity;
+    HFONT IdentityFont;
+    HFONT DetailFont;
+    double IdentityScale;
+    CIdentityHyperLink* IdentityLinks[2];
+    void LayoutIdentity();
 
 public:
-    CAboutDialog(HWND parent);
+    CAboutDialog(HWND parent, const Sally::Artwork::IdentityStyle* preview = nullptr);
     ~CAboutDialog();
 
 protected:

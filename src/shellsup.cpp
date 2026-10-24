@@ -9,6 +9,7 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/Win32TextCodec.h"
+#include "common/Win32ShellBackgroundMenu.h"
 #include "common/unicode/PanelPathPolicy.h"
 #include "common/clipboard/ClipboardOwnershipPolicy.h"
 #include "common/clipboard/HDropWideDataObject.h"
@@ -986,6 +987,45 @@ HRESULT AuxGetCommandString(IContextMenu2* menu, UINT_PTR idCmd, UINT uType,
         name.assign(buffer.data(), wcsnlen(buffer.data(), buffer.size()));
     else
         name.clear();
+    return result;
+}
+
+static HRESULT QuerySharingVerb(IContextMenu2* context, UINT offset, std::wstring& verb)
+{
+    return AuxGetCommandString(context, offset, GCS_VERBW, NULL, verb);
+}
+
+static HRESULT InitializeSharingSubmenu(IContextMenu2* context, HMENU child, UINT position)
+{
+    CALL_STACK_MESSAGE_NONE
+    HRESULT result = E_UNEXPECTED;
+    IContextMenu3* context3 = NULL;
+    __try
+    {
+        if (SUCCEEDED(context->QueryInterface(IID_IContextMenu3, (void**)&context3)))
+        {
+            LRESULT menuResult = 0;
+            result = context3->HandleMenuMsg2(WM_INITMENUPOPUP, (WPARAM)child, MAKELPARAM(position, FALSE), &menuResult);
+        }
+        else
+            result = context->HandleMenuMsg(WM_INITMENUPOPUP, (WPARAM)child, MAKELPARAM(position, FALSE));
+    }
+    __except (CCallStack::HandleException(GetExceptionInformation(), 19))
+    {
+        ICExceptionHasOccured++;
+    }
+    if (context3 != NULL)
+    {
+        __try
+        {
+            context3->Release();
+        }
+        __except (CCallStack::HandleException(GetExceptionInformation(), 19))
+        {
+            ICExceptionHasOccured++;
+            result = E_UNEXPECTED;
+        }
+    }
     return result;
 }
 
@@ -2514,6 +2554,9 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 InsertMenuItemW(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
                             }
 
+                            sally::shell::PreferFolderSharingSubmenu(h, panel->ContextMenu,
+                                bckgndMenu, panel->ContextSubmenuNew->GetMenu2(),
+                                QuerySharingVerb, InitializeSharingSubmenu);
                             DestroyMenu(h);
                             h = bckgndMenu;
                         }

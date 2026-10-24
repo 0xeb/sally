@@ -45,6 +45,7 @@ enum class Option
     ActivatePanel,
     RunNotepad,
     Profile,
+    DefaultProfile,
     Do,
     Unknown,
 };
@@ -58,6 +59,7 @@ struct CommandLineRequest
     std::wstring titlePrefix;
     std::wstring runNotepadPath;
     std::wstring profile; // -profile <name>: a separate configuration (common/ConfigProfile.h)
+    bool profileSpecified = false; // includes -profile-default: bypass the remembered startup choice
     std::vector<std::wstring> actions; // -do <action>, in order (common/StartupActions.h)
 
     bool activePathUsesHotPath = false;

@@ -530,6 +530,29 @@ void CEditListBox::OnBeginEdit(int start, int end)
     OnSelChanged();
 }
 
+void CEditListBox::LayoutEditLine()
+{
+    if (EditLine == NULL || EditLine->HWindow == NULL)
+        return;
+    int index;
+    RECT row;
+    if (!GetCurSel(index) || SendMessage(HWindow, LB_GETITEMRECT, index, (LPARAM)&row) == LB_ERR)
+        return;
+
+    const int buttonWidth = (Flags & ELB_RIGHTARROW) ? row.bottom - row.top : 0;
+    const int iconWidth = (Flags & ELB_SHOWICON) ? IconSizes[ICONSIZE_16] + 2 : 0;
+    if (Flags & ELB_RIGHTARROW)
+    {
+        ButtonRect = row;
+        ButtonRect.left = ButtonRect.right - buttonWidth;
+    }
+    // Keep the existing edit HWND, text and selection while its list resizes.
+    SetWindowPos(EditLine->HWindow, NULL, row.left + iconWidth, row.top,
+                 max(0, row.right - row.left - buttonWidth - iconWidth), row.bottom - row.top,
+                 SWP_NOACTIVATE | SWP_NOZORDER);
+    InvalidateRect(HWindow, NULL, TRUE);
+}
+
 void CEditListBox::OnEndEdit()
 {
     CALL_STACK_MESSAGE1("CEditListBox::OnEndEdit()");
@@ -826,6 +849,13 @@ CEditListBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     CALL_STACK_MESSAGE4("CEditListBox::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
+    case WM_SIZE:
+    {
+        const LRESULT result = CWindow::WindowProc(uMsg, wParam, lParam);
+        LayoutEditLine();
+        return result;
+    }
+
     case WM_SETFONT:
         UpdateFonts((HFONT)wParam);
         break;

@@ -56,3 +56,6 @@ void DarkMode_ApplyToThreadTopLevelWindows(DWORD threadId);
 void DarkMode_ApplyListTreeThemeRecursive(HWND root);
 void DarkMode_ApplyGroupBoxThemeRecursive(HWND root);
 void DarkMode_DrawSunkenFrame(HDC hDC, const RECT* r, const DarkModeMainFramePalette& palette);
+
+// Keep native scrollbar input/tracking, but retain visible themed arrow glyphs.
+void DarkMode_PaintConfigurationScrollbarArrows(HWND window);

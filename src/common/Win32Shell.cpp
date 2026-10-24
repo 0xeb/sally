@@ -16,6 +16,7 @@
 #include <string.h>
 #include <VersionHelpers.h>
 #include "ShellUndoPolicy.h"
+#include "ShellFileOperationResult.h"
 
 namespace
 {
@@ -388,15 +389,7 @@ public:
             hr = fileOperation->GetAnyOperationsAborted(&aborted);
         fileOperation->Release();
 
-        if (FAILED(hr))
-            return ResultFromHResult(hr);
-        if (aborted)
-            return ShellResult::Error(ERROR_CANCELLED);
-        // Nothing was queued, or something was dropped on the way in: the shell never saw
-        // those items, so it cannot have reported them. Say so rather than returning Ok.
-        if (FAILED(firstItemError))
-            return ResultFromHResult(firstItemError);
-        return ShellResult::Ok();
+        return sally::shell::FileOperationResult(hr, aborted != FALSE, firstItemError);
     }
 
     ShellResult GetFileInfo(const wchar_t* path,

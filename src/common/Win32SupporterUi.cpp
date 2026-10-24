@@ -422,7 +422,7 @@ namespace Sally::Supporter
                 config.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW | TDF_SIZE_TO_CONTENT;
                 config.pszWindowTitle = Caption.c_str(); config.pszMainInstruction = Caption.c_str(); config.pszContent = Body.c_str();
                 config.cButtons = ARRAYSIZE(Buttons); config.pButtons = Buttons; config.nDefaultButton = IDCANCEL;
-                config.pfCallback = Callback; config.lpCallbackData = reinterpret_cast<LONG_PTR>(this); config.cxWidth = 350;
+                config.pfCallback = Callback; config.lpCallbackData = reinterpret_cast<LONG_PTR>(this); config.cxWidth = 250;
                 return config;
             }
             std::wstring Content()

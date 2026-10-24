@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "configuration_profiles.h"
 
 #include "mainwnd.h"
 #include "tasklist.h"
@@ -387,12 +388,21 @@ BOOL CTaskList::Init()
     // this build does not define UNICODE, so the unsuffixed names would resolve to the A forms
     // anyway, but under the msvc-unicode-canary probe they'd resolve to W forms taking wchar_t*.
     FMOMutex = NOHANDLES(OpenMutexA(SYNCHRONIZE, FALSE, processListMutexName.c_str()));
-    if (FMOMutex == NULL) // we're the first Salamander 3.0 or newer in the local session
+    bool createdProcessMutex = false;
+    if (FMOMutex == NULL)
+    {
+        FMOMutex = NOHANDLES(CreateMutexA(saPtr, TRUE, processListMutexName.c_str()));
+        if (FMOMutex != NULL)
+            createdProcessMutex = GetLastError() != ERROR_ALREADY_EXISTS;
+        else
+            // Another process may have won creation after our initial Open. Its
+            // ACL denies WRITE_OWNER, so Create's MUTEX_ALL_ACCESS cannot reopen it.
+            FMOMutex = NOHANDLES(OpenMutexA(SYNCHRONIZE, FALSE, processListMutexName.c_str()));
+    }
+    if (FMOMutex == NULL) return FALSE;
+    if (createdProcessMutex) // first instance; CreateMutex granted initial ownership
     {
         //---  creation of system objects for communication, acquire FMO
-        FMOMutex = NOHANDLES(CreateMutexA(saPtr, TRUE, processListMutexName.c_str())); // task list is valid only for the given session, mutex belongs to local namespace
-        if (FMOMutex == NULL)
-            return FALSE; // fail
         FMO = NOHANDLES(CreateFileMappingA(INVALID_HANDLE_VALUE, saPtr, PAGE_READWRITE | SEC_COMMIT,
                                            0, sizeof(CProcessList), processListName.c_str()));
         if (FMO == NULL)
@@ -424,7 +434,7 @@ BOOL CTaskList::Init()
     {
         //---  acquire FMO
         DWORD waitRet = WaitForSingleObject(FMOMutex, TASKLIST_TODO_TIMEOUT);
-        if (waitRet == WAIT_TIMEOUT)
+        if (waitRet != WAIT_OBJECT_0 && waitRet != WAIT_ABANDONED)
             return FALSE; // fail
 
         //---  attach to other system objects for communication
@@ -540,6 +550,12 @@ BOOL CTaskList::Init()
 
     ActivationDispatchMutex = NOHANDLES(CreateMutexA(
         saPtr, FALSE, activationDispatchMutexName.c_str()));
+    if (ActivationDispatchMutex == NULL)
+        // Existing shared objects deliberately deny WRITE_OWNER/WRITE_DAC.
+        // CreateMutex requests ALL_ACCESS when reopening; waiting/releasing
+        // needs only SYNCHRONIZE. Without this fallback every later Init failed.
+        ActivationDispatchMutex = NOHANDLES(OpenMutexA(
+            SYNCHRONIZE, FALSE, activationDispatchMutexName.c_str()));
     if (ActivationDispatchMutex == NULL)
     {
         if (psidEveryone != NULL)
@@ -776,6 +792,33 @@ BOOL CTaskList::FireEvent(DWORD todo, DWORD pid, BOOL* timeouted)
     return FALSE;
 }
 
+bool CTaskList::HasUnknownProfilePeer()
+{
+    if (!OK) return true;
+    const DWORD wait = WaitForSingleObject(FMOMutex, 200);
+    if (wait != WAIT_OBJECT_0 && wait != WAIT_ABANDONED) return true;
+    CProcessListItem ours;
+    RemoveKilledItems(nullptr);
+    bool unknown = false;
+    for (DWORD i = 0; i < ProcessList->ItemsCount && i < MAX_TL_ITEMS; ++i)
+    {
+        const auto& item = ProcessList->Items[i];
+        if (item.PID == ours.PID || memcmp(item.SID_MD5, ours.SID_MD5, 16) != 0 || item.ProcessState == PROCESS_STATE_ENDING)
+            continue;
+        const HWND window = reinterpret_cast<HWND>(static_cast<UINT_PTR>(item.HMainWindow));
+        DWORD owner = 0;
+        GetWindowThreadProcessId(window, &owner);
+        if (item.ProcessState == PROCESS_STATE_STARTING ||
+            (owner == item.PID && GetPropW(window, L"Sally.ConfigurationRoot") == nullptr))
+        {
+            unknown = true;
+            break;
+        }
+    }
+    ReleaseMutex(FMOMutex);
+    return unknown;
+}
+
 BOOL CTaskList::ActivateRunningInstance(
     const sally::cmdline::CommandLineRequest* request, BOOL* timeouted)
 {
@@ -823,11 +866,14 @@ BOOL CTaskList::ActivateRunningInstance(
                     item->IntegrityLevel == ourProcessInfo.IntegrityLevel &&
                     memcmp(item->SID_MD5, ourProcessInfo.SID_MD5, 16) == 0)
                 {
-                    if (item->ProcessState == PROCESS_STATE_RUNNING)
+                    if (item->ProcessState == PROCESS_STATE_RUNNING &&
+                        MatchesConfigurationProfile(reinterpret_cast<HWND>(static_cast<UINT_PTR>(item->HMainWindow)), item->PID))
                     {
                         firstRunnig = i;
                         break; // if we found running instance, we don't need to search for starting one anymore
                     }
+                    // Wait for a starting peer to publish its identity, then compare on the
+                    // next pass. This preserves simultaneous same-profile -o startup.
                     if (item->ProcessState == PROCESS_STATE_STARTING && firstStarting == -1)
                         firstStarting = i;
                 }

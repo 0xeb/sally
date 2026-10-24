@@ -51,6 +51,7 @@
 #include "common/Win32UpdateFileOps.h"
 #include "update_check.h"
 #include "common/ConfigProfile.h"
+#include "configuration_profiles.h"
 #include "common/IFileSystem.h"
 
 // Issue #82: shell-extension DLLs from OLD Sally/Salamander installs stay loaded/locked by
@@ -133,15 +134,21 @@ static BOOL BuildModuleRelativePathW(HINSTANCE module, const wchar_t* relativePa
 // -profile <name> (common/ConfigProfile.h): the configuration lives in its own key, and no other
 // configuration is read or offered for import. Before anything reads the configuration; a name that
 // is not valid is left to the command-line parse, which reports it.
-static void ApplyConfigurationProfile()
+static bool ApplyConfigurationProfile()
 {
-    const std::wstring name = sally::cmdline::ParseRawCommandLine(GetCommandLineW()).profile;
-    if (!sally::profile::IsValidProfileName(name))
-        return;
+    const LONG error = InitializeConfigurationProfiles(SalamanderConfigurationRoots[0]);
+    if (error != ERROR_SUCCESS)
+    {
+        GetUIPrompter()->ShowError(L"Sally", GetErrorTextOwned(error).c_str());
+        return false;
+    }
+    const std::wstring& name = ActiveConfigurationProfile();
+    if (name.empty()) return true;
     static std::wstring root; // SalamanderConfigurationRoots keeps pointing at it
     root = sally::profile::ProfileRegistryRoot(SalamanderConfigurationRoots[0], name);
     SalamanderConfigurationRoots[0] = root.c_str();
     SalamanderConfigurationRoots[1] = NULL; // the older versions' configurations are not looked at
+    return true;
 }
 
 // #128: a file the updater renamed aside because it was still in use (the shell extension,
@@ -3423,6 +3430,15 @@ BOOL ParseCommandLineParameters(
             sally::cmdline::ParseRawCommandLine(GetCommandLineW());
         if (!parsed.ok())
             return FALSE;
+        if (!parsed.profileSpecified && !ActiveConfigurationProfile().empty())
+        {
+            parsed.profile = ActiveConfigurationProfile();
+            if (!parsed.titlePrefixSpecified)
+            {
+                parsed.setTitlePrefix = true;
+                parsed.titlePrefix = parsed.profile;
+            }
+        }
 
         // Build the install-relative config.reg path in Unicode so non-ASCII
         // install directories survive intact through ImportConfigurationW.
@@ -3511,6 +3527,10 @@ BOOL ParseCommandLineParameters(
 
 int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine, int cmdShow)
 {
+    struct ProfileCleanup
+    {
+        ~ProfileCleanup() { ReleaseConfigurationProfiles(); }
+    } profileCleanup;
     int myExitCode = 1;
 
     //--- don't want any critical errors like "no disk in drive A:"
@@ -3580,7 +3600,8 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     MainThreadID = GetCurrentThreadId();
     HInstance = hInstance;
     CALL_STACK_MESSAGE4("WinMainBody(0x%p, , %s, %d)", hInstance, cmdLine, cmdShow);
-    ApplyConfigurationProfile();
+    if (!ApplyConfigurationProfile())
+        return 1;
 
     // Well, I'm not to blame for this... what to do when the competition does it, we must
     // too - inspired by Explorer.
@@ -3882,6 +3903,9 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         {
             GetValueW(actKey, CONFIG_SHOWSPLASHSCREEN_REG, REG_DWORD,
                       &Configuration.ShowSplashScreen, sizeof(DWORD));
+            for (const auto& setting : Sally::Artwork::IdentitySettings(Configuration.Identity))
+                GetValueW(actKey, setting.first, REG_DWORD, setting.second, sizeof(DWORD));
+            Sally::Artwork::Normalize(Configuration.Identity);
             CloseKey(actKey);
         }
         CloseKey(hSalamander);
@@ -4387,7 +4411,10 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
                     MainWindow->RightPanel->UserWorkedOnThisPath = TRUE;
 
                     // let process list know that we're running and have main window (it's possible to activate us with OnlyOneInstance)
-                    TaskList.SetProcessState(PROCESS_STATE_RUNNING, MainWindow->HWindow);
+                    // Publish before discovery: -o may only activate the same effective profile.
+                    if (PublishConfigurationProfile(MainWindow->HWindow))
+                        TaskList.SetProcessState(PROCESS_STATE_RUNNING, MainWindow->HWindow);
+                    FinishConfigurationProfileStartup();
 
                     // ask Salmon to check if there are old bug reports on disk that need to be sent
                     SalmonCheckBugs();

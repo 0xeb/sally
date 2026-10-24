@@ -146,6 +146,22 @@ LONG EnsureRegStringTerminator(HKEY key, DWORD type, void* data, DWORD capacity,
 class Win32Registry : public IRegistry
 {
 public:
+    RegistryResult CreateKeyExclusive(HKEY root, const wchar_t* subKey, HKEY& outKey) override
+    {
+        outKey = nullptr;
+        DWORD disposition = 0;
+        HKEY key = nullptr;
+        const LONG error = HANDLES_Q(RegCreateKeyExW(root, subKey, 0, nullptr, REG_OPTION_NON_VOLATILE,
+                                                    KEY_READ | KEY_WRITE, nullptr, &key, &disposition));
+        if (error != ERROR_SUCCESS) return RegistryResult::Error(error);
+        if (disposition != REG_CREATED_NEW_KEY)
+        {
+            HANDLES(RegCloseKey(key));
+            return RegistryResult::Error(ERROR_ALREADY_EXISTS);
+        }
+        outKey = key;
+        return RegistryResult::Ok();
+    }
     // These must go through HANDLES()/HANDLES_Q(), not raw RegOpenKeyExW/
     // RegCreateKeyExW/RegCloseKey - CloseKey(HKEY) (regwork.cpp's CloseKeyAux, the only close path
     // callers of OpenKeyW/CreateKeyW have - there is no CloseKeyW) closes through the HANDLES-

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
@@ -56,40 +56,62 @@ BEGIN
     PUSHBUTTON      "Nápoveda",IDHELP,135,50,50,14
 END
 
-IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 231
+IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 275
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Všeobecné"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         "&Pred ukončením uložiť konfiguráciu",IDC_AUTOSAVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,100,12
+    CONTROL         "&Pred ukončením uložiť konfiguráciu",IDC_AUTOSAVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,295,12
     CONTROL         "Pri &kopírovaní z kompaktného disku odstrániť atribút len na čítanie",IDC_CLEARREADONLY,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,209,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,295,12
     CONTROL         "Povol&iť iba jednu inštanciu programu Sally",IDC_ONLYONEINSTANCE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,182,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,295,12
     CONTROL         "&Upozorniť zvukovým signálom na dokončenie operácie v neaktívnom okne",IDC_MINBEEPWHENDONE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,238,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,295,12
     CONTROL         "Zat&voriť okno prostredia po vykonaní príkazu (z príkazového riadku)",IDC_CLOSESHELL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,55,227,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,55,295,12
     CONTROL         "P&orovnanie adresárov: ignorovať časové rozdiely až do",IDC_TIMERESOLUTION,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,68,182,12
     EDITTEXT        IDE_TIMERESOLUTION,184,68,28,12,ES_AUTOHSCROLL
     LTEXT           "s",IDC_STATIC_2,216,70,6,8,NOT WS_GROUP
     CONTROL         "Po&rovnanie adresárov: ignorovať časové rozdiely presne jednej alebo dvoch hodín",IDC_IGNOREDSTSHIFTS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,81,256,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,81,295,12
     CONTROL         "Vybr&ať aj príponu súboru v príkazoch Rýchlo premenovať a Komprimovať",IDC_QUICKRENAME_SELALL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,94,243,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,94,295,12
     CONTROL         "Vybrať aj prípo&nu súboru v príkaze Upraviť nový súbor",IDC_EDITNEW_SELALL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,107,202,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,107,295,12
     CONTROL         "Použiť rýchly presun adresárov na Novell Net&Ware",IDC_NETWAREFASTDIRMOVE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,120,156,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,120,295,12
     CONTROL         "Kopírovanie &súborov: použiť rýchlejší asynchrónny algoritmus na sieť (Windows 7 a novšie)",IDC_ASYNCCOPYALG,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,295,12
     CONTROL         "U&držiavať premenné prostredia aktualizované na systémové hodnoty",IDC_RELOADENVVARS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,295,12
     CONTROL         "Navr&hovať názvy priečinkov pri písaní cesty (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,290,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,295,12
     LTEXT           "Kon&trolovať aktualizácie:",IDC_UPDATECHECK_LABEL,1,178,120,8
     COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    GROUPBOX        "Profil nastavení",IDC_PROFILE_GROUP,1,197,295,76
+    LTEXT           "Používaný profil:",IDC_PROFILE_CURRENT_LABEL,8,210,94,10
+    EDITTEXT        IDC_PROFILE_CURRENT,105,207,182,14,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Ďalšie spustenie:",IDC_PROFILE_STARTUP_LABEL,8,228,94,10
+    COMBOBOX        IDC_PROFILE_STARTUP,105,225,95,100,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Správa profilov...",IDC_PROFILE_MANAGE,205,225,82,15
+    LTEXT           "Na zmenu profilu reštartujte Sally. Prepínač -profile má prednosť.",IDC_PROFILE_NOTE,8,247,279,24
+END
+
+
+IDD_PROFILE_MANAGER DIALOGEX 0, 0, 310, 200
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Profily nastavení"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDC_PROFILE_LIST,8,8,140,126,LBS_NOTIFY | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP | WS_BORDER
+    LTEXT           "Názov nového profilu:",IDC_PROFILE_NAME_LABEL,158,10,144,12
+    EDITTEXT        IDC_PROFILE_NAME,158,26,144,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Vytvoriť",IDC_PROFILE_CREATE,158,48,144,16
+    PUSHBUTTON      "Odstrániť vybraný...",IDC_PROFILE_DELETE,158,72,144,16
+    LTEXT           "Nové profily majú predvolené nastavenia. Vytvorenie a odstránenie platia ihneď. Používané profily a profily zvolené na ďalšie spustenie nemožno odstrániť.",IDC_PROFILE_MANAGER_NOTE,8,142,294,30
+    DEFPUSHBUTTON   "Zavrieť",IDOK,242,178,60,16
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -1091,7 +1113,7 @@ BEGIN
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 275
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 408
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Vzhľad"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1121,9 +1143,22 @@ BEGIN
     GROUPBOX        " Vzhľad aplikácie ",IDC_STATIC_7,1,192,295,74
     LTEXT           "Mo&tív:",IDC_STATIC_8,8,206,62,8
     COMBOBOX        IDC_THEME_MODE,78,203,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "&Farba ikony:",IDC_STATIC_9,8,225,62,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,78,223,150,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Ikona aplikácie:",IDC_STATIC_9,8,225,84,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,223,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
     LTEXT           "Na zmenu farby ikony zástupcu na ploche alebo v ponuke Štart,\nkliknite pravým tlačidlom na zástupcu > Vlastnosti > Zmeniť ikonu.",IDC_STATIC_10,8,244,278,16
+    GROUPBOX " Úvodné okno a O aplikácii ",IDC_IDENTITY_GROUP,1,272,295,128
+    LTEXT "Farebný rad:",IDC_IDENTITY_PALETTE_LABEL,8,286,90,8
+    COMBOBOX IDC_IDENTITY_PALETTE,100,283,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Odtieň (0–100):",IDC_IDENTITY_SHADE_LABEL,8,309,90,8
+    EDITTEXT IDC_IDENTITY_SHADE,100,306,30,14,ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,306,138,14
+    LTEXT "Nápis Sally:",IDC_IDENTITY_LETTERING_LABEL,8,332,90,8
+    COMBOBOX IDC_IDENTITY_LETTERING,100,329,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Písmo textu:",IDC_IDENTITY_FONT_LABEL,8,355,90,8
+    COMBOBOX IDC_IDENTITY_FONT,100,352,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Farba textu:",IDC_IDENTITY_TONE_LABEL,8,378,90,8
+    COMBOBOX IDC_IDENTITY_TONE,100,375,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    PUSHBUTTON "Náhľad…",IDC_IDENTITY_PREVIEW,206,375,68,14,WS_TABSTOP
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -3982,6 +4017,21 @@ IDS_OLDPLUGINVERSION2, "Tento plugin (%s) nie je podporovaný v tejto verzii Sal
  IDS_SALAMANDERICON_GREEN, "Zelená"
  IDS_SALAMANDERICON_BLUE, "Klasická (oranžová)"
  IDS_APPLICATIONICON_BLUE, "Modrá"
+ IDS_APPLICATIONICON_GECKO, "Gecko 01"
+ IDS_SPLASH_TAGLINE, "Váš priateľský správca súborov"
+ IDS_IDENTITY_GROUP, "Úvodné okno a O aplikácii"
+ IDS_IDENTITY_PALETTE, "Farebný rad:"
+ IDS_IDENTITY_SHADE, "Odtieň (0–100):"
+ IDS_IDENTITY_LETTERING, "Nápis Sally:"
+ IDS_IDENTITY_FONT, "Písmo textu:"
+ IDS_IDENTITY_TONE, "Farba textu:"
+ IDS_IDENTITY_PREVIEW, "Náhľad…"
+ IDS_IDENTITY_VECTOR, "Pôvodný vektorový nápis"
+ IDS_IDENTITY_COORDINATED, "Zladená farba"
+ IDS_IDENTITY_SLATE, "Bridlicová"
+ IDS_IDENTITY_BLACK, "Čierna"
+ IDS_IDENTITY_WEBSITE, "Web ↗"
+ IDS_IDENTITY_ORANGE, "Oranžová"
  
  IDS_PROGDLGHOURS, "%d hod"
  IDS_PROGDLGMINUTES, "%d min"
@@ -4158,3 +4208,12 @@ IDS_OLDPLUGINVERSION2, "Tento plugin (%s) nie je podporovaný v tejto verzii Sal
  IDS_MASTERPASSWORD_STORE_DAMAGED, "Uložené nastavenia hlavného hesla sa nedajú prečítať. Sally ich zachová a neuloží zmeny konfigurácie. Pred zmenou hesiel obnovte funkčnú zálohu konfigurácie."
 
 }
+
+
+STRINGTABLE
+BEGIN
+ IDS_PROFILE_DEFAULT, "(Predvolený)"
+ IDS_PROFILE_MANAGER, "Profily nastavení"
+ IDS_PROFILE_NAME_RULE, "Použite 1 až 64 písmen (A-Z, a-z), číslic, bodiek, podčiarkovníkov alebo pomlčiek; nie . ani .. ."
+ IDS_PROFILE_DELETE_CONFIRM, "Natrvalo odstrániť tento profil a jeho uložené nastavenia?"
+END

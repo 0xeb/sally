@@ -125,6 +125,9 @@ public:
     // used by dialog as info to refresh the list; 'itemsStateUID' can be NULL
     // if 'timeouted' is not NULL, sets whether failure was caused by timeout waiting for shared memory
     int GetItems(CProcessListItem* items, DWORD* itemsStateUID, BOOL* timeouted = NULL);
+    // Older peers cannot advertise which registry root they own. Destructive profile
+    // operations fail closed while one might be using a named profile.
+    bool HasUnknownProfilePeer();
 
     // asks process 'pid' to perform action per 'todo' (except TASKLIST_TODO_ACTIVATE)
     // if 'timeouted' is not NULL, sets whether failure was caused by timeout waiting for shared memory

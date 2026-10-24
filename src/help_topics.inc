@@ -373,6 +373,7 @@
 {L"sally", 6110u, L"viewerdlg_find"}, // IDD_FINDSET
 {L"sally", 6220u, L"viewerdlg_gotooffset"}, // IDD_VIEWERGOTOOFFSET
 {L"sally", 7001u, L"plugins_config"}, // CM_PLUGINCFG_MIN
+{L"sally", 8300u, L"configuration_gener"}, // IDD_PROFILE_MANAGER
 {L"splitcbn", 101u, L"dlgboxes_config"}, // IDD_CONFIG
 {L"splitcbn", 102u, L"dlgboxes_split"}, // IDD_SPLIT
 {L"splitcbn", 103u, L"dlgboxes_combine"}, // IDD_COMBINE

@@ -1962,7 +1962,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             // user clicked a group in the User Menu Toolbar
             int iterator = id - CM_USERMENU_MIN;
             int endIndex = UserMenuItems->GetSubmenuEndIndex(iterator);
-            if (endIndex != -1)
+            // A missing closing marker implicitly extends to the end of the
+            // saved list. Keep its children reachable without rewriting data.
+            if (endIndex == -1)
+                endIndex = min(CM_USERMENU_MAX - CM_USERMENU_MIN, UserMenuItems->Count);
+            if (iterator < endIndex)
             {
                 UserMenuIconBkgndReader.BeginUserMenuIconsInUse();
                 iterator++;

@@ -56,6 +56,10 @@ public:
     // Creates key (or opens if exists)
     virtual RegistryResult CreateKey(HKEY root, const wchar_t* subKey, HKEY& outKey) = 0;
 
+    // Create a new key only. Never opens/merges an existing destination.
+    virtual RegistryResult CreateKeyExclusive(HKEY root, const wchar_t* subKey, HKEY& outKey)
+    { (void)root; (void)subKey; outKey = nullptr; return RegistryResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+
     // Closes key handle
     virtual void CloseKey(HKEY key) = 0;
 

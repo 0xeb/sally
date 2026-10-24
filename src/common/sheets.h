@@ -34,6 +34,7 @@ protected:
     void FindMoveCtrls();
 
 protected:
+    friend class CTreePropHolderDlg;
     // handle of dialog whose layout we ensure
     HWND HWindow;
     // dividing line from which we move controls (lies on bottom edge of ResizeCntrls)
@@ -96,6 +97,7 @@ protected:
     // if different from NULL, we change the layout of controls when dialog size changes
     CElasticLayout* ElasticLayout;
     BOOL DarkModeGroupBoxThemeEnabled;
+    bool ResponsiveLayout = false;
 
     friend class CPropertyDialog;
     friend class CTreePropDialog;
@@ -166,7 +168,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
-// on grip control we want only top-down cursor
+// Legacy tree dialogs resize vertically; Configuration opts into both axes.
 class CTPHGripWindow : public CWindow
 {
 public:
@@ -181,7 +183,7 @@ class CTPHPageViewport : public CWindow
     CTreePropHolderDlg* Holder;
     int WheelRemainder = 0;
 public:
-    CTPHPageViewport(HWND parent, int id, CTreePropHolderDlg* holder);
+    explicit CTPHPageViewport(CTreePropHolderDlg* holder);
 protected:
     virtual LRESULT WindowProc(UINT message, WPARAM wParam, LPARAM lParam);
 };
@@ -199,6 +201,16 @@ protected:
     SIZE MaximumPageSize = {};
     std::vector<SIZE> PageSizes;
     std::vector<HFONT> ReflowFonts;
+    struct PageControl
+    {
+        HWND Window;
+        RECT Bounds;
+        bool Stretch, Right, Grow, Below;
+    };
+    std::vector<std::vector<PageControl>> PageControls;
+    void CapturePageControls(int page);
+    void RestorePageControls();
+    void SetMinimumSize(int borderX, int borderY, const RECT& workArea);
     HWND LastPageFocus = NULL;
     RECT ChildDialogRect;
     int CurrentPageIndex;
@@ -230,7 +242,8 @@ protected:
     void EnableButtons();
     BOOL SelectPage(int pageIndex);
     void LayoutPageViewport();
-    void ScrollPage(int bar, int command);
+    void ScrollPage(int bar, int command, UINT lines = 1);
+    void PositionPage();
     void EnsurePageFocusVisible();
     bool ReflowFont(const LOGFONTW& font);
 
@@ -284,6 +297,11 @@ public:
     virtual const WCHAR* ApplyButtonCaption() const { return NULL; }
     virtual bool AfterTransfer(bool save) { return true; }
     virtual bool ScrollablePages() const { return false; }
+    virtual bool ResizablePages() const { return false; }
+    // Readability affects the scrollable canvas, never the dialog's saved/default/minimum size.
+    virtual int MinimumPageContentWidth(HWND window, int naturalWidth) { return naturalWidth; }
+    virtual bool StretchFullRowCheckboxes(HWND window) const { return false; }
+    virtual bool LayoutPage(HWND window, SIZE available, SIZE& content, bool apply = true) { return false; }
     void RefreshLayout() { Dialog.LayoutControls(); }
     bool ReflowFont(const LOGFONTW& font) { return Dialog.ReflowFont(font); }
     bool NavigateToPage(int page, int control = 0);

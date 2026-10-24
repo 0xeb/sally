@@ -6,7 +6,10 @@
 // instead of HKCU\Software\Sally\1.0. A new name starts with Sally's defaults; the same name again
 // finds the same configuration. The usual configuration is not read, changed or offered for import,
 // so a profile is a clean, disposable Sally (to try a setting, a new release, or a fresh start)
-// beside the one in daily use. Delete the key to remove a profile.
+// beside the one in daily use. Configuration > General can manage named profiles
+// and remember one for normal launches. Explicit -profile <name> takes precedence;
+// -profile-default explicitly selects the usual configuration without reserving
+// a named profile called "default".
 //
 // The switch is applied before anything reads the configuration: Sally parses its command line
 // (common/CommandLineParser.h) for it first, then again at the usual place.

@@ -6,6 +6,7 @@
 
 #include "common/configuration/ConfigurationSearchIndex.h"
 #include "common/configuration/ConfigurationDraft.h"
+#include "common/artwork/IdentityStyle.h"
 #include <functional>
 #include <utility>
 
@@ -181,7 +182,7 @@ typedef struct
     int IconResID;
     int TextResID;
 } CMainWindowIconItem;
-#define MAINWINDOWICONS_COUNT 5
+#define MAINWINDOWICONS_COUNT 6
 extern CMainWindowIconItem MainWindowIcons[MAINWINDOWICONS_COUNT];
 
 struct CConfiguration
@@ -478,6 +479,7 @@ struct CConfiguration
     std::wstring TitleBarPrefixForced;              // command-line variant has priority and is not saved
     int MainWindowIconIndex;                     // index of the icon in MainWindowIcons[], 0=default
     int MainWindowIconIndexForced;               // command-line variant, has priority and is not saved; -1 -- unset
+    Sally::Artwork::IdentityStyle Identity;
 
     int ClickQuickRename; // clicking the focused item triggers Quick Rename
 
@@ -516,8 +518,12 @@ extern CLoadSaveToRegistryMutex LoadSaveToRegistryMutex; // mutex for synchroniz
 
 class CCfgPageGeneral : public CCommonPropSheetPage
 {
+    std::vector<std::wstring> ProfileNames;
+    std::wstring StartupProfile;
+    void LoadProfiles();
 public:
     CCfgPageGeneral();
+    bool CommitProfileChoice(HWND parent);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -1107,6 +1113,7 @@ public:
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
     BOOL InitIconCombobox();
+    Sally::Artwork::IdentityStyle ReadIdentityControls();
 };
 
 //
@@ -1265,6 +1272,10 @@ protected:
     virtual const WCHAR* ApplyButtonCaption() const override { return ApplyCaption.c_str(); }
     virtual bool AfterTransfer(bool save) override;
     virtual bool ScrollablePages() const override { return true; }
+    virtual bool ResizablePages() const override { return true; }
+    virtual int MinimumPageContentWidth(HWND window, int naturalWidth) override;
+    virtual bool StretchFullRowCheckboxes(HWND window) const override { return window == PageGeneral.HWindow; }
+    virtual bool LayoutPage(HWND window, SIZE available, SIZE& content, bool apply = true) override;
     virtual void DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 

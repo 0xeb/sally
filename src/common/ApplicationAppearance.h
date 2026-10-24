@@ -7,8 +7,8 @@
 
 namespace Sally::Appearance
 {
-inline constexpr int IconCount = 5;
-inline constexpr int IconResources[IconCount] = {960, 961, 962, 963, 984};
+inline constexpr int IconCount = 6;
+inline constexpr int IconResources[IconCount] = {960, 961, 962, 963, 984, 985};
 inline constexpr ULONG_PTR CopyDataId = 0x41505031;
 struct Snapshot
 {

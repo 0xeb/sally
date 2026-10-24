@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 #include "common/ColumnWidthInput.h"
+#include "common/ConfigProfileStore.h"
+#include "configuration_profiles.h"
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
@@ -16,6 +18,7 @@
 #include "usermenu.h"
 #include "edtlbwnd.h"
 #include "cfgdlg.h"
+#include "common/configuration/ResponsiveLayout.h"
 #include "dialogs.h"
 #include "sal_colors.h"
 #include "plugins.h"
@@ -572,6 +575,7 @@ CConfiguration::CConfiguration()
 
     MainWindowIconIndex = 0; // default icon
     MainWindowIconIndexForced = -1;
+    Identity = Sally::Artwork::IdentityStyle{};
 
     ClickQuickRename = TRUE;
 
@@ -896,6 +900,162 @@ sally::configuration::DraftState CConfigurationDlg::CaptureDraft(int page)
     return state;
 }
 
+int CConfigurationDlg::MinimumPageContentWidth(HWND window, int naturalWidth)
+{
+    if (window != PageGeneral.HWindow) return naturalWidth;
+    RECT margins = {0, 0, 4, 0};
+    Sally::Appearance::MapCurrentDialogRect(window, margins);
+    int width = naturalWidth;
+    for (int id : {IDC_AUTOSAVE, IDC_CLEARREADONLY, IDC_ONLYONEINSTANCE, IDC_MINBEEPWHENDONE,
+                   IDC_CLOSESHELL, IDC_IGNOREDSTSHIFTS, IDC_QUICKRENAME_SELALL, IDC_EDITNEW_SELALL,
+                   IDC_NETWAREFASTDIRMOVE, IDC_ASYNCCOPYALG, IDC_RELOADENVVARS, IDC_SUGGESTPATHNAMES})
+    {
+        const HWND check = GetDlgItem(window, id);
+        const int length = GetWindowTextLengthW(check);
+        std::wstring caption(static_cast<size_t>(length) + 1, L'\0');
+        GetWindowTextW(check, caption.data(), static_cast<int>(caption.size()));
+        HDC dc = GetDC(check);
+        if (!dc) continue;
+        HGDIOBJ previous = SelectObject(dc, reinterpret_cast<HFONT>(SendMessageW(check, WM_GETFONT, 0, 0)));
+        RECT text{};
+        DrawTextW(dc, caption.c_str(), length, &text, DT_CALCRECT | DT_SINGLELINE);
+        if (previous && previous != HGDI_ERROR) SelectObject(dc, previous);
+        ReleaseDC(check, dc);
+        width = (std::max)(width, static_cast<int>(text.right) + GetSystemMetrics(SM_CXMENUCHECK) + 8 + static_cast<int>(margins.right));
+    }
+    return width;
+}
+
+bool CConfigurationDlg::LayoutPage(HWND window, SIZE available, SIZE& content, bool apply)
+{
+    const bool main = window == PageMainWindow.HWindow;
+    const bool drives = window == PageDrives.HWindow;
+    const bool viewer = window == PageViewer.HWindow;
+    const bool colors = window == PageColors.HWindow;
+    if (!main && !drives && !viewer && !colors) return false;
+    RECT units = {0, 0, 200, 14};
+    Sally::Appearance::MapCurrentDialogRect(window, units);
+    const int width = (std::max<int>)(units.right, available.cx);
+    const int button = units.bottom;
+    const int gap = (std::max<int>)(2, button / 3);
+    const auto measure = [&](int id, int targetWidth)
+    {
+        HWND control = GetDlgItem(window, id);
+        if (control == NULL) return button;
+        const int length = GetWindowTextLengthW(control);
+        std::wstring text(length + 1, L'\0');
+        GetWindowTextW(control, &text[0], length + 1);
+        HDC dc = GetDC(control);
+        HFONT font = reinterpret_cast<HFONT>(SendMessageW(control, WM_GETFONT, 0, 0));
+        HGDIOBJ old = SelectObject(dc, font);
+        wchar_t name[32] = {};
+        GetClassNameW(control, name, ARRAYSIZE(name));
+        const bool check = _wcsicmp(name, L"button") == 0;
+        RECT bounds = {0, 0, (std::max<int>)(1, targetWidth - (check ? button : 0)), 0};
+        DrawTextW(dc, text.c_str(), length, &bounds, DT_CALCRECT | DT_WORDBREAK);
+        SelectObject(dc, old);
+        ReleaseDC(control, dc);
+        return (std::max<int>)(button * 2 / 3, bounds.bottom + (check ? gap : 0));
+    };
+    sally::configuration::PageRows rows(width, gap, button * 2 / 3, button, measure);
+    if (main)
+    {
+        rows.Text(IDC_SPLASHSCREEN, true);
+        rows.Text(IDC_STATUSAREA, true);
+        rows.Field(IDC_TITLEBAR_PATH, IDC_TITLEBAR_MODE);
+        rows.Field(IDC_TITLEBAR_PREFIX, IDC_TITLEBAR_PREFIX_TEXT);
+    }
+    else if (drives)
+    {
+        const int groups[][3] = {
+            {IDC_STATIC_10, IDC_DRVSPEC_FLOPPYMON, IDC_DRVSPEC_FLOPPYSIMPLE},
+            {IDC_STATIC_2, IDC_DRVSPEC_REMOVABLEMON, IDC_DRVSPEC_REMOVABLESIMPLE},
+            {IDC_STATIC_4, IDC_DRVSPEC_FIXEDMON, IDC_DRVSPEC_FIXEDSIMPLE},
+            {IDC_STATIC_6, IDC_DRVSPEC_CDROMMON, IDC_DRVSPEC_CDROMSIMPLE},
+            {IDC_STATIC_8, IDC_DRVSPEC_REMOTEMON, IDC_DRVSPEC_REMOTESIMPLE}};
+        for (const auto& group : groups)
+        {
+            rows.Text(group[0]);
+            rows.Checks({group[1], group[2]}, 2);
+            rows.Space();
+        }
+        rows.Text(IDC_DRVSPEC_REMOTEACT, true);
+        rows.Field(IDC_STATIC_9, IDE_DRVSPEC_ONERRGOTO, IDB_BROWSECOMMAND);
+    }
+    else if (viewer)
+    {
+        rows.Text(IDC_STATIC_1);
+        rows.Checks({IDC_CRLFEOL, IDC_CREOL, IDC_LFEOL, IDC_NULLEOL}, 2);
+        for (int id : {IDC_STATIC_2, IDC_STATIC_3, IDC_STATIC_4}) rows.Text(id);
+        rows.Space();
+        rows.Text(IDC_STATIC_5);
+        rows.Checks({IDC_SAVEONCLOSE, IDC_SETBYMAINWINDOW}, 2);
+        rows.Space();
+        rows.Text(IDC_STATIC_6);
+        rows.Text(IDC_COPYFINDTEXT, true);
+        rows.Field(IDC_STATIC_7, IDC_TABSIZE);
+        rows.Space();
+        rows.Text(IDC_STATIC_14);
+        rows.Field(IDC_STATIC_12, IDC_VIEW_INTEXT);
+        rows.Field(IDC_STATIC_13, IDC_VIEW_INHEX);
+        rows.Text(IDC_FILEMASK_HINT);
+        rows.Space();
+        rows.Text(IDC_STATIC_9);
+        rows.ButtonField(IDB_VIEWERFONT, IDE_VIEWERFONT, button * 4);
+        rows.Color(IDC_STATIC_10, IDC_IV_NORMAL_TEXT, button * 4);
+        rows.Color(IDC_STATIC_11, IDC_IV_SELECTED_TEXT, button * 4);
+    }
+    else
+    {
+        rows.Fields(IDC_STATIC_1, IDC_C_SCHEME, IDC_STATIC_2, IDC_C_ITEM);
+        for (int index = 0; index != 5; ++index)
+            rows.Color(IDC_C_ITEM1_L + index, IDC_C_ITEM1_C + index, button * 4);
+        rows.Space();
+        rows.Text(IDC_STATIC_5);
+        rows.List(IDC_C_LIST_HEADER, IDC_C_LIST, button * 4);
+        rows.Text(IDC_STATIC_3);
+        rows.Checks({IDC_C_ARCHIVE, IDC_C_READONLY, IDC_C_HIDDEN, IDC_C_SYSTEM, IDC_C_COMPRESSED, IDC_C_ENCRYPTED, IDC_C_DIRECTORY}, 3);
+        rows.Text(IDC_STATIC_6);
+        for (int index = 0; index != 5; ++index)
+            rows.Color(IDC_C_MASK1_L + index, IDC_C_MASK1_C + index, button * 4);
+        rows.FillHeight(IDC_C_LIST, available.cy);
+    }
+    content = {width, (std::max<int>)(available.cy, rows.ContentHeight())};
+    if (!apply) return true;
+    if (colors)
+        for (int index = 0; index != CFG_COLORS_BUTTONS; ++index)
+        {
+            if (PageColors.Items[index] != NULL) PageColors.Items[index]->SetLargeArrow(true);
+            if (PageColors.Masks[index] != NULL) PageColors.Masks[index]->SetLargeArrow(true);
+        }
+
+    // Hide obsolete horizontal separators; every actual setting keeps its ID,
+    // tab order, tooltip, handler and translated caption.
+    for (HWND child = GetWindow(window, GW_CHILD); child != NULL; child = GetWindow(child, GW_HWNDNEXT))
+    {
+        wchar_t name[32] = {};
+        GetClassNameW(child, name, ARRAYSIZE(name));
+        if (_wcsicmp(name, L"static") == 0 && (GetWindowLongPtrW(child, GWL_STYLE) & SS_TYPEMASK) == SS_ETCHEDHORZ)
+            ShowWindow(child, SW_HIDE);
+    }
+    for (const auto& control : rows.Controls)
+    {
+        HWND child = GetDlgItem(window, control.Id);
+        if (child == NULL) continue;
+        wchar_t name[32] = {};
+        GetClassNameW(child, name, ARRAYSIZE(name));
+        const bool combo = _wcsicmp(name, L"combobox") == 0;
+        if (_wcsicmp(name, L"button") == 0)
+            SetWindowLongPtrW(child, GWL_STYLE, GetWindowLongPtrW(child, GWL_STYLE) | BS_MULTILINE);
+        else if (_wcsicmp(name, L"static") == 0 && (GetWindowLongPtrW(child, GWL_STYLE) & SS_TYPEMASK) == SS_RIGHT)
+            SetWindowLongPtrW(child, GWL_STYLE, GetWindowLongPtrW(child, GWL_STYLE) & ~SS_TYPEMASK);
+        const auto& r = control.Bounds;
+        SetWindowPos(child, NULL, r.X, r.Y, r.Width, combo ? (std::max<int>)(r.Height, button * 8) : r.Height,
+                     SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW);
+    }
+    return true;
+}
+
 void CConfigurationDlg::PageCreated(int page)
 {
     AppliedDrafts[page] = CaptureDraft(page);
@@ -926,6 +1086,7 @@ bool CConfigurationDlg::PrepareDialogTemplate(const void* source, std::size_t si
 
 bool CConfigurationDlg::AfterTransfer(bool save)
 {
+    PageGeneral.CommitProfileChoice(Dialog.HWindow);
     if (ApplyHandler)
         ApplyHandler();
     LOGFONTW nativeFont;
@@ -941,12 +1102,17 @@ bool CConfigurationDlg::AfterTransfer(bool save)
         }
         ConfigurationFont = selected;
     }
-    ResetAppliedDrafts();
     if (!save)
+    {
+        ResetAppliedDrafts();
         return true;
+    }
     LONG error = ERROR_SUCCESS;
     if (MainWindow->SaveConfig(Dialog.HWindow, &error))
+    {
+        ResetAppliedDrafts();
         return true;
+    }
     const std::wstring message = LoadStrOwned(IDS_CFG_SAVE_FAILED) + L"\n\n" + GetErrorTextOwned(error);
     gPrompter->ShowError(Dialog.HWindow, LoadStrW(IDS_ERRORSAVECONFIG), message.c_str());
     return false;
@@ -1130,6 +1296,14 @@ void CConfigurationDlg::DrawSearchAction(const DRAWITEMSTRUCT& item)
 
 bool CConfigurationDlg::HandleDialogMessage(UINT message, WPARAM wParam, LPARAM lParam)
 {
+    if (message == WM_UPDATEUISTATE)
+    {
+        // Owner-drawn search actions must repaint when mouse/keyboard input
+        // changes focus cues, even while the focused HWND remains unchanged.
+        if (SearchOpen != NULL) InvalidateRect(SearchOpen, NULL, TRUE);
+        if (SearchClose != NULL) InvalidateRect(SearchClose, NULL, TRUE);
+        // Continue through DefDlgProc so it updates and propagates the state.
+    }
     if (message == WM_DRAWITEM && lParam != 0)
     {
         const auto& item = *reinterpret_cast<const DRAWITEMSTRUCT*>(lParam);
@@ -1402,6 +1576,41 @@ CCfgPageGeneral::CCfgPageGeneral()
 {
 }
 
+void CCfgPageGeneral::LoadProfiles()
+{
+    IRegistry& registry = *(gRegistry ? gRegistry : GetWin32Registry());
+    sally::profile::Store store(registry, UsualConfigurationRoot());
+    std::vector<std::wstring> names;
+    const auto result = store.List(names);
+    if (!result.success)
+        gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(result.errorCode).c_str());
+    ProfileNames = {L""};
+    ProfileNames.insert(ProfileNames.end(), names.begin(), names.end());
+    SendDlgItemMessageW(HWindow, IDC_PROFILE_STARTUP, CB_RESETCONTENT, 0, 0);
+    int selected = 0;
+    for (size_t i = 0; i < ProfileNames.size(); ++i)
+    {
+        const auto label = ProfileNames[i].empty() ? LoadStrOwned(IDS_PROFILE_DEFAULT) : ProfileNames[i];
+        SendDlgItemMessageW(HWindow, IDC_PROFILE_STARTUP, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+        if (_wcsicmp(ProfileNames[i].c_str(), StartupProfile.c_str()) == 0) selected = static_cast<int>(i);
+    }
+    StartupProfile = ProfileNames[selected];
+    SendDlgItemMessageW(HWindow, IDC_PROFILE_STARTUP, CB_SETCURSEL, selected, 0);
+    RECT units = {0, 0, 280, 0};
+    Sally::Appearance::MapCurrentDialogRect(HWindow, units);
+    SendDlgItemMessageW(HWindow, IDC_PROFILE_STARTUP, CB_SETDROPPEDWIDTH, units.right, 0);
+    const auto active = ActiveConfigurationProfile().empty() ? LoadStrOwned(IDS_PROFILE_DEFAULT) : ActiveConfigurationProfile();
+    SetDlgItemTextW(HWindow, IDC_PROFILE_CURRENT, active.c_str());
+}
+
+bool CCfgPageGeneral::CommitProfileChoice(HWND parent)
+{
+    (void)parent;
+    if (!HWindow) return true; // the General page may not have been created
+    ApplyConfigurationProfileChoice(StartupProfile);
+    return true;
+}
+
 void CCfgPageGeneral::Validate(CTransferInfo& ti)
 {
     BOOL useTimeRes;
@@ -1442,6 +1651,10 @@ void CCfgPageGeneral::Transfer(CTransferInfo& ti)
     // of Sally::Update::UpdateCheckMode.
     if (ti.Type == ttDataToWindow)
     {
+        const LONG error = ReadConfigurationProfileChoice(StartupProfile);
+        if (error != ERROR_SUCCESS)
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(error).c_str());
+        LoadProfiles();
         const int names[] = {IDS_UPDATECHECK_NEVER, IDS_UPDATECHECK_DAY, IDS_UPDATECHECK_WEEK,
                              IDS_UPDATECHECK_MONTH, IDS_UPDATECHECK_3MONTHS, IDS_UPDATECHECK_6MONTHS,
                              IDS_UPDATECHECK_STARTUP};
@@ -1452,6 +1665,8 @@ void CCfgPageGeneral::Transfer(CTransferInfo& ti)
     }
     else
     {
+        const auto selected = SendDlgItemMessageW(HWindow, IDC_PROFILE_STARTUP, CB_GETCURSEL, 0, 0);
+        if (selected >= 0 && static_cast<size_t>(selected) < ProfileNames.size()) StartupProfile = ProfileNames[selected];
         const int mode = (int)SendDlgItemMessage(HWindow, IDC_UPDATECHECK, CB_GETCURSEL, 0, 0);
         if (mode >= 0 && Sally::Update::IsKnownUpdateCheckMode(static_cast<DWORD>(mode)))
             Configuration.UpdateCheckMode = mode;
@@ -1479,6 +1694,14 @@ CCfgPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_COMMAND:
     {
+        if (LOWORD(wParam) == IDC_PROFILE_MANAGE)
+        {
+            const auto selected = SendDlgItemMessageW(HWindow, IDC_PROFILE_STARTUP, CB_GETCURSEL, 0, 0);
+            if (selected >= 0 && static_cast<size_t>(selected) < ProfileNames.size()) StartupProfile = ProfileNames[selected];
+            ManageConfigurationProfiles(HWindow, StartupProfile);
+            LoadProfiles();
+            return TRUE;
+        }
         if (HIWORD(wParam) == BN_CLICKED)
             EnableControls();
         break;
@@ -3115,6 +3338,8 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 if (UserMenuItems->At(index)->Type != umitSubmenuEnd)
                     dispInfo->Enable |= TLBHDRMASK_DELETE | TLBHDRMASK_MODIFY;
+                else if (UserMenuItems->GetSubmenuBeginIndex(index) == -1)
+                    dispInfo->Enable |= TLBHDRMASK_DELETE; // explicit recovery of a saved orphan
 
                 if (UserMenuItems->At(index)->Type == umitSubmenuBegin ||
                     UserMenuItems->At(index)->Type == umitSubmenuEnd)
@@ -3224,6 +3449,10 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 const int moved = UserMenuItems->MoveItem(index, dispInfo->NewIndex < index ? -1 : 1);
                 if (moved != index)
                 {
+                    // Rows store item pointers. Synchronize the complete moved block
+                    // before SetCurSel synchronously reloads the selected item's controls.
+                    for (int row = 0; row < UserMenuItems->Count; ++row)
+                        EditLB->SetItemID(row, (INT_PTR)UserMenuItems->At(row));
                     EditLB->SetCurSel(moved);
                     InvalidateRect(EditLB->HWindow, NULL, FALSE);
                 }
