@@ -1,4 +1,10 @@
-# Sally
+<p align="center">
+  <a href="https://get-sally.app/"><img src="https://get-sally.app/images/gecko_01-mascot.png" alt="Sally, the glasses-wearing Gecko holding a folder beside her desk" width="200"></a>
+</p>
+
+<h1 align="center">Sally</h1>
+
+<p align="center"><strong>Your friendly file manager</strong></p>
 
 [![Release](https://img.shields.io/github/v/release/0xeb/sally)](https://github.com/0xeb/sally/releases)
 [![Build](https://img.shields.io/github/actions/workflow/status/0xeb/sally/pr-cmake.yml?label=build)](https://github.com/0xeb/sally/actions)
