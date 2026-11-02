@@ -715,7 +715,7 @@ namespace
     sally::configuration::DialogFont ReadConfigurationDialogFont(HWND parent, LOGFONTW& dialogFont)
     {
         sally::configuration::DialogFont result;
-        dialogFont = UseCustomPanelFont ? LogFont : Sally::Appearance::SystemDialogFont(0);
+        dialogFont = UseCustomConfigurationFont ? ConfigurationLogFont : Sally::Appearance::SystemDialogFont(0);
         HDC fontDC = GetDC(parent);
         const int dpi = fontDC != NULL ? GetDeviceCaps(fontDC, LOGPIXELSY) : 96;
         if (fontDC != NULL)
@@ -807,11 +807,13 @@ sally::configuration::DraftState CConfigurationDlg::CaptureDraft(int page)
     const bool modelPage = selected == &PageView || selected == &PageUserMenu || selected == &PageHotPath ||
                            selected == &PageColors || selected == &Page13 || selected == &Page14 || selected == &Page15 ||
                            selected == &PageP1 || selected == &PageP2 || selected == &PageP3 || selected == &PageP4;
-    sally::configuration::CaptureDraftControls(selected->HWindow, state, modelPage);
+    sally::configuration::CaptureDraftControls(selected->HWindow, state, modelPage, selected == &PageGeneral ? IDC_LONGPATH_ENABLE : 0);
     if (selected == &PageAppear)
     {
         state.Add(PageAppear.LocalUseCustomPanelFont);
         sally::configuration::CaptureDraftFont(PageAppear.LocalPanelLogFont, state);
+        state.Add(PageAppear.LocalUseCustomConfigurationFont);
+        sally::configuration::CaptureDraftFont(PageAppear.LocalConfigurationLogFont, state);
     }
     else if (selected == &PageViewer)
     {
@@ -1101,6 +1103,10 @@ bool CConfigurationDlg::AfterTransfer(bool save)
             return false;
         }
         ConfigurationFont = selected;
+        // Reapply the independently selected preview faces after the generic
+        // reflow, including a preview that shared the previous dialog font.
+        if (PageAppear.HWindow != NULL)
+            PageAppear.LoadControls();
     }
     if (!save)
     {
@@ -1416,6 +1422,7 @@ void CConfigurationDlg::IndexPageResource(int page, const void* source, std::siz
         for (const auto& icon : MainWindowIcons)
             ConfigurationSearch.AddOptionValue(page, IDC_TITLEBAR_ICON_INDEX, LoadStrOwned(icon.TextResID));
         choices(IDB_PANELFONT, {IDS_FONTDESCRIPTION_DEF, IDS_FONTDESCRIPTION_CST});
+        choices(IDB_CONFIGURATIONFONT, {IDS_FONTDESCRIPTION_DEF, IDS_FONTDESCRIPTION_CST});
     }
     else if (At(page) == &PageGeneral)
     {
@@ -1463,6 +1470,8 @@ void CConfigurationDlg::IndexPageResource(int page, const void* source, std::siz
         IndexColorSearchMetadata(ConfigurationSearch, page);
     else if (At(page) == &PageSecurity)
         ConfigurationSearch.AddKeywords(page, IDC_SEC_ENABLE_MASTERPWD, LoadStrOwned(IDS_CFGSEC_MASTERPWD_INFO));
+    if (At(page) == &PageGeneral)
+        ConfigurationSearch.AddKeywords(page, IDC_LONGPATH_ENABLE, L"long paths Windows 260 LongPathsEnabled");
 }
 
 void CConfigurationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -1655,6 +1664,8 @@ void CCfgPageGeneral::Transfer(CTransferInfo& ti)
         if (error != ERROR_SUCCESS)
             gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(error).c_str());
         LoadProfiles();
+        RefreshLongPathSetting();
+        SetTimer(HWindow, 0x4C50, 500, nullptr);
         const int names[] = {IDS_UPDATECHECK_NEVER, IDS_UPDATECHECK_DAY, IDS_UPDATECHECK_WEEK,
                              IDS_UPDATECHECK_MONTH, IDS_UPDATECHECK_3MONTHS, IDS_UPDATECHECK_6MONTHS,
                              IDS_UPDATECHECK_STARTUP};
@@ -1687,13 +1698,77 @@ void CCfgPageGeneral::EnableControls()
     EnableWindow(GetDlgItem(HWindow, IDC_ASYNCCOPYALG), Windows7AndLater);
 }
 
+void CCfgPageGeneral::RefreshLongPathSetting()
+{
+    using namespace sally::configuration;
+    LongPathModel.State = LongPathWindows.Read();
+    const auto state = LongPathModel.State;
+    CheckDlgButton(HWindow, IDC_LONGPATH_ENABLE,
+                   state == LongPathState::Enabled ? BST_CHECKED :
+                   state == LongPathState::Disabled ? BST_UNCHECKED : BST_INDETERMINATE);
+    EnableWindow(GetDlgItem(HWindow, IDC_LONGPATH_ENABLE), LongPathModel.CanChange());
+}
+
+void CCfgPageGeneral::ChangeWindowsLongPaths()
+{
+    RefreshLongPathSetting();
+    if (!LongPathModel.CanChange()) return;
+    const bool requested = LongPathModel.State != sally::configuration::LongPathState::Enabled;
+    const std::wstring question = LoadStrOwned(requested ? IDS_LONGPATH_ENABLED : IDS_LONGPATH_DISABLED) +
+                                  L"\n\n" + LoadStrOwned(IDS_LONGPATH_CONFIRM);
+    if (!LongPathModel.Begin(gPrompter->AskYesNo(HWindow, LoadStrW(IDS_LONGPATH_TITLE),
+                                               question.c_str()).type == PromptResult::kYes, requested)) return;
+    RefreshLongPathSetting();
+    const DWORD error = LongPathWindows.Begin(HWindow, requested);
+    if (error != ERROR_SUCCESS)
+    {
+        LongPathModel.Finish(error == ERROR_CANCELLED, false, LongPathWindows.Read());
+        if (error != ERROR_CANCELLED)
+            gPrompter->ShowError(HWindow, LoadStrW(IDS_LONGPATH_TITLE), LoadStrW(IDS_LONGPATH_FAILED));
+        RefreshLongPathSetting();
+    }
+}
+
 INT_PTR
 CCfgPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
+    case WM_DESTROY:
+        KillTimer(HWindow, 0x4C50);
+        break;
+    case WM_NOTIFY:
+        if (lParam && reinterpret_cast<NMHDR*>(lParam)->code == PSN_SETACTIVE)
+            RefreshLongPathSetting();
+        break;
+    case WM_TIMER:
+        if (wParam == 0x4C50)
+        {
+            if (LongPathModel.Busy)
+            {
+                const auto result = LongPathWindows.Poll();
+                if (result != sally::configuration::LongPathChangeResult::Pending)
+                {
+                    const auto completion = LongPathModel.Finish(false, result == sally::configuration::LongPathChangeResult::Verified, LongPathWindows.Read());
+                    RefreshLongPathSetting();
+                    if (completion == sally::configuration::LongPathChangeResult::Failed)
+                        gPrompter->ShowError(HWindow, LoadStrW(IDS_LONGPATH_TITLE), LoadStrW(IDS_LONGPATH_FAILED));
+                    else
+                        gPrompter->ShowInfo(HWindow, LoadStrW(IDS_LONGPATH_TITLE), LoadStrW(IDS_LONGPATH_RESTART));
+                }
+            }
+            if (LongPathModel.Busy || (IsWindowVisible(HWindow) && GetForegroundWindow() == GetAncestor(HWindow, GA_ROOT)))
+                RefreshLongPathSetting();
+            return TRUE;
+        }
+        break;
     case WM_COMMAND:
     {
+        if (LOWORD(wParam) == IDC_LONGPATH_ENABLE && HIWORD(wParam) == BN_CLICKED)
+        {
+            ChangeWindowsLongPaths();
+            return TRUE;
+        }
         if (LOWORD(wParam) == IDC_PROFILE_MANAGE)
         {
             const auto selected = SendDlgItemMessageW(HWindow, IDC_PROFILE_STARTUP, CB_GETCURSEL, 0, 0);

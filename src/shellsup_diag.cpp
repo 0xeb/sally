@@ -135,6 +135,8 @@ const char* OwnerText(ShellMenuOwner owner)
         return "ItemMenu";
     case ShellMenuOwner::NewMenu:
         return "NewMenu";
+    case ShellMenuOwner::BackgroundMenu:
+        return "BackgroundMenu";
     case ShellMenuOwner::SallyOwned:
         return "SallyOwned";
     case ShellMenuOwner::Cancelled:

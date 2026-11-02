@@ -375,6 +375,8 @@ WORD LanguageID = 0;                // LANGID of the UI language
 std::wstring OpenReadmeInNotepad; // used only when launched from installer: filename to open in notepad during IDLE (start notepad)
 
 BOOL UseCustomPanelFont = FALSE;
+BOOL UseCustomConfigurationFont = FALSE;
+LOGFONTW ConfigurationLogFont = {};
 HFONT Font = NULL;
 HFONT FontUL = NULL;
 LOGFONT LogFont;
@@ -1723,6 +1725,7 @@ BOOL InitializeConstGraphics()
     ncm.cbSize = sizeof(ncm);
     SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
     LogFont = ncm.lfStatusFont;
+    ConfigurationLogFont = ncm.lfMessageFont;
     /*
   LogFont.lfHeight = -10;
   LogFont.lfWidth = 0;

@@ -3,9 +3,54 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "common/Win32ShellBackgroundMenu.h"
+#include <algorithm>
+#include <vector>
 
 namespace sally::shell
 {
+    HMENU FindNewSubmenu(HMENU menu, IContextMenu2* context, UINT first, UINT last, MenuVerbQuery queryVerb)
+    {
+        if (context == nullptr || queryVerb == nullptr || first > last)
+            return nullptr;
+        for (int position = 0; position < GetMenuItemCount(menu); ++position)
+        {
+            MENUITEMINFOW item = {sizeof(item)};
+            item.fMask = MIIM_ID | MIIM_SUBMENU | MIIM_FTYPE;
+            if (!GetMenuItemInfoW(menu, position, TRUE, &item) || item.hSubMenu == nullptr ||
+                (item.fType & MFT_SEPARATOR) != 0 || item.wID < first || item.wID > last)
+                continue;
+            std::wstring verb;
+            if (queryVerb(context, item.wID - first, verb) == S_OK && _wcsicmp(verb.c_str(), L"New") == 0)
+                return item.hSubMenu;
+        }
+        return nullptr;
+    }
+
+    bool MenuContainsCommand(HMENU menu, UINT command)
+    {
+        std::vector<HMENU> pending{menu}, visited;
+        while (!pending.empty())
+        {
+            HMENU current = pending.back();
+            pending.pop_back();
+            if (std::find(visited.begin(), visited.end(), current) != visited.end())
+                continue;
+            visited.push_back(current);
+            for (int position = 0; position < GetMenuItemCount(current); ++position)
+            {
+                MENUITEMINFOW item = {sizeof(item)};
+                item.fMask = MIIM_ID | MIIM_SUBMENU | MIIM_FTYPE;
+                if (!GetMenuItemInfoW(current, position, TRUE, &item) || (item.fType & MFT_SEPARATOR) != 0)
+                    continue;
+                if (item.hSubMenu != nullptr)
+                    pending.push_back(item.hSubMenu);
+                else if (item.wID == command)
+                    return true;
+            }
+        }
+        return false;
+    }
+
     namespace
     {
         struct SharingRow

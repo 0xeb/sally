@@ -6,6 +6,7 @@
 
 #include "common/configuration/ConfigurationSearchIndex.h"
 #include "common/configuration/ConfigurationDraft.h"
+#include "common/Win32LongPathSetting.h"
 #include "common/artwork/IdentityStyle.h"
 #include <functional>
 #include <utility>
@@ -521,6 +522,10 @@ class CCfgPageGeneral : public CCommonPropSheetPage
     std::vector<std::wstring> ProfileNames;
     std::wstring StartupProfile;
     void LoadProfiles();
+    sally::configuration::Win32LongPathSetting LongPathWindows;
+    sally::configuration::LongPathSettingModel LongPathModel;
+    void RefreshLongPathSetting();
+    void ChangeWindowsLongPaths();
 public:
     CCfgPageGeneral();
     bool CommitProfileChoice(HWND parent);
@@ -1096,8 +1101,11 @@ class CCfgPageAppearance : public CCommonPropSheetPage
 protected:
     HIMAGELIST HIconsList;
     HFONT HPanelFont;
+    HFONT HConfigurationFont;
     BOOL LocalUseCustomPanelFont;
     LOGFONT LocalPanelLogFont;
+    BOOL LocalUseCustomConfigurationFont;
+    LOGFONTW LocalConfigurationLogFont;
     BOOL NotificationEnabled;
 
 public:

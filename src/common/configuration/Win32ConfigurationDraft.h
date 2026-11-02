@@ -9,7 +9,7 @@ namespace sally::configuration
 {
     // Model pages supply semantic values themselves; only an active in-place
     // label edit is then read from controls. Ordinary scalar pages use controls.
-    void CaptureDraftControls(HWND page, DraftState& output, bool modelPage);
+    void CaptureDraftControls(HWND page, DraftState& output, bool modelPage, int immediateControl = 0);
     // Keep invalid pending width edits actionable without treating a valid
     // alternate numeric spelling as a model change.
     void CaptureInvalidColumnWidthControls(HWND page, DraftState& output, int leftControl, int rightControl);

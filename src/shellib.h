@@ -425,6 +425,7 @@ class CMenuNew
 protected:
     IContextMenu2* Menu2; // menu-interface 2
     HMENU Menu;           // submenu New
+    HMENU NewSubmenu;     // borrowed child when Menu contains the entire background menu
 
 public:
     CMenuNew() { Init(); }
@@ -434,19 +435,22 @@ public:
     {
         Menu2 = NULL;
         Menu = NULL;
+        NewSubmenu = NULL;
     }
 
-    void Set(IContextMenu2* menu2, HMENU menu)
+    void Set(IContextMenu2* menu2, HMENU menu, HMENU newSubmenu)
     {
         if (menu == NULL)
             return; // is-not-set
         Menu2 = menu2;
         Menu = menu;
+        NewSubmenu = newSubmenu;
     }
 
     BOOL MenuIsAssigned() { return Menu != NULL; }
 
     HMENU GetMenu() { return Menu; }
+    BOOL IsNewCommand(UINT command) const;
     IContextMenu2* GetMenu2() { return Menu2; }
 
     void Release();

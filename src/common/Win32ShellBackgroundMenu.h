@@ -44,6 +44,9 @@ namespace sally::shell
                                 BackgroundMenuQuery query);
 
     using MenuVerbQuery = HRESULT (*)(IContextMenu2*, UINT, std::wstring&);
+    // Identify New by its canonical verb, never by translated text or position.
+    HMENU FindNewSubmenu(HMENU menu, IContextMenu2* context, UINT first, UINT last, MenuVerbQuery queryVerb);
+    bool MenuContainsCommand(HMENU menu, UINT command);
     using MenuInitialize = HRESULT (*)(IContextMenu2*, HMENU, UINT);
     struct SharingMenuOperations
     {

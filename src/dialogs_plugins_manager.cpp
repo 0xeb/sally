@@ -26,6 +26,7 @@
 #include "shellib.h"
 #include "darkmode.h"
 #include "common/PluginsVerPolicy.h"
+#include "common/DialogFont.h"
 
 static std::wstring LastSelectedPluginDLLName; // after reopening Plugins Manager, select the last chosen plugin
 
@@ -2811,8 +2812,11 @@ CCfgPageAppearance::CCfgPageAppearance()
 {
     HIconsList = NULL;
     HPanelFont = NULL;
+    HConfigurationFont = NULL;
     LocalUseCustomPanelFont = UseCustomPanelFont;
     memcpy(&LocalPanelLogFont, &LogFont, sizeof(LocalPanelLogFont));
+    LocalUseCustomConfigurationFont = UseCustomConfigurationFont;
+    LocalConfigurationLogFont = UseCustomConfigurationFont ? ConfigurationLogFont : Sally::Appearance::SystemDialogFont(0);
     NotificationEnabled = TRUE;
 }
 
@@ -2822,6 +2826,8 @@ CCfgPageAppearance::~CCfgPageAppearance()
         ImageList_Destroy(HIconsList);
     if (HPanelFont != NULL)
         HANDLES(DeleteObject(HPanelFont));
+    if (HConfigurationFont != NULL)
+        HANDLES(DeleteObject(HConfigurationFont));
 }
 
 void CCfgPageAppearance::LoadControls()
@@ -2853,6 +2859,21 @@ void CCfgPageAppearance::LoadControls()
                 LoadStrW(LocalUseCustomPanelFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
     SetWindowTextW(hEdit, buf);
 
+    HANDLES(ReleaseDC(HWindow, hDC));
+
+    LOGFONTW configurationFont = LocalUseCustomConfigurationFont ? LocalConfigurationLogFont : Sally::Appearance::SystemDialogFont(0);
+    hEdit = GetDlgItem(HWindow, IDE_CONFIGURATIONFONT);
+    origHeight = configurationFont.lfHeight;
+    configurationFont.lfHeight = GetWindowFontHeight(hEdit);
+    if (HConfigurationFont != NULL)
+        HANDLES(DeleteObject(HConfigurationFont));
+    HConfigurationFont = HANDLES(CreateFontIndirectW(&configurationFont));
+    SendMessageW(hEdit, WM_SETFONT, (WPARAM)HConfigurationFont, TRUE);
+    hDC = HANDLES(GetDC(HWindow));
+    _snwprintf_s(buf, _TRUNCATE, LoadStrW(IDS_FONTDESCRIPTION),
+                MulDiv(-origHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)), configurationFont.lfFaceName,
+                LoadStrW(LocalUseCustomConfigurationFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
+    SetWindowTextW(hEdit, buf);
     HANDLES(ReleaseDC(HWindow, hDC));
 }
 
@@ -2932,6 +2953,8 @@ void CCfgPageAppearance::Transfer(CTransferInfo& ti)
     {
         UseCustomPanelFont = LocalUseCustomPanelFont;
         memcpy(&LogFont, &LocalPanelLogFont, sizeof(LocalPanelLogFont));
+        UseCustomConfigurationFont = LocalUseCustomConfigurationFont;
+        ConfigurationLogFont = LocalConfigurationLogFont;
     }
 }
 
@@ -2991,6 +3014,7 @@ CCfgPageAppearance::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         InitIconCombobox();
         ChangeToArrowButton(HWindow, IDC_INFOLINEBROWSE);
         new CButton(HWindow, IDB_PANELFONT, BTF_RIGHTARROW);
+        new CButton(HWindow, IDB_CONFIGURATIONFONT, BTF_RIGHTARROW);
 
         // attach the UpDown control to the edit line
         int resID[] = {IDC_THUMBNAILSIZE, -1};
@@ -3053,6 +3077,7 @@ CCfgPageAppearance::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         case IDB_PANELFONT:
+        case IDB_CONFIGURATIONFONT:
         {
             /* used by the export_mnu.py script which generates salmenu.mnu for the Translator
    keep synchronized with the InsertMenu() call below...
@@ -3065,7 +3090,10 @@ MENU_TEMPLATE_ITEM CfgPageAppearanceMenu[] =
 };
 */
             HMENU hMenu = CreatePopupMenu();
-            BOOL cstFont = LocalUseCustomPanelFont;
+            const bool configurationFont = LOWORD(wParam) == IDB_CONFIGURATIONFONT;
+            BOOL& customFont = configurationFont ? LocalUseCustomConfigurationFont : LocalUseCustomPanelFont;
+            LOGFONTW& selectedFont = configurationFont ? LocalConfigurationLogFont : LocalPanelLogFont;
+            BOOL cstFont = customFont;
             InsertMenuW(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStrW(IDS_USEDEFAULTFONT));
             InsertMenuW(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStrW(IDS_USECUSTOMFONT));
 
@@ -3074,25 +3102,28 @@ MENU_TEMPLATE_ITEM CfgPageAppearanceMenu[] =
             GetWindowRect((HWND)lParam, &tpmPar.rcExclude);
             DWORD cmd = TrackPopupMenuEx(hMenu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_RIGHTBUTTON, tpmPar.rcExclude.right, tpmPar.rcExclude.top,
                                          HWindow, &tpmPar);
+            DestroyMenu(hMenu);
             if (cmd != 0)
             {
                 if (cmd == 1) // standard font
                 {
-                    LocalUseCustomPanelFont = FALSE;
+                    customFont = FALSE;
                     LoadControls();
                 }
                 if (cmd == 2) // custom font
                 {
-                    CHOOSEFONT cf;
-                    memset(&cf, 0, sizeof(CHOOSEFONT));
-                    cf.lStructSize = sizeof(CHOOSEFONT);
+                    LOGFONTW candidate = selectedFont;
+                    CHOOSEFONTW cf;
+                    memset(&cf, 0, sizeof(cf));
+                    cf.lStructSize = sizeof(cf);
                     cf.hwndOwner = HWindow;
-                    cf.lpLogFont = &LocalPanelLogFont;
+                    cf.lpLogFont = &candidate;
                     cf.iPointSize = 10;
                     cf.Flags = CF_NOVERTFONTS | CF_SCREENFONTS | CF_INITTOLOGFONTSTRUCT;
-                    if (ChooseFont(&cf) != 0)
+                    if (ChooseFontW(&cf) != 0)
                     {
-                        LocalUseCustomPanelFont = TRUE;
+                        selectedFont = candidate;
+                        customFont = TRUE;
                         LoadControls();
                     }
                     return 0;

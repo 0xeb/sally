@@ -2429,6 +2429,11 @@ HRESULT GetMenuNewAux(IContextMenu2* contextMenu2, HMENU m, UINT minCmd, UINT ma
 // Shared body of both GetNewOrBackgroundMenu overloads: everything from the bound folder
 // onwards is identical, only the way the folder is reached differs (CP_ACP namespace walk
 // vs. SHParseDisplayName). 'folder' stays owned by the caller.
+static HRESULT QueryNewMenuVerb(IContextMenu2* context, UINT offset, std::wstring& verb)
+{
+    return AuxGetCommandString(context, offset, GCS_VERBW, NULL, verb);
+}
+
 static void FillNewOrBackgroundMenu(HWND hOwnerWindow, IShellFolder* folder, CMenuNew* menu,
                                     int minCmd, int maxCmd, BOOL backgoundMenu)
 {
@@ -2450,9 +2455,10 @@ static void FillNewOrBackgroundMenu(HWND hOwnerWindow, IShellFolder* folder, CMe
         return;
     HMENU m = built.GetMenu();
     RemoveUselessSeparatorsFromMenu(m);
+    HMENU newSubmenu = sally::shell::FindNewSubmenu(m, built.GetInterface(), minCmd, maxCmd, QueryNewMenuVerb);
     if (backgoundMenu)
     {
-        menu->Set(built.DetachInterface(), built.DetachMenu());
+        menu->Set(built.DetachInterface(), built.DetachMenu(), newSubmenu);
         return;
     }
     int index = 0;
@@ -2463,7 +2469,7 @@ static void FillNewOrBackgroundMenu(HWND hOwnerWindow, IShellFolder* folder, CMe
     mi.fMask = MIIM_SUBMENU;
     while (GetMenuItemInfo(m, index, TRUE, &mi))
     {
-        if (mi.hSubMenu != NULL)
+        if (mi.hSubMenu != NULL && mi.hSubMenu == newSubmenu)
         {
             foundIndex = index;
             foundSubMenu = mi.hSubMenu;
@@ -2471,7 +2477,7 @@ static void FillNewOrBackgroundMenu(HWND hOwnerWindow, IShellFolder* folder, CMe
         ++index;
     }
     if (foundIndex != -1 && RemoveMenu(m, foundIndex, MF_BYPOSITION))
-        menu->Set(built.DetachInterface(), foundSubMenu);
+        menu->Set(built.DetachInterface(), foundSubMenu, foundSubMenu);
 }
 
 // The narrow GetNewOrBackgroundMenu stood here. Its last three callers
@@ -2497,6 +2503,11 @@ void GetNewOrBackgroundMenuW(HWND hOwnerWindow, const wchar_t* dirW, CMenuNew* m
 //
 // CMenuNew
 //
+
+BOOL CMenuNew::IsNewCommand(UINT command) const
+{
+    return sally::shell::MenuContainsCommand(NewSubmenu, command);
+}
 
 void CMenuNew::ReleaseBody()
 {

@@ -38,6 +38,7 @@ enum class ShellMenuOwner
     NewMenu,     // panel->ContextSubmenuNew
     SallyOwned,  // Sally's own pseudo-commands (paste / paste shortcuts) or a claimed verb
     Cancelled,   // tracking returned 0
+    BackgroundMenu, // non-New command from panel->ContextSubmenuNew
 };
 
 // One right-click, from menu construction through invocation.

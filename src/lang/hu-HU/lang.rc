@@ -56,7 +56,7 @@ BEGIN
     PUSHBUTTON      "Súgó",IDHELP,135,50,50,14
 END
 
-IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 275
+IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 295
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Általános"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -90,13 +90,14 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,295,12
     LTEXT           "&Frissítések keresése:",IDC_UPDATECHECK_LABEL,1,178,120,8
     COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    GROUPBOX        "Beállításprofil",IDC_PROFILE_GROUP,1,197,295,76
-    LTEXT           "Aktuális profil:",IDC_PROFILE_CURRENT_LABEL,8,210,94,10
-    EDITTEXT        IDC_PROFILE_CURRENT,105,207,182,14,ES_AUTOHSCROLL | ES_READONLY
-    LTEXT           "Következő indítás:",IDC_PROFILE_STARTUP_LABEL,8,228,94,10
-    COMBOBOX        IDC_PROFILE_STARTUP,105,225,95,100,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    PUSHBUTTON      "Profilok kezelése...",IDC_PROFILE_MANAGE,205,225,82,15
-    LTEXT           "A profilváltáshoz indítsa újra a Sallyt. A -profile kapcsoló elsőbbséget élvez.",IDC_PROFILE_NOTE,8,247,279,24
+    CONTROL         "Hosszú Windows-elérési utak (minden felhasználónak)",IDC_LONGPATH_ENABLE,"Button",BS_3STATE | WS_TABSTOP,1,197,295,12
+    GROUPBOX        "Beállításprofil",IDC_PROFILE_GROUP,1,217,295,76
+    LTEXT           "Aktuális profil:",IDC_PROFILE_CURRENT_LABEL,8,230,94,10
+    EDITTEXT        IDC_PROFILE_CURRENT,105,227,182,14,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Következő indítás:",IDC_PROFILE_STARTUP_LABEL,8,248,94,10
+    COMBOBOX        IDC_PROFILE_STARTUP,105,245,95,100,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Profilok kezelése...",IDC_PROFILE_MANAGE,205,245,82,15
+    LTEXT           "A profilváltáshoz indítsa újra a Sallyt. A -profile kapcsoló elsőbbséget élvez.",IDC_PROFILE_NOTE,8,267,279,24
 END
 
 
@@ -1113,7 +1114,7 @@ BEGIN
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 408
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 430
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Megjelenés"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1130,35 +1131,37 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,133,12
     CONTROL         "&Maximalizáló/visszaállító gomb a Mappa sorban",IDC_PANELZOOM,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,169,12
-    GROUPBOX        " Panel betűtípus ",IDC_STATIC_2,1,81,295,32
-    PUSHBUTTON      "&Betűtípus",IDB_PANELFONT,7,93,52,14,WS_GROUP
-    EDITTEXT        IDE_PANELFONT,64,93,224,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    GROUPBOX        " Inf&ormációs sor tartalma ",IDC_STATIC_3,1,118,295,30,WS_GROUP
-    EDITTEXT        IDC_INFOLINECONTENT,7,130,268,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,130,12,12
-    GROUPBOX        " Bé&lyegképek ",IDC_STATIC_4,1,154,295,30
-    LTEXT           "Méret:",IDC_STATIC_5,8,168,19,8
-    EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
-    LTEXT           "pixel",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " Alkalmazás megjelenése ",IDC_STATIC_7,1,192,295,74
-    LTEXT           "&Téma:",IDC_STATIC_8,8,206,62,8
-    COMBOBOX        IDC_THEME_MODE,78,203,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Alkalmazás&ikon:",IDC_STATIC_9,8,225,84,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,223,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Az asztali vagy a start menüi parancsikon színének módosításához,\nJobb gomb a parancsikonon > Tulajdonságok > Ikoncsere.",IDC_STATIC_10,8,244,278,16
-    GROUPBOX " Indítóképernyő és Névjegy ",IDC_IDENTITY_GROUP,1,272,295,128
-    LTEXT "Színcsalád:",IDC_IDENTITY_PALETTE_LABEL,8,286,90,8
-    COMBOBOX IDC_IDENTITY_PALETTE,100,283,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Árnyalat (0–100):",IDC_IDENTITY_SHADE_LABEL,8,309,90,8
-    EDITTEXT IDC_IDENTITY_SHADE,100,306,30,14,ES_NUMBER | ES_AUTOHSCROLL
-    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,306,138,14
-    LTEXT "Sally felirat:",IDC_IDENTITY_LETTERING_LABEL,8,332,90,8
-    COMBOBOX IDC_IDENTITY_LETTERING,100,329,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Szöveg betűtípusa:",IDC_IDENTITY_FONT_LABEL,8,355,90,8
-    COMBOBOX IDC_IDENTITY_FONT,100,352,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Szöveg színe:",IDC_IDENTITY_TONE_LABEL,8,378,90,8
-    COMBOBOX IDC_IDENTITY_TONE,100,375,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
-    PUSHBUTTON "Előnézet…",IDC_IDENTITY_PREVIEW,206,375,68,14,WS_TABSTOP
+    GROUPBOX        " Betűtípusok ",IDC_STATIC_2,1,81,295,54
+    PUSHBUTTON      "Panel betűtíp&usa…",IDB_PANELFONT,7,93,110,14,WS_GROUP
+    EDITTEXT        IDE_PANELFONT,122,93,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "&Beállítások betűtípusa…",IDB_CONFIGURATIONFONT,7,113,110,14
+    EDITTEXT        IDE_CONFIGURATIONFONT,122,113,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    GROUPBOX        " Inf&ormációs sor tartalma ",IDC_STATIC_3,1,140,295,30,WS_GROUP
+    EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
+    GROUPBOX        " Bé&lyegképek ",IDC_STATIC_4,1,176,295,30
+    LTEXT           "Méret:",IDC_STATIC_5,8,190,19,8
+    EDITTEXT        IDC_THUMBNAILSIZE,29,188,33,12,ES_AUTOHSCROLL
+    LTEXT           "pixel",IDC_STATIC_6,66,190,22,8,NOT WS_GROUP
+    GROUPBOX        " Alkalmazás megjelenése ",IDC_STATIC_7,1,214,295,74
+    LTEXT           "&Téma:",IDC_STATIC_8,8,228,62,8
+    COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Alkalmazás&ikon:",IDC_STATIC_9,8,247,84,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,245,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Az asztali vagy a start menüi parancsikon színének módosításához,\nJobb gomb a parancsikonon > Tulajdonságok > Ikoncsere.",IDC_STATIC_10,8,266,278,16
+    GROUPBOX " Indítóképernyő és Névjegy ",IDC_IDENTITY_GROUP,1,294,295,128
+    LTEXT "Színcsalád:",IDC_IDENTITY_PALETTE_LABEL,8,308,90,8
+    COMBOBOX IDC_IDENTITY_PALETTE,100,305,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Árnyalat (0–100):",IDC_IDENTITY_SHADE_LABEL,8,331,90,8
+    EDITTEXT IDC_IDENTITY_SHADE,100,328,30,14,ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,328,138,14
+    LTEXT "Sally felirat:",IDC_IDENTITY_LETTERING_LABEL,8,354,90,8
+    COMBOBOX IDC_IDENTITY_LETTERING,100,351,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Szöveg betűtípusa:",IDC_IDENTITY_FONT_LABEL,8,377,90,8
+    COMBOBOX IDC_IDENTITY_FONT,100,374,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Szöveg színe:",IDC_IDENTITY_TONE_LABEL,8,400,90,8
+    COMBOBOX IDC_IDENTITY_TONE,100,397,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    PUSHBUTTON "Előnézet…",IDC_IDENTITY_PREVIEW,206,397,68,14,WS_TABSTOP
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -4216,4 +4219,14 @@ BEGIN
  IDS_PROFILE_MANAGER, "Beállításprofilok"
  IDS_PROFILE_NAME_RULE, "Használjon 1–64 betűt (A-Z, a-z), számjegyet, pontot, aláhúzást vagy kötőjelet; a . és .. nem használható."
  IDS_PROFILE_DELETE_CONFIRM, "Végleg törli ezt a profilt és a mentett beállításait?"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_LONGPATH_TITLE "Hosszú elérési utak támogatása a Windowsban"
+    IDS_LONGPATH_ENABLED "Windows-beállítás: Engedélyezve"
+    IDS_LONGPATH_DISABLED "Windows-beállítás: Letiltva"
+    IDS_LONGPATH_RESTART "A Windows beállítása megváltozott. Indítsa újra az alkalmazásokat; a Windows újraindítására is szükség lehet."
+    IDS_LONGPATH_CONFIRM "Azonnal módosítja ezt a Windows-beállítást minden felhasználónál? A konfiguráció Mégse gombja nem vonja vissza. Rendszergazdai jóváhagyás szükséges. Ezután indítsa újra az alkalmazásokat; a Windows újraindítására is szükség lehet."
+    IDS_LONGPATH_FAILED "A Windows nem erősítette meg a hosszú elérési utak kért beállítását. Ellenőrizze a rendszergazdai jogosultságokat, vagy forduljon a rendszergazdához."
 END

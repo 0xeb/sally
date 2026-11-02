@@ -712,3 +712,14 @@
 #define IDC_PROFILE_CREATE                     8311
 #define IDC_PROFILE_DELETE                     8312
 #define IDC_PROFILE_MANAGER_NOTE               8313
+
+// Windows long-path setting (machine-wide, independent of profiles).
+#define IDC_LONGPATH_ENABLE 8403
+#define IDB_CONFIGURATIONFONT 8404
+#define IDE_CONFIGURATIONFONT 8405
+#define IDS_LONGPATH_TITLE 8410
+#define IDS_LONGPATH_ENABLED 8411
+#define IDS_LONGPATH_DISABLED 8412
+#define IDS_LONGPATH_RESTART 8417
+#define IDS_LONGPATH_CONFIRM 8418
+#define IDS_LONGPATH_FAILED 8419

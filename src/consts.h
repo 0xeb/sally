@@ -1406,6 +1406,8 @@ extern HINSTANCE HLanguage;           // module with the language-dependent reso
 extern WORD LanguageID;               // LANGID of the UI language Sally started in (Configuration.LoadedSLGName)
 
 extern BOOL UseCustomPanelFont; // if TRUE, Font and FontUL come from LogFont structure; otherwise from system font (default)
+extern BOOL UseCustomConfigurationFont;
+extern LOGFONTW ConfigurationLogFont;
 extern HFONT Font;              // panel font
 extern HFONT FontUL;            // underlined version
 extern int FontCharHeight;      // font height

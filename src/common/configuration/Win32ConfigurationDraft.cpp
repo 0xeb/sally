@@ -30,6 +30,7 @@ namespace sally::configuration
         {
             DraftState& Output;
             bool ModelPage;
+            int ImmediateControl;
         };
     } // namespace
 
@@ -65,9 +66,9 @@ namespace sally::configuration
         output.Add(std::wstring(font.lfFaceName, wcsnlen_s(font.lfFaceName, LF_FACESIZE)));
     }
 
-    void CaptureDraftControls(HWND page, DraftState& output, bool modelPage)
+    void CaptureDraftControls(HWND page, DraftState& output, bool modelPage, int immediateControl)
     {
-        CaptureContext context{output, modelPage};
+        CaptureContext context{output, modelPage, immediateControl};
         EnumChildWindows(page, [](HWND window, LPARAM parameter) -> BOOL
                          {
             auto& context = *reinterpret_cast<CaptureContext*>(parameter);
@@ -75,6 +76,7 @@ namespace sally::configuration
             GetClassNameW(window, name, ARRAYSIZE(name));
             auto& state = context.Output;
             const int id = GetDlgCtrlID(window);
+            if (context.ImmediateControl != 0 && id == context.ImmediateControl) return TRUE;
             if (_wcsicmp(name, L"Edit") == 0)
             {
                 wchar_t parentClass[32] = {};

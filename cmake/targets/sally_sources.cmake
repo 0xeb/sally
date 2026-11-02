@@ -1,4 +1,5 @@
 set(SALLY_SOURCES
+  "${SAL_SRC}/common/Win32LongPathSetting.cpp"
   "${SAL_SRC}/configuration_profiles.cpp"
   "${SAL_SRC}/common/ConfigProfileStore.cpp"
   "${SAL_SRC}/bitmap.cpp"

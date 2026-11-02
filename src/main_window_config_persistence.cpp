@@ -452,6 +452,8 @@ const wchar_t* CONFIG_CMDLFOCUS_REG = L"Command Line Focused";
 const wchar_t* CONFIG_CLOSESHELL_REG = L"Close Shell Window";
 const wchar_t* CONFIG_USECUSTOMPANELFONT_REG = L"Use Custom Panel Font";
 const wchar_t* CONFIG_PANELFONT_REG = L"Panel Font";
+const wchar_t* CONFIG_USECUSTOMCONFIGURATIONFONT_REG = L"Use Custom Configuration Font";
+const wchar_t* CONFIG_CONFIGURATIONFONT_REG = L"Configuration Font";
 // Registry names are native UTF-16 even where the corresponding legacy value
 // payload is imported as ACP bytes. The ...W names select the canonical UTF-16
 // history values; the unsuffixed names are read-only legacy import locations.
@@ -2318,6 +2320,8 @@ BOOL CMainWindow::SaveConfig(HWND parent, LONG* error)
 
                 SetValueW(actKey, CONFIG_USECUSTOMPANELFONT_REG_W, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
                 writes.Require(SaveLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont) != FALSE);
+                SetValueW(actKey, CONFIG_USECUSTOMCONFIGURATIONFONT_REG, REG_DWORD, &UseCustomConfigurationFont, sizeof(DWORD));
+                writes.Require(SaveLogFont(actKey, CONFIG_CONFIGURATIONFONT_REG, &ConfigurationLogFont) != FALSE);
 
                 if (GlobalSaveWaitWindow == NULL)
                     analysing.SetProgressPos(++savingProgress); // 4
@@ -4050,11 +4054,22 @@ BOOL CMainWindow::LoadConfig(
             GetValueW(actKey, CONFIG_CMDLFOCUS_REG_W, REG_DWORD, &cmdLineFocus, sizeof(DWORD));
 
             GetValueW(actKey, CONFIG_USECUSTOMPANELFONT_REG_W, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
-            if (LoadLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont) && UseCustomPanelFont)
+            const BOOL panelFontLoaded = LoadLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont);
+            if (panelFontLoaded && UseCustomPanelFont)
             {
                 // if the user uses a custom font, propagate it now
                 SetFont();
             }
+
+            // #165: preserve an existing profile's Configuration appearance once,
+            // then keep the two choices independent. Fresh profiles use Windows.
+            if (!GetValueW(actKey, CONFIG_USECUSTOMCONFIGURATIONFONT_REG, REG_DWORD, &UseCustomConfigurationFont, sizeof(DWORD)))
+            {
+                UseCustomConfigurationFont = panelFontLoaded && UseCustomPanelFont;
+                ConfigurationLogFont = LogFont;
+            }
+            else if (!LoadLogFont(actKey, CONFIG_CONFIGURATIONFONT_REG, &ConfigurationLogFont))
+                UseCustomConfigurationFont = FALSE;
 
             LoadHistory(actKey, CONFIG_NAMEDHISTORYW_REG, FindNamedHistory, FIND_NAMED_HISTORY_SIZE);
             if (IsWideHistoryEmpty(FindNamedHistory, FIND_NAMED_HISTORY_SIZE))

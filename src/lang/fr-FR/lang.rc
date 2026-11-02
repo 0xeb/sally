@@ -56,7 +56,7 @@ BEGIN
     PUSHBUTTON      "Aide",IDHELP,135,50,50,14
 END
 
-IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 275
+IDD_CFGPAGE_GENERAL DIALOGEX 65, 18, 299, 295
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Général"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -90,13 +90,14 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,295,12
     LTEXT           "Rec&hercher les mises à jour :",IDC_UPDATECHECK_LABEL,1,178,120,8
     COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    GROUPBOX        "Profil de configuration",IDC_PROFILE_GROUP,1,197,295,76
-    LTEXT           "Profil actuel :",IDC_PROFILE_CURRENT_LABEL,8,210,94,10
-    EDITTEXT        IDC_PROFILE_CURRENT,105,207,182,14,ES_AUTOHSCROLL | ES_READONLY
-    LTEXT           "Prochain démarrage :",IDC_PROFILE_STARTUP_LABEL,8,228,94,10
-    COMBOBOX        IDC_PROFILE_STARTUP,105,225,95,100,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    PUSHBUTTON      "Gérer les profils...",IDC_PROFILE_MANAGE,205,225,82,15
-    LTEXT           "Redémarrez Sally pour changer de profil. L’option -profile est prioritaire.",IDC_PROFILE_NOTE,8,247,279,24
+    CONTROL         "Activer les chemins longs Windows (tous les utilisateurs)",IDC_LONGPATH_ENABLE,"Button",BS_3STATE | WS_TABSTOP,1,197,295,12
+    GROUPBOX        "Profil de configuration",IDC_PROFILE_GROUP,1,217,295,76
+    LTEXT           "Profil actuel :",IDC_PROFILE_CURRENT_LABEL,8,230,94,10
+    EDITTEXT        IDC_PROFILE_CURRENT,105,227,182,14,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Prochain démarrage :",IDC_PROFILE_STARTUP_LABEL,8,248,94,10
+    COMBOBOX        IDC_PROFILE_STARTUP,105,245,95,100,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Gérer les profils...",IDC_PROFILE_MANAGE,205,245,82,15
+    LTEXT           "Redémarrez Sally pour changer de profil. L’option -profile est prioritaire.",IDC_PROFILE_NOTE,8,267,279,24
 END
 
 
@@ -1113,7 +1114,7 @@ BEGIN
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 408
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 430
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Apparence"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1130,35 +1131,37 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,133,12
     CONTROL         "Afficher le bouton &Déployer/Restaurer dans le bandeau de répertoire",IDC_PANELZOOM,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,169,12
-    GROUPBOX        " Panneau des fontes ",IDC_STATIC_2,1,81,295,32
-    PUSHBUTTON      "&Fonte",IDB_PANELFONT,7,93,52,14,WS_GROUP
-    EDITTEXT        IDE_PANELFONT,64,93,224,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    GROUPBOX        " C&ontenu du bandeau d'information ",IDC_STATIC_3,1,118,295,30,WS_GROUP
-    EDITTEXT        IDC_INFOLINECONTENT,7,130,268,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,130,12,12
-    GROUPBOX        " &Vignettes ",IDC_STATIC_4,1,154,295,30
-    LTEXT           "Taille:",IDC_STATIC_5,8,168,19,8
-    EDITTEXT        IDC_THUMBNAILSIZE,29,166,33,12,ES_AUTOHSCROLL
-    LTEXT           "éléments d'images (pixels)",IDC_STATIC_6,66,168,22,8,NOT WS_GROUP
-    GROUPBOX        " Apparence de l’application ",IDC_STATIC_7,1,192,295,74
-    LTEXT           "&Thème :",IDC_STATIC_8,8,206,62,8
-    COMBOBOX        IDC_THEME_MODE,78,203,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "&Icône de l’application :",IDC_STATIC_9,8,225,84,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,223,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Pour changer la couleur de l'icône de raccourci sur le bureau ou dans le menu Démarrer:\nClic droit > Propriétés > Changer l'icône.",IDC_STATIC_10,8,244,278,16
-    GROUPBOX " Écran de démarrage et À propos ",IDC_IDENTITY_GROUP,1,272,295,128
-    LTEXT "Famille de couleurs :",IDC_IDENTITY_PALETTE_LABEL,8,286,90,8
-    COMBOBOX IDC_IDENTITY_PALETTE,100,283,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Nuance (0–100) :",IDC_IDENTITY_SHADE_LABEL,8,309,90,8
-    EDITTEXT IDC_IDENTITY_SHADE,100,306,30,14,ES_NUMBER | ES_AUTOHSCROLL
-    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,306,138,14
-    LTEXT "Lettrage Sally :",IDC_IDENTITY_LETTERING_LABEL,8,332,90,8
-    COMBOBOX IDC_IDENTITY_LETTERING,100,329,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Police du texte :",IDC_IDENTITY_FONT_LABEL,8,355,90,8
-    COMBOBOX IDC_IDENTITY_FONT,100,352,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Couleur du texte :",IDC_IDENTITY_TONE_LABEL,8,378,90,8
-    COMBOBOX IDC_IDENTITY_TONE,100,375,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
-    PUSHBUTTON "Aperçu…",IDC_IDENTITY_PREVIEW,206,375,68,14,WS_TABSTOP
+    GROUPBOX        " Polices ",IDC_STATIC_2,1,81,295,54
+    PUSHBUTTON      "Police des panneau&x…",IDB_PANELFONT,7,93,110,14,WS_GROUP
+    EDITTEXT        IDE_PANELFONT,122,93,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "Police de confi&guration…",IDB_CONFIGURATIONFONT,7,113,110,14
+    EDITTEXT        IDE_CONFIGURATIONFONT,122,113,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    GROUPBOX        " C&ontenu du bandeau d'information ",IDC_STATIC_3,1,140,295,30,WS_GROUP
+    EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
+    GROUPBOX        " &Vignettes ",IDC_STATIC_4,1,176,295,30
+    LTEXT           "Taille:",IDC_STATIC_5,8,190,19,8
+    EDITTEXT        IDC_THUMBNAILSIZE,29,188,33,12,ES_AUTOHSCROLL
+    LTEXT           "éléments d'images (pixels)",IDC_STATIC_6,66,190,22,8,NOT WS_GROUP
+    GROUPBOX        " Apparence de l’application ",IDC_STATIC_7,1,214,295,74
+    LTEXT           "&Thème :",IDC_STATIC_8,8,228,62,8
+    COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Icône de l’application :",IDC_STATIC_9,8,247,84,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,245,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Pour changer la couleur de l'icône de raccourci sur le bureau ou dans le menu Démarrer:\nClic droit > Propriétés > Changer l'icône.",IDC_STATIC_10,8,266,278,16
+    GROUPBOX " Écran de démarrage et À propos ",IDC_IDENTITY_GROUP,1,294,295,128
+    LTEXT "Famille de couleurs :",IDC_IDENTITY_PALETTE_LABEL,8,308,90,8
+    COMBOBOX IDC_IDENTITY_PALETTE,100,305,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Nuance (0–100) :",IDC_IDENTITY_SHADE_LABEL,8,331,90,8
+    EDITTEXT IDC_IDENTITY_SHADE,100,328,30,14,ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,328,138,14
+    LTEXT "Lettrage Sally :",IDC_IDENTITY_LETTERING_LABEL,8,354,90,8
+    COMBOBOX IDC_IDENTITY_LETTERING,100,351,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Police du texte :",IDC_IDENTITY_FONT_LABEL,8,377,90,8
+    COMBOBOX IDC_IDENTITY_FONT,100,374,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Couleur du texte :",IDC_IDENTITY_TONE_LABEL,8,400,90,8
+    COMBOBOX IDC_IDENTITY_TONE,100,397,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    PUSHBUTTON "Aperçu…",IDC_IDENTITY_PREVIEW,206,397,68,14,WS_TABSTOP
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -4216,4 +4219,14 @@ BEGIN
  IDS_PROFILE_MANAGER, "Profils de configuration"
  IDS_PROFILE_NAME_RULE, "Utilisez 1 à 64 lettres (A-Z, a-z), chiffres, points, tirets bas ou traits d’union ; pas . ni .. ."
  IDS_PROFILE_DELETE_CONFIRM, "Supprimer définitivement ce profil et ses réglages enregistrés ?"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_LONGPATH_TITLE "Prise en charge des chemins longs sous Windows"
+    IDS_LONGPATH_ENABLED "Paramètre Windows : Activé"
+    IDS_LONGPATH_DISABLED "Paramètre Windows : Désactivé"
+    IDS_LONGPATH_RESTART "Paramètre Windows modifié. Redémarrez les applications, et éventuellement Windows."
+    IDS_LONGPATH_CONFIRM "Modifier immédiatement ce paramètre Windows pour tous les utilisateurs ? Le bouton d’annulation de la configuration ne l’annule pas. L’accord d’un administrateur est requis. Redémarrez ensuite les applications, et éventuellement Windows."
+    IDS_LONGPATH_FAILED "Windows n’a pas confirmé le paramètre de chemins longs demandé. Vérifiez les droits d’administrateur ou contactez votre administrateur."
 END

@@ -2815,11 +2815,16 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 {
                                     if (panel->ContextSubmenuNew->MenuIsAssigned()) // exception could have occurred
                                     {
-                                        panel->RenameFirstNewItem = TRUE; // the New menu: rename the new item in place
+                                        // The same provider owns the full background menu (#166).
+                                        // Only a command inside its genuine New child requests rename.
+                                        const BOOL newCommand = panel->ContextSubmenuNew->IsNewCommand(cmd);
+                                        panel->RenameFirstNewItem = newCommand;
                                         HRESULT invokeHr = AuxInvokeCommand2(panel, (CMINVOKECOMMANDINFO*)&ici);
+                                        if (FAILED(invokeHr))
+                                            panel->RenameFirstNewItem = FALSE;
                                         if (diag != NULL)
                                         {
-                                            diag->Owner = ShellMenuOwner::NewMenu;
+                                            diag->Owner = newCommand ? ShellMenuOwner::NewMenu : ShellMenuOwner::BackgroundMenu;
                                             diag->InvokeHr = invokeHr;
                                             diag->ParentWasTransient = ici.hwnd != MainWindow->HWindow;
                                             diag->ParentAliveAfter = IsWindow(ici.hwnd) != FALSE;
