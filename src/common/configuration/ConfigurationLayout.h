@@ -42,6 +42,14 @@ namespace sally::configuration
             (std::max)(minimum, static_cast<int>((std::min)(requested, static_cast<unsigned long>((std::max)(0, workArea)))))));
     }
 
+    // The narrowest page viewport (outer pixels) that shows the widest page without scrolling
+    // sideways. A page taller than the viewport scrolls vertically, and its vertical scrollbar takes
+    // width from the view; without room for it a full-width page (User Menu) scrolls sideways too.
+    inline int MinimumViewportWidth(int widestPage, int tallestPage, int viewportHeight, int verticalBar)
+    {
+        return (std::max)(0, widestPage) + (tallestPage > viewportHeight ? (std::max)(0, verticalBar) : 0);
+    }
+
     struct PageExtent { int Width, Height; };
     struct ViewportLayout
     {
