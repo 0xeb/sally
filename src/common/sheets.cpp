@@ -910,7 +910,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         SetMinimumSize(marginW, marginH, clipR);
         height = sally::configuration::FitOpeningHeight(*WindowHeight, preferredHeight,
             MinWindowSize.cy, clipR.bottom - clipR.top);
-        SetWindowPos(HWindow, NULL, 0, 0, (std::max)(initialWidth, static_cast<int>(MinWindowSize.cx)), height,
+        SetWindowPos(HWindow, NULL, 0, 0, initialWidth, height,
                      SWP_NOZORDER | SWP_NOMOVE);
 
         LayoutControls();
@@ -1187,9 +1187,7 @@ void CTreePropHolderDlg::SetMinimumSize(int borderX, int borderY, const RECT& wo
     // remain intact. Oversized new pages scroll inside that legacy viewport.
     RECT page = {0, 0, 0, 275};
     Sally::Appearance::MapCurrentDialogRect(HWindow, page);
-    const int viewportWidth = sally::configuration::MinimumViewportWidth(
-        MaximumPageSize.cx, MaximumPageSize.cy, page.bottom, GetSystemMetrics(SM_CXVSCROLL));
-    MinWindowSize.cx = (std::min)(TreeWidth + viewportWidth + 3 * MarginSize.cx + borderX,
+    MinWindowSize.cx = (std::min)(TreeWidth + MaximumPageSize.cx + 3 * MarginSize.cx + borderX,
                                  workArea.right - workArea.left);
     MinWindowSize.cy = (std::min)(page.bottom + CaptionHeight + ButtonSize.cy + 5 * MarginSize.cy + 1 + borderY,
                                  workArea.bottom - workArea.top);
