@@ -64,13 +64,13 @@ BEGIN
     CONTROL         "&Salveaza configurarea la iesire",IDC_AUTOSAVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,295,12
     CONTROL         "S&terge atributul de mod citire doar cand copii de pe Disc Compact",IDC_CLEARREADONLY,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,295,12
-    CONTROL         "&Permite doar o singura Sally odata",IDC_ONLYONEINSTANCE,
+    CONTROL         "&Permite o singura instanta Sally simultan",IDC_ONLYONEINSTANCE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,295,12
     CONTROL         "&Foloseste sunetul difuzorului pentru a anunta terminarea operatiunilor in fereastra inactiva",IDC_MINBEEPWHENDONE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,295,12
     CONTROL         "I&nchide fereastra de promp dupa executarea comenzii (in linie de Comanda)",IDC_CLOSESHELL,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,55,295,12
-    CONTROL         "Co&mpara Directoarele: ignora diferentele de ore pana la",IDC_TIMERESOLUTION,
+    CONTROL         "Co&mpară directoare: ignoră diferențe de până la",IDC_TIMERESOLUTION,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,68,182,12
     EDITTEXT        IDE_TIMERESOLUTION,184,68,28,12,ES_AUTOHSCROLL
     LTEXT           "s",IDC_STATIC_2,216,70,6,8,NOT WS_GROUP
@@ -86,7 +86,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,295,12
     CONTROL         "Pastrez &variabilele de mediu actualizate la valori de sistem",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,295,12
-    CONTROL         "S&ugerează nume de dosare la tastarea unei căi (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
+    CONTROL         "S&ugerează nume de dosare și fișiere la tastarea unei căi (F5, F6, F7, Shift+F7)",IDC_SUGGESTPATHNAMES,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,295,12
     LTEXT           "Caută actuali&zări:",IDC_UPDATECHECK_LABEL,1,178,120,8
     COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
@@ -136,24 +136,24 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Poti alege daca fisierele sterse si directoarele vor fi duse in Recycle Bin sau vor fi sterse permanent de pe disk.",IDC_STATIC_1,1,4,278,16
     GROUPBOX        "    ",IDC_STATIC_11,2,28,295,57
-    LTEXT           "Tine tasta SHIFT apasata pentru a sterge fisierele si directoarele permanent.",IDC_STATIC_4,9,42,186,8,NOT WS_GROUP
+    LTEXT           "Tine tasta SHIFT apasata pentru a sterge fisierele si directoarele permanent.",IDC_STATIC_4,9,42,249,8,NOT WS_GROUP
     LTEXT           "Confirmarile sunt date de proprietatile Recycle Bin.",IDC_STATIC_5,9,51,174,8,NOT WS_GROUP
-    LTEXT           "Operatiunea de stergere e facuta de Windows, deci functiile avansate cum ar",IDC_STATIC_6,9,60,227,8,NOT WS_GROUP
-    LTEXT           "fi o bara de progresie detaliata, sari peste, si mai incearca nu sunt suportate.",IDC_STATIC_7,9,69,220,8,NOT WS_GROUP
+    LTEXT           "Operatiunea de stergere e facuta de Windows, deci functiile avansate cum ar",IDC_STATIC_6,9,60,253,8,NOT WS_GROUP
+    LTEXT           "fi o bara de progresie detaliata, sari peste, si mai incearca nu sunt suportate.",IDC_STATIC_7,9,69,250,8,NOT WS_GROUP
     GROUPBOX        "    ",IDC_STATIC_10,2,95,295,37
-    LTEXT           "Tine tasta SHIFT apasata pentru a muta fisierele si directoarele la Recycle Bin.",IDC_STATIC_2,9,107,202,8,NOT WS_GROUP
+    LTEXT           "Tine tasta SHIFT apasata pentru a muta fisierele si directoarele la Recycle Bin.",IDC_STATIC_2,9,107,254,8,NOT WS_GROUP
     LTEXT           "Confirmarile sunt date de pagina de Confirmari.",IDC_STATIC_3,9,116,164,8,NOT WS_GROUP
     GROUPBOX        "    ",IDC_STATIC_12,2,142,295,57
     CONTROL         "Muta &toate fisierele si directoarele sterse in Recycle Bin",IDR_RECYCLE2,
                     "Button",BS_AUTORADIOBUTTON | BS_VCENTER | WS_GROUP | WS_TABSTOP,9,27,196,12
     CONTROL         "&Scoate fisierele si directoarele imediat dupa ce sunt sterse",IDR_RECYCLE1,
-                    "Button",BS_AUTORADIOBUTTON,9,93,197,12
+                    "Button",BS_AUTORADIOBUTTON,9,93,206,12
     CONTROL         "Muta &urmatoarele fisiere in Recycle Bin, sterge-le pe celelalte permanent",IDR_RECYCLE3,
-                    "Button",BS_AUTORADIOBUTTON,9,141,232,12
-    LTEXT           "Tine tasta SHIFT apasata pentru a sterge fisierele si directoarele permanent.",IDC_STATIC_8,9,175,186,8,NOT WS_GROUP
+                    "Button",BS_AUTORADIOBUTTON,9,141,255,12
+    LTEXT           "Țineți apăsat SHIFT pentru a șterge permanent fișierele și directoarele.",IDC_STATIC_8,9,175,238,8,NOT WS_GROUP
     LTEXT           "Confirmarile sunt date de pagina de Confirmari.",IDC_STATIC_9,9,184,164,8,NOT WS_GROUP
     EDITTEXT        IDE_RECYCLEMASKS,9,156,279,12,ES_AUTOHSCROLL | WS_GROUP
-    RTEXT           "masca indicii",IDC_FILEMASK_HINT,250,169,38,8,NOT WS_GROUP | WS_TABSTOP
+    RTEXT           "Info măști",IDC_FILEMASK_HINT,250,169,38,8,NOT WS_GROUP | WS_TABSTOP
 END
 
 IDD_CFGPAGE_VIEWS DIALOGEX 51, 24, 299, 231
@@ -161,26 +161,26 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Vizualizari"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "&Vizualizari Definite:",IDC_VIEWLIST_HEADER,1,26,60,8
+    LTEXT           "&Vizualizari Definite:",IDC_VIEWLIST_HEADER,1,26,64,8
     CONTROL         "",IDC_VIEW_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,1,36,177,99
-    LTEXT           "&Coloane Disponibile:",IDC_VIEWLIST_HEADER2,182,26,65,8
+    LTEXT           "&Coloane Disponibile:",IDC_VIEWLIST_HEADER2,182,26,69,8
     CONTROL         "",IDC_VIEW_LIST2,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,182,36,114,99
-    LTEXT           "Vizualizari in mod detaliat pot contine toate coloanele Disponibile in lista de Coloane.",IDC_VIEW_TEXT1,1,2,269,8
-    LTEXT           "Alege coloanele din aceasta lista pe care o doriti a vedea in vizualizare selectata.",IDC_VIEW_TEXT3,1,12,252,8
+    LTEXT           "Vizualizari in mod detaliat pot contine toate coloanele Disponibile in lista de Coloane.",IDC_VIEW_TEXT1,1,2,283,8
+    LTEXT           "Alege coloanele din aceasta lista pe care o doriti a vedea in vizualizare selectata.",IDC_VIEW_TEXT3,1,12,265,8
     GROUPBOX        " Setati largimea coloanei selectate din lista Coloane Disponibile: ",IDC_VIEW_TEXT4,1,141,295,50,WS_GROUP
-    CONTROL         "Largime &fixata a coloanei in panoul din stanga:",IDC_VIEW_LEFT_FIXED,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,152,122,12
+    CONTROL         "Lățime &fixă a coloanei (stânga):",IDC_VIEW_LEFT_FIXED,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,152,126,12
     EDITTEXT        IDC_VIEW_LEFT_WIDTH,138,152,26,12,ES_AUTOHSCROLL | WS_GROUP
-    LTEXT           "pixels (largime trasa in linia Header)",IDC_VIEW_TEXT2,167,154,114,8
-    CONTROL         "Largime fi&xata a coloanei in panoul din dreapta:",IDC_VIEW_RIGHT_FIXED,
+    LTEXT           "pixels (largime trasa in linia Header)",IDC_VIEW_TEXT2,167,154,118,8
+    CONTROL         "Lățime fi&xă a coloanei (dreapta):",IDC_VIEW_RIGHT_FIXED,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,166,128,12
     EDITTEXT        IDC_VIEW_RIGHT_WIDTH,138,166,26,12,ES_AUTOHSCROLL | WS_GROUP
-    LTEXT           "pixels (largime trasa in linia Header)",IDC_VIEW_TEXT5,167,168,114,8
-    LTEXT           "Nota: nebifat = largimea coloanei se mareste conform celei mai mari valori din coloana",IDC_VIEW_TEXT6,9,180,231,8
+    LTEXT           "pixels (largime trasa in linia Header)",IDC_VIEW_TEXT5,167,168,118,8
+    LTEXT           "Notă: nebifat = lățimea coloanei se adaptează la cea mai lungă valoare din coloană",IDC_VIEW_TEXT6,9,180,284,8
     GROUPBOX        " Seteaza modul destept (micsoreaza coloana Nume pentru a reduce scrolll-ul) pentru vizualizarea selectata la: ",IDC_VIEW_TEXT7,1,194,295,37,WS_GROUP
-    CONTROL         "Panoul &stang (doar pentru coloana Nume altime nefixata; foloseste Ctrl+N in panoul din stanga)",IDC_VIEW_LEFT_SMARTMODE,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,204,274,12
-    CONTROL         "Panoul &drept (doar pentru coloana Nume latime nefixata; foloseste Ctrl+N in panoul din dreapta)",IDC_VIEW_RIGHT_SMARTMODE,
+    CONTROL         "Panoul &stâng (doar dacă coloana Nume nu are lățime fixă; Ctrl+N în panoul stâng)",IDC_VIEW_LEFT_SMARTMODE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,204,284,12
+    CONTROL         "Panoul &drept (doar dacă coloana Nume nu are lățime fixă; Ctrl+N în panoul drept)",IDC_VIEW_RIGHT_SMARTMODE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,217,285,12
 END
 
@@ -189,8 +189,8 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Vizualizator Intern"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Linia se Sfarseste",IDC_STATIC_1,1,4,35,8
-    CONTROL         "",IDC_STATIC_15,"Static",SS_ETCHEDHORZ | WS_GROUP,38,8,258,1
+    LTEXT           "Linia se Sfarseste",IDC_STATIC_1,1,4,57,8
+    CONTROL         "",IDC_STATIC_15,"Static",SS_ETCHEDHORZ | WS_GROUP,60,8,236,1
     CONTROL         "C&R/LF",IDC_CRLFEOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,15,35,12
     CONTROL         "&CR",IDC_CREOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,27,24,12
     CONTROL         "&LF",IDC_LFEOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,63,15,23,12
@@ -198,42 +198,42 @@ BEGIN
     LTEXT           "CR = Carriage Return",IDC_STATIC_2,118,17,75,8
     LTEXT           "LF = Line Feed",IDC_STATIC_3,118,29,53,8
     LTEXT           "NULL = Null Character",IDC_STATIC_4,210,17,78,8
-    LTEXT           "Pozitia Window",IDC_STATIC_5,1,43,57,8
+    LTEXT           "Pozitia ferestrei",IDC_STATIC_5,1,43,57,8
     CONTROL         "",IDC_STATIC_16,"Static",SS_ETCHEDHORZ | WS_GROUP,60,47,236,1
     CONTROL         "&Salv. inchidere",IDC_SAVEONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,10,54,63,12
-    CONTROL         "S&etata la pozitia principal ferestre Sally",IDC_SETBYMAINWINDOW,
+    CONTROL         "S&eteaza la pozitia ferestrei principale a Sally",IDC_SETBYMAINWINDOW,
                     "Button",BS_AUTORADIOBUTTON,86,54,163,12
     LTEXT           "Optiuni Generale",IDC_STATIC_6,1,71,56,8
     CONTROL         "",IDC_STATIC_17,"Static",SS_ETCHEDHORZ | WS_GROUP,59,75,237,1
     CONTROL         "Seteaza G&aseste in vizualizator intern pt caut grep text din dialogul de Caut",IDC_COPYFINDTEXT,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,83,264,12
-    LTEXT           "Marimea &Tab:",IDC_STATIC_7,10,100,34,8
-    EDITTEXT        IDC_TABSIZE,45,98,23,12,ES_AUTOHSCROLL | WS_GROUP
-    LTEXT           "Reguli Aditionale pentru Mod Vizualizare Auto-Selectie",IDC_STATIC_14,1,116,156,8
-    CONTROL         "",IDC_STATIC_18,"Static",SS_ETCHEDHORZ | WS_GROUP,159,120,137,1
-    LTEXT           "Mod fortat Text pentru fisierele:",IDC_STATIC_12,10,132,88,8
-    EDITTEXT        IDC_VIEW_INTEXT,99,130,195,12,WS_GROUP
-    LTEXT           "Mod fortat Hex pentru fisierele:",IDC_STATIC_13,10,147,87,8
-    EDITTEXT        IDC_VIEW_INHEX,99,145,195,12,WS_GROUP
+    LTEXT           "Marimea &Tab:",IDC_STATIC_7,10,100,45,8
+    EDITTEXT        IDC_TABSIZE,57,98,23,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Reguli Aditionale pentru Mod Vizualizare Auto-Selectie",IDC_STATIC_14,1,116,182,8
+    CONTROL         "",IDC_STATIC_18,"Static",SS_ETCHEDHORZ | WS_GROUP,185,120,111,1
+    LTEXT           "Mod fortat Text pentru fisierele:",IDC_STATIC_12,10,132,105,8
+    EDITTEXT        IDC_VIEW_INTEXT,117,130,177,12,WS_GROUP
+    LTEXT           "Mod fortat Hex pentru fisierele:",IDC_STATIC_13,10,147,105,8
+    EDITTEXT        IDC_VIEW_INHEX,117,145,177,12,WS_GROUP
     RTEXT           "masca indicii",IDC_FILEMASK_HINT,247,159,46,8,WS_TABSTOP
     LTEXT           "Aparenta",IDC_STATIC_9,1,175,42,8
     CONTROL         "",IDC_STATIC_19,"Static",SS_ETCHEDHORZ | WS_GROUP,45,179,251,1
     PUSHBUTTON      "&Font",IDB_VIEWERFONT,10,189,52,14,WS_GROUP
     EDITTEXT        IDE_VIEWERFONT,66,189,228,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    LTEXT           "Culoare text normal",IDC_STATIC_10,10,212,60,8
+    LTEXT           "Culoare: normal",IDC_STATIC_10,10,212,60,8
     PUSHBUTTON      "text",IDC_IV_NORMAL_TEXT,72,209,30,14
-    LTEXT           "Culoare text selectat",IDC_STATIC_11,197,212,64,8
+    LTEXT           "Culoare: selectat",IDC_STATIC_11,197,212,64,8
     PUSHBUTTON      "text",IDC_IV_SELECTED_TEXT,263,209,30,14
 END
 
-IDD_CFGPAGE_USERMENU DIALOGEX 53, 64, 299, 231
+IDD_CFGPAGE_USERMENU DIALOGEX 53, 64, 299, 295
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Meniu utilizator"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Continut M&eniu:",IDS_USHEADER,1,6,55,8
     LISTBOX         IDL_MENUITEMS,1,16,295,108,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    CONTROL         "Su&bmeniu",IDC_UM_SUBMENU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,131,47,12
+    CONTROL         "Su&bmeniu",IDC_UM_SUBMENU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,131,49,12
     CONTROL         "&Separator",IDC_UM_SEPARATOR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,131,47,12
     PUSHBUTTON      "S&chimba Icoana...",IDB_UM_CHANGEICON,233,130,63,14
     LTEXT           "C&omanda:",IDC_STATIC_1,1,153,39,8
@@ -246,9 +246,16 @@ BEGIN
     EDITTEXT        IDE_INITDIR,57,183,222,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDB_BROWSEINITDIR,284,183,12,12,WS_GROUP
     CONTROL         "E&xecuta prin shell",IDC_THROUGHSHELL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,202,85,12
-    CONTROL         "&Deschide fereastra shell",IDC_OUTPUTWND,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,125,202,76,12
-    CONTROL         "Inchide &fereastra shell",IDC_CLOSESHELL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,214,76,12
-    CONTROL         "Arata obiect in bara Meniu &Utilizator",IDC_UM_TOOLBAR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,214,108,12
+    CONTROL         "&Deschide fereastra shell",IDC_OUTPUTWND,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,125,202,93,12
+    CONTROL         "Inchide &fereastra shell",IDC_CLOSESHELL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,214,87,12
+    CONTROL         "Arata obiect in bara Meniu &Utilizator",IDC_UM_TOOLBAR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,214,134,12
+    CONTROL         "Arată &numai când",IDC_UM_SHOWWHEN,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,231,72,10
+    GROUPBOX        "",IDC_UM_SHOWWHEN_GROUP,1,232,295,60
+    LTEXT           "Fișie&rul cu focus:",IDC_UM_SHOWWHEN_FILE_LABEL,8,244,88,8
+    EDITTEXT        IDE_UM_SHOWWHEN_FILE,100,242,190,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "În dosarul nu&mit:",IDC_UM_SHOWWHEN_FOLDER_LABEL,8,260,88,8
+    EDITTEXT        IDE_UM_SHOWWHEN_FOLDER,100,258,190,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "",IDC_UM_SHOWWHEN_NOTE,8,273,284,16,SS_NOPREFIX
 END
 
 IDD_CFGPAGE_HOTPATH DIALOGEX 93, 62, 299, 231
@@ -261,9 +268,9 @@ BEGIN
     EDITTEXT        IDC_HOTPATH_PATH,22,177,258,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDC_HOTPATH_BROWSE,284,177,12,12,WS_GROUP
     LTEXT           "Caile Rapide bifate vor fi aratate in meniul Schimba Drive-ul.",IDC_STATIC_2,1,193,215,8
-    LTEXT           "Puteti folosi Ctrl+Shift+numar tentru a desemna o Cale Rapida din panou.",IDC_STATIC_3,1,205,214,8
+    LTEXT           "Puteti folosi Ctrl+Shift+numar tentru a desemna o Cale Rapida din panou.",IDC_STATIC_3,1,205,245,8
     CONTROL         "&Deschide aceasta pagina cand Cale Rapida este desemnata din panou",IDC_HOTPATH_AUTOCONFIG,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,218,193,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,218,244,12
     LTEXT           "Cai &Rapide definite:",IDC_HOTPATH_HEADER,1,6,67,8
 END
 
@@ -787,19 +794,19 @@ BEGIN
     PUSHBUTTON      "",IDC_C_ITEM4_C,265,47,30,12
     RTEXT           "dummy",IDC_C_ITEM5_L,172,63,88,8
     PUSHBUTTON      "",IDC_C_ITEM5_C,265,61,30,12
-    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,225,80,71,1
-    LTEXT           "Reguli Aditionale Pentru Evidentierea Fisierelor si Directoarelor in Panouri",IDC_STATIC_5,3,76,220,8
-    LTEXT           "Mascheaza &Lista cu Prioritati:",IDC_C_LIST_HEADER,3,94,66,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,246,80,50,1
+    LTEXT           "Reguli Aditionale Pentru Evidentierea Fisierelor si Directoarelor in Panouri",IDC_STATIC_5,3,76,241,8
+    LTEXT           "Mascheaza &Lista cu Prioritati:",IDC_C_LIST_HEADER,3,94,95,8
     LISTBOX         IDC_C_LIST,3,104,292,49,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Cand numele se potirveste cu masca, verifica atributele:",IDC_STATIC_3,3,157,157,8
+    LTEXT           "Dacă numele corespunde măștii, verifică atributele:",IDC_STATIC_3,3,157,172,8
     CONTROL         "&Arhiva",IDC_C_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,3,166,39,12
-    CONTROL         "&Numai citit",IDC_C_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,3,178,49,12
+    CONTROL         "&Numai citit",IDC_C_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,3,178,52,12
     CONTROL         "Asc&uns",IDC_C_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,3,190,39,12
     CONTROL         "S&istem",IDC_C_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,3,202,38,12
     CONTROL         "&Comprimat",IDC_C_COMPRESSED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,166,55,12
     CONTROL         "C&riptat",IDC_C_ENCRYPTED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,178,55,12
     CONTROL         "&Director",IDC_C_DIRECTORY,"Button",BS_AUTO3STATE | WS_TABSTOP,69,190,55,12
-    LTEXT           "Nota: al treilea tip = nu-mi pasa",IDC_STATIC_6,3,216,103,8
+    LTEXT           "Nota: al treilea tip = nu-mi pasa",IDC_STATIC_6,3,216,106,8
     RTEXT           "dummy",IDC_C_MASK1_L,178,160,82,8
     PUSHBUTTON      "",IDC_C_MASK1_C,265,158,30,12
     RTEXT           "dummy",IDC_C_MASK2_L,178,174,82,8
@@ -818,8 +825,8 @@ CAPTION "Confirmari"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "",IDC_CNFRM_TREE,"SysTreeView32",TVS_LINESATROOT | TVS_DISABLEDRAGDROP | WS_BORDER | WS_VSCROLL | WS_TABSTOP,1,2,295,174
-    LTEXT           "Nota 1: este ignorat cand Recycle Bin este folosit pentru toate obiectele (vezi pagina despre Recycle Bin).",IDC_STATIC_2,2,180,295,8
-    LTEXT           "Nota 2: este ignorat in arhive si este ignorat cand Recycle Bin este folosit pentru toate obiectele.",IDC_STATIC_3,2,190,295,8
+    LTEXT           "Notă 1: ignorat când toate obiectele sunt mutate în Recycle Bin (vezi pagina Recycle Bin).",IDC_STATIC_2,2,180,295,8
+    LTEXT           "Notă 2: ignorat în arhive și când toate obiectele sunt mutate în Recycle Bin.",IDC_STATIC_3,2,190,295,8
     LTEXT           "Pentru a seta confirmare la stergere cand folositi Recycle Bin, deschideti Properties din click dreapta pe scurtatura Recycle Bin de pe desktop-ul dvs.",IDC_STATIC_4,2,207,284,16
 END
 
@@ -831,27 +838,27 @@ BEGIN
     LTEXT           "Dis&keta",IDC_STATIC_10,1,1,46,8
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,49,5,244,1
     CONTROL         "Foloseste refresh automat",IDC_DRVSPEC_FLOPPYMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,11,104,12
-    CONTROL         "Foloseste icoane simple",IDC_DRVSPEC_FLOPPYSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,11,69,12
+    CONTROL         "Foloseste icoane simple",IDC_DRVSPEC_FLOPPYSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,11,94,12
     LTEXT           "&Alte drive-uri care se scot (ex. stick USB , ZIP si JAZ)",IDC_STATIC_2,1,31,225,8
     CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,228,35,65,1
     CONTROL         "Foloseste refresh automat",IDC_DRVSPEC_REMOVABLEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,41,104,12
-    CONTROL         "Foloseste icoane simple",IDC_DRVSPEC_REMOVABLESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,41,69,12
-    LTEXT           "Drive-uri fi&xate drives (ex. hdd locale)",IDC_STATIC_4,1,61,114,8
-    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,117,65,176,1
+    CONTROL         "Foloseste icoane simple",IDC_DRVSPEC_REMOVABLESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,41,94,12
+    LTEXT           "Drive-uri fi&xate drives (ex. hdd locale)",IDC_STATIC_4,1,61,124,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,127,65,166,1
     CONTROL         "Foloseste refresh automat",IDC_DRVSPEC_FIXEDMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,71,104,12
-    CONTROL         "Foloseste icoane simple",IDC_DRVSPEC_FIXEDSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,71,69,12
-    LTEXT           "U&nitate CD-ROM sau DVD-ROM",IDC_STATIC_6,1,91,98,8
-    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,101,95,192,1
+    CONTROL         "Foloseste icoane simple",IDC_DRVSPEC_FIXEDSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,71,94,12
+    LTEXT           "U&nitate CD-ROM sau DVD-ROM",IDC_STATIC_6,1,91,107,8
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,110,95,183,1
     CONTROL         "Foloseste refresh automat",IDC_DRVSPEC_CDROMMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,101,104,12
-    CONTROL         "Foloseste icoane simple",IDC_DRVSPEC_CDROMSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,101,69,12
-    LTEXT           "Drive-uri in Retea",IDC_STATIC_8,1,121,52,8
-    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,55,125,238,1
+    CONTROL         "Foloseste icoane simple",IDC_DRVSPEC_CDROMSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,101,94,12
+    LTEXT           "Drive-uri in Retea",IDC_STATIC_8,1,121,59,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,62,125,231,1
     CONTROL         "Foloseste refresh au&tomat",IDC_DRVSPEC_REMOTEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,131,104,12
-    CONTROL         "Foloseste icoane simp&le",IDC_DRVSPEC_REMOTESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,143,69,12
+    CONTROL         "Foloseste icoane simp&le",IDC_DRVSPEC_REMOTESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,143,94,12
     CONTROL         "N&u fa refresh la activarea Sally (refresh manual poate fi necesar)",IDC_DRVSPEC_REMOTEACT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,155,276,12
-    LTEXT           "Daca calea in panou nu este accesi&bila, mergi la:",IDC_STATIC_9,1,180,128,8
-    EDITTEXT        IDE_DRVSPEC_ONERRGOTO,130,178,146,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Daca calea in panou nu este accesi&bila, mergi la:",IDC_STATIC_9,1,180,159,8
+    EDITTEXT        IDE_DRVSPEC_ONERRGOTO,162,178,114,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "...",IDB_BROWSECOMMAND,280,178,13,12,WS_GROUP
 END
 
@@ -868,7 +875,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Vizualizatori"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Masca fisier prioritate &lista",IDS_MASKSHDR,1,6,74,8
+    LTEXT           "Masca fisier prioritate &lista",IDS_MASKSHDR,1,6,87,8
     LISTBOX         IDL_FILEMASKS,1,16,295,120,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT           "&Vizualizator asociat:",IDC_STATIC_1,1,144,65,8
     COMBOBOX        IDC_VIEW_TYPE,69,142,226,67,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
@@ -889,7 +896,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Editori"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Masca fisier prioritate &lista",IDS_MASKSHDR,1,6,74,8
+    LTEXT           "Masca fisier prioritate &lista",IDS_MASKSHDR,1,6,87,8
     LISTBOX         IDL_FILEMASKS,1,16,295,153,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT           "&Comanda:",IDC_STATIC_1,1,178,39,8
     EDITTEXT        IDE_COMMAND,59,176,220,12,ES_AUTOHSCROLL | WS_GROUP
@@ -1005,7 +1012,7 @@ CAPTION "Arhivatori"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Foloseste &icoane simple in arhive",IDC_ARCH_SIMPLEICONS,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,4,106,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,4,124,12
     CONTROL         "&Arhiveaza in alt panou",IDC_ARCH_ANOTHERPANELP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,99,12
     CONTROL         "&Dezarhiveaza in alt panou",IDC_ARCH_ANOTHERPANELU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,28,109,12
     CONTROL         "Dezarhiveaza in &subdirectorul numit dupa arhiva",IDC_ARCH_ARCHIVENAME,
@@ -1019,7 +1026,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "&Nume",IDC_P1_NAME,1,6,66,8
     LISTBOX         IDC_P1_LIST,1,16,295,70,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Arhiveaza cu:",IDC_STATIC_1,1,92,37,8
+    LTEXT           "&Arhiveaza cu:",IDC_STATIC_1,1,92,45,8
     COMBOBOX        IDC_P1_TYPE,53,90,100,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "&Extensie default:",IDC_STATIC_2,195,92,62,8
     EDITTEXT        IDC_P1_EXT,261,90,35,12,ES_AUTOHSCROLL
@@ -1039,8 +1046,8 @@ BEGIN
     LTEXT           "Arg&umente:",IDC_STATIC_8,10,192,42,8
     EDITTEXT        IDC_P1_MVARG,53,190,220,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P1_MVARG_BROWSE,277,190,12,12,WS_GROUP
-    CONTROL         "&Suporta numele lungi",IDC_P1_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,79,12
-    CONTROL         "L&ista Fisierelor Necesare in Caractere ANSI",IDC_P1_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,124,12
+    CONTROL         "&Suporta numele lungi",IDC_P1_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,87,12
+    CONTROL         "L&ista Fisierelor Necesare in Caractere ANSI",IDC_P1_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,153,12
 END
 
 IDD_CFGPAGE_UNPACKERS DIALOGEX 85, 24, 299, 231
@@ -1050,20 +1057,20 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "&Nume",IDC_P2_NAME,1,6,60,8
     LISTBOX         IDC_P2_LIST,1,16,295,116,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Dezarhivare cu:",IDC_STATIC_1,1,139,46,8
-    COMBOBOX        IDC_P2_TYPE,53,137,100,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Masti de fisier:",IDC_STATIC_2,178,139,40,8
-    EDITTEXT        IDC_P2_EXT,221,137,75,12,ES_AUTOHSCROLL
-    RTEXT           "indicii masca",IDC_FILEMASK_HINT,257,150,38,8,WS_TABSTOP
+    LTEXT           "&Dezarhivare cu:",IDC_STATIC_1,1,139,52,8
+    COMBOBOX        IDC_P2_TYPE,55,137,98,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Masti de fisier:",IDC_STATIC_2,178,139,49,8
+    EDITTEXT        IDC_P2_EXT,229,137,67,12,ES_AUTOHSCROLL
+    RTEXT           "indicii masca",IDC_FILEMASK_HINT,252,150,43,8,WS_TABSTOP
     GROUPBOX        " Dezarhiveaza arhiva ",IDC_STATIC_3,1,162,295,48
     LTEXT           "&Comanda:",IDC_STATIC_4,10,177,39,8
-    EDITTEXT        IDC_P2_EXCMD,53,175,220,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P2_EXCMD,55,175,218,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P2_EXCMD_BROWSE,277,175,12,12,WS_GROUP
     LTEXT           "&Argumente:",IDC_STATIC_5,10,192,42,8
-    EDITTEXT        IDC_P2_EXARG,53,190,220,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P2_EXARG,55,190,218,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P2_EXARG_BROWSE,277,190,12,12,WS_GROUP
-    CONTROL         "Suporta numele l&ungi",IDC_P2_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,80,12
-    CONTROL         "&Lista Fisierelor Necesare in Caractere ANSI",IDC_P2_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,124,12
+    CONTROL         "Suporta numele l&ungi",IDC_P2_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,87,12
+    CONTROL         "&Lista Fisierelor Necesare in Caractere ANSI",IDC_P2_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,153,12
 END
 
 IDD_CFGPAGE_ARCHIVERSLOCATIONS DIALOGEX 64, 22, 299, 231
@@ -1073,14 +1080,14 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "&Arhivatori Externi",IDC_P3_NAME,1,3,70,8
     LISTBOX         IDC_P3_LIST,1,13,295,143,LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Listeaza si Dezarhiveaza:",IDC_STATIC_1,7,175,58,8
-    EDITTEXT        IDC_P3_VIEW,71,173,202,12,ES_AUTOHSCROLL
+    LTEXT           "&Listeaza si Dezarhiveaza:",IDC_STATIC_1,7,175,81,8
+    EDITTEXT        IDC_P3_VIEW,90,173,183,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P3_VIEW_BROWSE,277,173,12,12
-    EDITTEXT        IDC_P3_EDIT,71,191,202,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P3_EDIT,90,191,183,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P3_EDIT_BROWSE,277,191,12,12
-    LTEXT           "&Sterge si Arhiveaza:",IDC_STATIC_2,7,193,60,8
+    LTEXT           "&Sterge si Arhiveaza:",IDC_STATIC_2,7,193,81,8
     GROUPBOX        " Localizarile Arhivatorilor Externi ",IDC_STATIC_3,1,161,295,51
-    LTEXT           "Foloseste Optiuni/Arhivatori Autoconfigurare pentru a cauta arhivatori externi instalati.",IDC_STATIC_4,1,216,275,8
+    LTEXT           "Foloseste Optiuni/Arhivatori Autoconfigurare pentru a cauta arhivatori externi instalati.",IDC_STATIC_4,1,216,285,8
 END
 
 IDD_CFGPAGE_ASSOCIATIONS DIALOGEX 67, 23, 299, 231
@@ -1091,11 +1098,11 @@ BEGIN
     LTEXT           "&Extensii de Fisier",IDC_P4_NAME,1,6,60,8
     LISTBOX         IDC_P4_LIST,1,16,295,147,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     RTEXT           "indicii masca extinse",IDC_FILEMASK_HINT,223,165,72,8,WS_TABSTOP
-    LTEXT           "&Listeaza si Dezarhiveaza:",IDC_STATIC_2,7,189,57,8
-    COMBOBOX        IDC_P4_VIEW,79,187,210,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_P4_EDIT,79,205,210,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Listeaza si Dezarhiveaza:",IDC_STATIC_2,7,189,81,8
+    COMBOBOX        IDC_P4_VIEW,90,187,199,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_P4_EDIT,90,205,199,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     GROUPBOX        " Arhivatori Asociati ",IDC_STATIC_3,1,177,295,47
-    LTEXT           "&Sterge si Arhiveaza:",IDC_STATIC_4,7,207,60,8
+    LTEXT           "&Sterge si Arhiveaza:",IDC_STATIC_4,7,207,65,8
 END
 
 IDD_CFGPAGE_MAINWINDOW DIALOGEX 67, 23, 299, 231
@@ -1103,14 +1110,14 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Fereastra Principala"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         "Arata ecranul &de pornire la startup",IDC_SPLASHSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,113,12
+    CONTROL         "Arata ecranul &de pornire la startup",IDC_SPLASHSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,128,12
     CONTROL         "Arata &icoana Sally in langa ceas, dreapta jos",IDC_STATUSAREA,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,17,217,12
-    CONTROL         "&Arata calea curenta ca titlu in fereastra principala ca:",IDC_TITLEBAR_PATH,
+    CONTROL         "&Arată calea curentă în titlul ferestrei ca:",IDC_TITLEBAR_PATH,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,31,162,12
     COMBOBOX        IDC_TITLEBAR_MODE,164,31,130,55,CBS_DROPDOWNLIST | WS_TABSTOP
-    CONTROL         "&Custom text prefix in titlul ferestrei principale:",IDC_TITLEBAR_PREFIX,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
+    CONTROL         "&Prefix personalizat în titlul ferestrei:",IDC_TITLEBAR_PREFIX,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,160,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
@@ -1120,17 +1127,17 @@ CAPTION "Aparenta"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Selectare tot &randul (moduri doar Detaliat si Scurt)",IDC_FULLROWSELECT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,169,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,180,12
     CONTROL         "Rand &evidentiat focused (mod doar Detaliat)",IDC_FULLROWHIGHLIGHT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,161,12
     CONTROL         "Cu un singur-&click pentru a deschide un obiect (da click pe el pentru select)",IDC_SINGLECLICK,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,27,160,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,27,264,12
     CONTROL         "&Arata icoana tincture in panou (sistem/ascuns/selectat/obiecte focus)",IDC_ICONTINCTURE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,39,240,12
     CONTROL         "Arata caption  &panou in linia Director",IDC_PANELCAPTION,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,133,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,137,12
     CONTROL         "Arata butonul de &maximizeaza/refacere in linia Director",IDC_PANELZOOM,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,169,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,197,12
     GROUPBOX        " Fonturi ",IDC_STATIC_2,1,81,295,54
     PUSHBUTTON      "&Font panou…",IDB_PANELFONT,7,93,110,14,WS_GROUP
     EDITTEXT        IDE_PANELFONT,122,93,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
@@ -1140,9 +1147,9 @@ BEGIN
     EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
     GROUPBOX        " &Thumbnails ",IDC_STATIC_4,1,176,295,30
-    LTEXT           "Marime:",IDC_STATIC_5,8,190,19,8
-    EDITTEXT        IDC_THUMBNAILSIZE,29,188,33,12,ES_AUTOHSCROLL
-    LTEXT           "pixels",IDC_STATIC_6,66,190,22,8,NOT WS_GROUP
+    LTEXT           "Marime:",IDC_STATIC_5,8,190,28,8
+    EDITTEXT        IDC_THUMBNAILSIZE,38,188,33,12,ES_AUTOHSCROLL
+    LTEXT           "pixels",IDC_STATIC_6,75,190,22,8,NOT WS_GROUP
     GROUPBOX        " Aspectul aplicației ",IDC_STATIC_7,1,214,295,74
     LTEXT           "Temă (&V):",IDC_STATIC_8,8,228,62,8
     COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
@@ -1169,10 +1176,22 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Tastatura"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Scurtaturi pentru comenzile Sally nu pot fi schimbate in aceasta versiune.",IDC_STATIC_1,2,4,264,8
+    LTEXT           "Alegeți interpretorul de comenzi pentru fiecare scurtătură.",IDC_STATIC_1,2,4,264,8
     LTEXT           "Puteti vedea o lista cuprinzatoare de scurtaturi din tastatura in",IDC_STATIC_2,2,17,196,8
     LTEXT           "help",IDC_KEYBOARD_SHORTCUTS,198,17,17,8,WS_TABSTOP
     LTEXT           "Puteti defini scurtaturile de tastatura pentru comenzi plugin:\r  1. Din meniul Plugins alege comanda Plugins Manager\r  2. Selecteaza plugin dorit\r  3. Apasa butonul de pe Tastatura",IDC_STATIC_3,2,31,282,32
+    GROUPBOX        "Interpretor de comenzi",IDC_SHELL_GROUP,2,76,295,149
+    LTEXT           "Interpretor &implicit:",IDC_SHELL_DEFAULT_LABEL,10,91,103,8
+    COMBOBOX        IDC_SHELL_DEFAULT,116,88,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Ctrl+Num /:",IDC_SHELL_CTRL_LABEL,10,116,103,8
+    COMBOBOX        IDC_SHELL_CTRL,116,113,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Shift+Num /:",IDC_SHELL_SHIFT_LABEL,10,140,103,8
+    COMBOBOX        IDC_SHELL_SHIFT,116,137,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Alt+Num /:",IDC_SHELL_ALT_LABEL,10,164,103,8
+    COMBOBOX        IDC_SHELL_ALT,116,161,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Reîncarcă profilurile",IDC_SHELL_REFRESH,203,187,91,14
+    LTEXT           "Fiecare interpretor se deschide în dosarul panoului activ.",IDC_SHELL_NOTE,10,189,185,16
+    LTEXT           "",IDC_SHELL_STATUS,10,207,277,16
 END
 
 IDD_FILELIST DIALOGEX 61, 53, 304, 136
@@ -1506,23 +1525,23 @@ BEGIN
     PUSHBUTTON      "&Help",IDHELP,241,130,50,14
 END
 
-IDD_SLGSELECTOR DIALOGEX 107, 84, 276, 220
+IDD_LANGUAGESELECTOR DIALOGEX 107, 84, 276, 220
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Selecteaza Limba"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Selecteaza una din limbile instalate.",IDC_STATIC_1,5,7,240,8
-    CONTROL         "",IDC_SLG_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,266,101
+    CONTROL         "",IDC_LANGUAGE_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,266,101
     GROUPBOX        "About language version",IDC_STATIC_2,5,124,266,69,WS_GROUP
     LTEXT           "Authors:",IDC_STATIC_3,13,138,30,8
-    EDITTEXT        IDC_SLG_AUTHOR,66,138,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    EDITTEXT        IDC_LANGUAGE_AUTHOR,66,138,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
     LTEXT           "Web:",IDC_STATIC_5,13,166,22,8
-    LTEXT           "",IDC_SLG_WEB,68,166,194,8,WS_TABSTOP
+    LTEXT           "",IDC_LANGUAGE_WEB,68,166,194,8,WS_TABSTOP
     LTEXT           "Comentariu:",IDC_STATIC_6,13,177,37,8
-    LTEXT           "",IDC_SLG_COMMENT,68,177,194,8
+    LTEXT           "",IDC_LANGUAGE_COMMENT,68,177,194,8
     DEFPUSHBUTTON   "OK",IDOK,164,199,50,14,WS_GROUP
     PUSHBUTTON      "Anuleaza",IDCANCEL,220,199,50,14
-    LTEXT           "Limba",IDC_SLG_DESCR,19,31,46,8
+    LTEXT           "Limba",IDC_LANGUAGE_DESCR,19,31,46,8
 END
 
 IDD_SKILLLEVEL DIALOGEX 137, 77, 239, 132
@@ -1548,15 +1567,15 @@ CAPTION "Istorie"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Puteti alege valorile recent folosite (istorie) vor fi stocate in registry(registru) ca o parte a Sally si plugin-s.",IDC_STATIC_2,1,4,254,16
-    CONTROL         "&Salveaza istoria",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,54,12
+    CONTROL         "&Salveaza istoria",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,65,12
     CONTROL         "Lista Salvata a Directoarelor in &Lucru",IDC_HISTORY_WORKDIRS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,118,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,134,12
     LTEXT           "Pentru istoria Comenzii de linie (poate contine parole) puteti alege optiuni speciale.",IDC_STATIC_3,1,60,228,16
     CONTROL         "&Activeaza istoria Comenzii de linie",IDC_HISTORY_ENABLECMDLINE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,80,247,12
     CONTROL         "Salvea&za istoria Comenzii de linie",IDC_HISTORY_SAVECMDLINE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,93,247,12
-    LTEXT           "Puteti sterge acum toate datele referitoare la istorie.",IDC_STATIC_4,1,116,144,8
+    LTEXT           "Puteti sterge acum toate datele referitoare la istorie.",IDC_STATIC_4,1,116,172,8
     PUSHBUTTON      "S&terge Istoria...",IDC_HISTORY_CLEARHISTORY,1,126,60,14
 END
 
@@ -1833,9 +1852,9 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Poti customiza continutul meniului Schimba Drive si bara de Drive.",IDC_STATIC_1,1,3,221,8
     GROUPBOX        " Drive-uri ",IDC_STATIC_2,1,18,294,73,WS_GROUP
-    LTEXT           "&Selecteaza drive-urile care ar trebui sa fie vizibile:",IDC_STATIC_3,9,31,120,8
+    LTEXT           "&Selecteaza drive-urile care ar trebui sa fie vizibile:",IDC_STATIC_3,9,31,163,8
     LISTBOX         IDL_CHD_DRIVES,9,41,277,12,LBS_MULTIPLESEL | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | LBS_DISABLENOSCROLL | LBS_NODATA | WS_TABSTOP
-    LTEXT           "S&electeaza drive-urile care ar trebui urmate de un separator:",IDC_STATIC_4,9,60,172,8
+    LTEXT           "S&electeaza drive-urile care ar trebui urmate de un separator:",IDC_STATIC_4,9,60,198,8
     LISTBOX         IDL_CHD_SEPARATORS,9,70,277,12,LBS_MULTIPLESEL | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | LBS_DISABLENOSCROLL | LBS_NODATA | WS_TABSTOP
     GROUPBOX        " Obiecte aditionale ",IDC_STATIC_5,1,99,294,73,WS_GROUP
     CONTROL         "&Documente",IDC_CHD_SHOWMYDOC,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,113,55,12
@@ -1843,12 +1862,12 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,126,100,12
     CONTROL         "&Retea",IDC_CHD_SHOWNET,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,139,44,12
     CONTROL         "Ca &in Celalalt Panou (doar in meniul Schimba Drive)",IDC_CHD_SHOWANOTHER,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,152,161,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,152,185,12
     LTEXT           "Cum sa schimbi vizibilitatea ",IDC_STATIC_6,1,181,91,8
     LTEXT           "Cale Rapida",IDS_CHD_HOTPATHS,92,181,30,8,WS_TABSTOP
     LTEXT           "si",IDC_STATIC_7,125,181,15,8
     LTEXT           "Plugin FS",IDS_CHD_PLUGINS,142,181,33,8,WS_TABSTOP
-    LTEXT           "obiecte.",IDC_STATIC_8,175,181,22,8
+    LTEXT           "obiecte.",IDC_STATIC_8,175,181,27,8
 END
 
 IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 231
@@ -1857,41 +1876,41 @@ CAPTION "Panouri"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "&Ascunde fisierele si directoarele cu atribute sistem sau ascuns (Ctrl+H)",IDC_NOTHIDDENSYSTEM,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,232,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,245,12
     CONTROL         "I&nclude directoarele in operatiuni de selectare/deselectare",IDC_INCLUDEDIRS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,173,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,206,12
     LTEXT           "A&rata numele:",IDC_STATIC_1,1,33,48,8
-    COMBOBOX        IDC_NAMEMANGLE,50,31,243,72,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Ara&ta marimile:",IDC_STATIC_5,1,49,42,8
-    COMBOBOX        IDC_SIZEFORMAT,50,47,243,49,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_NAMEMANGLE,54,31,239,72,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Ara&ta marimile:",IDC_STATIC_5,1,49,51,8
+    COMBOBOX        IDC_SIZEFORMAT,54,47,239,49,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Tastatura",IDC_STATIC_2,1,67,34,8
     CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,37,71,260,1
-    CONTROL         "Redrectioneaza ta&starea din panou la linia de Comanda (tine apasat ALT pentru Cautare Rapida)",IDC_QUICKSEARCH_ALT,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,78,256,12
-    CONTROL         "&Foloseste Shift+numar pentru a merge la Cale Rapida (da conflict cu tip tastatura regionala - romania, uk)",IDC_SHIFTFORHOTPATHS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,90,282,12
+    CONTROL         "Trimite ta&starea din panou la linia de comandă (ține ALT pentru Căutare Rapidă)",IDC_QUICKSEARCH_ALT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,78,285,12
+    CONTROL         "&Folosește Shift+număr pentru Cale Rapidă (conflict cu tastaturile naționale)",IDC_SHIFTFORHOTPATHS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,90,285,12
     LTEXT           "Mouse",IDC_STATIC_3,1,105,24,8
     CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,27,109,270,1
-    CONTROL         "&Click dreapta pentru a deschide meniul de scurtaturi (tine tasta CTRL apasat pentru a selecta/deselecta)",IDE_PRIMARYCTXMENU,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,116,228,12
+    CONTROL         "&Click dreapta deschide meniul contextual (ține CTRL pentru selectare/deselectare)",IDE_PRIMARYCTXMENU,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,116,285,12
     CONTROL         "R&edenumeste prin doua click-uri pe nume",IDC_CLICKTORENAME,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,128,153,12
-    CONTROL         "Anuleaza operatiuni de &drag-and-drop mai mici de:",IDC_DISABLEDANDD,
+    CONTROL         "Anulează &drag-and-drop mai scurt de:",IDC_DISABLEDANDD,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,140,170,12
     EDITTEXT        IDE_DRAGDROPDELAY,181,140,28,12,ES_AUTOHSCROLL
     LTEXT           "ms",IDC_STATIC_4,213,142,13,8,NOT WS_GROUP
     LTEXT           "Sortez",IDC_STATIC_6,1,156,26,8
     CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,29,160,268,1
     CONTROL         "S&ortarea sirurilor cu respect pentru Regional Settings",IDC_SORTUSESLOCALE,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,166,163,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,166,188,12
     CONTROL         "Foloseste sortare nu&merica pentru numere continute in siruri",IDC_SORTDETECTNUMBERS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,178,186,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,178,215,12
     CONTROL         "Ordonate dupa Tim&p: obiectele mai noi primele",IDC_SORTNEWERONTOP,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,190,146,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,190,172,12
     CONTROL         "Sortate dupa T&imp: sorteaza directoarele dupa nume",IDC_SORTDIRSBYNAME,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,141,12
-    CONTROL         "Tratea&za directoarele ca si cum ar avea extensii (de asemenea arata extensiile in coloana Ext)",IDC_SORTDIRSBYEXT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,265,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,188,12
+    CONTROL         "Tratea&ză directoarele ca având extensii (arată extensiile și în coloana Ext)",IDC_SORTDIRSBYEXT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,285,12
 END
 
 IDD_CANNOTSETATTRSINFO DIALOGEX 15, 33, 353, 89
@@ -4229,4 +4248,24 @@ BEGIN
     IDS_LONGPATH_RESTART "Setarea Windows a fost modificată. Reporniți aplicațiile; poate fi necesară și repornirea Windows."
     IDS_LONGPATH_CONFIRM "Modificați imediat această setare Windows pentru toți utilizatorii? Butonul de anulare din configurare nu revocă modificarea. Este necesară aprobarea administratorului. Apoi reporniți aplicațiile; poate fi necesară repornirea Windows."
     IDS_LONGPATH_FAILED "Windows nu a confirmat setarea solicitată pentru căi lungi. Verificați drepturile de administrator sau contactați administratorul."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_SHELL_NOT_ASSIGNED "Neatribuit"
+    IDS_SHELL_UNAVAILABLE_LABEL "indisponibil"
+    IDS_SHELL_SHORTCUT_CONFLICT "O scurtătură selectată este folosită de un plugin. Eliminați această atribuire sau modificați scurtătura pluginului."
+    IDS_SHELL_PROFILE_UNAVAILABLE "Un profil atribuit nu este disponibil. Se păstrează selecția salvată."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_UM_SHOWWHEN_NOTE_ON "Dacă o regulă nu se potrivește, comanda este ascunsă în bara Meniu Utilizator și în Meniul Utilizator F9."
+    IDS_UM_SHOWWHEN_NOTE_OFF "Dezactivat: comanda este afișată mereu. Măștile sunt păstrate."
+    IDS_UM_SHOWWHEN_NOTE_NESTED "Regulile se aplică doar comenzilor și submeniurilor de nivel superior."
+    IDS_UM_FOLDERMASK_INCORRECT "Masca de nume de dosar este incorectă sintactic."
+    IDS_UM_FILEMASK_CUE "*.png;*.jpg  (gol = orice fișier)"
+    IDS_UM_FOLDERMASK_CUE "Poze;src  (gol = orice dosar)"
+    IDS_UM_SHOWWHEN_FILE_HINT "când %s"
+    IDS_UM_SHOWWHEN_FOLDER_HINT "în %s"
 END

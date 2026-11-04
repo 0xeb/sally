@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cwctype>
+#include <iterator>
 
 namespace Sally::PathCompletion
 {
@@ -147,28 +148,59 @@ std::vector<std::wstring> Candidates(const std::wstring& head, std::vector<std::
     return result;
 }
 
-std::vector<std::wstring> ListFolderCandidates(IFileEnumerator& enumerator, const Target& target, size_t maxCount)
+std::vector<std::wstring> ListCandidates(IFileEnumerator& enumerator, const Target& target, size_t maxCount,
+                                         const CandidateOptions& options)
 {
     if (!target.Complete || target.Directory.empty())
         return {};
     HENUM handle = enumerator.StartEnum(target.Directory.c_str(), L"*");
     if (handle == INVALID_HENUM)
         return {};
-    std::vector<std::wstring> names;
+    const bool withFiles = options.Kinds == CandidateKinds::FoldersAndFiles;
+    std::vector<std::wstring> folders;
+    std::vector<std::wstring> files;
     FileEnumEntry entry;
-    // Read a little past the cap, so the sorted result is the alphabetically first ones of a
+    // Read a little past each cap, so the sorted result is the alphabetically first ones of a
     // large folder more often than not; a huge folder is never read to the end.
     const size_t readLimit = maxCount * 4;
-    while (names.size() < readLimit)
+    while (folders.size() < readLimit || (withFiles && files.size() < readLimit))
     {
         const EnumResult r = enumerator.NextFile(handle, entry);
         if (!r.success || r.noMoreFiles)
             break;
         if (entry.IsDirectory())
-            names.push_back(entry.name);
+        {
+            if (folders.size() < readLimit)
+                folders.push_back(entry.name);
+        }
+        else if (withFiles && files.size() < readLimit &&
+                 !(options.ExcludeFile && options.ExcludeFile(entry.name)))
+        {
+            files.push_back(entry.name);
+        }
     }
     enumerator.EndEnum(handle);
-    return Candidates(target.Head, std::move(names), maxCount);
+
+    std::vector<std::wstring> result = Candidates(target.Head, std::move(folders), maxCount);
+    if (options.AppendFolderSeparator)
+    {
+        const wchar_t separator = !target.Head.empty() && target.Head.back() == L'/' ? L'/' : L'\\';
+        for (std::wstring& candidate : result)
+            candidate.push_back(separator);
+    }
+    if (withFiles)
+    {
+        std::vector<std::wstring> fileCandidates = Candidates(target.Head, std::move(files), maxCount);
+        result.insert(result.end(), std::make_move_iterator(fileCandidates.begin()),
+                      std::make_move_iterator(fileCandidates.end()));
+    }
+    return result;
+}
+
+CandidateKinds SuggestionKindsFor(size_t operationItemCount, bool singleItemIsFile, bool sourceIsDisk)
+{
+    return operationItemCount == 1 && singleItemIsFile && sourceIsDisk ? CandidateKinds::FoldersAndFiles
+                                                                       : CandidateKinds::Folders;
 }
 
 } // namespace Sally::PathCompletion

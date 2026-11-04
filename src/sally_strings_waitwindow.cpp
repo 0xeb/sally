@@ -2834,12 +2834,11 @@ BOOL CLanguage::Init(LANGID languageID, HMODULE module)
 {
     if (module == NULL)
         module = HInstance;
-    const wchar_t* persistedName = sally::languages::PersistedNameFromLangId(languageID);
     const wchar_t* tag = sally::languages::TagFromLangId(languageID);
-    if (persistedName == NULL || tag == NULL)
+    if (tag == NULL)
         return FALSE;
     LanguageID = languageID;
-    PersistedName = persistedName;
+    Tag = tag;
 
     // the language's own name ("Čeština (Česko)") reads best in a list the user may not
     // understand yet; Windows knows it even when that language is not installed

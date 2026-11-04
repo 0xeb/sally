@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "windows_terminal_ui.h"
 
 #define NONE 0x00
 #define CONTROL 0x01
@@ -13,6 +14,8 @@
 
 BOOL IsSalHotKey(WORD hotKey)
 {
+    if (IsAssignedCommandShellShortcut(hotKey))
+        return TRUE;
     BYTE vk = LOBYTE(hotKey);
     //TRACE_I("vk="<<std::hex<<(WORD)vk);
     BYTE hk_mods = HIBYTE(hotKey);

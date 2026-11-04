@@ -1,0 +1,33 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for webviewer. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/webviewer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\webviewer.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Microsoft Edge WebView2 기반의 가벼운 HTML, XML, Markdown 뷰어입니다."
+ IDS_ABOUT, "플러그인 정보"
+ IDS_PLUGINNAME, "웹 뷰어"
+ IDS_UNABLETOOPENIE, "웹 뷰어를 열 수 없습니다.\nMicrosoft Edge WebView2 런타임이 설치되어 있는지 확인하십시오."
+ IDS_ERRORTITLE, "오류"
+ IDS_NAVIGATIONFAILED, "웹 뷰어에서 이 파일을 표시할 수 없습니다."
+ IDS_VIEW, "보기(&V)"
+ IDS_SVG_BACKGROUND, "배경(&B)"
+ IDS_SVG_CHECKERBOARD, "바둑판 무늬(&C)"
+ IDS_SVG_LIGHT, "밝게(&L)"
+ IDS_SVG_DARK, "어둡게(&D)"
+}

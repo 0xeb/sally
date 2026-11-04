@@ -1304,7 +1304,7 @@ BEGIN
     BEGIN
         MENUITEM "&Mai Incearca",                      IDOK
         MENUITEM "Re&ia",                     CM_SIED_RESUME
-        MENUITEM "Reia& sau Suprascrie",        CM_SIED_RESUMEOROVR
+        MENUITEM "Reia sau &Suprascrie",        CM_SIED_RESUMEOROVR
         MENUITEM "&Foloseste Nume Alternativ",         CM_SCRD_USEALTNAME
     END
 END

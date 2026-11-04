@@ -6,6 +6,7 @@
 #endif
 
 #include "WindowsTerminalService.h"
+#include "IShell.h"
 #include "Win32Utf8.h"
 
 #pragma push_macro("free")
@@ -121,11 +122,12 @@ namespace
 CWindowsTerminalService::CWindowsTerminalService(IExecutableLocator* executableLocator,
                                                  IEnvironment* environment,
                                                  IFileSystem* fileSystem,
-                                                 IProcess* process)
+                                                 IProcess* process, IShell* shell)
     : ExecutableLocator(executableLocator),
       Environment(environment),
       FileSystem(fileSystem),
-      Process(process)
+      Process(process),
+      Shell(shell)
 {
 }
 
@@ -323,6 +325,8 @@ bool CWindowsTerminalService::ParseSettingsJson(const char* json, size_t size,
             if (!ReadJsonString(value, "name", profile.name) || profile.name.empty())
                 continue;
             ReadJsonString(value, "guid", profile.guid);
+            if (!profile.guid.empty() && !IsCanonicalWindowsTerminalGuid(profile.guid))
+                continue; // Terminal cannot identify a malformed GUID profile reliably.
 
             std::wstring foldedGuid = FoldCase(profile.guid);
             if (!foldedGuid.empty() && seenGuids.find(foldedGuid) != seenGuids.end())
@@ -394,6 +398,24 @@ const WindowsTerminalCatalog& CWindowsTerminalService::Refresh(bool force)
     return Catalog;
 }
 
+bool IsCanonicalWindowsTerminalGuid(const std::wstring& value)
+{
+    if (value.size() != 38 || value.front() != L'{' || value.back() != L'}')
+        return false;
+    for (size_t i = 1; i < 37; ++i)
+    {
+        if (i == 9 || i == 14 || i == 19 || i == 24)
+        {
+            if (value[i] != L'-') return false;
+        }
+        else if (!((value[i] >= L'0' && value[i] <= L'9') ||
+                   (value[i] >= L'a' && value[i] <= L'f') ||
+                   (value[i] >= L'A' && value[i] <= L'F')))
+            return false;
+    }
+    return true;
+}
+
 bool ResolveWindowsTerminalTarget(const WindowsTerminalCatalog& catalog,
                                   const ShellTarget& requested,
                                   ShellTarget& resolved)
@@ -415,19 +437,30 @@ bool ResolveWindowsTerminalTarget(const WindowsTerminalCatalog& catalog,
                 return true;
             }
         }
+        return false; // A saved identity must not become another same-named profile.
     }
 
     if (!requested.profileName.empty())
     {
         std::wstring wanted = FoldCase(requested.profileName);
+        const WindowsTerminalProfile* match = nullptr;
         for (const WindowsTerminalProfile& profile : catalog.profiles)
         {
             if (FoldCase(profile.name) == wanted)
             {
-                resolved.profileGuid = profile.guid;
-                resolved.profileName = profile.name;
-                return true;
+                if (match != nullptr)
+                    return false; // Name-only assignments must be unambiguous.
+                match = &profile;
             }
+        }
+        if (match != nullptr)
+        {
+            // A GUID-shaped display name is interpreted as an identity by Terminal.
+            if (match->guid.empty() && IsCanonicalWindowsTerminalGuid(match->name))
+                return false;
+            resolved.profileGuid = match->guid;
+            resolved.profileName = match->name;
+            return true;
         }
     }
     return false;
@@ -443,8 +476,13 @@ std::wstring CWindowsTerminalService::BuildCommandLine(
     const std::wstring& executablePath, const ShellTarget& target,
     const WindowsTerminalLaunchRequest& request)
 {
-    std::wstring commandLine = QuoteArgument(executablePath);
-    commandLine.append(L" -w new");
+    return QuoteArgument(executablePath) + L" " + BuildParameters(target, request);
+}
+
+std::wstring CWindowsTerminalService::BuildParameters(
+    const ShellTarget& target, const WindowsTerminalLaunchRequest& request)
+{
+    std::wstring commandLine = L"-w new";
     if (request.usePosition)
     {
         commandLine.append(L" --pos ");
@@ -455,13 +493,11 @@ std::wstring CWindowsTerminalService::BuildCommandLine(
     commandLine.append(L" new-tab");
     if (target.kind == ShellTargetKind::WindowsTerminalProfile)
     {
-        // wt.exe's -p selector matches by profile NAME, not GUID, and dynamically
-        // generated profiles (WSL, PowerShell) are only reachable by name. Prefer the
-        // resolved name; the GUID stays a defensive fallback. (Duplicate names resolve
-        // to wt's first match — wt has no CLI GUID selector to disambiguate them.)
-        const std::wstring& selector = !target.profileName.empty()
-                                           ? target.profileName
-                                           : target.profileGuid;
+        // Terminal accepts a canonical GUID or a name. Keep duplicate names and
+        // renamed profiles attached to the selected identity; dynamic name-only
+        // profiles continue to use their unique resolved name.
+        const bool canonicalGuid = IsCanonicalWindowsTerminalGuid(target.profileGuid);
+        const std::wstring& selector = canonicalGuid ? target.profileGuid : target.profileName;
         if (!selector.empty())
         {
             commandLine.append(L" -p ");
@@ -487,6 +523,23 @@ try
     ShellTarget resolved;
     if (!ResolveTarget(target, resolved) || resolved.kind == ShellTargetKind::ComSpec)
         return CommandShellResult::Error(ERROR_NOT_FOUND);
+
+    if (request.runAsAdministrator)
+    {
+        IShell* shell = Shell != nullptr ? Shell : gShell;
+        if (shell == nullptr)
+            return CommandShellResult::Error(ERROR_INVALID_PARAMETER);
+        const std::wstring parameters = BuildParameters(resolved, request);
+        ShellExecInfo info;
+        info.file = catalog.executablePath.c_str();
+        info.parameters = parameters.c_str();
+        info.verb = L"runas";
+        info.directory = request.workingDirectory.empty() ? nullptr : request.workingDirectory.c_str();
+        info.hwnd = request.owner;
+        const ShellExecResult result = shell->Execute(info);
+        return result.success ? CommandShellResult::Ok(INVALID_HPROCESS, 0, nullptr)
+                              : CommandShellResult::Error(result.errorCode);
+    }
 
     IProcess* process = ResolveProcess();
     if (process == nullptr)

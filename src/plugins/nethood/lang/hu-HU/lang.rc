@@ -31,7 +31,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,52,204,10
     CONTROL         "Távoli asztalon át kapcsoló&dó lemezek mutatása",IDC_SHOWTSC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,67,173,10
-    CONTROL         "Hálózat vizsgálta a Sally indítá&sakor",IDC_PRELOAD,
+    CONTROL         "Hálózat vizsgálata a Sally indítá&sakor",IDC_PRELOAD,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,82,155,10
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,99,221,1
     DEFPUSHBUTTON   "OK",IDOK,37,106,50,14,WS_GROUP

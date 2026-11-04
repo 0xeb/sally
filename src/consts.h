@@ -1403,7 +1403,7 @@ extern HINSTANCE Shell32DLL;          // handle to shell32.dll (icons)
 extern HINSTANCE ImageResDLL;         // handle to imageres.dll (icons - Vista+)
 extern HINSTANCE User32DLL;           // handle to user32.dll (DisableProcessWindowsGhosting)
 extern HINSTANCE HLanguage;           // module with the language-dependent resources: sally.exe itself (every language is built in)
-extern WORD LanguageID;               // LANGID of the UI language Sally started in (Configuration.LoadedSLGName)
+extern WORD LanguageID;               // LANGID of the UI language Sally started in (Configuration.LoadedLanguageTag)
 
 extern BOOL UseCustomPanelFont; // if TRUE, Font and FontUL come from LogFont structure; otherwise from system font (default)
 extern BOOL UseCustomConfigurationFont;

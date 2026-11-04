@@ -27,6 +27,7 @@
 #include "darkmode.h"
 #include "common/PluginsVerPolicy.h"
 #include "common/DialogFont.h"
+#include "windows_terminal_ui.h"
 
 static std::wstring LastSelectedPluginDLLName; // after reopening Plugins Manager, select the last chosen plugin
 
@@ -3266,6 +3267,18 @@ void CCfgPageChangeDrive::InitList(int resID)
     SendMessage(hList, LB_SETCOUNT, DRIVES_COUNT, 0);
 }
 
+void CondenseChangeDriveHintTexts(HWND page)
+{
+    int staticsArr[] = {IDC_STATIC_6, IDS_CHD_HOTPATHS, IDC_STATIC_7, IDS_CHD_PLUGINS, IDC_STATIC_8, 0};
+    CondenseStaticTexts(page, staticsArr);
+}
+
+void CondenseKeyboardHintTexts(HWND page)
+{
+    int staticsArr[] = {IDC_STATIC_2, IDC_KEYBOARD_SHORTCUTS, 0};
+    CondenseStaticTexts(page, staticsArr);
+}
+
 INT_PTR
 CCfgPageChangeDrive::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -3273,8 +3286,7 @@ CCfgPageChangeDrive::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        int staticsArr[] = {IDC_STATIC_6, IDS_CHD_HOTPATHS, IDC_STATIC_7, IDS_CHD_PLUGINS, IDC_STATIC_8, 0};
-        CondenseStaticTexts(HWindow, staticsArr);
+        CondenseChangeDriveHintTexts(HWindow);
 
         // store dimensions of the largest character in CharSize
         HFONT hFont = (HFONT)SendDlgItemMessage(HWindow, IDL_CHD_DRIVES, WM_GETFONT, 0, 0);
@@ -3688,37 +3700,180 @@ CTaskListDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CCfgPageKeyboard
 //
 
+namespace
+{
+    constexpr int ShellControls[] = {IDC_SHELL_DEFAULT, IDC_SHELL_CTRL, IDC_SHELL_SHIFT, IDC_SHELL_ALT};
+
+    std::wstring ShellTargetLabel(const WindowsTerminalCatalog& catalog, const ShellTarget& target)
+    {
+        std::wstring label;
+        if (target.kind == ShellTargetKind::Unassigned)
+            label = LoadStrOwned(IDS_SHELL_NOT_ASSIGNED);
+        else if (target.kind == ShellTargetKind::ComSpec)
+            label = LoadStrOwned(IDS_SHELL_COMSPEC);
+        else if (target.kind == ShellTargetKind::WindowsTerminalDefault)
+            label = LoadStrOwned(IDS_SHELL_WT_DEFAULT);
+        else
+        {
+            label = target.profileName.empty() ? target.profileGuid : target.profileName;
+            const auto matches = std::count_if(catalog.profiles.begin(), catalog.profiles.end(), [&](const auto& profile)
+            { return _wcsicmp(profile.name.c_str(), target.profileName.c_str()) == 0; });
+            if (matches > 1 && !target.profileGuid.empty())
+                label += L" [" + target.profileGuid + L"]";
+        }
+        if (!Sally::ShellProfiles::Available(catalog, target))
+            label += L" (" + LoadStrOwned(IDS_SHELL_UNAVAILABLE_LABEL) + L")";
+        return label;
+    }
+}
+
 CCfgPageKeyboard::CCfgPageKeyboard()
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_KEYBOARD, IDD_CFGPAGE_KEYBOARD, PSP_USETITLE, NULL)
 {
 }
 
-INT_PTR
-CCfgPageKeyboard::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+void CCfgPageKeyboard::RefreshShellProfiles(bool force)
 {
-    CALL_STACK_MESSAGE4("CTaskListDialog::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
-    switch (uMsg)
+    ShellCatalog = gWindowsTerminalService != nullptr ? gWindowsTerminalService->Refresh(force) : WindowsTerminalCatalog{};
+    for (size_t slot = 0; slot < LocalShellTargets.size(); ++slot)
     {
-    case WM_INITDIALOG:
-    {
-        int staticsArr[] = {IDC_STATIC_2, IDC_KEYBOARD_SHORTCUTS, 0};
-        CondenseStaticTexts(HWindow, staticsArr);
-
-        CHyperLink* hl = new CHyperLink(HWindow, IDC_KEYBOARD_SHORTCUTS);
-        if (hl != NULL)
-            hl->SetActionPostCommand(CM_HELP_KEYBOARD);
-        break;
+        auto& choices = ShellChoices[slot];
+        choices.clear();
+        if (slot != 0)
+        {
+            ShellTarget none;
+            none.kind = ShellTargetKind::Unassigned;
+            choices.push_back(none);
+        }
+        choices.push_back(ShellTarget{});
+        if (ShellCatalog.installed)
+        {
+            ShellTarget terminal;
+            terminal.kind = ShellTargetKind::WindowsTerminalDefault;
+            choices.push_back(terminal);
+            for (const auto& profile : ShellCatalog.profiles)
+            {
+                ShellTarget target;
+                target.kind = ShellTargetKind::WindowsTerminalProfile;
+                target.profileGuid = profile.guid;
+                target.profileName = profile.name;
+                choices.push_back(std::move(target));
+            }
+        }
+        ShellTarget displayed = LocalShellTargets[slot], resolved;
+        if (Sally::ShellProfiles::Available(ShellCatalog, displayed) &&
+            ResolveWindowsTerminalTarget(ShellCatalog, displayed, resolved))
+            displayed = std::move(resolved);
+        auto selected = std::find_if(choices.begin(), choices.end(), [&](const auto& target)
+        { return Sally::ShellProfiles::SameTarget(target, displayed); });
+        if (selected == choices.end())
+        {
+            choices.push_back(LocalShellTargets[slot]);
+            selected = choices.end() - 1;
+        }
+        const int selection = static_cast<int>(selected - choices.begin());
+        const HWND combo = GetDlgItem(HWindow, ShellControls[slot]);
+        SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+        HDC dc = GetDC(combo);
+        const HFONT font = reinterpret_cast<HFONT>(SendMessageW(combo, WM_GETFONT, 0, 0));
+        const HGDIOBJ previousFont = dc != nullptr && font != nullptr ? SelectObject(dc, font) : nullptr;
+        int droppedWidth = 0;
+        for (const auto& target : choices)
+        {
+            const auto label = ShellTargetLabel(ShellCatalog, target);
+            SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(label.c_str()));
+            SIZE size{};
+            if (dc != nullptr && GetTextExtentPoint32W(dc, label.c_str(), static_cast<int>(label.size()), &size))
+                droppedWidth = (std::max<int>)(droppedWidth, size.cx);
+        }
+        if (previousFont != nullptr) SelectObject(dc, previousFont);
+        if (dc != nullptr) ReleaseDC(combo, dc);
+        SendMessageW(combo, CB_SETCURSEL, selection, 0);
+        // Measure with the actual Configuration font so duplicate GUID tails
+        // remain readable at larger sizes. Windows positions the list on screen.
+        droppedWidth += GetSystemMetrics(SM_CXVSCROLL) + 4 * GetSystemMetrics(SM_CXEDGE);
+        MONITORINFO monitor{sizeof(monitor)};
+        if (GetMonitorInfoW(MonitorFromWindow(combo, MONITOR_DEFAULTTONEAREST), &monitor))
+            droppedWidth = (std::min<int>)(droppedWidth, monitor.rcWork.right - monitor.rcWork.left);
+        SendMessageW(combo, CB_SETDROPPEDWIDTH, droppedWidth, 0);
     }
+    UpdateShellStatus();
+}
 
-    case WM_COMMAND:
+void CCfgPageKeyboard::UpdateShellStatus()
+{
+    bool conflict = false, unavailable = false;
+    for (size_t slot = 0; slot < LocalShellTargets.size(); ++slot)
+    {
+        unavailable |= !Sally::ShellProfiles::Available(ShellCatalog, LocalShellTargets[slot]);
+        if (slot > 0 && LocalShellTargets[slot].kind != ShellTargetKind::Unassigned)
+            conflict |= CommandShellShortcutConflicts(slot - 1);
+    }
+    SetDlgItemTextW(HWindow, IDC_SHELL_STATUS, conflict ? LoadStrW(IDS_SHELL_SHORTCUT_CONFLICT) :
+        unavailable ? LoadStrW(IDS_SHELL_PROFILE_UNAVAILABLE) : L"");
+}
+
+void CCfgPageKeyboard::Transfer(CTransferInfo& ti)
+{
+    if (ti.Type == ttDataToWindow)
+    {
+        LocalShellTargets[0].kind = static_cast<ShellTargetKind>(Configuration.CommandShellTargetKind);
+        LocalShellTargets[0].profileGuid = Configuration.CommandShellProfileGuid;
+        LocalShellTargets[0].profileName = Configuration.CommandShellProfileName;
+        std::copy(Configuration.CommandShellShortcuts.begin(), Configuration.CommandShellShortcuts.end(), LocalShellTargets.begin() + 1);
+        RefreshShellProfiles(false);
+    }
+    else
+    {
+        Configuration.CommandShellTargetKind = static_cast<int>(LocalShellTargets[0].kind);
+        Configuration.CommandShellProfileGuid = LocalShellTargets[0].profileGuid;
+        Configuration.CommandShellProfileName = LocalShellTargets[0].profileName;
+        std::copy(LocalShellTargets.begin() + 1, LocalShellTargets.end(), Configuration.CommandShellShortcuts.begin());
+    }
+}
+
+void CCfgPageKeyboard::Validate(CTransferInfo& ti)
+{
+    for (size_t slot = 1; slot < LocalShellTargets.size(); ++slot)
+        if (LocalShellTargets[slot].kind != ShellTargetKind::Unassigned && CommandShellShortcutConflicts(slot - 1))
+        {
+            gPrompter->ShowError(LoadStrW(IDS_CONFIGURATION), LoadStrW(IDS_SHELL_SHORTCUT_CONFLICT));
+            ti.ErrorOn(ShellControls[slot]);
+            return;
+        }
+}
+
+INT_PTR CCfgPageKeyboard::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    if (uMsg == WM_INITDIALOG)
+    {
+        CondenseKeyboardHintTexts(HWindow);
+        CHyperLink* link = new CHyperLink(HWindow, IDC_KEYBOARD_SHORTCUTS);
+        if (link != nullptr)
+            link->SetActionPostCommand(CM_HELP_KEYBOARD);
+    }
+    else if (uMsg == WM_COMMAND)
     {
         if (LOWORD(wParam) == CM_HELP_KEYBOARD)
         {
             OpenHtmlHelp(NULL, HWindow, HHCDisplayContext, CM_HELP_KEYBOARD, FALSE);
             return 0;
         }
-        break;
-    }
+        if (LOWORD(wParam) == IDC_SHELL_REFRESH)
+        {
+            RefreshShellProfiles(true); // Catalog only; never changes the semantic draft.
+            return TRUE;
+        }
+        if (HIWORD(wParam) == CBN_SELCHANGE)
+            for (size_t slot = 0; slot < LocalShellTargets.size(); ++slot)
+                if (LOWORD(wParam) == ShellControls[slot])
+                {
+                    const auto choice = static_cast<size_t>(SendDlgItemMessageW(HWindow, ShellControls[slot], CB_GETCURSEL, 0, 0));
+                    if (choice < ShellChoices[slot].size())
+                        LocalShellTargets[slot] = ShellChoices[slot][choice];
+                    UpdateShellStatus();
+                    break;
+                }
     }
     return CCommonPropSheetPage::DialogProc(uMsg, wParam, lParam);
 }

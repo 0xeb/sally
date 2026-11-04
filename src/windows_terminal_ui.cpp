@@ -8,9 +8,10 @@
 #include "common/WindowsTerminalService.h"
 #include "common/unicode/helpers.h"
 #include "cfgdlg.h"
-#include "dialogs_command_shell.h"
 #include "plugins.h"
 #include "fileswnd.h"
+#include "filesbox.h"
+#include "editwnd.h"
 #include "mainwnd.h"
 #include "menu.h"
 #include "ui/IPrompter.h"
@@ -24,13 +25,6 @@ namespace
         target.profileGuid = Configuration.CommandShellProfileGuid;
         target.profileName = Configuration.CommandShellProfileName;
         return target;
-    }
-
-    void SaveConfiguredTarget(const ShellTarget& target)
-    {
-        Configuration.CommandShellTargetKind = static_cast<int>(target.kind);
-        Configuration.CommandShellProfileGuid = target.profileGuid;
-        Configuration.CommandShellProfileName = target.profileName;
     }
 
     // WT profile names are user-editable (WSL distro names, custom shells) and
@@ -100,7 +94,7 @@ namespace
     }
 
     CommandShellResult LaunchTarget(CMainWindow* mainWindow, CFilesWindow* activePanel,
-                                    const ShellTarget& target)
+                                    const ShellTarget& target, bool runAsAdministrator)
     {
         const wchar_t* workingDirectory =
             (activePanel->Is(ptDisk) || activePanel->Is(ptZIPArchive)) ? activePanel->GetPathW() : nullptr;
@@ -110,6 +104,8 @@ namespace
         if (target.kind == ShellTargetKind::ComSpec)
         {
             CommandShellRequest request;
+            request.runAsAdministrator = runAsAdministrator;
+            request.owner = mainWindow->HWindow;
             if (workingDirectory != nullptr)
                 request.workingDirectory = workingDirectory;
             request.windowTitle = LoadStrW(IDS_COMMANDSHELL);
@@ -124,6 +120,8 @@ namespace
         }
 
         WindowsTerminalLaunchRequest request;
+        request.runAsAdministrator = runAsAdministrator;
+        request.owner = mainWindow->HWindow;
         if (workingDirectory != nullptr)
             request.workingDirectory = workingDirectory;
         request.usePosition = usePosition;
@@ -134,19 +132,8 @@ namespace
                    : CommandShellResult::Error(ERROR_INVALID_PARAMETER);
     }
 
-    bool ChooseDefaultShell(HWND parent, const WindowsTerminalCatalog& catalog,
-                            ShellTarget& target)
-    {
-        ShellTarget selected;
-        if (!ShowDefaultShellDialog(parent, catalog, target, selected))
-            return false;
-        SaveConfiguredTarget(selected);
-        target = std::move(selected);
-        return true;
-    }
-
     void LaunchWithFeedback(CMainWindow* mainWindow, CFilesWindow* activePanel,
-                            const ShellTarget& target)
+                            const ShellTarget& target, bool runAsAdministrator)
     {
         if (!CheckRunPolicy(target))
         {
@@ -156,7 +143,9 @@ namespace
         }
 
         mainWindow->SetDefaultDirectories();
-        CommandShellResult result = LaunchTarget(mainWindow, activePanel, target);
+        CommandShellResult result = LaunchTarget(mainWindow, activePanel, target, runAsAdministrator);
+        if (!result.success && runAsAdministrator && result.errorCode == ERROR_CANCELLED)
+            return; // Declining UAC is an intentional cancellation, not a launch error.
         if (!result.success)
             gPrompter->ShowError(LoadStrW(IDS_ERROREXECPROMPT), GetErrorTextOwned(result.errorCode).c_str());
         else
@@ -204,10 +193,20 @@ void UpdateWindowsTerminalCommandsMenu(CMenuPopup* popup)
     popup->InsertItem(position != -1 ? position : 0xFFFFFFFF, TRUE, &item);
 }
 
+DWORD CaptureCommandShellMenuSelection(DWORD commandId, HWND owner, bool helpMode)
+{
+    // Menu teardown posts WM_COMMAND. Capture Shift while consuming the actual
+    // selection event, before a queued release (or a later press) can change it.
+    return commandId == CM_DEFAULT_SHELL && !helpMode && MainWindow != nullptr &&
+                   owner == MainWindow->HWindow && (GetKeyState(VK_SHIFT) & 0x8000) != 0
+               ? CM_DEFAULT_SHELL_ADMIN : commandId;
+}
+
 bool HandleCommandShellMenuCommand(CMainWindow* mainWindow, CFilesWindow* activePanel,
                                    DWORD commandId)
 {
-    if (commandId != CM_DOSSHELL && commandId != CM_DEFAULT_SHELL &&
+    if (commandId != CM_DOSSHELL && commandId != CM_DEFAULT_SHELL && commandId != CM_DEFAULT_SHELL_ADMIN &&
+        !(commandId >= CM_SHELL_SHORTCUT1 && commandId <= CM_SHELL_SHORTCUT3) &&
         !IsWindowsTerminalCommand(commandId))
         return false;
 
@@ -223,14 +222,22 @@ bool HandleCommandShellMenuCommand(CMainWindow* mainWindow, CFilesWindow* active
         return true;
 
     ShellTarget target;
+    const bool runAsAdministrator = commandId == CM_DEFAULT_SHELL_ADMIN;
     if (commandId == CM_DEFAULT_SHELL)
     {
-        target = LoadConfiguredTarget();
-        if (ChooseDefaultShell(mainWindow->HWindow, catalog, target))
-            LaunchWithFeedback(mainWindow, activePanel, target);
+        PostMessageW(mainWindow->HWindow, WM_USER_CONFIGURATION, 7, 0);
         return true;
     }
-    if (commandId == CM_WT_DEFAULT_PROFILE)
+    if (commandId >= CM_SHELL_SHORTCUT1 && commandId <= CM_SHELL_SHORTCUT3)
+    {
+        const size_t slot = commandId - CM_SHELL_SHORTCUT1;
+        if (CommandShellShortcutConflicts(slot))
+            return true;
+        target = Configuration.CommandShellShortcuts[slot];
+        if (target.kind == ShellTargetKind::Unassigned)
+            return true;
+    }
+    else if (commandId == CM_WT_DEFAULT_PROFILE)
     {
         target.kind = ShellTargetKind::WindowsTerminalDefault;
     }
@@ -253,8 +260,7 @@ bool HandleCommandShellMenuCommand(CMainWindow* mainWindow, CFilesWindow* active
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERROREXECPROMPT),
                                      LoadStrW(IDS_SHELL_TARGET_UNAVAILABLE));
-                if (!ChooseDefaultShell(mainWindow->HWindow, catalog, target))
-                    return true;
+                return true;
             }
             else
             {
@@ -263,6 +269,50 @@ bool HandleCommandShellMenuCommand(CMainWindow* mainWindow, CFilesWindow* active
         }
     }
 
-    LaunchWithFeedback(mainWindow, activePanel, target);
+    if (!Sally::ShellProfiles::Available(catalog, target))
+        gPrompter->ShowError(LoadStrW(IDS_ERROREXECPROMPT),
+            LoadStrW(commandId >= CM_SHELL_SHORTCUT1 && commandId <= CM_SHELL_SHORTCUT3
+                ? IDS_SHELL_PROFILE_UNAVAILABLE : IDS_SHELL_TARGET_UNAVAILABLE));
+    else
+        LaunchWithFeedback(mainWindow, activePanel, target, runAsAdministrator);
+    return true;
+}
+
+bool CommandShellShortcutConflicts(size_t slot)
+{
+    int plugin = -1, item = -1;
+    return Plugins.FindHotKey(Sally::ShellProfiles::ShortcutHotKey(slot, false), TRUE, nullptr, &plugin, &item) ||
+           Plugins.FindHotKey(Sally::ShellProfiles::ShortcutHotKey(slot, true), TRUE, nullptr, &plugin, &item);
+}
+
+bool IsAssignedCommandShellShortcut(WORD hotKey)
+{
+    const BYTE modifiers = HIBYTE(hotKey);
+    const int slot = Sally::ShellProfiles::ShortcutForKey(LOBYTE(hotKey),
+        (modifiers & HOTKEYF_CONTROL) != 0, (modifiers & HOTKEYF_SHIFT) != 0, (modifiers & HOTKEYF_ALT) != 0);
+    return slot >= 0 && Configuration.CommandShellShortcuts[slot].kind != ShellTargetKind::Unassigned &&
+           !CommandShellShortcutConflicts(slot);
+}
+
+bool TranslateCommandShellShortcut(CMainWindow* mainWindow, const MSG& message)
+{
+    if (mainWindow == nullptr || (message.message != WM_KEYDOWN && message.message != WM_SYSKEYDOWN) ||
+        !mainWindow->CaptionIsActive || mainWindow->HasLockedUI() || mainWindow->HDisabledKeyboard != nullptr ||
+        mainWindow->DragMode || mainWindow->QuickRenameWindowActive() ||
+        GetActiveWindow() != mainWindow->HWindow || !IsWindowEnabled(mainWindow->HWindow) || GetCapture() != nullptr)
+        return false;
+    CFilesWindow* panel = mainWindow->GetActivePanel();
+    if (panel == nullptr || (message.hwnd != panel->GetListBoxHWND() && message.hwnd != mainWindow->GetEditLineHWND()))
+        return false;
+    if (mainWindow->EditWindow != nullptr && mainWindow->EditWindow->Dropped())
+        return false;
+    if ((GetKeyState(VK_LWIN) & 0x8000) || (GetKeyState(VK_RWIN) & 0x8000))
+        return false;
+    const int slot = Sally::ShellProfiles::ShortcutForKey(static_cast<unsigned>(message.wParam),
+        (GetKeyState(VK_CONTROL) & 0x8000) != 0, (GetKeyState(VK_SHIFT) & 0x8000) != 0, (GetKeyState(VK_MENU) & 0x8000) != 0);
+    if (slot < 0 || Configuration.CommandShellShortcuts[slot].kind == ShellTargetKind::Unassigned || CommandShellShortcutConflicts(slot))
+        return false;
+    if ((message.lParam & 0x40000000) == 0) // One launch per press, not every auto-repeat.
+        PostMessageW(mainWindow->HWindow, WM_COMMAND, CM_SHELL_SHORTCUT1 + slot, 0);
     return true;
 }

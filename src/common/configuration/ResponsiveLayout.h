@@ -62,6 +62,14 @@ namespace sally::configuration
             if (trailing != 0) Place(trailing, Width - Gap - Button, Y, Button, Button);
             Y += Button + Gap;
         }
+        void InlineField(int label, int field)
+        {
+            const int labelWidth = (Width - 3 * Gap) / 3;
+            const int height = (std::max)(Button, Measure(label, labelWidth));
+            Place(label, Gap, Y, labelWidth, height);
+            Place(field, 2 * Gap + labelWidth, Y, Width - 3 * Gap - labelWidth, Button);
+            Y += height + Gap;
+        }
         void Fields(int firstLabel, int first, int secondLabel, int second)
         {
             const int half = (Width - 3 * Gap) / 2;

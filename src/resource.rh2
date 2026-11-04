@@ -116,6 +116,10 @@
 #define CM_WT_MENU_ROOT     8001
 #define CM_WT_DEFAULT_PROFILE 8002
 #define CM_WT_REFRESH_PROFILES 8003
+#define CM_SHELL_SHORTCUT1  8004
+#define CM_SHELL_SHORTCUT2  8005
+#define CM_SHELL_SHORTCUT3  8006
+#define CM_DEFAULT_SHELL_ADMIN 8007 // Captured at menu selection; never infer from a later key state.
 #define CM_WT_PROFILE_MIN   8100
 #define CM_WT_PROFILE_MAX   9099
 #define CM_OCCUPIEDSPACE    739

@@ -103,7 +103,7 @@ STRINGTABLE
  IDS_CONFIG_CHANGES_EFFECT "Die Änderungen werden erst beim nächsten Öffnen der Prüfsummenberechnung wirksam."
  IDS_ALLOK "Alle Dateien OK"
  IDS_RESULT "%d beschädigt, %d fehlen, %d übersprungen"
- IDS_BUSY "Der Sally ist ausgelastet. Das angeforderte Kommando kann nicht ausgeführt werden, versuchen Sie es später noch einmal."
+ IDS_BUSY "Sally ist ausgelastet. Das angeforderte Kommando kann nicht ausgeführt werden, versuchen Sie es später noch einmal."
  IDS_CLOSE "&Schließen"
  IDS_READINGTREE "Lese Verzeichnisbaum, bitte warten..."
  IDS_ERRORREADINGDIR "Kann das Verzeichnis nicht lesen"

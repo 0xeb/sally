@@ -5,6 +5,9 @@
 #pragma once
 
 #include <string>
+#include <vector>
+
+#include "common/UserMenuConditions.h"
 
 //*****************************************************************************
 //
@@ -352,8 +355,14 @@ class CUserMenuBar : public CToolBar
 public:
     CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin = ooStatic);
 
-    // pulls items from UserMenu and loads buttons into the toolbar
+    // pulls items from UserMenu and loads buttons into the toolbar, as the active panel shows them
     BOOL CreateButtons();
+    // #50: the buttons of the commands whose "Show only when" rule matches 'context'
+    BOOL CreateButtons(const Sally::UserMenuConditions::Context& context);
+    // #50: rebuilds the bar only when 'context' changes which commands it shows
+    void RefreshForContext(const Sally::UserMenuConditions::Context& context);
+    // User Menu index of each current button or separator, in bar order
+    const std::vector<size_t>& GetShownEntries() const { return ShownEntries; }
 
     void ToggleLabels();
     virtual int WINAPI GetNeededHeight();
@@ -367,6 +376,8 @@ public:
 
 protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+    std::vector<size_t> ShownEntries; // User Menu indexes of the current buttons and separators
 };
 
 //*****************************************************************************

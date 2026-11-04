@@ -131,6 +131,51 @@ std::string FrameName(std::string_view line)
     return std::string(name);
 }
 
+// Structured plugin-entry metadata is read only from the faulting thread. Revalidate at this
+// public boundary even though Sally's producer already removes paths and control characters.
+bool ReadLoadingPluginField(std::string_view line, CrashSummary& summary)
+{
+    if (StartsWith(line, "Loading plugin DLL: "))
+    {
+        std::string_view name = TrimSpaces(line.substr(20));
+        const size_t separator = name.find_last_of("\\/");
+        if (separator != std::string_view::npos)
+            name.remove_prefix(separator + 1);
+        if (summary.LoadingPluginDll.empty())
+            summary.LoadingPluginDll = Restrict(name, "._- ", 64);
+    }
+    else if (StartsWith(line, "Loading plugin version: "))
+    {
+        const std::string_view value = line.substr(24);
+        bool valid = value == "unknown";
+        if (!value.empty() && value.size() <= 40 && IsAsciiDigit(value.front()))
+        {
+            valid = true;
+            for (char c : value)
+                valid = valid && (IsAsciiDigit(c) || c == '.' || c == '-' || c == '_');
+        }
+        if (valid && summary.LoadingPluginVersion.empty())
+            summary.LoadingPluginVersion = value;
+    }
+    else if (StartsWith(line, "Loading plugin SDK: "))
+    {
+        const std::string_view value = line.substr(20);
+        bool valid = !value.empty() && value.size() <= 6;
+        for (char c : value)
+            valid = valid && IsAsciiDigit(c);
+        if (valid && summary.LoadingPluginSdk.empty())
+            summary.LoadingPluginSdk = value;
+    }
+    else if (StartsWith(line, "Plugin phase: "))
+    {
+        if (line.substr(14) == "entry")
+            summary.PluginPhase = "entry";
+    }
+    else
+        return false;
+    return true;
+}
+
 void AppendLine(std::string& body, std::string_view text)
 {
     body.append(text);
@@ -215,7 +260,8 @@ CrashSummary SummarizeBugReport(std::string_view report)
                 if (frame.empty() || lines[j][0] != ' ' || frame == "----" ||
                     StartsWith(frame, "Number of skipped records:") || StartsWith(frame, "Thread ID: "))
                     break;
-                frames.push_back(FrameName(frame));
+                if (!ReadLoadingPluginField(frame, summary))
+                    frames.push_back(FrameName(frame));
             }
             // The report lists the outermost call first.
             std::reverse(frames.begin(), frames.end());
@@ -273,6 +319,16 @@ std::string ComposeCrashIssueBody(const CrashSummary& summary, std::string_view 
         AppendLine(body, "- Location: " + summary.Location);
     if (!summary.Plugin.empty())
         AppendLine(body, "- Plugin: " + summary.Plugin);
+    if (!summary.LoadingPluginDll.empty())
+    {
+        AppendLine(body, "- Loading plugin: " + summary.LoadingPluginDll);
+        if (!summary.LoadingPluginVersion.empty())
+            AppendLine(body, "- Last registered plugin version: " + summary.LoadingPluginVersion);
+        if (!summary.LoadingPluginSdk.empty())
+            AppendLine(body, "- Plugin SDK: " + summary.LoadingPluginSdk);
+        if (!summary.PluginPhase.empty())
+            AppendLine(body, "- Plugin phase: " + summary.PluginPhase);
+    }
     if (otherReports > 0)
         AppendLine(body, "- Other crash reports on this computer: " + std::to_string(otherReports));
 

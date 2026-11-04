@@ -639,7 +639,7 @@ STRINGTABLE
  IDS_EXECUTE_FULLPATH,    "Full Path"
  IDS_EXECUTE_WINDIR,      "Windows Directory"
  IDS_EXECUTE_SYSDIR,      "System Directory"
- IDS_EXECUTE_SALDIR,      "Salamander Directory"
+ IDS_EXECUTE_SALDIR,      "Sally Directory"
  IDS_EXECUTE_BROWSE,      "Browse..."
  IDS_EXECUTE_DOSFULLPATH, "DOS Full Path"
  IDS_EXECUTE_DOSWINDIR,   "DOS Windows Directory"

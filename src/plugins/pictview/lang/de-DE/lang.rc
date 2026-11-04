@@ -52,7 +52,7 @@ CAPTION "Fenster && Zoom"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        "Fenstergröße",IDC_STATIC_1,6,5,293,53,WS_GROUP
-    CONTROL         "&Fenstergröße des Sally verwenden",IDC_CFGAPP_WINPOS_SAME,
+    CONTROL         "&Fenstergröße von Sally verwenden",IDC_CFGAPP_WINPOS_SAME,
                     "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,17,175,12
     CONTROL         "&Automatische Anpassung - keine Fensterverkleinerung",IDC_CFGAPP_WINPOS_LARGER,
                     "Button",BS_AUTORADIOBUTTON | WS_TABSTOP,14,29,194,12

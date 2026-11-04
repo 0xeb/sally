@@ -303,7 +303,7 @@ STRINGTABLE
   IDS_DIFFERENCES, "&Különbség"
   IDS_MISSINGPATH, "Hiányzó fájlnév."
   IDS_ERROR, "Hiba"
-  IDS_SELECTALL, "Minden kijelöl&"
+  IDS_SELECTALL, "Mindent ki&jelöl"
   IDS_RECOMPARE, "Újra-hasonlítás (Ctrl+R)"
   IDS_COPY, "&Másolás"
   IDS_COPYCLIP, "Másolás vágólapra (Ctr+C)"

@@ -71,7 +71,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,52,168,10
     CONTROL         "Show &disks connected via Remote Desktop",IDC_SHOWTSC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,67,155,10
-    CONTROL         "&Scan network on start of Salamander",IDC_PRELOAD,
+    CONTROL         "&Scan network on start of Sally",IDC_PRELOAD,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,82,137,10
     CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,99,206,1
     DEFPUSHBUTTON   "OK",IDOK,30,106,50,14,WS_GROUP

@@ -39,6 +39,7 @@ protected:
     wchar_t** History;
     int HistoryCount;
     BOOL DirectoryHelper;
+    BOOL NewDirectorySuggestions = FALSE; // explicit disk F7 opt-in; other name/plugin dialogs stay unchanged
     int SelectionEnd;
 
     // Owned; freed on WM_DESTROY. The caller-owned std::wstring is the sole path state.
@@ -57,6 +58,7 @@ public:
                     wchar_t* history[], int historyCount, BOOL directoryHelper);
 
     void SetSelectionEnd(int selectionEnd);
+    void EnableNewDirectorySuggestions() { NewDirectorySuggestions = TRUE; }
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
@@ -103,6 +105,11 @@ protected:
     // Owned; freed on WM_DESTROY. The caller-owned std::wstring is the sole path state.
     HFONT UnicodeFont;
 
+    // Copy/Move of one disk file: suggestions offer files too, relative to the source folder,
+    // and the first Enter only accepts a visible suggestion. Folders only otherwise.
+    BOOL FileSuggestions = FALSE;
+    std::wstring SuggestionBaseDirectory;
+
 public:
     // 'history' determines whether the dialog will contain a combobox (TRUE) or an editline (FALSE)
     // 'directoryHelper' specifies if a resource with a button behind the editline will be used to select a directory
@@ -112,6 +119,11 @@ public:
                         BOOL havePermissions, BOOL supportsADS);
     ~CCopyMoveMoreDialog();
 
+    void EnableFileSuggestions(const std::wstring& sourceDirectory)
+    {
+        FileSuggestions = TRUE;
+        SuggestionBaseDirectory = sourceDirectory;
+    }
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
 
@@ -1254,15 +1266,15 @@ class CLanguageSelectorDialog : public CCommonDialog
 protected:
     std::vector<CLanguage> Items;
     CHyperLink* Web;
-    std::wstring& SLGName;
+    std::wstring& LanguageTag;
     BOOL OpenedFromConfiguration;
     HWND HListView;
     std::wstring ExitButtonLabel;
 
 public:
-    // 'slgName' is the persisted name of the selected language (e.g. czech.slg): it preselects
+    // 'languageTag' is the BCP-47 tag of the selected language (e.g. cs-CZ): it preselects
     // and receives the choice
-    CLanguageSelectorDialog(HWND hParent, std::wstring& slgName);
+    CLanguageSelectorDialog(HWND hParent, std::wstring& languageTag);
 
     int Execute();
 
@@ -1277,9 +1289,9 @@ public:
 
     void Transfer(CTransferInfo& ti);
 
-    // returns the index into Items of 'selectSLGName', or of the en-US language if that is not
+    // returns the index into Items of 'selectLanguageTag', or of the en-US language if that is not
     // one of them
-    int GetPreferredLanguageIndex(const wchar_t* selectSLGName);
+    int GetPreferredLanguageIndex(const wchar_t* selectLanguageTag);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

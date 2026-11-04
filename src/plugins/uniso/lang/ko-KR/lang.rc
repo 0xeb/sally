@@ -1,0 +1,122 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for uniso. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/uniso/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\uniso.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 220, 83
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "UnISO 설정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "압축 파일에서 복사할 때 읽기 전용 특성 해제(&C)",IDC_CFG_READONLY,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,8,11,188,10
+    CONTROL         "세션을 디렉터리로 표시(모든 세션에 액세스 허용)(&S)",IDC_CFG_SESSIONASDIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,23,198,10
+    CONTROL         "부트 이미지 디스크를 파일로 표시(&H)",IDC_CFG_BOOTIMAGEASFILE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,35,118,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,2,58,216,1
+    DEFPUSHBUTTON   "확인",IDOK,108,64,50,14
+    PUSHBUTTON      "취소",IDCANCEL,163,64,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "파일을 열 수 없습니다."
+    IDS_UNKNOW_ERROR            "지정되지 않은 오류입니다."
+    IDS_UNPACKING_ARCHIVE       "ISO 압축 파일 압축 풀기"
+    IDS_ERROR_UNPACKING         "압축 파일의 압축을 푸는 중 오류가 발생했습니다."
+    IDS_CANT_HANDLE_FILE        "이 파일을 처리할 수 없습니다."
+    IDS_INSUFFICIENT_MEMORY     "메모리가 부족합니다."
+    IDS_ERR_TOO_LONG_NAME       "이름이 너무 길어 작업을 완료할 수 없습니다."
+    IDS_ABOUT                   "플러그인 정보"
+    IDS_PLUGIN_DESCRIPTION      "CD/DVD ISO 이미지 파일을 탐색하고 추출합니다."
+    IDS_CANT_CREATE_TEMP        "임시 디렉터리를 만들 수 없습니다."
+    IDS_CANT_DELETE_TEMP_FILE   "임시 파일을 삭제할 수 없습니다."
+    IDS_UNKNOWN_FILE_FORMAT     "알 수 없는 파일 형식이거나 올바른 ISO 이미지가 아닙니다.\n\n올바른 ISO 이미지가 확실하면 https://github.com/0xeb/sally/issues 에 이슈를 등록하여 이 형식을 지원할 수 있도록 도와주십시오."
+    IDS_CANT_OPEN_FILE          "파일 '%s'을(를) 열 수 없습니다."
+    IDS_ERR_TMP                 "임시 파일을 만들지 못했습니다."
+    IDS_CANT_SET_ATTRS          "파일 특성을 설정할 수 없습니다."
+    IDS_CANT_CREATE_DIR         "디렉터리 '%s'을(를) 만들 수 없습니다."
+    IDS_YES                     "예"
+    IDS_NO                      "아니요"
+    IDS_ERROR                   "오류"
+    IDS_WARNING                 "경고"
+    IDS_ERROR_OPENING_MULTISESSION  "다중 세션 이미지를 읽는 중 오류가 발생했습니다.\n\n올바르게 읽은 세션만 표시합니다."
+    IDS_UNKNOWN_TRACK_TYPE      "알 수 없는 트랙 형식입니다."
+    IDS_READERROR               "읽기 오류"
+    IDS_WRITEERROR              "쓰기 오류"
+    IDS_CCD_BAD_FORMAT          ".CCD 파일의 형식이 잘못되었습니다.\n\n표시된 이미지가 불완전할 수 있습니다."
+    IDS_CCD_MISSING             ".CCD 파일이 없습니다.\n\n표시된 이미지가 불완전할 수 있습니다."
+    IDS_ERROR_READING_SECTOR    "섹터 #%08X을(를) 읽을 수 없습니다."
+    IDS_ERROR_LISTING_IMAGE     "섹터 #%08X에서 디렉터리 구조를 읽는 중 오류가 발생했습니다.\n\nISO 이미지의 내용이 불완전합니다."
+    IDS_INTERNAL_PLUGIN_ERROR   "플러그인 내부 오류입니다."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "알 수 없는 할당 전략(%d)입니다.\n\nhttps://github.com/0xeb/sally/issues 에 이슈를 등록하여 이 문제를 해결할 수 있도록 도와주십시오."
+    IDS_UDF_INVALID_TAG_ID      "UDF 태그 ID가 잘못되었습니다."
+    IDS_UDF_ERROR_READING_VAT   "섹터 #%08X에서 가상 할당 테이블을 읽는 중 오류가 발생했습니다."
+    IDS_UDF_MISSING_VAT         "가상 할당 테이블이 없습니다."
+    IDS_UDF_BAD_ROOT_ICB        "루트 ICB가 잘못되었습니다.\n\n디렉터리 구조를 읽을 수 없습니다."
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "파일 ""%s""을(를) 추출할 수 없습니다.\n\n파일 크기와 ICB 블록이 일치하지 않습니다."
+    IDS_CANT_OPEN_TRACK         "트랙 #%d을(를) 열 수 없습니다."
+    IDS_BOOT_OR_MBR             "이 파일은 플로피 디스크, 하드 디스크 또는 하드 디스크 파티션 이미지인 것 같습니다.\nUnFAT 플러그인을 사용하려면 파일 확장명을 .ima로 바꿔 보십시오."
+    IDS_UNSUPPORTED_APFS        "이 디스크 이미지에는 APFS 파일 시스템이 들어 있습니다.\n이 파일 시스템은 아직 지원되지 않습니다."
+
+    IDS_ERR_HFS_READ            "파티션 헤더를 읽을 수 없습니다. 파일이 너무 작습니다."
+    IDS_ERR_HFS_INVALID_PARTITION "파티션 관리자 구조가 손상되었습니다."
+    IDS_ERR_HFS_UNRECOGNIZED    "이 디스크 이미지에는 HFS Plus 파티션이 없습니다."
+    IDS_ERR_HFS_ORIGINAL_HFS    "이 디스크 이미지에는 HFS Plus가 아닌 HFS 파일 시스템이 들어 있습니다.\nHFS는 지원되지 않습니다."
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "블록 #%08X(으)로 이동할 수 없습니다.\n파일 %s은(는) 추출되지 않습니다."
+    IDS_ERR_HFS_SEEK            "블록 #%08X(으)로 이동할 수 없습니다."
+    IDS_ERR_HFS_BTREE_NODETYPE  "카탈로그 파일의 BTree 루트 노드 형식이 지원되지 않습니다."
+    IDS_ERR_HFS_BTREE_FRAGMENTED "카탈로그 파일이 8개를 넘는 조각으로 나뉘어 있어 지원되지 않습니다."
+    IDS_ERR_HFS_FILE_FRAGMENTED "파일 '%s'이(가) 8개를 넘는 조각으로 나뉘어 있어 지원되지 않습니다.\n이 파일은 추출되지 않습니다."
+
+    IDS_ERR_TOO_LONG_PATH       "이 디스크 이미지에는 Sally가 처리할 수 없는 너무 긴 경로가 들어 있습니다."
+
+    IDS_ERR_DMG_READ_HDR        "패키지 헤더를 읽을 수 없습니다. 파일이 너무 작습니다."
+    IDS_ERR_DMG_ENCRYPTED       "이 패키지는 암호화되어 있습니다.\n암호화된 패키지는 지원되지 않습니다."
+    IDS_ERR_DMG_NO_FOOTER       "이 파일은 DMG 패키지가 아니거나 불완전한 것 같습니다.\n올바른 DMG 푸터가 없습니다."
+    IDS_ERR_DMG_PLIST           "이 파일은 올바른 DMG 패키지가 아니거나 불완전한 것 같습니다.\n올바른 속성 목록(Property List)이 없습니다."
+    IDS_ERR_DMG_BLOCK_UNDEFINED "이 패키지에는 %I64u에서 시작하는 HFS Plus 파티션의 데이터 블록이 없습니다.\n패키지를 올바르게 처리하려면 이 블록이 필요합니다."
+
+    IDS_ERR_BF_READ             "디스크 이미지의 위치 %I64u에서 데이터를 읽을 수 없습니다."
+    IDS_ERR_BF_SEEK             "디스크 이미지에서 위치 %I64u(으)로 이동할 수 없습니다."
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "내부 오류: 지원되지 않는 이동 방법입니다."
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "이 디스크 이미지에는 알 수 없는 방법으로 압축된 블록이 있습니다.\n이러한 디스크 이미지는 지원되지 않습니다."
+    IDS_ERR_BF_ZLIB             "ZLIB로 압축된 블록의 압축을 풀지 못했습니다. 디스크 이미지가 손상된 것 같습니다."
+    IDS_ERR_BF_BZIP2            "BZIP2로 압축된 블록의 압축을 풀지 못했습니다. 디스크 이미지가 손상된 것 같습니다."
+
+    IDS_ERR_ISZ_NO_HEADER       "이 파일은 압축된 ISZ 이미지가 아니거나 불완전한 것 같습니다.\n올바른 ISZ 헤더가 없습니다."
+    IDS_ERR_ISZ_READ_HDR        "압축된 이미지 헤더를 읽을 수 없습니다. 파일이 너무 작습니다."
+    IDS_ERR_ISZ_SEGMENTED       "이 이미지는 분할되어 있습니다.\n분할된 이미지는 지원되지 않습니다."
+    IDS_ERR_ISZ_ENCRYPTED       "이 이미지는 암호화되어 있습니다.\n암호화된 이미지는 지원되지 않습니다."
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "오디오 트랙은 추출할 수 없습니다."
+
+    IDS_CANCELING_OPERATION     "작업을 취소하는 중입니다. 잠시 기다려 주십시오..."
+
+    IDS_INFO_LABEL              "이미지 정보\n\n"
+    IDS_INFO_LABEL_LABEL        "이미지 ""%s"" 정보\n\n"
+    IDS_INFO_CNT_SESSIONS       "세션 수: %d"
+    IDS_INFO_SESSION_NUM        "\n세션 %d\n"
+    IDS_INFO_CNT_TRACKS         "  트랙 수: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  트랙: %d, %s, 크기: %d KB\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  트랙: %d, %s, 크기: %d KB - ""%s""\n"
+}

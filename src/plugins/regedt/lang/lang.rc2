@@ -133,7 +133,7 @@ STRINGTABLE
   IDS_EXP_WINDIR, "Windows Directory"
   IDS_EXP_SYSDIR, "System Directory"
   IDS_EXP_BROWSE, "Browse..."
-  IDS_EXP_SALDIR, "Salamander Directory"
+  IDS_EXP_SALDIR, "Sally Directory"
   IDS_EXP_DOSFULLNAME, "DOS Full Name"
   IDS_EXP_DOSDRIVE, "DOS Drive"
   IDS_EXP_DOSPATH, "DOS Path"

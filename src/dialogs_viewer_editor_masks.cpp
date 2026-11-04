@@ -1268,8 +1268,8 @@ CImportConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CLanguageSelectorDialog
 //
 
-CLanguageSelectorDialog::CLanguageSelectorDialog(HWND hParent, std::wstring& slgName)
-    : CCommonDialog(HInstance, IDD_SLGSELECTOR, hParent), SLGName(slgName)
+CLanguageSelectorDialog::CLanguageSelectorDialog(HWND hParent, std::wstring& languageTag)
+    : CCommonDialog(HInstance, IDD_LANGUAGESELECTOR, hParent), LanguageTag(languageTag)
 {
     Web = NULL;
     OpenedFromConfiguration = hParent != NULL;
@@ -1296,9 +1296,9 @@ void CLanguageSelectorDialog::FillControls()
     int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
     if (index >= 0 && index < (int)Items.size())
     {
-        SetDlgItemTextW(HWindow, IDC_SLG_AUTHOR, Items[index].Author.c_str());
-        SetDlgItemTextW(HWindow, IDC_SLG_WEB, Items[index].Web.c_str());
-        SetDlgItemTextW(HWindow, IDC_SLG_COMMENT, Items[index].Comment.c_str());
+        SetDlgItemTextW(HWindow, IDC_LANGUAGE_AUTHOR, Items[index].Author.c_str());
+        SetDlgItemTextW(HWindow, IDC_LANGUAGE_WEB, Items[index].Web.c_str());
+        SetDlgItemTextW(HWindow, IDC_LANGUAGE_COMMENT, Items[index].Comment.c_str());
         if (Web != NULL)
             Web->SetActionOpen(MakeOpenableWebUrl(Items[index].Web.c_str()).c_str());
     }
@@ -1316,7 +1316,7 @@ void CLanguageSelectorDialog::LoadListView()
         ListView_SetItemTextW(HListView, i, 0, (LPWSTR)Items[i].DisplayName.c_str());
     }
 
-    int preferredIndex = GetPreferredLanguageIndex(SLGName.c_str());
+    int preferredIndex = GetPreferredLanguageIndex(LanguageTag.c_str());
     DWORD state = LVIS_SELECTED | LVIS_FOCUSED;
     ListView_SetItemState(HListView, preferredIndex, state, state);
     ListView_EnsureVisible(HListView, preferredIndex, FALSE);
@@ -1337,7 +1337,7 @@ void CLanguageSelectorDialog::Transfer(CTransferInfo& ti)
     {
         int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
         if (index >= 0 && index < (int)Items.size())
-            SLGName = Items[index].PersistedName;
+            LanguageTag = Items[index].Tag;
     }
 }
 
@@ -1357,12 +1357,12 @@ BOOL CLanguageSelectorDialog::Initialize()
     return !Items.empty();
 }
 
-int CLanguageSelectorDialog::GetPreferredLanguageIndex(const wchar_t* selectSLGName)
+int CLanguageSelectorDialog::GetPreferredLanguageIndex(const wchar_t* selectLanguageTag)
 {
     int englishIndex = 0;
     for (int i = 0; i < (int)Items.size(); i++)
     {
-        if (selectSLGName != NULL && _wcsicmp(Items[i].PersistedName.c_str(), selectSLGName) == 0)
+        if (selectLanguageTag != NULL && _wcsicmp(Items[i].Tag.c_str(), selectLanguageTag) == 0)
             return i;
         if (Items[i].LanguageID == sally::languages::kEnglishLangId)
             englishIndex = i;
@@ -1385,9 +1385,9 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetDlgItemTextW(HWindow, IDCANCEL, ExitButtonLabel.c_str());
         }
 
-        Web = new CHyperLink(HWindow, IDC_SLG_WEB, STF_HYPERLINK_COLOR);
+        Web = new CHyperLink(HWindow, IDC_LANGUAGE_WEB, STF_HYPERLINK_COLOR);
 
-        HListView = GetDlgItem(HWindow, IDC_SLG_LIST);
+        HListView = GetDlgItem(HWindow, IDC_LANGUAGE_LIST);
 
         DWORD exFlags = LVS_EX_FULLROWSELECT;
         DWORD origFlags = ListView_GetExtendedListViewStyle(HListView);
@@ -1399,8 +1399,8 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         lvc.mask = LVCF_TEXT | LVCF_SUBITEM;
         lvc.pszText = buff;
         lvc.iSubItem = 0;
-        GetDlgItemTextW(HWindow, IDC_SLG_DESCR, buff, 100);
-        DestroyWindow(GetDlgItem(HWindow, IDC_SLG_DESCR));
+        GetDlgItemTextW(HWindow, IDC_LANGUAGE_DESCR, buff, 100);
+        DestroyWindow(GetDlgItem(HWindow, IDC_LANGUAGE_DESCR));
         ListView_InsertColumnW(HListView, 0, &lvc);
 
         // under W2K when launched via a shortcut set to MAXIMIZED
@@ -1412,7 +1412,7 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_NOTIFY:
     {
-        if (wParam == IDC_SLG_LIST)
+        if (wParam == IDC_LANGUAGE_LIST)
         {
             LPNMHDR nmh = (LPNMHDR)lParam;
             switch (nmh->code)

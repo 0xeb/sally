@@ -3804,7 +3804,9 @@ void CFindDialog::OnUserMenu()
 
     UserMenuIconBkgndReader.BeginUserMenuIconsInUse();
     CMenuPopup menu;
-    MainWindow->FillUserMenu(&menu, FALSE); // keep customization disabled
+    // Keep customization disabled. The commands act on found files, not on the active panel,
+    // so the panel's "Show only when" rules (#50) do not apply here: an Unknown context.
+    MainWindow->FillUserMenu(&menu, FALSE, Sally::UserMenuConditions::Context());
     POINT p;
     GetListViewContextMenuPos(FoundFilesListView->HWindow, &p);
     // another locking round (BeginUserMenuIconsInUse+EndUserMenuIconsInUse) will happen

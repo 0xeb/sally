@@ -116,7 +116,7 @@ BEGIN
     BEGIN
         MENUITEM "Browse…",                     ID_BROWSE
         MENUITEM SEPARATOR
-        MENUITEM "Salamander Directory",        ID_SALDIR
+        MENUITEM "Sally Directory",        ID_SALDIR
         MENUITEM "Environment Variable",        ID_ENVVAR
     END
 END

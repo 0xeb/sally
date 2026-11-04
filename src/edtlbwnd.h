@@ -38,6 +38,9 @@ typedef struct
     int Index;
     INT_PTR ItemID;
     BOOL Bold;    // should the text be printed bold?
+    // edtlbGetData: optional dimmed note drawn at the right of the row (NULL or "" = none);
+    // owned by the parent, which keeps it valid until its next EDTLBN_GETDISPINFO.
+    const wchar_t* Note;
                   //  BOOL          Up;            // for EDTLBN_MOVEITEM
     HWND HEdit;   // for EDTLBN_CONTEXTMENU
     POINT Point;  // for EDTLBN_CONTEXTMENU

@@ -580,8 +580,7 @@ const wchar_t* CONFIG_LASTPLUGINVER_OP = L"Plugins.ver Version (x86)";
 const wchar_t* CONFIG_LASTPLUGINVER = L"Plugins.ver Version (x86)";
 const wchar_t* CONFIG_LASTPLUGINVER_OP = L"Plugins.ver Version (x64)";
 #endif // _WIN64
-// persisted name of the UI language, e.g. czech.slg (an identifier; no file): the same value older
-// versions read, so a configuration works with both, see common/BuiltinLanguages.h
+// BCP-47 tag of the UI language, e.g. cs-CZ, see common/BuiltinLanguages.h
 const wchar_t* CONFIG_LANGUAGE_REG = L"Language";
 const wchar_t* CONFIG_SHOWSPLASHSCREEN_REG = L"Show Splash Screen";
 const wchar_t* CONFIG_CONVERSIONTABLE_REG = L"Conversion Table";
@@ -737,6 +736,32 @@ const wchar_t* USERMENU_SEPARATOR_REG = L"Separator";
 const wchar_t* USERMENU_SHOWINTOOLBAR_REG = L"Show In Toolbar";
 const wchar_t* USERMENU_TYPE_REG = L"Type";
 const wchar_t* USERMENU_ICON_REG = L"Icon";
+const wchar_t* USERMENU_SHOWWHEN_ENABLED_REG = L"Show When Enabled";
+const wchar_t* USERMENU_SHOWWHEN_FILE_REG = L"Show When File";
+const wchar_t* USERMENU_SHOWWHEN_FOLDER_REG = L"Show When Folder";
+
+void SaveUserMenuShowWhen(HKEY itemKey, const CUserMenuItem& item)
+{
+    // Written only for a command with a rule (absent means always shown), so profiles
+    // without rules keep exactly their earlier values.
+    if (!item.ShowWhenEnabled && item.ShowWhenFile.empty() && item.ShowWhenFolder.empty())
+        return;
+    DWORD enabled = item.ShowWhenEnabled ? 1 : 0;
+    SetValue(itemKey, USERMENU_SHOWWHEN_ENABLED_REG, REG_DWORD, &enabled, sizeof(DWORD));
+    SetValueW(itemKey, USERMENU_SHOWWHEN_FILE_REG, REG_SZ, item.ShowWhenFile.c_str(), -1);
+    SetValueW(itemKey, USERMENU_SHOWWHEN_FOLDER_REG, REG_SZ, item.ShowWhenFolder.c_str(), -1);
+}
+
+void LoadUserMenuShowWhen(HKEY itemKey, CUserMenuItem& item)
+{
+    // An absent value (an older profile) leaves the command always shown.
+    DWORD enabled = 0;
+    item.ShowWhenEnabled = GetValue(itemKey, USERMENU_SHOWWHEN_ENABLED_REG, REG_DWORD, &enabled, sizeof(DWORD)) && enabled != 0;
+    std::wstring mask;
+    item.ShowWhenFile = gRegistry->GetString(itemKey, USERMENU_SHOWWHEN_FILE_REG, mask).success ? mask : std::wstring();
+    mask.clear();
+    item.ShowWhenFolder = gRegistry->GetString(itemKey, USERMENU_SHOWWHEN_FOLDER_REG, mask).success ? mask : std::wstring();
+}
 
 const wchar_t* SALAMANDER_VIEWERS_REG = L"Viewers";
 const wchar_t* SALAMANDER_ALTVIEWERS_REG = L"Alternative Viewers";
@@ -1087,78 +1112,6 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, std::wstring& autoImportConfigFromKe
     }
     LoadSaveToRegistryMutex.Leave();
     return doNotExit;
-}
-
-//****************************************************************************
-//
-// FindLanguageFromPrevVerOfSal
-//
-// Retrieves the language (persisted name, e.g. czech.slg) from an older version of Salamander.
-// The oldest version from which we obtain this information is 2.53 beta 2 (the first version shipped with multiple languages: CZ+DE+EN).
-// If a configuration for the current version exists or such a language is not found, returns FALSE.
-// Otherwise returns the language in 'slgName'.
-
-BOOL FindLanguageFromPrevVerOfSal(std::wstring& slgName)
-{
-    HKEY hCfgKey = NULL;
-    HKEY hRootKey = NULL;
-    int rootIndex = 0;
-    const wchar_t* root;
-    DWORD saveInProgress; // dummy
-    IRegistry* registry = GetMainWindowRegistry();
-
-    slgName.clear();
-    LoadSaveToRegistryMutex.Enter();
-    if (registry == NULL)
-    {
-        LoadSaveToRegistryMutex.Leave();
-        return FALSE;
-    }
-    do
-    {
-        // check if the key exists and if a configuration is stored under it
-        root = SalamanderConfigurationRoots[rootIndex];
-        if (root == NULL) // the list ends early with -profile (common/ConfigProfile.h)
-            break;
-        BOOL rootFound = registry->OpenKeyRead(HKEY_CURRENT_USER, root, hRootKey).success;
-        BOOL cfgFound = rootFound &&
-                        registry->OpenKeyRead(hRootKey, SALAMANDER_CONFIG_REG_W, hCfgKey).success;
-        if (cfgFound && GetValueW(hRootKey, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
-        { // the configuration is corrupted
-            cfgFound = FALSE;
-            registry->CloseKey(hCfgKey);
-        }
-        DWORD configVersion = 1; // this is configuration from 1.52 or older
-        if (cfgFound)
-        {
-            HKEY actKey;
-            if (registry->OpenKeyRead(hRootKey, SALAMANDER_VERSION_REG_W, actKey).success)
-            {
-                configVersion = 2; // configuration from 1.6b1
-                GetValueW(actKey, SALAMANDER_VERSIONREG_REG_W, REG_DWORD, &configVersion, sizeof(DWORD));
-                registry->CloseKey(actKey);
-            }
-        }
-        if (rootFound)
-            registry->CloseKey(hRootKey);
-        if (cfgFound)
-        {
-            BOOL found = FALSE;
-            if (rootIndex != 0 &&                      // only for one of the older keys
-                configVersion >= 59 /* 2.53 beta 2 */) // before 2.53 beta 2 there was only English, so reading makes no sense; offer system default language or manual selection of the language
-            {
-                GetStringValueW(hCfgKey, CONFIG_LANGUAGE_REG, slgName);
-                found = !slgName.empty();
-            }
-            registry->CloseKey(hCfgKey);
-            LoadSaveToRegistryMutex.Leave();
-            return found;
-        }
-        rootIndex++;
-    } while (rootIndex < SALCFG_ROOTS_COUNT);
-
-    LoadSaveToRegistryMutex.Leave();
-    return FALSE;
 }
 
 // obtains a number from a string (unsigned decimal format); returns TRUE, if a number was found
@@ -2021,6 +1974,8 @@ BOOL CMainWindow::SaveConfig(HWND parent, LONG* error)
                     SetValueW(actKey, CONFIG_COMMANDSHELL_PROFILE_NAME_REG_W, REG_SZ,
                               Configuration.CommandShellProfileName.c_str(), -1);
                 }
+                sally::configuration::RegistryWriteMonitor::Record(
+                    Sally::ShellProfiles::SaveShortcuts(gRegistry, actKey, Configuration.CommandShellShortcuts));
                 //      SetValue(actKey, CONFIG_FASTDIRMOVE_REG, REG_DWORD,
                 //               &Configuration.FastDirectoryMove, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_SORTUSESLOCALE_REG_W, REG_DWORD,
@@ -2109,8 +2064,8 @@ BOOL CMainWindow::SaveConfig(HWND parent, LONG* error)
                 SetValueW(actKey, CONFIG_SHIFTFORHOTPATHS_REG_W, REG_DWORD,
                          &Configuration.ShiftForHotPaths, sizeof(DWORD));
                 SetValue(actKey, CONFIG_LANGUAGE_REG, REG_SZ,
-                         Configuration.SLGName.c_str(), -1);
-                DWORD langChanged = (StrICmpW(Configuration.SLGName.c_str(), Configuration.LoadedSLGName.c_str()) != 0); // TRUE if user changed Salamander language
+                         Configuration.LanguageTag.c_str(), -1);
+                DWORD langChanged = (StrICmpW(Configuration.LanguageTag.c_str(), Configuration.LoadedLanguageTag.c_str()) != 0); // TRUE if user changed Salamander language
                 SetValueW(actKey, CONFIG_LANGUAGECHANGED_REG_W, REG_DWORD, &langChanged, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_SHOWSPLASHSCREEN_REG_W, REG_DWORD,
                          &Configuration.ShowSplashScreen, sizeof(DWORD));
@@ -2522,6 +2477,7 @@ BOOL CMainWindow::SaveConfig(HWND parent, LONG* error)
                                  &UserMenuItems->At(i)->Type, sizeof(DWORD));
                         SetValue(subKey, USERMENU_SHOWINTOOLBAR_REG, REG_DWORD,
                                  &UserMenuItems->At(i)->ShowInToolbar, sizeof(DWORD));
+                        SaveUserMenuShowWhen(subKey, *UserMenuItems->At(i));
 
                         CloseKey(subKey);
                     }
@@ -3494,6 +3450,8 @@ BOOL CMainWindow::LoadConfig(
                     CUserMenuItem* item = new CUserMenuItem(name.c_str(), command.c_str(), arguments.c_str(), initDir.c_str(), icon.c_str(),
                                                             throughShell, closeShell, useWindow,
                                                             showInToolbar, type, bkgndReaderData);
+                    if (item != NULL)
+                        LoadUserMenuShowWhen(subKey, *item);
                     if (item != NULL && item->IsGood())
                     {
                         UserMenuItems->Add(item);
@@ -3639,6 +3597,7 @@ BOOL CMainWindow::LoadConfig(
                 if (gRegistry->GetString(actKey, CONFIG_COMMANDSHELL_PROFILE_NAME_REG_W, profileValue).success)
                     Configuration.CommandShellProfileName = profileValue;
             }
+            Configuration.CommandShellShortcuts = Sally::ShellProfiles::LoadShortcuts(gRegistry, actKey);
             //      GetValue(actKey, CONFIG_FASTDIRMOVE_REG, REG_DWORD,
             //               &Configuration.FastDirectoryMove, sizeof(DWORD));
             GetValueW(actKey, CONFIG_SORTUSESLOCALE_REG_W, REG_DWORD,

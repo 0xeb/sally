@@ -10,7 +10,7 @@ namespace sally::salmon
 {
 
 bool ParseCommandLine(std::wstring_view commandLine, std::wstring& mappingName,
-                      std::wstring& slgName) noexcept
+                      std::wstring& languageTag) noexcept
 {
     try
     {
@@ -20,15 +20,15 @@ bool ParseCommandLine(std::wstring_view commandLine, std::wstring& mappingName,
         if (mappingEnd == std::wstring_view::npos || mappingEnd + 2 >= commandLine.size() ||
             commandLine[mappingEnd + 1] != L' ' || commandLine[mappingEnd + 2] != L'"')
             return false;
-        const size_t slgBegin = mappingEnd + 3;
-        const size_t slgEnd = commandLine.find(L'"', slgBegin);
-        if (slgEnd == std::wstring_view::npos)
+        const size_t tagBegin = mappingEnd + 3;
+        const size_t tagEnd = commandLine.find(L'"', tagBegin);
+        if (tagEnd == std::wstring_view::npos)
             return false;
 
         std::wstring parsedMapping(commandLine.substr(1, mappingEnd - 1));
-        std::wstring parsedSlg(commandLine.substr(slgBegin, slgEnd - slgBegin));
+        std::wstring parsedLanguageTag(commandLine.substr(tagBegin, tagEnd - tagBegin));
         mappingName.swap(parsedMapping);
-        slgName.swap(parsedSlg);
+        languageTag.swap(parsedLanguageTag);
         return true;
     }
     catch (...)

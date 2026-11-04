@@ -1,0 +1,63 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for nethood. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/nethood/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\nethood.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CONFIG DIALOGEX 22, 38, 220, 127
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "네트워크 설정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "관리 공유 표시(&A)",IDC_SYSSHARES,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,7,106,10
+    CONTROL         "관리 공유를 숨김 항목으로 표시(&H)",IDC_HIDESYSSHARES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,22,159,10
+    CONTROL         "최상위 디렉터리에 내 네트워크 환경 항목 표시(&M)",IDC_NETSHORTCUTS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,37,204,10
+    CONTROL         "최상위 디렉터리에 네트워크 컴퓨터 표시(&C)",IDC_SHOWWORKGRP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,52,168,10
+    CONTROL         "원격 데스크톱으로 연결된 디스크 표시(&D)",IDC_SHOWTSC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,67,155,10
+    CONTROL         "Sally 시작 시 네트워크 검색(&S)",IDC_PRELOAD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,82,137,10
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,99,206,1
+    DEFPUSHBUTTON   "확인",IDOK,30,106,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,85,106,50,14
+    PUSHBUTTON      "도움말",IDHELP,140,106,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_COLUMN_COMMENTS     "설명"
+    IDS_INFOLINE_SELECTION_PLURAL "{!}<%d>개 개체 선택됨{}"
+    IDS_MENUITEM            "네트워크"
+    IDS_REFRESHING          "네트워크 검색 중…"
+    IDS_NETWORK_UNAVAILABLE "네트워크를 사용할 수 없습니다."
+    IDS_ABOUT               "플러그인 정보"
+    IDS_TSCLIENT            "%2의 %1"
+    IDS_TSFOLDER            "로컬 컴퓨터"
+    IDS_TSHOST              "호스트 컴퓨터"
+    IDS_TSFOLDERCOMMENT     "%s의 디스크"
+END
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME         "네트워크"
+    IDS_DESCRIPTION         "네트워크에 있는 컴퓨터에 액세스할 수 있게 합니다."
+END

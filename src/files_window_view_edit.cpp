@@ -1922,6 +1922,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
                             &subject, IDD_CREATEDIRDIALOG,
                             Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE,
                             FALSE);
+        dlg.EnableNewDirectorySuggestions();
 
     CREATE_AGAIN:
 

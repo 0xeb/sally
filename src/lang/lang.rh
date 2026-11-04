@@ -364,12 +364,12 @@
 #define IDC_ACDRVLIST                   1023
 #define IDS_ACDRVHDR                    1024
 #define IDS_ACSTATUSDONE                1025
-#define IDD_SLGSELECTOR                 1030
-#define IDC_SLG_LIST                    1031
-#define IDC_SLG_AUTHOR                  1032
-#define IDC_SLG_DESCR                   1034
-#define IDC_SLG_COMMENT                 1036
-#define IDC_SLG_WEB                     1037
+#define IDD_LANGUAGESELECTOR            1030
+#define IDC_LANGUAGE_LIST               1031
+#define IDC_LANGUAGE_AUTHOR             1032
+#define IDC_LANGUAGE_DESCR              1034
+#define IDC_LANGUAGE_COMMENT            1036
+#define IDC_LANGUAGE_WEB                1037
 #define IDD_CONVERSION_TABLES           1040
 #define IDC_CT_LIST                     1041
 #define IDC_CT_CODEPAGE                 1042
@@ -723,3 +723,38 @@
 #define IDS_LONGPATH_RESTART 8417
 #define IDS_LONGPATH_CONFIRM 8418
 #define IDS_LONGPATH_FAILED 8419
+
+// Command-shell preferences and optional numpad shortcuts.
+#define IDC_SHELL_GROUP 8500
+#define IDC_SHELL_DEFAULT_LABEL 8501
+#define IDC_SHELL_DEFAULT 8502
+#define IDC_SHELL_CTRL_LABEL 8503
+#define IDC_SHELL_CTRL 8504
+#define IDC_SHELL_SHIFT_LABEL 8505
+#define IDC_SHELL_SHIFT 8506
+#define IDC_SHELL_ALT_LABEL 8507
+#define IDC_SHELL_ALT 8508
+#define IDC_SHELL_REFRESH 8509
+#define IDC_SHELL_NOTE 8510
+#define IDC_SHELL_STATUS 8511
+#define IDS_SHELL_NOT_ASSIGNED 8520
+#define IDS_SHELL_UNAVAILABLE_LABEL 8521
+#define IDS_SHELL_SHORTCUT_CONFLICT 8522
+#define IDS_SHELL_PROFILE_UNAVAILABLE 8523
+
+// #50 User Menu: "Show only when" rules for top-level commands and submenus.
+#define IDC_UM_SHOWWHEN 8600
+#define IDC_UM_SHOWWHEN_GROUP 8601
+#define IDC_UM_SHOWWHEN_FILE_LABEL 8602
+#define IDE_UM_SHOWWHEN_FILE 8603
+#define IDC_UM_SHOWWHEN_FOLDER_LABEL 8604
+#define IDE_UM_SHOWWHEN_FOLDER 8605
+#define IDC_UM_SHOWWHEN_NOTE 8606
+#define IDS_UM_SHOWWHEN_NOTE_ON 8620
+#define IDS_UM_SHOWWHEN_NOTE_OFF 8621
+#define IDS_UM_SHOWWHEN_NOTE_NESTED 8622
+#define IDS_UM_FOLDERMASK_INCORRECT 8623
+#define IDS_UM_FILEMASK_CUE 8624
+#define IDS_UM_FOLDERMASK_CUE 8625
+#define IDS_UM_SHOWWHEN_FILE_HINT 8626
+#define IDS_UM_SHOWWHEN_FOLDER_HINT 8627

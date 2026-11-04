@@ -7,6 +7,7 @@
 #include "common/configuration/ConfigurationSearchIndex.h"
 #include "common/configuration/ConfigurationDraft.h"
 #include "common/Win32LongPathSetting.h"
+#include "common/ShellProfileSettings.h"
 #include "common/artwork/IdentityStyle.h"
 #include <functional>
 #include <utility>
@@ -460,10 +461,9 @@ struct CConfiguration
     int FindColNameWidth; // width of the Name column in the Find dialog
 
     // Language
-    // persisted name of the UI language, e.g. czech.slg (an identifier; no file), see
-    // common/BuiltinLanguages.h
-    std::wstring LoadedSLGName; // the language Sally started in
-    std::wstring SLGName;       // the language to use next time Sally starts
+    // BCP-47 tag of the UI language, e.g. cs-CZ, see common/BuiltinLanguages.h
+    std::wstring LoadedLanguageTag; // the language Sally started in
+    std::wstring LanguageTag;       // the language to use next time Sally starts
 
     // Directory name convert\\XXX\\convert.cfg from which convert.cfg is loaded
     std::wstring ConversionTable;
@@ -472,6 +472,7 @@ struct CConfiguration
     int CommandShellTargetKind; // ShellTargetKind persisted as a DWORD
     std::wstring CommandShellProfileGuid;
     std::wstring CommandShellProfileName;
+    Sally::ShellProfiles::Shortcuts CommandShellShortcuts;
     int TitleBarShowPath;                        // will we display the path in the title bar?
     int TitleBarMode;                            // title bar display mode (TITLE_BAR_MODE_xxx)
     int UseTitleBarPrefix;                       // should prefix be shown in the title bar?
@@ -545,7 +546,7 @@ protected:
 class CCfgPageRegional : public CCommonPropSheetPage
 {
 public:
-    std::wstring SLGName; // persisted name of the chosen UI language, e.g. czech.slg (no file)
+    std::wstring LanguageTag; // BCP-47 tag of the chosen UI language, e.g. cs-CZ
     std::wstring DirName;
 
 public:
@@ -688,6 +689,15 @@ class CSmallIconWindow : public CWindow
 };
 */
 
+// #50: sizes the "Show only when" group-title checkbox of a User Menu page to its caption in the
+// page's own font (the Configuration font may differ from the template's), within its group.
+void FitUserMenuShowWhenTitle(HWND page);
+
+// Lays the sentence of static texts and hint links on the Change Drive and Keyboard pages out at
+// their measured widths (CondenseStaticTexts), as each page does in WM_INITDIALOG.
+void CondenseChangeDriveHintTexts(HWND page);
+void CondenseKeyboardHintTexts(HWND page);
+
 class CCfgPageUserMenu : public CCommonPropSheetPage
 {
     friend class CConfigurationDlg;
@@ -708,11 +718,16 @@ protected:
 
     void RefreshGroupIconInUMItems(); // after changing colors, HGroupIcon changes; we must update it in UserMenuItems as well
 
+    // #50: only top-level commands and submenus can have a "Show only when" rule.
+    BOOL CanHaveShowWhen(int index);
+    std::wstring ShowWhenSummary(int index); // the list row's note, "" without an active rule
+
     CUserMenuItems* UserMenuItems;
     CUserMenuItems* SourceUserMenuItems;
     CEditListBox* EditLB;
     //    CSmallIconWindow *SmallIcon;
     BOOL DisableNotification;
+    std::wstring RowNote; // the note of the row being drawn; must outlive the draw notification
 };
 
 //
@@ -931,8 +946,15 @@ class CCfgPageKeyboard : public CCommonPropSheetPage
 {
 public:
     CCfgPageKeyboard();
+    virtual void Transfer(CTransferInfo& ti);
+    virtual void Validate(CTransferInfo& ti);
+    std::array<ShellTarget, 4> LocalShellTargets;
 
 protected:
+    WindowsTerminalCatalog ShellCatalog;
+    std::array<std::vector<ShellTarget>, 4> ShellChoices;
+    void RefreshShellProfiles(bool force);
+    void UpdateShellStatus();
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 

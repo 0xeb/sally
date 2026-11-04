@@ -91,7 +91,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        "Window position",IDC_STATIC_1,4,6,199,41
     CONTROL         "&Save on close",IDC_CFG_SAVEPOSONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,11,17,63,12
-    CONTROL         "S&et to position of Salamander's window",IDC_CFG_SETBYMAINWINDOW,
+    CONTROL         "S&et to position of Sally's window",IDC_CFG_SETBYMAINWINDOW,
                     "Button",BS_AUTORADIOBUTTON,11,29,156,12
 END
 

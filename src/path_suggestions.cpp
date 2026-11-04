@@ -9,12 +9,14 @@
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
+#include "pack.h"
 #include "common/IFileEnumerator.h"
 #include "common/PathCompletion.h"
 
 #include <shldisp.h>
 #include <shlobj.h>
 
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -22,14 +24,80 @@
 namespace
 {
 
+// The dialog manager handles Enter/Escape before forwarding key messages to an edit. When
+// a suggestion is visible, let autocomplete consume that key instead of submitting/canceling
+// the dialog (F7, Copy/Move of one file). The COM reference belongs to this edit subclass,
+// not to a dialog/global registry.
+LRESULT CALLBACK SuggestionAcceptEditProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
+                                          UINT_PTR subclassId, DWORD_PTR reference)
+{
+    IAutoCompleteDropDown* dropdown = reinterpret_cast<IAutoCompleteDropDown*>(reference);
+    if (message == WM_NCDESTROY)
+    {
+        RemoveWindowSubclass(window, SuggestionAcceptEditProc, subclassId);
+        const LRESULT result = DefSubclassProc(window, message, wParam, lParam);
+        dropdown->Release();
+        return result;
+    }
+    DWORD beforeStatus = 0;
+    const bool accepting = message == WM_KEYDOWN && wParam == VK_RETURN &&
+                           SUCCEEDED(dropdown->GetDropDownStatus(&beforeStatus, nullptr)) &&
+                           (beforeStatus & ACDD_VISIBLE) != 0;
+    const LRESULT result = DefSubclassProc(window, message, wParam, lParam);
+    if (accepting)
+    {
+        // Autocomplete leaves its completion selected. F7 offers a parent, so typing next
+        // must append the new leaf instead of replacing the accepted parent path; an accepted
+        // file name is likewise edited at its end.
+        const LRESULT length = SendMessageW(window, WM_GETTEXTLENGTH, 0, 0);
+        SendMessageW(window, EM_SETSEL, static_cast<WPARAM>(length), length);
+    }
+    if (message == WM_GETDLGCODE && lParam != 0)
+    {
+        const MSG* key = reinterpret_cast<const MSG*>(lParam);
+        if (key->message == WM_KEYDOWN && (key->wParam == VK_RETURN || key->wParam == VK_ESCAPE))
+        {
+            DWORD status = 0;
+            if (SUCCEEDED(dropdown->GetDropDownStatus(&status, nullptr)) && (status & ACDD_VISIBLE) != 0)
+                return result | DLGC_WANTMESSAGE;
+        }
+    }
+    return result;
+}
+
+void KeepSuggestionKeysInEdit(HWND edit, IAutoComplete2* autocomplete)
+{
+    IAutoCompleteDropDown* dropdown = nullptr;
+    if (SUCCEEDED(autocomplete->QueryInterface(IID_PPV_ARGS(&dropdown))))
+    {
+        if (!SetWindowSubclass(edit, SuggestionAcceptEditProc, 1, reinterpret_cast<DWORD_PTR>(dropdown)))
+            dropdown->Release();
+    }
+}
+
+// Recognized archives are left out of file suggestions. The autocomplete lists on its own
+// worker thread, which may still run after the dialog closes, while plugin loading and the
+// Configuration dialog rebuild the global format table on the UI thread. So the worker gets a
+// private copy taken on the UI thread when the dialog attaches.
+std::function<bool(const std::wstring&)> ArchiveFilterSnapshot()
+{
+    auto formats = std::make_shared<CPackerFormatConfig>();
+    if (!formats->Load(PackerFormatConfig))
+        return {};
+    // A duplicate extension makes BuildArray report failure after building every other
+    // entry; Sally's own table is used the same way, so the copy recognizes what Sally does.
+    formats->BuildArray();
+    return [formats](const std::wstring& name) { return formats->PackIsArchive(name.c_str()) != 0; };
+}
+
 // The strings Windows' autocomplete offers. It calls this object on a worker thread of its own:
 // IACList::Expand when the typed text reaches a separator, then Reset and Next. The folder is
 // listed there, never on the dialog's thread, so a slow network folder cannot stall typing.
 class CPathSuggestionSource final : public IEnumString, public IACList
 {
 public:
-    explicit CPathSuggestionSource(std::wstring baseDirectory)
-        : BaseDirectory(std::move(baseDirectory))
+    CPathSuggestionSource(std::wstring baseDirectory, Sally::PathCompletion::CandidateOptions options)
+        : BaseDirectory(std::move(baseDirectory)), Options(std::move(options))
     {
     }
 
@@ -114,7 +182,7 @@ private:
     {
         using namespace Sally::PathCompletion;
         Items = gFileEnumerator != nullptr
-                    ? ListFolderCandidates(*gFileEnumerator, Resolve(Head, BaseDirectory), MaxSuggestions)
+                    ? ListCandidates(*gFileEnumerator, Resolve(Head, BaseDirectory), MaxSuggestions, Options)
                     : std::vector<std::wstring>();
         Position = 0;
         Filled = true;
@@ -123,6 +191,7 @@ private:
     LONG Refs = 1;
     std::mutex Lock;
     const std::wstring BaseDirectory;
+    const Sally::PathCompletion::CandidateOptions Options;
     std::wstring Head;
     std::vector<std::wstring> Items;
     size_t Position = 0;
@@ -141,8 +210,9 @@ HWND EditOf(HWND control)
 
 } // namespace
 
-void AttachPathSuggestions(HWND dialog, int controlId)
+void AttachPathSuggestions(HWND dialog, int controlId, const PathSuggestionOptions& options)
 {
+    using Sally::PathCompletion::CandidateKinds;
     if (!Configuration.SuggestPathNames)
         return;
     HWND edit = EditOf(GetDlgItem(dialog, controlId));
@@ -150,17 +220,44 @@ void AttachPathSuggestions(HWND dialog, int controlId)
         return;
 
     std::wstring baseDirectory;
-    CFilesWindow* panel = MainWindow != NULL ? MainWindow->GetActivePanel() : NULL;
-    if (panel != NULL && panel->Is(ptDisk))
-        baseDirectory = panel->GetPathW();
+    if (options.BaseDirectory.has_value())
+        baseDirectory = *options.BaseDirectory;
+    else
+    {
+        CFilesWindow* panel = MainWindow != NULL ? MainWindow->GetActivePanel() : NULL;
+        if (panel != NULL && panel->Is(ptDisk))
+            baseDirectory = panel->GetPathW();
+    }
+
+    Sally::PathCompletion::CandidateOptions candidates;
+    candidates.Kinds = options.Kinds;
+    candidates.AppendFolderSeparator = options.AppendFolderSeparator;
+    if (candidates.Kinds == CandidateKinds::FoldersAndFiles)
+    {
+        candidates.ExcludeFile = ArchiveFilterSnapshot();
+        if (!candidates.ExcludeFile)
+            candidates.Kinds = CandidateKinds::Folders; // never offer an archive unfiltered
+    }
 
     IAutoComplete2* autoComplete = NULL;
     if (FAILED(CoCreateInstance(CLSID_AutoComplete, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&autoComplete))))
         return;
-    CPathSuggestionSource* source = new CPathSuggestionSource(baseDirectory);
+    CPathSuggestionSource* source = new CPathSuggestionSource(baseDirectory, std::move(candidates));
     // The drop-down only: completed text is never typed for the user (no inline append).
     if (SUCCEEDED(autoComplete->Init(edit, static_cast<IEnumString*>(source), NULL, NULL)))
+    {
         autoComplete->SetOptions(ACO_AUTOSUGGEST | ACO_UPDOWNKEYDROPSLIST);
+        if (options.AcceptOnlyWhileVisible)
+            KeepSuggestionKeysInEdit(edit, autoComplete);
+    }
     source->Release();       // the autocomplete object keeps its own reference
     autoComplete->Release(); // and lives as long as the edit control
+}
+
+void AttachPathSuggestions(HWND dialog, int controlId, bool appendSeparator)
+{
+    PathSuggestionOptions options;
+    options.AppendFolderSeparator = appendSeparator;
+    options.AcceptOnlyWhileVisible = appendSeparator;
+    AttachPathSuggestions(dialog, controlId, options);
 }

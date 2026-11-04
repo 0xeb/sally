@@ -2328,7 +2328,7 @@ STRINGTABLE
  IDS_LOGMSGUPLRESUMEERR, "Kann die Datei nicht fortsetzen (anhängen), unbekannter Fehler.\r\n"
  IDS_LOGMSGUPLNOTCONFIRMED, "Die gesamte Datei wurde gesendet, aber der Server hat den Empfang nicht bestätigt.\r\nVersuche die Dateigröße (in Bytes) zu ermitteln um sicherzustellen das die Datei erfolgreich kopiert/verschoben wurde.\r\n"
 
- IDS_SSL_ERR_OPENSSLNOTFOUND "Die für die Verschlüsselung nötigen OpenSSL Bibliotheken konnten nicht gefunden oder geladen werden.\r\nDie benötigten Dateien sind ssleay32.dll und libeay32.dll.\r\nSie sind Teil der Sally Installation."
+ IDS_SSL_ERR_OPENSSLNOTFOUND "Die für die Verschlüsselung nötigen OpenSSL Bibliotheken konnten nicht gefunden oder geladen werden.\r\nDie benötigten Dateien sind ssleay32.dll und libeay32.dll.\r\nSie sind Teil der Sally-Installation."
  IDS_SSL_ERR_NEW "OpenSSL-Kontrollstruktur kann nicht zugewiesen werden. Kein Speicher mehr verfügar."
  IDS_SSL_ERR_NEW_LOG "SSL FEHLER: OpenSSL-Kontrollstruktur konnte nicht zugewiesen werden. Kein Speicher mehr verfügar.\r\n"
  IDS_SSL_ERR_CONNECT "Kann keine verschlüsselte Verbindung aufbauen (SSL).\n\nFehler: %s"

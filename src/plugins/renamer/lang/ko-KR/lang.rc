@@ -1,0 +1,482 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for renamer. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/renamer/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\renamer.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_RENAME DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "일괄 이름 바꾸기"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_MENUSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,368,1
+    LTEXT           "마스크(&M):",IDC_STATIC_1,16,11,51,8
+    COMBOBOX        IDC_MASK,70,9,95,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "하위 디렉터리 포함(&B)",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,10,66,12
+    PUSHBUTTON      "이름 바꾸기(&R)",IDOK,301,9,60,14
+    CONTROL         "수동 모드(&L)",IDC_MANUAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,6,27,57,12
+    CONTROL         "",IDS_MANSEP,"Static",SS_ETCHEDHORZ | WS_GROUP,65,32,297,1
+    EDITTEXT        IDE_MANUAL,6,41,355,138,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "새 이름(&N):",IDS_LABELNEWNAME,16,43,51,8
+    COMBOBOX        IDC_NEWNAME,70,41,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_NEWNAME,349,41,12,12
+    LTEXT           "바꾸기",IDS_LABELREPLACE,6,60,20,8
+    CONTROL         "",IDS_REPLACESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,28,64,334,1
+    LTEXT           "찾을 내용(&S):",IDS_LABELSEARCHFOR,16,77,51,8
+    COMBOBOX        IDC_SEARCH,70,75,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_SEARCH,349,75,12,12
+    LTEXT           "바꿀 내용(&I):",IDS_LABELREPLACEWITH,16,94,51,8
+    COMBOBOX        IDC_REPLACE,70,92,276,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "",IDB_REPLACE,349,92,12,12
+    CONTROL         "대/소문자 구분(&T)",IDC_CASESENSITIVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,70,109,67,12
+    CONTROL         "각 이름에서 한 번만(&Y)",IDC_GLOBAL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,70,123,92,12
+    CONTROL         "단어 단위로(&W)",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,109,61,12
+    CONTROL         "정규식(&G)",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,174,123,67,12
+    CONTROL         "확장명 제외(&D)",IDC_EXCLUDEEXT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,274,109,67,12
+    LTEXT           "대소문자 변경",IDS_LABELCASE,6,139,45,8
+    CONTROL         "",IDS_CHANGECASESEP,"Static",SS_ETCHEDHORZ | WS_GROUP,53,143,309,1
+    LTEXT           "파일 이름(&A):",IDS_LABELNAME,16,155,51,8
+    COMBOBOX        IDC_NAMECASE,70,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "확장명(&X):",IDS_LABELEXT,186,155,41,8
+    COMBOBOX        IDC_EXTCASE,236,153,100,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "경로 부분 포함(&U)",IDC_PATHPART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,70,170,76,12
+    LTEXT           "미리 보기(&P):",IDS_PREVIEW,6,182,32,8
+    RTEXT           "",IDS_COUNT,100,182,261,8
+    CONTROL         "",IDL_PREVIEW,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,0,192,368,68
+END
+
+IDD_CUT DIALOGEX 9, 20, 210, 88
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "부분 문자열 추가"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "부분 문자열 대상(&S):",IDC_STATIC_1,7,9,50,8
+    COMBOBOX        IDC_CUTFROM,64,7,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "시작 위치(&A)",IDC_STATIC_2,7,28,50,8
+    EDITTEXT        IDE_START,64,26,48,12,ES_AUTOHSCROLL
+    LTEXT           "기준",IDC_STATIC_3,121,28,28,8
+    COMBOBOX        IDC_START,155,26,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "끝 위치(&E)",IDC_STATIC_4,7,47,50,8
+    EDITTEXT        IDE_END,64,45,48,12,ES_AUTOHSCROLL
+    LTEXT           "기준",IDC_STATIC_5,121,47,28,8
+    COMBOBOX        IDC_END,155,45,48,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "확인",IDOK,53,67,50,14
+    PUSHBUTTON      "취소",IDCANCEL,107,67,50,14
+END
+
+IDD_COUNTER DIALOGEX 9, 20, 162, 130
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "카운터 추가"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "시작 값(&S):",IDC_STATIC_1,7,9,41,8
+    EDITTEXT        IDE_START,60,7,95,12,ES_AUTOHSCROLL
+    LTEXT           "증가 값(&E):",IDC_STATIC_2,7,25,32,8
+    EDITTEXT        IDE_STEP,60,23,95,12,ES_AUTOHSCROLL
+    LTEXT           "진법(&B):",IDC_STATIC_3,7,41,32,8
+    COMBOBOX        IDC_BASE,60,39,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "최소 너비(&W):",IDC_STATIC_4,7,57,52,8
+    EDITTEXT        IDE_MINWIDTH,60,55,95,12,ES_AUTOHSCROLL
+    LTEXT           "채울 문자(&F):",IDC_STATIC_5,7,73,52,8
+    COMBOBOX        IDC_FILL,60,71,95,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "왼쪽 맞춤(&L)",IDC_LEFT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,90,49,12
+    DEFPUSHBUTTON   "확인",IDOK,29,109,50,14
+    PUSHBUTTON      "취소",IDCANCEL,83,109,50,14
+END
+
+IDD_DEFINESET DIALOGEX 9, 20, 269, 192
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "문자 집합 정의"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "집합에 포함할 문자(&S):",IDC_STATIC_1,7,7,67,8
+    EDITTEXT        IDE_SET,7,17,255,12,ES_AUTOHSCROLL
+    LTEXT           "힌트:\n\n문자 범위를 포함하려면 '-'를 사용합니다(예: A-Z).\n\n'-' 문자를 포함하려면 집합의 맨 앞이나 맨 뒤에 씁니다(예: -AZ).",IDC_STATIC_2,7,36,255,40
+    LTEXT           "']' 문자를 포함하려면 집합의 맨 앞에 씁니다.\n\n긍정 문자 집합에 '^' 문자를 포함하려면 집합의 맨 앞이 아닌 곳에 씁니다.",IDC_STATIC_3,7,84,255,32
+    LTEXT           "POSIX 문자 클래스를 포함하려면 [:class:]를 사용합니다. class는 alpha, alnum, ascii, blank, cntrl, digit, graph, lower, print, punct, space, upper, word, xdigit 중 하나입니다.\n\n백슬래시를 포함하려면 \\\\를 사용합니다.",IDC_STATIC_4,7,124,255,40
+    DEFPUSHBUTTON   "확인",IDOK,82,171,50,14
+    PUSHBUTTON      "취소",IDCANCEL,136,171,50,14
+END
+
+IDD_SUBEXPRESSION DIALOGEX 9, 20, 168, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "하위 식 지정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "하위 식 번호(&S):",IDC_STATIC_1,7,9,58,8
+    COMBOBOX        IDC_NUMBER,71,7,90,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "힌트: 일치한 식 전체를 지정하려면 0을 사용합니다.",IDC_STATIC_2,7,23,154,8
+    LTEXT           "대소문자(&C):",IDC_STATIC_3,7,37,41,8
+    COMBOBOX        IDC_CASE,71,35,90,132,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "확인",IDOK,32,57,50,14
+    PUSHBUTTON      "취소",IDCANCEL,86,57,50,14
+END
+
+IDD_PROGRESS DIALOGEX 6, 15, 194, 60
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Renamer"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDS_MESSAGE,7,7,180,8
+    LTEXT           "",IDS_PROGRESS,7,22,180,10,0,WS_EX_STATICEDGE
+    DEFPUSHBUTTON   "취소",IDCANCEL,72,39,50,14
+END
+
+IDD_COMMAND DIALOGEX 9, 20, 368, 58
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "셸 명령 실행"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "명령(&C):",IDC_STATIC_1,7,7,82,8
+    COMBOBOX        IDC_COMMAND,7,17,354,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "확인",IDOK,257,37,50,14
+    PUSHBUTTON      "취소",IDCANCEL,311,37,50,14
+END
+
+IDD_ERROR DIALOGEX 9, 20, 368, 260
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "셸 명령 오류"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "명령이 성공적으로 완료되지 않았을 수 있습니다.",IDC_STATIC_1,7,7,218,8
+    LTEXT           "명령줄:",IDC_STATIC_2,7,22,40,8
+    EDITTEXT        IDE_COMMAND,47,22,314,8,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    LTEXT           "종료 코드:",IDC_STATIC_3,7,34,40,8
+    LTEXT           "",IDS_EXITCODE,49,34,312,8
+    LTEXT           "표준 오류(&S):",IDC_STATIC_4,7,46,82,8
+    EDITTEXT        IDE_STDERR,7,56,354,176,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL
+    DEFPUSHBUTTON   "무시",IDOK,257,239,50,14
+    PUSHBUTTON      "취소",IDCANCEL,311,239,50,14
+END
+
+IDD_CONFIG DIALOGEX 45, 31, 257, 160
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Renamer 고급 옵션"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "수동 모드의 외부 편집기 설정:",IDC_STATIC_1,7,7,240,8
+    LTEXT           "명령(&C):",IDC_STATIC_2,14,21,48,8
+    EDITTEXT        IDE_COMMAND,63,19,171,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_BROWSE,237,19,13,12,WS_GROUP
+    LTEXT           "인수(&A):",IDC_STATIC_3,14,37,48,8
+    EDITTEXT        IDE_ARGUMENTS,63,35,171,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ARGHELP,237,35,13,12,WS_GROUP
+    LTEXT           "시작 디렉터리(&I):",IDC_STATIC_4,14,53,48,8
+    EDITTEXT        IDE_INITDIR,63,51,171,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_INITDIRHELP,237,51,13,12,WS_GROUP
+    LTEXT           "수동 모드 글꼴:",IDC_STATIC_5,7,74,113,8
+    PUSHBUTTON      "변경(&G)",IDB_FONT,14,84,50,14,WS_GROUP
+    LTEXT           "확인 메시지:",IDC_STATIC_6,7,109,60,8
+    CONTROL         "Esc 키로 기본 창 닫기(&E)",IDC_CONFIRMESCCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,118,201,12
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,7,138,243,1
+    DEFPUSHBUTTON   "확인",IDOK,92,142,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,146,142,50,14
+    PUSHBUTTON      "도움말",IDHELP,200,142,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Renamer"
+  IDS_DESCRIPTION, "실시간 미리 보기를 지원하는 강력한 일괄 이름 바꾸기 도구입니다."
+  IDS_ABOUT, "플러그인 정보"
+  IDS_RENAMERERR, "Renamer - 오류"
+  IDS_LOWMEM, "메모리가 부족합니다."
+  IDS_PLUGMENU_RENAME, "일괄 이름 바꾸기(&B)..."
+  IDS_PLUGMENU_UNDO, "실행 취소(&U)..."
+  IDS_RENAME, "이름 바꾸기(&R)"
+  IDS_VALIDATE, "유효성 검사(&V)"
+  IDS_ORIGNAME_COLUMN, "원래 이름"
+  IDS_NEWNAME_COLUMN, "새 이름"
+  IDS_SIZE_COLUMN, "크기"
+  IDS_DATE_COLUMN, "날짜"
+  IDS_TIME_COLUMN, "시간"
+  IDS_PATH_COLUMN, "경로"
+
+  // menu
+  IDS_MENU_FILE, "명령(&C)"
+  IDS_MENU_VIEW, "보기(&V)"
+  IDS_MENU_OPTIONS, "옵션(&O)"
+  IDS_MENU_HELP, "도움말(&H)"
+  IDS_MENU_RENAME, "이름 바꾸기(&R)\tAlt+R"
+  IDS_MENU_VALIDATE, "유효성 검사(&V)\tCtrl+I"
+  IDS_MENU_EXIT, "끝내기(&X)\tAlt+F4"
+  IDS_MENU_SORTOLD, "원래 이름으로 정렬(&O)\tCtrl+F1"
+  IDS_MENU_SORTNEW, "새 이름으로 정렬(&N)\tCtrl+F1"
+  IDS_MENU_SORTSIZE, "크기로 정렬(&S)\tCtrl+F2"
+  IDS_MENU_SORTTIME, "시간으로 정렬(&T)\tCtrl+F3"
+  IDS_MENU_SORTPATH, "경로로 정렬(&P)\tCtrl+F4"
+  IDS_MENU_FILENAMES, "파일 이름 바꾸기(&N)\tCtrl+N"
+  IDS_MENU_RELATIVEPATH, "상대 경로 바꾸기(&R)\tCtrl+R"
+  IDS_MENU_FULLPATH, "전체 경로 바꾸기(&F)\tCtrl+F"
+  IDS_MENU_FONT, "수동 모드 글꼴(&M)..."
+  IDS_MENU_LAST, "마지막으로 사용한 설정(&L)\tCtrl+L"
+  IDS_MENU_RESET, "초기화(&S)\tCtrl+D"
+  IDS_MENU_REGEXP, "정규식(&R)"
+  IDS_MENU_CUSTOMFONT, "사용자 지정 글꼴 사용(&C)..."
+  IDS_MENU_AUTOFONT, "기본 글꼴 사용(&D)"
+  IDS_MENU_REMOVESOURCEPATH, "비게 된 디렉터리 제거(&E)"
+  IDS_MENU_UNDO, "실행 취소(&U)\tCtrl+U"
+  IDS_MENU_EDIT, "편집(&E)"
+  IDS_MENU_STORELIST, "목록을 클립보드에 저장(&S)\tF2"
+  IDS_MENU_LOADLIST, "클립보드에서 목록 불러오기(&L)\tF3"
+  IDS_MENU_EDITLIST, "외부 편집기에서 목록 열기(&O)...\tF4"
+  IDS_MENU_FILTER, "셸 명령으로 목록 필터링(&F)...\tF5"
+  IDS_MENU_ALLFILES, "모든 파일(&A)\tF6"
+  IDS_MENU_RENAMED, "이름을 바꾼 파일(&R)\tF7"
+  IDS_MENU_NOTRENAMED, "이름을 바꾸지 못한 파일(&N)\tF8"
+  IDS_MENU_ADVANCED, "고급(&A)..."
+  IDS_MENU_BATCHRENDLG, "일괄 이름 바꾸기 대화 상자(&B)\tF1"
+
+  IDS_VAR_ORIGNAME, "$(OriginalName)"
+  IDS_CASE_DONTCHANGE, "변경 안 함"
+  IDS_CASE_LOWER, "소문자"
+  IDS_CASE_UPPER, "대문자"
+  IDS_CASE_MIXED, "대소문자 혼합"
+  IDS_INVALIDMASK, "잘못된 마스크입니다."
+  IDS_TOOLONGPATH, "경로 이름이 너무 길어 디렉터리를 읽을 수 없습니다."
+  IDS_ERRREADDIR, "디렉터리를 읽을 수 없습니다."
+  IDS_ERROR, "오류"
+  IDS_DIRTEXT, "DIR"
+  IDS_CANCELCNFRM, "이 작업을 취소하시겠습니까?"
+  IDS_QUESTION, "질문"
+  IDS_VAR_ORIGINALNAME, "원래 이름"
+  IDS_VAR_DRIVE, "드라이브"
+  IDS_VAR_PATH, "경로"
+  IDS_VAR_RELATIVEPATH, "상대 경로"
+  IDS_VAR_NAME, "이름"
+  IDS_VAR_NAMEPART, "이름 부분"
+  IDS_VAR_EXTPART, "확장명 부분"
+  IDS_VAR_SIZE, "크기"
+  IDS_VAR_TIME, "시간"
+  IDS_VAR_DATE, "날짜"
+  IDS_VAR_COUNTER, "카운터..."
+  IDS_VAR_LOWER, "소문자"
+  IDS_VAR_UPPER, "대문자"
+  IDS_VAR_MIXED, "대소문자 혼합"
+  IDS_VAR_STRIPDIA, "발음 구별 기호 제거"
+  IDS_VAR_CUT, "부분 문자열..."
+  IDS_LEFT, "시작"
+  IDS_RIGHT, "끝"
+  IDS_BADCUTOFFSET, "음수가 아닌 값을 지정하십시오."
+  IDS_DECIMAL, "10진수"
+  IDS_HEX_LOWER, "16진수(abcdef)"
+  IDS_HEX_UPPER, "16진수(ABCDEF)"
+  IDS_FILL_SPACES, "공백"
+  IDS_FILL_ZEROS, "숫자 0"
+  IDS_FILL_UNDERSCORES, "밑줄"
+
+  IDS_EXP_UNMATCHEDPAR, "변수 이름은 ')'로 끝나야 합니다."
+  IDS_EXP_VARNOTFOUND, "변수를 찾을 수 없습니다."
+  IDS_EXP_UNEXPECTEDCHAR, "괄호 안의 변수 이름이나 '$' 문자가 필요합니다."
+  IDS_EXP_SMALLBUFFER, "확장된 문자열이 너무 깁니다."
+  IDS_EXP_TRAILINGDOLLAR, "문자열이 예기치 않게 끝났습니다. '$' 문자 뒤에는 변수 이름이나 '$' 문자가 와야 합니다."
+  IDS_EXP_EMPTYSTR, "여기에는 빈 문자열을 사용할 수 없습니다."
+  IDS_EXP_UNEXPECTARG, "여기에는 인수를 사용할 수 없습니다."
+  IDS_EXP_EXPECTCUTORCASE, "대소문자 지정('lower', 'upper', 'mixed' 또는 'stripdia')이나 이름 자르기 지정(정수 두 개)이 필요합니다."
+  IDS_EXP_EXPECTENDCUT, "이름 자르기 지정의 끝(정수)이 필요합니다."
+  IDS_EXP_UNEXPECTEDARGUMENT, "예기치 않은 인수입니다."
+  IDS_EXP_MISTIMEFORMAT, "시간 형식이 없습니다."
+  IDS_EXP_INVALIDTIMEFMT, "잘못된 시간 형식입니다."
+  IDS_EXP_MISDATEFORMAT, "날짜 형식이 없습니다."
+  IDS_EXP_INVALIDDATEFMT, "잘못된 날짜 형식입니다."
+  IDS_EXP_TOOMUCHARGUMENTS, "인수가 너무 많습니다."
+  IDS_EXP_EXPECTSTART, "카운터 시작 값(정수)이 필요합니다."
+  IDS_EXP_EXPECTSTEP, "카운터 증가 값(부동 소수점 수)이 필요합니다."
+  IDS_EXP_EXPECTBASEALIGNWIDTH, "진법('dxX' 중 하나), 맞춤('l') 또는 너비(양의 정수) 지정이 필요합니다."
+  IDS_EXP_EXPECTALIGNWIDTH, "맞춤('l') 또는 너비(양의 정수) 지정이 필요합니다."
+  IDS_EXP_EXPECTWIDTH, "너비 지정(양의 정수)이 필요합니다."
+  IDS_EXP_EXPECTFILL, "채울 문자 지정(문자 하나)이 필요합니다."
+
+  IDS_NEWNAMEERR, "<새 이름 오류: %s>"
+  IDS_TRANSFERERROR, "<일부 입력 필드의 값이 잘못됨>"
+  IDS_REGEXPERR, "<정규식 오류: %s>"
+  IDS_BMERR, "<Boyer-Moore 오류: %s>"
+  IDS_GENERICERR, "<오류: %s>"
+  IDS_REPLACEERR, "<바꾸기 패턴 오류: %s>"
+
+  IDS_REP_EXPCLOSEPAR1, "닫는 괄호나 대소문자 지정('lower', 'upper', 'mixed' 또는 'stripdia')이 필요합니다."
+  IDS_REP_EXPCLOSEPAR2, "닫는 괄호가 필요합니다."
+  IDS_REP_EXPCLOSEPAR3, "닫는 괄호나, 대소문자 지정('lower', 'upper', 'mixed' 또는 'stripdia')이 뒤따르는 ':' 문자가 필요합니다."
+  IDS_REP_BADREF, "정의되지 않은 하위 식을 참조합니다."
+  IDS_EXP_EXPECTSUBNUM1, "하위 식 번호가 필요합니다."
+  IDS_EXP_EXPECTSUBNUM2, "하위 식 번호, 괄호 안의 하위 식 번호 또는 '$' 문자가 필요합니다."
+  IDS_EXP_TRAILINGBACKSLASH, "문자열이 예기치 않게 끝났습니다. 문자열 끝에는 백슬래시를 사용할 수 없습니다."
+
+  IDS_REENOERROR, "오류가 없습니다."
+  IDS_REELOWMEMORY, "메모리가 부족합니다."
+  IDS_REEEMPTY, "정규식이 비어 있습니다."
+  IDS_REETOOBIG, "정규식이 너무 큽니다."
+  IDS_REETOOMANYPARENTHESISES, "()가 너무 많습니다."
+  IDS_REEUNMATCHEDPARENTHESIS, "()의 짝이 맞지 않습니다."
+  IDS_REEOPERANDCOULDBEEMPTY, "*+ 피연산자가 비어 있을 수 있습니다."
+  IDS_REENESTED, "*?+가 중첩되었습니다."
+  IDS_REEUNMATCHEDBRACKET, "[]의 짝이 맞지 않습니다."
+  IDS_REEFOLLOWSNOTHING, "?+* 앞에 아무것도 없습니다."
+  IDS_REETRAILINGBACKSLASH, "끝에 \\가 있습니다."
+  IDS_REEINTERNALDISASTER, "내부 오류가 발생했습니다."
+  IDS_REEINVALIDPOSIXCLASS, "알 수 없는 POSIX 클래스 이름입니다."
+  IDS_REEEXPECTINGXDIGIT, "\\x 뒤에는 16진수 두 자리가 와야 합니다."
+  IDS_REESTACKOVERFLOW, "스택 오버플로"
+  IDS_REENOPATTERN, "컴파일된 식이 필요합니다."
+  IDS_REEERRORSTARTINGTHREAD, "새 스레드를 시작할 수 없습니다."
+  IDS_REEEXPECTINGEXTENDEDPATTERN1, "(? 뒤에는 :=!< 중 하나가 와야 합니다."
+  IDS_REEEXPECTINGEXTENDEDPATTERN2, "(?< 뒤에는 =! 중 하나가 와야 합니다."
+  IDS_REEBADFIXEDWIDTHLOOKBEHIND, "후방 탐색 패턴의 너비가 고정되어 있지 않습니다."
+
+  IDS_RE_POSIX_ALPHA, "영문자 (alpha)"
+  IDS_RE_POSIX_ALNUM, "영숫자 (alnum)"
+  IDS_RE_POSIX_ASCII, "ASCII 문자 (ascii)"
+  IDS_RE_POSIX_CNTRL, "제어 문자 (cntrl)"
+  IDS_RE_POSIX_DIGIT, "10진수 숫자 (digit)"
+  IDS_RE_POSIX_GRAPH, "공백을 제외한 인쇄 가능 문자 (graph)"
+  IDS_RE_POSIX_LOWER, "소문자 (lower)"
+  IDS_RE_POSIX_PRINT, "인쇄 가능 문자 (print)"
+  IDS_RE_POSIX_PUNCT, "문장 부호 (punct)"
+  IDS_RE_POSIX_SPACE, "공백 문자 (space)"
+  IDS_RE_POSIX_UPPER, "대문자 (upper)"
+  IDS_RE_POSIX_WORD, "영숫자 + '_' (word)"
+  IDS_RE_POSIX_XDIGIT , "16진수 숫자 (xdigit)"
+  IDS_RE_LEFTPAREN, "여는 괄호 '('"
+  IDS_RE_RIGHTPAREN, "닫는 괄호 ')'"
+  IDS_RE_LEFTBRACKET, "여는 대괄호 '['"
+  IDS_RE_CIRCUMFLEX,  "캐럿 '^'"
+  IDS_RE_DOLLAR, "달러 기호 '$'"
+  IDS_RE_DOT, "마침표 '.'"
+  IDS_RE_PIPE, "세로 막대 '|'"
+  IDS_RE_ASTERISK, "별표 '*'"
+  IDS_RE_PLUS, "더하기 기호 '+'"
+  IDS_RE_QUESTIONMARK, "물음표 '?'"
+  IDS_RE_BACKSLASH, "백슬래시 '\\'"
+  IDS_RE_ANYCHAR, "임의의 문자"
+  IDS_RE_ANYFROM, "문자 집합 중 하나"
+  IDS_RE_ANYBUT, "문자 집합 이외의 문자"
+  IDS_RE_ANYFROMPOSIX, "POSIX 문자 클래스"
+  IDS_RE_ANYBUTPOSIX, "POSIX 문자 클래스"
+  IDS_RE_BOL, "이름의 시작"
+  IDS_RE_EOL, "이름의 끝"
+  IDS_RE_OR, "또는"
+  IDS_RE_ITERATION, "0회 이상 일치"
+  IDS_RE_POSITIVEITERATION, "1회 이상 일치"
+  IDS_RE_ITERATION_GREEDY, "가능한 한 많이 일치"
+  IDS_RE_ITERATION_UNGREEDY, "필요한 만큼만 적게 일치"
+  IDS_RE_ONEORZERO, "1회 또는 0회 일치"
+  IDS_RE_ZEROORONE, "0회 또는 1회 일치"
+  IDS_RE_SUBEXPRESSION, "하위 식"
+  IDS_RE_NOTCAPTURESUBEXP, "캡처하지 않는 하위 식"
+  IDS_RE_LITERALS, "특수 문자를 리터럴로"
+  IDS_RE_WORDCHAR, "단어 문자"
+  IDS_RE_NONWORDCHAR, "단어 이외의 문자"
+  IDS_RE_SPACE, "공백 문자"
+  IDS_RE_NONSPACE, "공백 이외의 문자"
+  IDS_RE_DIGIT, "숫자 문자"
+  IDS_RE_NONDIGIT, "숫자 이외의 문자"
+  IDS_RE_WORDB, "단어 경계"
+  IDS_RE_NONWORDB, "단어 경계 아님"
+  IDS_RE_NUMBER, "10진수"
+  IDS_RE_HEXNUMBER, "16진수"
+  IDS_RE_WORD, "단어"
+  IDS_RE_PATHCOMPONENT, "경로 구성 요소"
+  IDS_RE_FILENAME, "파일 이름($1에 이름, $2에 확장명)"
+  IDS_RE_DEFINESET, "집합 정의..."
+  IDS_RE_MATCHEDEXPR, "일치한 정규식"
+  IDS_RE_MATCHEDSUBEXP, "일치한 하위 식..."
+  IDS_RE_PLOOKA, "긍정 전방 탐색"
+  IDS_RE_NLOOKA, "부정 전방 탐색"
+  IDS_RE_PLOOKB, "긍정 후방 탐색"
+  IDS_RE_NLOOKB, "부정 후방 탐색"
+  IDS_RE_ZEROWIDTHASSERT, "너비가 0인 어설션"
+
+  IDS_EMPTYSTR, "여기에는 빈 문자열을 사용할 수 없습니다."
+  IDS_EMPTYMSG_DEF, "목록에 항목이 없습니다."
+  IDS_EMPTYMSG_NOMATCH, "입력한 마스크와 일치하는 파일이 없습니다."
+  IDS_EMPTYMSG_BADMASK, "잘못된 마스크입니다."
+  IDS_EMPTYMSG_GENERATING, "파일 목록을 만드는 중입니다. 취소하려면 Esc 키를 누르십시오."
+  IDS_EMPTYMSG_ERROR, "파일 목록을 만드는 동안 오류가 발생했습니다."
+  IDS_CNFRM_CLOSE, "일괄 이름 바꾸기를 닫으시겠습니까?"
+  IDS_CNFRM_ESC_CLOSE2, "다음부터 묻지 않고 일괄 이름 바꾸기 닫기(&C)"
+
+  IDS_CANCELING, "작업을 취소하는 중입니다. 잠시 기다려 주십시오..."
+  IDS_NOTVALID_FILENAME, "올바른 파일 이름이 아닙니다."
+  IDS_NOTVALID_RELATIVEPATH, "올바른 상대 경로가 아닙니다."
+  IDS_NOTVALID_FULLPATH, "올바른 전체 경로가 아닙니다."
+  IDS_DUPLICATENAME, "중복된 이름입니다."
+  IDS_DEPENDENCE, "이름이 순환 종속되었거나 이름을 바꿀 수 없는 파일에 종속되어 있습니다."
+
+  IDS_RENAMING, "파일 이름을 바꾸는 중입니다. 취소하려면 Esc 키를 누르십시오..."
+  IDS_PREPARING, "이름 바꾸기 작업을 위해 데이터를 준비하는 중..."
+  IDS_DIRNOTSAMEROOT, "디렉터리를 다른 디스크 드라이브로 이동할 수 없습니다."
+  IDS_DIRDIR, "같은 이름의 디렉터리가 이미 있습니다."
+  IDS_FILEDIR, "이 이름은 이미 디렉터리에 사용되었습니다."
+  IDS_CNFRM_SHOVERWRITE, "시스템 또는 숨김 특성이 있는 파일을 덮어쓰시겠습니까?"
+  IDS_OVEWWRITETITLE, "파일 덮어쓰기 확인"
+  IDS_OVERWRITEERROR, "파일을 덮어쓸 수 없습니다: "
+  IDS_MOVEERROR, "파일 이름을 바꿀 수 없습니다: "
+  IDS_DELETEERROR, "파일을 삭제할 수 없습니다: "
+  IDS_WRITEERROR, "파일을 쓸 수 없습니다: "
+  IDS_READERROR, "파일을 읽을 수 없습니다: "
+  IDS_OPENFILEERROR, "파일을 열 수 없습니다: "
+  IDS_DIRCASEERROR, "디렉터리 이름의 대소문자를 변경할 수 없습니다: "
+  IDS_CREATEDIR, "디렉터리를 만들 수 없습니다: "
+  IDS_UNDOING, "이름 바꾸기 작업을 실행 취소하는 중..."
+  IDS_REMOVEDIR,"디렉터리를 제거할 수 없습니다: "
+  IDS_UNDOQUEST, "이름 바꾸기 작업을 실행 취소하시겠습니까?"
+  IDS_SOMEERRORS, "일부 파일의 이름을 바꾸지 못했습니다. 오류를 수정하고 다시 이름을 바꿀 수 있도록 해당 파일 목록이 표시됩니다.\n\n이름을 바꾼 파일을 보려면 '보기' 메뉴의 옵션을 사용하십시오."
+  IDS_VALIDATEOK, "유효성 검사를 완료했습니다."
+  IDS_NOTTODO, "수행할 작업이 없습니다."
+  IDS_WAITINGFORWINDOWS, "모든 일괄 이름 바꾸기 창이 닫힐 때까지 기다리는 중..."
+  IDS_MISLINES, "줄 수가 너무 적습니다."
+  IDS_BADLINECOUNT, "입력한 줄 수가 이름을 바꿀 파일 수와 같아야 합니다."
+  IDS_CREATETEMP, "임시 파일을 만들 수 없습니다. "
+  IDS_WRITETEMP, "임시 파일에 쓸 수 없습니다. "
+  IDS_OPENTEMP, "임시 파일을 열 수 없습니다. "
+  IDS_SIZEOFTEMP, "임시 파일의 크기를 가져올 수 없습니다. "
+  IDS_READTEMP, "임시 파일에서 읽을 수 없습니다. "
+  IDS_PROCESS, "새 프로세스를 시작할 수 없습니다: "
+  IDS_ERRLAUNCHEDIT, "외부 편집기를 시작할 수 없습니다. Renamer 플러그인 설정에서 외부 편집기 설정을 확인하십시오. "
+  IDS_LONGDATA, "데이터가 너무 길어 작업을 완료할 수 없습니다."
+  IDS_EXTEDIT, "외부 편집기에서 편집을 마치고 변경 내용을 저장한 다음 확인을 눌러 편집한 파일로 이름 목록을 업데이트하십시오.\n\n이름 목록을 변경하지 않고 돌아가려면 취소를 누르십시오."
+  IDS_CREATEPIPE, "파이프를 만들 수 없습니다: "
+  IDS_WRITEPIPE, "파이프에 쓸 수 없습니다. "
+  IDS_EXEFILES, "실행 파일 (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\t모든 파일 (*.*)\t*.*\t\t"
+  IDS_EXP_FULLNAME, "전체 이름"
+  IDS_EXP_DRIVE, "드라이브"
+  IDS_EXP_PATH, "경로"
+  IDS_EXP_NAME, "이름"
+  IDS_EXP_NAMEPART, "이름 부분"
+  IDS_EXP_EXTPART, "확장명 부분"
+  IDS_EXP_FULLPATH, "전체 경로"
+  IDS_EXP_WINDIR, "Windows 디렉터리"
+  IDS_EXP_SYSDIR, "시스템 디렉터리"
+  IDS_EXP_DOSFULLNAME, "DOS 전체 이름"
+  IDS_EXP_DOSDRIVE, "DOS 드라이브"
+  IDS_EXP_DOSPATH, "DOS 경로"
+  IDS_EXP_DOSNAME, "DOS 이름"
+  IDS_EXP_DOSNAMEPART, "DOS 이름 부분"
+  IDS_EXP_DOSEXTPART, "DOS 확장명 부분"
+  IDS_EXP_DOSFULLPATH, "DOS 전체 경로"
+  IDS_EXP_DOSWINDIR, "DOS Windows 디렉터리"
+  IDS_EXP_DOSSYSDIR, "DOS 시스템 디렉터리"
+  IDS_EXP_ENVVAR, "환경 변수"
+  IDS_EXP_BROWSE, "찾아보기..."
+  IDS_EXP_SALDIR, "Sally 디렉터리"
+  IDS_CFG_CONFLICT, "설정 창이 이미 열려 있습니다."
+  IDS_EXP_ENVVARNOTFOUND, "환경 변수 ""%s""을(를) 찾을 수 없습니다."
+  IDS_EXP_ENVVARTOOLARGE, "환경 변수 ""%s""의 값이 너무 큽니다."
+}

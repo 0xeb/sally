@@ -625,7 +625,7 @@ class CLanguage
 {
 public:
     LANGID LanguageID = 0;
-    std::wstring PersistedName; // Configuration\Language identifier, e.g. czech.slg (no file)
+    std::wstring Tag;         // BCP-47, e.g. "cs-CZ"; also the Configuration\Language value
     std::wstring DisplayName;   // the language's own name, e.g. "Čeština (Česko)"
 
     // translation credits, read from the language's own IDS_LANGMETA_xxx strings
@@ -1203,7 +1203,6 @@ extern CSalamanderSafeFile SalSafeFile; // interface for comfortable work with f
 extern const wchar_t* SalamanderConfigurationRoots[];                                                           // description in main_window_config_persistence.cpp
 BOOL GetUpgradeInfo(BOOL* autoImportConfig, std::wstring& autoImportConfigFromKey); // description in main_window_config_persistence.cpp
 BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const wchar_t*& loadConfiguration);                    // description in main_window_config_persistence.cpp
-BOOL FindLanguageFromPrevVerOfSal(std::wstring& slgName);                                                       // description in main_window_config_persistence.cpp
 
 // creates and attaches a special class to the edit line/combobox 'ctrlID' that enables
 // capturing keys and sending the WM_USER_KEYDOWN message to the dialog 'hDialog'

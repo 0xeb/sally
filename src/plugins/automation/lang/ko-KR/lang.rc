@@ -1,0 +1,110 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for automation. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/automation/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_INPUTBOX DIALOGEX 75, 140, 205, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "입력 상자"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "프롬프트:",IDC_PROMPT,8,8,189,8
+    EDITTEXT        IDC_INPUTBOX,8,18,189,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "확인",1,48,42,50,14,WS_GROUP
+    PUSHBUTTON      "취소",2,107,42,50,14
+END
+
+IDD_CONFIG DIALOGEX 75, 140, 332, 143
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "자동화 설정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "스크립트 디렉터리(&S):",IDC_DIRLISTHEADER,8,9,67,8
+    CONTROL         "",IDC_DIRLIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,8,19,316,73
+    CONTROL         "스크립트 디버깅 사용(&D)",IDC_ENABLEDBG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,102,105,10
+    DEFPUSHBUTTON   "확인",IDOK,75,121,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,141,121,50,14
+    PUSHBUTTON      "도움말(&H)",IDHELP,207,121,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_BROWSE MENU
+BEGIN
+    POPUP "[POPUP]"
+    BEGIN
+        MENUITEM "찾아보기…",                     ID_BROWSE
+        MENUITEM SEPARATOR
+        MENUITEM "Sally 디렉터리",        ID_SALDIR
+        MENUITEM "환경 변수",        ID_ENVVAR
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+BEGIN
+    IDS_SCRIPTERROR         "자동화 스크립트 오류"
+    IDS_LINE                "줄:\t%u\r\n"
+    IDS_COLUMN              "열:\t%u\r\n"
+    IDS_ERROR               "오류:\t%s"
+    IDS_RUNFOCUSED          "포커스된 스크립트 실행"
+    IDS_PROGRESSTITLE       "작업 진행률"
+    IDS_SOURCE              "원본:\t%s\r\n"
+    IDS_SCRIPTPOPUPMENU     "스크립트 메뉴 열기"
+    IDS_MENUEMPTY           "(스크립트 없음)"
+    IDS_LOADERRFMT          "스크립트 '%s'을(를) 실행하지 못했습니다.\r\n%s"
+    IDS_UNKERROR            "알 수 없는 오류입니다."
+    IDS_ABORT               "1\t중단(&A)"
+    IDS_DEBUGABORT          "1\t디버그(&D)\t2\t중단(&A)"
+    IDS_ADDDIRTITLE         "스크립트 디렉터리"
+    IDS_ADDDIRDESCR         "스크립트 저장소 디렉터리를 선택하십시오."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGINNAME          "자동화"
+    IDS_DESCRIPTION         "스크립트를 사용하여 일반적인 작업을 자동화합니다."
+    IDS_ABOUT               "플러그인 정보"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_E_INVALIDARCHIVE    "잘못된 압축 파일입니다."
+    IDS_E_CANNOTCLOSEPATH   "현재 경로를 닫을 수 없습니다."
+    IDS_E_SHORTERPATH       "경로가 잘렸습니다."
+    IDS_E_READONLYWHILEPROGRESSSHOWN 
+                            "창이 표시되어 있는 동안에는 속성을 변경하거나 메서드 %s을(를) 호출할 수 없습니다."
+    IDS_E_READONLYWHILEPROGRESSHIDDEN 
+                            "창이 숨겨져 있는 동안에는 속성을 변경하거나 메서드 %s을(를) 호출할 수 없습니다."
+    IDS_E_PLUGLOADFAIL      "플러그인을 로드하지 못했습니다."
+    IDS_E_PLUGERROR         "플러그인 오류입니다."
+    IDS_E_CACHEERROR        "파일을 디스크 캐시로 이동하지 못했습니다."
+    IDS_E_FILEMASKSYNTAX    "파일 마스크 구문 오류입니다."
+    IDS_E_NOTCOMPONENT      "컨테이너에는 구성 요소만 추가할 수 있습니다."
+    IDS_E_FORMPUT           "컨테이너에 폼을 추가할 수 없습니다."
+    IDS_E_SCRIPTABORTED     "사용자가 스크립트 실행을 중단했습니다."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABORTCAPTION        "스크립트 중단"
+    IDS_ABORTTIP            "실행 중인 스크립트 중단\tCtrl+Break"
+    IDS_MAINWINDOWLOCKED    "자동화 플러그인이 Sally 창을 잠갔습니다. 실행 중인 스크립트를 완료하십시오."
+    IDS_ENGINECREATEFAIL    "스크립팅 엔진을 초기화하지 못했습니다."
+END

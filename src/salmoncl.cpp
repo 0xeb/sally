@@ -107,7 +107,7 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
     mem->Process = NOHANDLES(OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, TRUE, mem->ProcessId));
     mem->Fire = NOHANDLES(CreateEvent(&sa, TRUE, FALSE, NULL));      // "nonsignaled" state, manual
     mem->Done = NOHANDLES(CreateEvent(&sa, TRUE, FALSE, NULL));      // "nonsignaled" state, manual
-    mem->SetSLG = NOHANDLES(CreateEvent(&sa, TRUE, FALSE, NULL));    // "nonsignaled" state, manual
+    mem->SetLanguage = NOHANDLES(CreateEvent(&sa, TRUE, FALSE, NULL)); // "nonsignaled" state, manual
     mem->CheckBugs = NOHANDLES(CreateEvent(&sa, TRUE, FALSE, NULL)); // "nonsignaled" state, manual
 
     // we now put the path for bug reports into LOCAL_APPDATA, where Windows WER stores minidumps by default
@@ -123,17 +123,17 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
     // base name for bug reports
     wcscpy_s(mem->BugName, L"AS" VERSINFO_SAL_SHORT_VERSION);
 
-    return (mem->Process != NULL && mem->Fire != NULL && mem->Done != NULL && mem->SetSLG != NULL &&
+    return (mem->Process != NULL && mem->Fire != NULL && mem->Done != NULL && mem->SetLanguage != NULL &&
             mem->CheckBugs != NULL && mem->BugPath[0] != 0);
 }
 
-std::wstring GetStartupSLGName()
+std::wstring GetStartupLanguageTag()
 {
-    // extract from registry the persisted name of the UI language that will probably be used (e.g.
-    // czech.slg, an identifier; no file); later during Salamander startup a different one may be
-    // selected, which will be changed afterwards (SalmonSetSLG)
+    // extract from registry the BCP-47 tag of the UI language that will probably be used (e.g.
+    // cs-CZ); later during Sally startup a different one may be
+    // selected, which will be changed afterwards (SalmonSetLanguage)
     // this serves only as a default; if the record is not found, we pass an empty string
-    std::wstring slgName;
+    std::wstring languageTag;
     const std::wstring keyName = std::wstring(SalamanderConfigurationRoots[0]) + L"\\" + SALAMANDER_CONFIG_REG;
     HKEY hKey;
     LONG res = NOHANDLES(RegOpenKeyExW(HKEY_CURRENT_USER, keyName.c_str(), 0, KEY_READ, &hKey));
@@ -149,11 +149,11 @@ std::wstring GetStartupSLGName()
             res = sally::registry::QueryValueForEarlyStartupW(hKey, CONFIG_LANGUAGE_REG,
                                                               &valueType, reinterpret_cast<BYTE*>(buffer.data()), &bufferSize);
             if (res == ERROR_SUCCESS && valueType == REG_SZ)
-                slgName.assign(buffer.data());
+                languageTag.assign(buffer.data());
         }
         RegCloseKey(hKey);
     }
-    return slgName;
+    return languageTag;
 }
 
 static BOOL GetModuleFileNameOwnedW(HMODULE module, std::wstring& path)
@@ -193,13 +193,13 @@ BOOL SalmonStartProcess(const wchar_t* fileMappingName)
     std::wstring rtlDirW(exePath, 0, slash + 1);
     std::wstring salmonExeW = rtlDirW + L"utils\\salmon.exe";
 
-    const std::wstring slgName = GetStartupSLGName();
+    const std::wstring languageTag = GetStartupLanguageTag();
 
     std::wstring cmdW;
     cmdW.reserve(salmonExeW.size() + wcslen(fileMappingName) + 64);
     cmdW.append(L"\"").append(salmonExeW).append(L"\"");
     cmdW.append(L" \"").append(fileMappingName).append(L"\"");
-    cmdW.append(L" \"").append(slgName).append(L"\"");
+    cmdW.append(L" \"").append(languageTag).append(L"\"");
 
     memset(&si, 0, sizeof(si));
     si.cb = sizeof(si);
@@ -339,12 +339,12 @@ BOOL SalmonInit()
 // info that salmon is not running needs to be displayed only once
 static BOOL SalmonNotRunningReported = FALSE;
 
-void SalmonSetSLG(const wchar_t* slgName)
+void SalmonSetLanguage(const wchar_t* languageTag)
 {
     ResetEvent(SalmonSharedMemory->Done);
 
-    wcscpy_s(SalmonSharedMemory->SLGName, slgName);
-    SetEvent(SalmonSharedMemory->SetSLG);
+    wcscpy_s(SalmonSharedMemory->LanguageTag, languageTag);
+    SetEvent(SalmonSharedMemory->SetLanguage);
 
     // wait for signal from Salmon that it processed the task (event Done) or for the case when someone killed Salmon
     HANDLE arr[2];
@@ -388,7 +388,7 @@ void SalmonCheckBugs()
 #ifdef _DEBUG
             TRACE_E("Salmon is not running (debug build, suppressing dialog)");
 #else
-            // wide - see SalmonSetSLG's identical call above.
+            // wide - see SalmonSetLanguage's identical call above.
             MessageBoxW(NULL, LoadStrW(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
 #endif
             SalmonNotRunningReported = TRUE;

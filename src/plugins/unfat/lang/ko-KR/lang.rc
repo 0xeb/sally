@@ -1,0 +1,65 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for unfat. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unfat/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unfat.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnFAT"
+    IDS_ABOUT                   "플러그인 정보"
+    IDS_PLUGIN_DESCRIPTION      "FAT 12, 16, 32 디스크 이미지를 찾아보고 추출합니다."
+
+    IDS_ERROR_OPENING_FILE,     "파일 ""%s""을(를) 여는 중 오류가 발생했습니다."
+    IDS_ERROR_READING_FILE,     "파일 ""%s""을(를) 읽는 중 오류가 발생했습니다."
+    IDS_ERROR_PARSING_FILE,     "파일 ""%s""을(를) 분석하는 중 오류가 발생했습니다.\n\n%s"
+    IDS_ERROR_BS_CORRUPTED,     "부트 섹터가 손상되었거나 이 파일은 FAT 12, 16, 32 이미지가 아닙니다."
+    IDS_ERROR_READING_DIR,      "파일 ""%s""에서 디렉터리를 읽는 중 오류가 발생했습니다.\n%s\n섹터: %d, 오프셋: 0x%s\n\n올바른 FAT 12, 16, 32 이미지 파일이 아닙니다."
+    IDS_ERROR_READING_FILE2,    "파일 ""%s""에서 파일을 읽는 중 오류가 발생했습니다.\n%s\n클러스터: %d\n\n올바른 FAT 12, 16, 32 이미지 파일이 아닙니다."
+    IDS_ERROR_WRITE,            "파일 쓰기 오류"
+    IDS_ERROR_MBR_UNSUPPORTED   "파일 ""%s""은(는) 하드 디스크 전체의 이미지인 것 같습니다.\nUnFAT 플러그인은 이러한 이미지를 지원하지 않습니다."
+    IDS_EXTRACTING_ARCHIVE,     "FAT 이미지 추출 - %s"
+    IDS_EXTRACTING,             "추출 중: %s"
+
+/*
+    IDS_CANT_OPEN               "Can not open file."
+    IDS_UNKNOW_ERROR            "Unspecified error."
+    IDS_UNPACKING_ARCHIVE       "Unpacking ISO Archive."
+    IDS_ERROR_UNPACKING         "Error unpacking archive."
+    IDS_CANT_HANDLE_FILE        "Can not handle this file."
+    IDS_INSUFFICIENT_MEMORY     "Insufficient memory."
+    IDS_CANT_CREATE_TEMP        "Can not create temporary directory."
+    IDS_CANT_DELETE_TEMP_FILE   "Can not delete temporary file."
+    IDS_UNKNOWN_FILE_FORMAT     "Unknown file format or not valid ISO image."
+    IDS_CANT_OPEN_FILE          "Can not open this file."
+    IDS_ERR_TMP,                "Creation of temporary file has failed."
+    IDS_CANT_SET_ATTRS,         "Can not set file attributes."
+    IDS_CANT_CREATE_DIR,        "Can not create directory '%s'."
+    IDS_MAKEISOHEAD,            "Create file sample for UnISO troubleshooting..."
+    IDS_MAKEISOHEAD_TITLE,      "UnISO troubleshooting"
+    IDS_MAKEISOHEAD_MSG,        "If you cannot open ISO image or content is incorrect, you can send us first 1MB of this file.\nWe will support this format in new version of UnISO plugin.\n\nPress OK to copy part of ISO image to the temporary directory and focus it in the panel.\nPack this file using Alt+F5 and attach it to a new issue at https://github.com/0xeb/sally/issues.\n\nThank you for helping us to make UnISO plugin better!"
+    IDS_YES,                    "Yes"
+    IDS_NO,                     "No"
+    IDS_PVD_NOT_FOUND,          "Primary Volume Descriptor not found."
+    IDS_PVD_CORRUPTED,          "Can not open, Primary Volume Descriptor corrupted."
+    IDS_CANT_GET_FILESIZE,      "Can not obtain file size\n\n%s."
+    IDS_ERROR,                  "Error"
+    IDS_WARNING,                "Warning"
+    IDS_CANT_READ,              "Reading problem\n\n"
+    IDS_CANT_SEEK_IN_FILE,      "Can not seek in file\n\n"
+    IDS_ERROR_OPENING_MULTISESSION, "Some error(s) occured while reading multisession image.\n\nShowing only correctly read sessions."
+*/
+}

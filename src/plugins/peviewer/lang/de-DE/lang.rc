@@ -46,5 +46,5 @@ STRINGTABLE
  IDS_ERR_OPEN_FILE, "Fehler beim Öffnen der Datei %s."
  IDS_ERR_TMP, "Fehler beim Erzeugen der temporären Datei."
  IDS_EXCEPTION, "Ausnahmefehler aufgetreten.\n\nAngesehene Datei: %s\n\nWenn die angezeigte Datei nach Ihrer Meinung nicht defekt ist, erstellen Sie bitte ein Issue auf https://github.com/0xeb/sally/issues und hängen Sie die Datei an.\nWir werden den Fehler im Betrachter beseitigen. Vielen Dank für die Kooperation!"
- IDS_HIDDEN_SECTIONS, "Es wurde kein ausgewählter PE Bereich in der Pluginkonfiguration gefunden.\nGehe zu Optionen > Pluginkonfiguration > PE Dateibetrachter\nim Sally Hauptfenster, um sichtbare Bereiche einzurichten."
+ IDS_HIDDEN_SECTIONS, "Es wurde kein ausgewählter PE Bereich in der Pluginkonfiguration gefunden.\nGehe zu Optionen > Pluginkonfiguration > PE Dateibetrachter\nim Sally-Hauptfenster, um sichtbare Bereiche einzurichten."
 }

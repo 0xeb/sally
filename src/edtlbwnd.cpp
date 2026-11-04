@@ -709,6 +709,7 @@ void CEditListBox::OnDrawItem(LPARAM lParam)
                 DispInfo.Text = &Buffer;
                 Buffer.clear();
                 DispInfo.Bold = FALSE;
+                DispInfo.Note = NULL;
                 NotifyParent(&DispInfo, EDTLBN_GETDISPINFO);
 
                 if (Flags & ELB_SHOWICON)
@@ -738,8 +739,26 @@ void CEditListBox::OnDrawItem(LPARAM lParam)
                     hOldFont = (HFONT)SelectObject(lpdis->hDC, HBoldFont);
                 else
                     hOldFont = (HFONT)SelectObject(lpdis->hDC, HNormalFont);
+                RECT textRect = itemRect; // the focus rectangle below keeps the whole row
+                if (DispInfo.Note != NULL && DispInfo.Note[0] != L'\0')
+                {
+                    // The note takes at most half the row, so the name stays readable.
+                    RECT noteRect = itemRect;
+                    DrawTextExW(lpdis->hDC, const_cast<wchar_t*>(DispInfo.Note), -1, &noteRect,
+                                DT_NOPREFIX | DT_SINGLELINE | DT_CALCRECT, &dtp);
+                    const LONG half = (itemRect.right - itemRect.left) / 2;
+                    const LONG width = min(noteRect.right - noteRect.left, half);
+                    noteRect = itemRect;
+                    noteRect.left = itemRect.right - width;
+                    if (!(lpdis->itemState & ODS_SELECTED && lpdis->itemState & ODS_FOCUS))
+                        SetTextColor(lpdis->hDC, colors.DisabledText);
+                    DrawTextExW(lpdis->hDC, const_cast<wchar_t*>(DispInfo.Note), -1, &noteRect,
+                                DT_NOPREFIX | DT_SINGLELINE | DT_RIGHT | DT_VCENTER | DT_END_ELLIPSIS, &dtp);
+                    SetTextColor(lpdis->hDC, color);
+                    textRect.right = noteRect.left;
+                }
                 DrawTextExW(lpdis->hDC, Buffer.data(),
-                            -1, &itemRect,
+                            -1, &textRect,
                             DT_NOPREFIX | DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_END_ELLIPSIS,
                             &dtp);
                 SelectObject(lpdis->hDC, hOldFont);

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "common/CommandShellService.h"
+#include "common/IShell.h"
 
 #include <new>
 
@@ -43,9 +44,10 @@ std::wstring ExtractExecutableName(const std::wstring& path)
 }
 } // namespace
 
-CCommandShellService::CCommandShellService(IProcess* process, IEnvironment* environment)
+CCommandShellService::CCommandShellService(IProcess* process, IEnvironment* environment, IShell* shell)
     : Process(process)
     , Environment(environment)
+    , Shell(shell)
 {
 }
 
@@ -86,10 +88,33 @@ bool CCommandShellService::ResolveComspec(const CommandShellRequest& request,
 }
 
 CommandShellResult CCommandShellService::LaunchBuiltCommand(const CommandShellRequest& request,
-                                                            const std::wstring& commandLine)
+                                                            const std::wstring& commandLine, const std::wstring& comspec)
 {
     if (CommandLineTooLong(commandLine))
         return CommandShellResult::Error(ERROR_FILENAME_EXCED_RANGE);
+
+    if (request.runAsAdministrator)
+    {
+        IShell* shell = Shell != nullptr ? Shell : gShell;
+        if (shell == nullptr)
+            return CommandShellResult::Error(ERROR_INVALID_PARAMETER);
+        // COMSPEC may carry surrounding quotes. ShellExecute takes a filename,
+        // while its separate parameter string must not contain that filename.
+        const std::wstring executable = comspec.size() >= 2 && comspec.front() == L'"' && comspec.back() == L'"'
+                                            ? comspec.substr(1, comspec.size() - 2) : comspec;
+        if (executable.empty())
+            return CommandShellResult::Error(ERROR_INVALID_PARAMETER);
+        const std::wstring parameters = commandLine.substr(QuoteExecutableForCommandLine(comspec).size());
+        ShellExecInfo info;
+        info.file = executable.c_str();
+        info.parameters = parameters.empty() ? nullptr : parameters.c_str();
+        info.verb = L"runas";
+        info.directory = request.workingDirectory.empty() ? nullptr : request.workingDirectory.c_str();
+        info.hwnd = request.owner;
+        const ShellExecResult result = shell->Execute(info);
+        return result.success ? CommandShellResult::Ok(INVALID_HPROCESS, 0, nullptr)
+                              : CommandShellResult::Error(result.errorCode);
+    }
 
     IProcess* process = ResolveProcess();
     if (process == nullptr)
@@ -129,7 +154,7 @@ try
     if (!ResolveComspec(request, comspec, errorCode))
         return CommandShellResult::Error(errorCode);
 
-    return LaunchBuiltCommand(request, QuoteExecutableForCommandLine(comspec));
+    return LaunchBuiltCommand(request, QuoteExecutableForCommandLine(comspec), comspec);
 }
 catch (const std::bad_alloc&)
 {
@@ -157,7 +182,7 @@ try
         commandLine.push_back(L'"');
     }
 
-    return LaunchBuiltCommand(request, commandLine);
+    return LaunchBuiltCommand(request, commandLine, comspec);
 }
 catch (const std::bad_alloc&)
 {

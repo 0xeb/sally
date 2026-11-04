@@ -10,7 +10,7 @@ namespace sally::salmon
 {
 
 bool ParseCommandLine(std::wstring_view commandLine, std::wstring& mappingName,
-                      std::wstring& slgName) noexcept;
+                      std::wstring& languageTag) noexcept;
 bool ReadFrozenWideString(const wchar_t* value, size_t capacity, std::wstring& output) noexcept;
 bool EncodeUtf8(std::wstring_view text, std::string& encoded) noexcept;
 

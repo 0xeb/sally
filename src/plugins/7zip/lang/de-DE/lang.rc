@@ -134,7 +134,7 @@ STRINGTABLE
   IDS_UPDATE_NOT_SUPPORTED,   "Aktualisierungsvorgänge werden für dieses Archiv nicht unterstützt."
   IDS_CANT_MOVE_TMPARCHIVE,   "Kann das temporäre Archiv '%s' nicht verschieben."
   IDS_CANT_DELETE_TMPARCHIVE, "Kann das temporäre Archiv '%s' nicht löschen."
-  IDS_7Z_UPDATE_ERROR,        "Bei der Aktualisierung ist ein Fehler aufgetreten.\n\nDas ist kein Fehler des Sally 7-Zip-Plugins. Das Problem liegt in der 7za.dll,\nsenden sie uns bitte KEINEN Bugreport, wir kennen das Problem."
+  IDS_7Z_UPDATE_ERROR,        "Bei der Aktualisierung ist ein Fehler aufgetreten.\n\nDas ist kein Fehler des Sally-7-Zip-Plugins. Das Problem liegt in der 7za.dll,\nsenden sie uns bitte KEINEN Bugreport, wir kennen das Problem."
   IDS_7Z_SOLID_DELETE_UNSUP,  "Das Löschen von Dateien aus soliden Archiven wird nicht unterstützt."
   IDS_CANT_UPDATE_ARCHIVE,    "Kann das Archiv '%s' nicht aktualisieren."
   IDS_CANT_CREATE_TMPFILE,    "Kann die temporäre Datei nicht anlegen."

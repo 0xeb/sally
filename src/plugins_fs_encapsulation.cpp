@@ -7,6 +7,7 @@
 #include "ui/IPrompter.h"
 #include "common/IPathService.h"
 #include "common/IRegistry.h"
+#include "common/PluginLoadDiagnostic.h"
 #include "common/fsutil.h" // IsUNCPathW / IsUNCRootPathW
 #include "common/unicode/helpers.h"
 #include "common/unicode/PanelPathPolicy.h"
@@ -2292,7 +2293,15 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     // !!! CALLING THE PLUGIN ENTRY POINT !!!
                     FSalamanderPluginEntry entry =
                         reinterpret_cast<FSalamanderPluginEntry>(entryProc);
-                    CPluginInterfaceAbstract* resIface = entry(&salamander);
+                    CPluginInterfaceAbstract* resIface;
+                    {
+#ifndef CALLSTK_DISABLE
+                        const sally::diagnostic::PluginLoadDiagnostic context(DLLName, Version, BuiltForVersion);
+                        CCallStack* stack = CCallStack::GetThis();
+                        sally::diagnostic::ScopedPluginLoadDiagnostic active(stack != nullptr ? stack->LoadingPluginSlot() : nullptr, context);
+#endif
+                        resIface = entry(&salamander);
+                    }
 
                     Plugins.EnterDataCS();
                     PluginIface.Init(resIface, BuiltForVersion);

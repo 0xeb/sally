@@ -16,3 +16,4 @@
 #include "ru-RU/lang.rc"
 #include "sk-SK/lang.rc"
 #include "zh-CN/lang.rc"
+#include "ko-KR/lang.rc"

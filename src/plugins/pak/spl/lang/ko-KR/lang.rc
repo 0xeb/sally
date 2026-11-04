@@ -1,0 +1,90 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for pak. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/pak/spl/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\pak.rh2"
+#include "..\..\..\dll\texts.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_OPTIMIZE DIALOGEX 15, 27, 194, 73
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "PAK 압축 파일 최적화"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "유효 데이터 크기:",IDC_STATIC_1,8,9,57,8
+    LTEXT           "",IDC_VALIDSIZE,67,9,115,8
+    LTEXT           "전체 파일 크기:",IDC_STATIC_2,8,20,48,8
+    LTEXT           "",IDC_TOTALSIZE,67,20,115,8
+    LTEXT           "낭비된 공간:",IDC_STATIC_3,8,31,40,8
+    LTEXT           "",IDC_WASTEDSPACE,67,31,115,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,8,44,178,1
+    DEFPUSHBUTTON   "최적화",IDOK,41,53,50,14
+    PUSHBUTTON      "취소",IDCANCEL,101,53,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+{
+ IDS_PAK_ERROPEN, "파일을 열 수 없습니다: %s"
+ IDS_PAK_ERRINIT, "paklib 인터페이스를 초기화할 수 없습니다. 이미 파일 하나가 열려 있습니다."
+ IDS_PAK_ERROPEN2, "파일을 열 수 없습니다. 이미 파일 하나가 열려 있습니다."
+ IDS_PAK_ERRGETFILESIZE, "파일 크기를 가져올 수 없습니다: %s"
+ IDS_PAK_INVLAIDDATA, "잘못된 데이터 형식입니다."
+ IDS_PAK_LOWMEMORY, "메모리가 부족합니다."
+ IDS_PAK_CENTRDIR, "현재 PAK 중앙 디렉터리"
+ IDS_PAK_ERRSETFILEPTR, "파일 포인터를 설정할 수 없습니다: %s"
+ IDS_PAK_ERRREADFILE, "파일에서 읽을 수 없습니다: %s"
+ IDS_PAK_ERRGETFILEPTR, "파일 포인터를 가져올 수 없습니다: %s"
+ IDS_PAK_ERRWRITEFILE, "파일에 쓸 수 없습니다: %s"
+ IDS_PAK_TOOLONGNAME, "이름이 너무 길어서 파일을 추가할 수 없습니다."
+}
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Quake PAK 압축 파일을 찾아보고 추출합니다."
+ IDS_ABOUT, "플러그인 정보"
+ IDS_LOWMEM, "메모리가 부족합니다."
+ IDS_ERRLIST, "파일을 목록에 추가할 수 없습니다."
+ IDS_ERRLOADPAKLIB, "paklib.dll을 로드하거나 프로시저 주소를 가져올 수 없습니다: "
+ IDS_EXTRPROGTITLE, "PAK 압축 파일 압축 풀기 - %s"
+ IDS_PREPAREDATA, "데이터 준비 중..."
+ IDS_EXTRACTFILES, "압축 푸는 중..."
+ IDS_EXTRACTING, "압축 푸는 중: "
+ IDS_TOOLONGNAME, "경로 이름이 너무 길어서 작업을 완료할 수 없습니다."
+ IDS_UNABLESEEK, "파일 포인터를 설정할 수 없습니다: "
+ IDS_UNABLEGETFIELPOS, "파일 포인터를 가져올 수 없습니다: "
+ IDS_UNABLEWRITE, "파일에 쓸 수 없습니다:"
+ IDS_ERROPEN, "파일을 열 수 없습니다: "
+ IDS_TOOLONGMASK, "마스크가 너무 길어서 작업을 완료할 수 없습니다."
+ IDS_DELPROGTITLE, "PAK 압축 파일에서 삭제 - %s"
+ IDS_DELFILES, "삭제 중..."
+ IDS_DELETING, "삭제 중: "
+ IDS_CANCELING, "작업을 취소하는 중입니다. 잠시 기다려 주십시오..."
+ IDS_ADDPROGTITLE, "PAK 압축 파일로 압축 - %s"
+ IDS_TOOLARGE, "파일을 추가할 수 없습니다: 파일이 너무 큽니다."
+ IDS_ADDFILES, "압축 중..."
+ IDS_TOOLONGNAME2, "이름이 너무 길어서 파일을 추가할 수 없습니다."
+ IDS_PACKING, "압축 중: "
+ IDS_UNABLEREAD, "파일에서 읽을 수 없습니다: "
+ IDS_ERRCONNECT, "플러그인을 Sally에 연결할 수 없습니다."
+ IDS_OPTIMIZING, "최적화하는 중입니다. 잠시 기다려 주십시오..."
+ IDS_OPTPROGTITLE, "PAK 압축 파일 최적화 - %s"
+ IDS_NEEDOPT, "파일 삭제가 완료되지 않았습니다. 디스크 공간 낭비를 막으려면 PAK 플러그인 메뉴에서 PAK 최적화를 실행해야 할 수 있습니다."
+ IDS_MENUOPTIMIZE, "PAK 최적화(&O)"
+ IDS_EXPIRE, "죄송합니다. 플러그인이 만료되었습니다. 웹 사이트에서 최신 버전을 확인하십시오."
+}

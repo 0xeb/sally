@@ -1,0 +1,120 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for diskmap. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/diskmap/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#define SALAMANDER
+#include "..\..\DiskMap\Resources\DiskMap.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDC_ZAREVAKDISKMAP MENU 
+BEGIN
+    POPUP "파일(&F)"
+    BEGIN
+        MENUITEM "파일 열기(&O)",                       IDM_FILE_OPEN
+        MENUITEM "패널에서 포커스(&F)\tF",        IDM_FILE_FOCUSINSALAMANDER
+        MENUITEM SEPARATOR
+        MENUITEM "중단(&A)\tEsc",                      IDM_FILE_ABORT
+        MENUITEM "새로 고침(&R)\tCtrl+R",            IDM_FILE_REFRESH
+        MENUITEM SEPARATOR
+        MENUITEM "닫기(&C)\tAlt+F4",                      IDM_FILE_EXIT
+    END
+    POPUP "보기(&V)"
+    BEGIN
+        MENUITEM "확대(&I)\t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "축소(&O)\t -",                IDM_VIEW_ZOOMOUT
+        MENUITEM "확대 해제(&U)\t Shift+Backspace",   IDM_VIEW_GOTOROOT
+        MENUITEM SEPARATOR
+        MENUITEM "로그 창(&L)...\tCtrl+L",              IDM_VIEW_LOG
+    END
+
+    POPUP "옵션(&O)"
+    BEGIN
+	MENUITEM "폴더 강조 표시(&H)",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
+	MENUITEM "도구 설명 표시(&D)\tCtrl+D",    IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+        POPUP "도구 설명 경로 형식(&F)"
+        BEGIN
+            MENUITEM "파일 이름(&F)",            IDM_PATHFORMAT_FILENAME
+            MENUITEM "상대 경로(&R)",            IDM_PATHFORMAT_RELATIVEVIEW
+//            MENUITEM "&Relative to Root",  IDM_PATHFORMAT_RELATIVEROOT
+            MENUITEM "절대 경로(&A)",            IDM_PATHFORMAT_ABSOLUTE
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "Esc로 닫을 때 확인(&C)",       IDM_OPTIONS_CONSFIRMCLOSE, CHECKED
+    END
+    POPUP "도움말(&H)"
+    BEGIN
+//        POPUP "&Debug"
+//        BEGIN
+//            MENUITEM "&Export Directory Structure...", IDM_DEBUG_EXPORTDIR
+//        END
+//        MENUITEM SEPARATOR
+        MENUITEM "정보(&A)...",                  IDM_HELP_ABOUT
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME,            "DiskMap"
+    IDS_PLUGIN_DESCRIPTION,     "디스크에 있는 파일의 트리맵을 표시합니다."
+    IDS_PLUGIN_ABOUT,           "Sally DiskMap 플러그인 정보"
+    IDS_PLUGIN_MENU,            "DiskMap 표시(&D)"
+    IDS_CLOSE_CONFIRMATION,     "DiskMap을 닫으시겠습니까?"
+    IDS_CLOSE_CONFIRMATION_CHECKBOX, "이 메시지를 다시 표시하지 않고 확인 없이 DiskMap 닫기"
+
+    IDS_DISKMAP_TITLE,               "DiskMap"
+    IDS_DISKMAP_TITLEPREFIX,         "DiskMap - "
+
+    IDS_DISKMAP_LOAD_TITLE,          "파일을 검색하는 중..."
+    IDS_DISKMAP_LOAD_FOOTER,         "...중단하려면 Esc 키를 누르십시오"
+    IDS_DISKMAP_LOAD_HSIZE,          "크기:"
+    IDS_DISKMAP_LOAD_HFILE,          "파일:"
+    IDS_DISKMAP_LOAD_HDIRS,          "폴더:"
+
+    IDS_DISKMAP_ABORT_TITLE,         "파일 검색이 취소되었습니다..."
+    IDS_DISKMAP_ABORT_FOOTER,        "...보기를 새로 고치려면 Ctrl+R을 누르십시오"
+
+    IDS_DISKMAP_LOG_TITLE,           "로그"
+    IDS_DISKMAP_LOG_HTYPE,           "유형"
+    IDS_DISKMAP_LOG_HTEXT,           "내용"
+    IDS_DISKMAP_LOG_HFILE,           "파일 또는 디렉터리"
+    IDS_DISKMAP_LOG_LINFO,           "정보"
+    IDS_DISKMAP_LOG_LWARN,           "경고"
+    IDS_DISKMAP_LOG_LERROR,          "오류"
+
+    IDS_DISKMAP_SHELL_FOCUS,         "패널에서 포커스(&F)"
+    IDS_DISKMAP_SHELL_ZOOMIN,        "확대(&I)"
+    IDS_DISKMAP_SHELL_ZOOMOUT,       "축소(&O)"
+    IDS_DISKMAP_SHELL_DIROPEN,       "패널에서 열기(&O)"
+    IDS_DISKMAP_SHELL_DIRCHANGE,     "디렉터리 변경(&D)"
+
+    IDS_DISKMAP_TTIP_TIMECREATE,     "만든 날짜:"
+    IDS_DISKMAP_TTIP_TIMEMODIFY,     "수정한 날짜:"
+    IDS_DISKMAP_TTIP_TIMEACCESS,     "액세스한 날짜:"
+    IDS_DISKMAP_TTIP_SIZEDATA,       "데이터 크기:"
+    IDS_DISKMAP_TTIP_SIZEREAL,       "실제 크기:"
+    IDS_DISKMAP_TTIP_SIZEDISK,       "디스크 할당 크기:"
+    IDS_DISKMAP_TTIP_COUNTFILE,      "파일:"
+    IDS_DISKMAP_TTIP_COUNTDIRS,      "폴더:"
+
+    IDS_DISKMAP_FORMAT_BYTE0,        "바이트"
+    IDS_DISKMAP_FORMAT_BYTE1,        "바이트"
+    IDS_DISKMAP_FORMAT_BYTEN,        "바이트"
+
+    IDS_DISKMAP_EMPTY_TITLE,         "표시할 내용이 없습니다..."
+    IDS_DISKMAP_EMPTY_FOOTER,        "...이 폴더에는 표시할 파일이 없습니다"
+END

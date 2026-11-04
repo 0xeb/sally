@@ -14,6 +14,7 @@ extern const int SPLIT_LINE_WIDTH;
 extern const int MIN_WIN_WIDTH;
 
 #include "common/CommandLineParser.h"
+#include "common/UserMenuConditions.h"
 
 // if the user disallows multiple instances, just activate the previous one
 BOOL CheckOnlyOneInstance(const sally::cmdline::CommandLineRequest* request);
@@ -590,11 +591,18 @@ public:
     void RemoveTrayIcon();
     void SetTrayIconTextW(const wchar_t* text);
 
-    // fills the menu with UserMenuItems items
+    // fills the menu with UserMenuItems items as the active panel shows them (#50)
     // customize specifies whether the configuration option should be added
     void FillUserMenu(CMenuPopup* menu, BOOL customize = TRUE);
-    // internal recursive function used for filling
-    void FillUserMenu2(CMenuPopup* menu, int* iterator, int max, BOOL submenu = FALSE);
+    // #50: only commands whose "Show only when" rule matches 'context'; an Unknown context
+    // (Find's User Menu) shows every command
+    void FillUserMenu(CMenuPopup* menu, BOOL customize, const Sally::UserMenuConditions::Context& context);
+    // internal recursive function used for filling; 'shown' (indexed like UserMenuItems)
+    // leaves out entries hidden by their rules, NULL shows all
+    void FillUserMenu2(CMenuPopup* menu, int* iterator, int max, BOOL submenu = FALSE,
+                       const std::vector<bool>* shown = NULL);
+    // #50: what the "Show only when" rules see: the active panel and its focused item
+    Sally::UserMenuConditions::Context GetUserMenuContext();
 
     // fills the View menu with modes
     // 'popup' is the popup we are going to be filling

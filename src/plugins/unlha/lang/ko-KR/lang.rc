@@ -1,0 +1,43 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for unlha. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unlha/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unlha.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "LHA 압축 파일을 찾아보고 추출합니다."
+ IDS_ABOUT, "플러그인 정보"
+ IDS_FILECORRUPT, "잘못된 LZH 파일이거나 알 수 없는 파일 형식입니다."
+ IDS_CHECKSUMERROR, "헤더 체크섬 오류입니다.\n압축 파일이 손상되어 일부 파일을 나열할 수 없습니다."
+ IDS_LOWMEM, "메모리가 부족합니다."
+ IDS_WRITEERROR, "쓰기 오류"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "압축 파일을 여는 중 오류가 발생했습니다."
+ IDS_LIST, "압축 파일 항목을 파일 목록에 추가할 수 없습니다."
+ IDS_SYMLINK, "압축 파일에 UNIX 기호화된 링크가 하나 이상 있으며, 이 링크는 표시되지 않습니다."
+ IDS_UNPACKERROR, "파일의 압축을 풀 수 없습니다."
+ IDS_CRCERROR, "압축된 데이터에 오류가 있습니다. CRC가 일치하지 않습니다."
+ IDS_READERROR, "압축 파일을 읽는 중 오류가 발생했습니다."
+ IDS_EXTRPROGTITLE, "LHA 압축 파일 압축 풀기 - %s"
+ IDS_PREPAREDATA, "데이터 준비 및 디렉터리 만드는 중..."
+ IDS_UNPACKING, "압축 푸는 중: "
+ IDS_EXTRACTFILES, "압축 푸는 중..."
+ IDS_TOOLONGNAME, "경로 이름이 너무 길어서 작업을 완료할 수 없습니다."
+ IDS_TOOLONGMASK, "마스크가 너무 길어서 작업을 완료할 수 없습니다."
+ IDS_METHOD, "알 수 없는 압축 방식입니다. 파일의 압축을 풀 수 없습니다."
+ IDS_METHOD2, "알 수 없는 방식, 건너뜀..."
+}

@@ -71,7 +71,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,70,245,12
     CONTROL         "WinZip kompatible Dateinamen für mehrteilige Archive benutzen (ausgenommen sind",IDC_WINZIPNAMES,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,82,300,12
-    LTEXT           "selbstentpackende Archive, die immer Sally übliche Namen verwenden)",IDC_STATIC_5,26,94,286,8
+    LTEXT           "selbstentpackende Archive, die immer Sally-übliche Namen verwenden)",IDC_STATIC_5,26,94,286,8
     LTEXT           "&Kompressionslevel (0 - 9, 9 beste Kompression, langsamste Methode):",IDC_STATIC_6,14,107,237,8
     EDITTEXT        IDC_LEVEL,252,105,16,12
     LTEXT           "Standardsprache des sel&bstentpackenden Archivs:",IDC_STATIC_7,14,120,171,8
@@ -639,7 +639,7 @@ STRINGTABLE
   IDS_SFX_COMMENT_AUTO, "\r\n;Bestimmt, ob das Entpacken automatisch gestartet werden soll, wenn der\r\n;Anwender das selbstentpackende Archiv aufruft\r\n;Setzen Sie den Wert auf 1 wenn das Entpacken automatisch gestartet werden soll\r\n\r\n"
   IDS_SFX_COMMENT_SUMMARY, "\r\n;Bestimmt, ob ein Hinweis gezeigt werden soll nachdem das Entpacken der\r\n;Dateien erfolgreich beendet wurde\r\n;Setzen sie den Wert auf 1 wenn der Hinweis gezeigt werden soll\r\n\r\n"
   IDS_SFX_COMMENT_HIDE, "\r\n;Bestimmt, ob das Hauptfenster des Self-Extractors gezeigt werden soll\r\n;Setzen Sie den Wert auf 1 wenn das SFX-Hauptfenster nicht gezeigt werden soll\r\n;Die Verwendung dieser Variablen macht nur Sinn wenn 'autostart' auf 1 gesetzt\r\n;wurde, ansonsten wird sie ignoriert\r\n\r\n"
-  IDS_SFX_COMMENT_OVERWRITE, "\r\n;Bestimmt, ob im Zielverzeichnis alle Dateien automatisch überschrieben\r\n;werden sollen\r\n;Setzen Sie den Wert auf 1 wenn alle Dateien automatisch überschrieben\r\nwerden sollen\r\n\r\n;"
+  IDS_SFX_COMMENT_OVERWRITE, "\r\n;Bestimmt, ob im Zielverzeichnis alle Dateien automatisch überschrieben\r\n;werden sollen\r\n;Setzen Sie den Wert auf 1 wenn alle Dateien automatisch überschrieben\r\n;werden sollen\r\n\r\n"
   IDS_SFX_COMMENT_AUTODIR, "\r\n;Bestimmt, ob das Zielverzeichnis ohne den Benutzer zu fragen automatisch\r\n;angelegt werden soll\r\n;Setzen Sie den Wert auf 1 wenn das Zielverzeichnis automatisch\r\n;angelegt werden soll\r\n\r\n"
   IDS_SFX_COMMENT_COMMAND, "\r\n;Programm, HTTP-Link oder Dokument, das nach dem erfolgreichen Entpacken\r\n;gestartet/aufgerufen werden soll.Der Pfad ist relativ zum Zielverzeichnis\r\n;des Entpackens.\r\n;Wenn Sie ein Programm angeben, können Sie auch Parameter verwenden\r\n\r\n"
   IDS_SFX_COMMENT_PACKAGE, "\r\n;SFX-Paket das beim Erstellen eines selbstentpackenden Archivs verwendet wird\r\n;relativer Pfad ist relativ zu dem Verzeichnis mit zip2sfx.exe\r\n\r\n"

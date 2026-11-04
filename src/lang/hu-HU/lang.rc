@@ -70,10 +70,10 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,295,12
     CONTROL         "Ab&lak bezárása parancs végrehajtása után (parancssorban)",IDC_CLOSESHELL,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,55,295,12
-    CONTROL         "&Mappák összehasonlítása: figyelmen kívül hagyandó időkülönbség",IDC_TIMERESOLUTION,
+    CONTROL         "&Mappák összehasonlítása: tűrt időkülönbség",IDC_TIMERESOLUTION,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,68,182,12
     EDITTEXT        IDE_TIMERESOLUTION,184,68,28,12,ES_AUTOHSCROLL
-    LTEXT           "mp",IDC_STATIC_2,216,70,6,8,NOT WS_GROUP
+    LTEXT           "mp",IDC_STATIC_2,216,70,12,8,NOT WS_GROUP
     CONTROL         "Ma&ppák összehasonlítása: pontosan 1-2 óra különbség figyelmen kívül hagyása",IDC_IGNOREDSTSHIFTS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,81,295,12
     CONTROL         "Gyors átn&evezés és Tömörítés parancsnál a fájlnév kiterjesztése is kijelölt",IDC_QUICKRENAME_SELALL,
@@ -86,7 +86,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,295,12
     CONTROL         "&Környezeti változók frissítése a rendszerbeli értékekhez",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,295,12
-    CONTROL         "Mappane&vek javaslata elérési út beírásakor (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
+    CONTROL         "Mappa- és fájlne&vek javaslata elérési út beírásakor (F5, F6, F7, Shift+F7)",IDC_SUGGESTPATHNAMES,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,295,12
     LTEXT           "&Frissítések keresése:",IDC_UPDATECHECK_LABEL,1,178,120,8
     COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
@@ -124,7 +124,7 @@ BEGIN
     PUSHBUTTON      "Nye&lv...",IDB_LANGUAGE,8,41,52,14,WS_GROUP
     EDITTEXT        IDE_LANGUAGE,65,41,224,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
     GROUPBOX        " Kódlap konverziós táblák ",IDC_STATIC_2,1,77,295,40
-    LTEXT           "A használt konverziós tábla megnézéséhez vagy módosításához kattintson a Részletek gombra, vagy a nézőben a Konvertálás menüpontra.",IDC_STATIC_3,8,91,220,16
+    LTEXT           "A nézők és a Konvertálás parancs tábláinak megtekintése és módosítása: Részletek gomb.",IDC_STATIC_3,8,91,220,16
     PUSHBUTTON      "&Részletek...",IDB_CONVERSION,237,93,52,14,WS_GROUP
     LTEXT           "Válasszon nyelvet az Sally-hez. A nyelvi beállítások az ablakok szövegeire, menükre, eszköztárakra és súgókra lesznek hatással.",IDC_STATIC_4,8,17,281,16
 END
@@ -136,12 +136,12 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Megadhatja, hogy törléskor a törölt fájlok és mappák a Lomtárba kerüljenek vagy véglegesen törlődjenek a lemezről.",IDC_STATIC_1,1,4,278,16
     GROUPBOX        "    ",IDC_STATIC_11,2,28,295,57
-    LTEXT           "A SHIFT gombot nyomva a fájlok és mappák véglegesen törlődnek.",IDC_STATIC_4,9,42,186,8,NOT WS_GROUP
+    LTEXT           "A SHIFT gombot nyomva a fájlok és mappák véglegesen törlődnek.",IDC_STATIC_4,9,42,222,8,NOT WS_GROUP
     LTEXT           "Jóváhagyást a lomtár tulajdonságainál kérhet.",IDC_STATIC_5,9,51,174,8,NOT WS_GROUP
-    LTEXT           "A törlési műveletet a Windows végzi, így az olyan funkciók, ",IDC_STATIC_6,9,60,227,8,NOT WS_GROUP
+    LTEXT           "A törlési műveletet a Windows végzi, így az olyan funkciók,",IDC_STATIC_6,9,60,227,8,NOT WS_GROUP
     LTEXT           "mint a részletes folyamatjelző, kihagyás és újra nem támogatott.",IDC_STATIC_7,9,69,220,8,NOT WS_GROUP
     GROUPBOX        "    ",IDC_STATIC_10,2,95,295,37
-    LTEXT           "A SHIFT gombot nyomva a fájlok és mappák a Lomtárba kerülnek.",IDC_STATIC_2,9,107,202,8,NOT WS_GROUP
+    LTEXT           "A SHIFT gombot nyomva a fájlok és mappák a Lomtárba kerülnek.",IDC_STATIC_2,9,107,218,8,NOT WS_GROUP
     LTEXT           "Jóváhagyást a Megerősítések oldalon kérhet.",IDC_STATIC_3,9,116,164,8,NOT WS_GROUP
     GROUPBOX        "    ",IDC_STATIC_12,2,142,295,57
     CONTROL         "Minden törölt fájl és mappa áthelyezése &a Lomtárba",IDR_RECYCLE2,
@@ -150,7 +150,7 @@ BEGIN
                     "Button",BS_AUTORADIOBUTTON,9,93,197,12
     CONTROL         "Következő &fájlok Lomtárba helyezése, a többiek végleges törlése",IDR_RECYCLE3,
                     "Button",BS_AUTORADIOBUTTON,9,141,232,12
-    LTEXT           "A SHIFT gombot nyomva a fájlok és mappák véglegesen törlődnek.",IDC_STATIC_8,9,175,186,8,NOT WS_GROUP
+    LTEXT           "A SHIFT gombot nyomva a fájlok és mappák véglegesen törlődnek.",IDC_STATIC_8,9,175,222,8,NOT WS_GROUP
     LTEXT           "Jóváhagyást a Megerősítések oldalon kérhet.",IDC_STATIC_9,9,184,164,8,NOT WS_GROUP
     EDITTEXT        IDE_RECYCLEMASKS,9,156,279,12,ES_AUTOHSCROLL | WS_GROUP
     RTEXT           "maszk tipp",IDC_FILEMASK_HINT,250,169,38,8,NOT WS_GROUP | WS_TABSTOP
@@ -161,7 +161,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Nézetek"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Megadott &nézetek:",IDC_VIEWLIST_HEADER,1,26,60,8
+    LTEXT           "Megadott &nézetek:",IDC_VIEWLIST_HEADER,1,26,63,8
     CONTROL         "",IDC_VIEW_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,1,36,177,99
     LTEXT           "&Elérhető oszlopok:",IDC_VIEWLIST_HEADER2,182,26,65,8
     CONTROL         "",IDC_VIEW_LIST2,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,182,36,114,99
@@ -194,23 +194,23 @@ BEGIN
     CONTROL         "C&R/LF",IDC_CRLFEOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,15,35,12
     CONTROL         "&CR",IDC_CREOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,27,24,12
     CONTROL         "&LF",IDC_LFEOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,63,15,23,12
-    CONTROL         "&NULLA",IDC_NULLEOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,63,27,34,12
+    CONTROL         "&NULLA",IDC_NULLEOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,63,27,38,12
     LTEXT           "CR = kocsi-visszaugrás",IDC_STATIC_2,118,17,75,8
     LTEXT           "LF = Soremelés",IDC_STATIC_3,118,29,53,8
     LTEXT           "NULLA = Nulla karakter",IDC_STATIC_4,210,17,78,8
     LTEXT           "Ablak pozíció",IDC_STATIC_5,1,43,57,8
     CONTROL         "",IDC_STATIC_16,"Static",SS_ETCHEDHORZ | WS_GROUP,60,47,236,1
-    CONTROL         "Menté&s bezáráskor",IDC_SAVEONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,10,54,63,12
-    CONTROL         "A Salamand&er főablakához igazítás",IDC_SETBYMAINWINDOW,
+    CONTROL         "Menté&s záráskor",IDC_SAVEONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,10,54,72,12
+    CONTROL         "A Sally &főablakához igazítás",IDC_SETBYMAINWINDOW,
                     "Button",BS_AUTORADIOBUTTON,86,54,163,12
-    LTEXT           "Általános beállítások",IDC_STATIC_6,1,71,56,8
-    CONTROL         "",IDC_STATIC_17,"Static",SS_ETCHEDHORZ | WS_GROUP,59,75,237,1
+    LTEXT           "Általános beállítások",IDC_STATIC_6,1,71,68,8
+    CONTROL         "",IDC_STATIC_17,"Static",SS_ETCHEDHORZ | WS_GROUP,71,75,225,1
     CONTROL         "A belső né&zőben is a Keresés ablakban megadott szöveg keresése",IDC_COPYFINDTEXT,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,83,264,12
-    LTEXT           "&Tab méret:",IDC_STATIC_7,10,100,34,8
-    EDITTEXT        IDC_TABSIZE,45,98,23,12,ES_AUTOHSCROLL | WS_GROUP
-    LTEXT           "Kiegészítő szabályok a Nézeti mód automatikus kijelöléséhez",IDC_STATIC_14,1,116,156,8
-    CONTROL         "",IDC_STATIC_18,"Static",SS_ETCHEDHORZ | WS_GROUP,159,120,137,1
+    LTEXT           "&Tab méret:",IDC_STATIC_7,10,100,36,8
+    EDITTEXT        IDC_TABSIZE,48,98,23,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Kiegészítő szabályok a Nézeti mód automatikus kijelöléséhez",IDC_STATIC_14,1,116,202,8
+    CONTROL         "",IDC_STATIC_18,"Static",SS_ETCHEDHORZ | WS_GROUP,205,120,91,1
     LTEXT           "Szöveges módra erőltetés:",IDC_STATIC_12,10,132,88,8
     EDITTEXT        IDC_VIEW_INTEXT,99,130,195,12,WS_GROUP
     LTEXT           "Hexa módra erőltetés:",IDC_STATIC_13,10,147,87,8
@@ -220,13 +220,13 @@ BEGIN
     CONTROL         "",IDC_STATIC_19,"Static",SS_ETCHEDHORZ | WS_GROUP,45,179,251,1
     PUSHBUTTON      "&Betűtípus",IDB_VIEWERFONT,10,189,52,14,WS_GROUP
     EDITTEXT        IDE_VIEWERFONT,66,189,228,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    LTEXT           "Normál szövegszín",IDC_STATIC_10,10,212,60,8
+    LTEXT           "Alap szövegszín",IDC_STATIC_10,10,212,60,8
     PUSHBUTTON      "text",IDC_IV_NORMAL_TEXT,72,209,30,14
     LTEXT           "Kijelölt szövegszín",IDC_STATIC_11,197,212,64,8
     PUSHBUTTON      "text",IDC_IV_SELECTED_TEXT,263,209,30,14
 END
 
-IDD_CFGPAGE_USERMENU DIALOGEX 53, 64, 299, 231
+IDD_CFGPAGE_USERMENU DIALOGEX 53, 64, 299, 295
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Egyéni menü"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -245,10 +245,17 @@ BEGIN
     LTEXT           "&Induló mappa:",IDC_STATIC_3,1,185,55,8
     EDITTEXT        IDE_INITDIR,57,183,222,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDB_BROWSEINITDIR,284,183,12,12,WS_GROUP
-    CONTROL         "&Futtatás keretprogramban",IDC_THROUGHSHELL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,202,85,12
+    CONTROL         "&Futtatás keretprogramban",IDC_THROUGHSHELL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,202,101,12
     CONTROL         "Keret ablak &nyitása",IDC_OUTPUTWND,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,125,202,76,12
-    CONTROL         "Keret ablak &bezárása",IDC_CLOSESHELL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,214,76,12
-    CONTROL         "Me&gjelenítés az Egyéni menü sorban",IDC_UM_TOOLBAR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,214,108,12
+    CONTROL         "Keret ablak &bezárása",IDC_CLOSESHELL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,214,83,12
+    CONTROL         "Me&gjelenítés az Egyéni menü sorban",IDC_UM_TOOLBAR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,214,137,12
+    CONTROL         "Csak akkor jelenjen meg, &ha",IDC_UM_SHOWWHEN,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,231,104,10
+    GROUPBOX        "",IDC_UM_SHOWWHEN_GROUP,1,232,295,60
+    LTEXT           "Fókuszál&t fájl:",IDC_UM_SHOWWHEN_FILE_LABEL,8,244,88,8
+    EDITTEXT        IDE_UM_SHOWWHEN_FILE,100,242,190,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Ilyen nevű &mappában:",IDC_UM_SHOWWHEN_FOLDER_LABEL,8,260,88,8
+    EDITTEXT        IDE_UM_SHOWWHEN_FOLDER,100,258,190,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "",IDC_UM_SHOWWHEN_NOTE,8,273,284,16,SS_NOPREFIX
 END
 
 IDD_CFGPAGE_HOTPATH DIALOGEX 93, 62, 299, 231
@@ -257,14 +264,14 @@ CAPTION "Gyors elérési utak"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "",IDC_HOTPATH_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,1,16,295,155
-    LTEXT           "&Helye:",IDC_STATIC_1,1,179,19,8
-    EDITTEXT        IDC_HOTPATH_PATH,22,177,258,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Helye:",IDC_STATIC_1,1,179,22,8
+    EDITTEXT        IDC_HOTPATH_PATH,25,177,255,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDC_HOTPATH_BROWSE,284,177,12,12,WS_GROUP
-    LTEXT           "A kijelölt Gyors elérési út megjelenik a Meghajtó váltása menüben.",IDC_STATIC_2,1,193,215,8
-    LTEXT           "Használhatja a Gyors elérési úthoz társított Ctrl+Shift+szám kombinációt.",IDC_STATIC_3,1,205,214,8
+    LTEXT           "A kijelölt Gyors elérési út megjelenik a Meghajtó váltása menüben.",IDC_STATIC_2,1,193,221,8
+    LTEXT           "Használhatja a Gyors elérési úthoz társított Ctrl+Shift+szám kombinációt.",IDC_STATIC_3,1,205,240,8
     CONTROL         "Ezen &oldal megnyitása, ha Gyors elérési utat társít a panelről",IDC_HOTPATH_AUTOCONFIG,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,218,193,12
-    LTEXT           "&Gyors elérési utak megadása:",IDC_HOTPATH_HEADER,1,6,67,8
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,218,213,12
+    LTEXT           "&Gyors elérési utak megadása:",IDC_HOTPATH_HEADER,1,6,97,8
 END
 
 IDD_COPYMOVEDIALOG DIALOGEX 10, 24, 227, 65
@@ -789,17 +796,17 @@ BEGIN
     PUSHBUTTON      "",IDC_C_ITEM5_C,265,61,30,12
     CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,225,80,71,1
     LTEXT           "Kiegészítő szabályok fájlok és mappák kiemeléséhez a paneleken",IDC_STATIC_5,3,76,220,8
-    LTEXT           "Maszk prioritási &lista:",IDC_C_LIST_HEADER,3,94,66,8
+    LTEXT           "Maszk prioritási &lista:",IDC_C_LIST_HEADER,3,94,69,8
     LISTBOX         IDC_C_LIST,3,104,292,49,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Ha a név jó a maszkba, attribútum ellenőrzése:",IDC_STATIC_3,3,157,157,8
     CONTROL         "&Archív",IDC_C_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,3,166,39,12
     CONTROL         "Í&rásvédett",IDC_C_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,3,178,49,12
     CONTROL         "Re&jtett",IDC_C_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,3,190,39,12
-    CONTROL         "Re&ndszer",IDC_C_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,3,202,38,12
+    CONTROL         "Re&ndszer",IDC_C_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,3,202,45,12
     CONTROL         "&Tömörített",IDC_C_COMPRESSED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,166,55,12
     CONTROL         "Tit&kosított",IDC_C_ENCRYPTED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,178,55,12
     CONTROL         "&Mappa",IDC_C_DIRECTORY,"Button",BS_AUTO3STATE | WS_TABSTOP,69,190,55,12
-    LTEXT           "Megjegyzés: harmadik állapot = nem érdekel",IDC_STATIC_6,3,216,103,8
+    LTEXT           "Megjegyzés: harmadik állapot = nem érdekel",IDC_STATIC_6,3,216,150,8
     RTEXT           "dummy",IDC_C_MASK1_L,178,160,82,8
     PUSHBUTTON      "",IDC_C_MASK1_C,265,158,30,12
     RTEXT           "dummy",IDC_C_MASK2_L,178,174,82,8
@@ -828,24 +835,24 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Meghajtók"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "&Floppy meghajtó",IDC_STATIC_10,1,1,46,8
-    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,49,5,244,1
+    LTEXT           "&Floppy meghajtó",IDC_STATIC_10,1,1,57,8
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,60,5,233,1
     CONTROL         "Automatikus frissítés",IDC_DRVSPEC_FLOPPYMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,11,104,12
     CONTROL         "Egyszerű ikonok",IDC_DRVSPEC_FLOPPYSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,11,69,12
-    LTEXT           "&Eltávolítható meghajtók (pl. USB flash meghajtók, ZIP és JAZ meghajtók)",IDC_STATIC_2,1,31,225,8
-    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,228,35,65,1
+    LTEXT           "&Eltávolítható meghajtók (pl. USB flash meghajtók, ZIP és JAZ meghajtók)",IDC_STATIC_2,1,31,238,8
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,241,35,52,1
     CONTROL         "Automatikus frissítés",IDC_DRVSPEC_REMOVABLEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,41,104,12
     CONTROL         "Egyszerű ikonok",IDC_DRVSPEC_REMOVABLESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,41,69,12
-    LTEXT           "&Rögzített meghajtók (pl. helyi merevlemezek)",IDC_STATIC_4,1,61,114,8
-    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,117,65,176,1
+    LTEXT           "&Rögzített meghajtók (pl. helyi merevlemezek)",IDC_STATIC_4,1,61,150,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,153,65,140,1
     CONTROL         "Automatikus frissítés",IDC_DRVSPEC_FIXEDMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,71,104,12
     CONTROL         "Egyszerű ikonok",IDC_DRVSPEC_FIXEDSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,71,69,12
-    LTEXT           "&CD-ROM vagy DVD-ROM meghajtók",IDC_STATIC_6,1,91,98,8
-    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,101,95,192,1
+    LTEXT           "&CD-ROM vagy DVD-ROM meghajtók",IDC_STATIC_6,1,91,122,8
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,125,95,168,1
     CONTROL         "Automatikus frissítés",IDC_DRVSPEC_CDROMMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,101,104,12
     CONTROL         "Egyszerű ikonok",IDC_DRVSPEC_CDROMSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,101,69,12
-    LTEXT           "Hálózati meghajtók",IDC_STATIC_8,1,121,52,8
-    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,55,125,238,1
+    LTEXT           "Hálózati meghajtók",IDC_STATIC_8,1,121,65,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,68,125,225,1
     CONTROL         "Au&tomatikus frissítés",IDC_DRVSPEC_REMOTEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,131,104,12
     CONTROL         "Egy&szerű ikonok",IDC_DRVSPEC_REMOTESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,143,69,12
     CONTROL         "&Ne frissítsen a Sally aktiválásakor (kézi frissítés szükséges)",IDC_DRVSPEC_REMOTEACT,
@@ -868,7 +875,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Nézők"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Fájl maszkolási prioritási &lista",IDS_MASKSHDR,1,6,74,8
+    LTEXT           "Fájl maszkolási prioritási &lista",IDS_MASKSHDR,1,6,95,8
     LISTBOX         IDL_FILEMASKS,1,16,295,120,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT           "&Társított néző:",IDC_STATIC_1,1,144,65,8
     COMBOBOX        IDC_VIEW_TYPE,69,142,226,67,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
@@ -889,7 +896,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Szerkesztők"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Fájl maszkolási prioritási &lista",IDS_MASKSHDR,1,6,74,8
+    LTEXT           "Fájl maszkolási prioritási &lista",IDS_MASKSHDR,1,6,95,8
     LISTBOX         IDL_FILEMASKS,1,16,295,153,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Paran&cs:",IDC_STATIC_1,1,178,39,8
     EDITTEXT        IDE_COMMAND,59,176,220,12,ES_AUTOHSCROLL | WS_GROUP
@@ -1005,9 +1012,9 @@ CAPTION "Archívumok"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Egyszerű &ikonok az archívumban",IDC_ARCH_SIMPLEICONS,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,4,106,12
-    CONTROL         "Tömörítés a másik &panelre",IDC_ARCH_ANOTHERPANELP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,99,12
-    CONTROL         "&Kicsomagolás a másik panelre",IDC_ARCH_ANOTHERPANELU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,28,109,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,4,123,12
+    CONTROL         "Tömörítés a másik &panelre",IDC_ARCH_ANOTHERPANELP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,101,12
+    CONTROL         "&Kicsomagolás a másik panelre",IDC_ARCH_ANOTHERPANELU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,28,113,12
     CONTROL         "Kicsomagolá&s az archívum nevű almappába",IDC_ARCH_ARCHIVENAME,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,40,175,12
 END
@@ -1039,7 +1046,7 @@ BEGIN
     LTEXT           "Paramétere&k:",IDC_STATIC_8,10,192,42,8
     EDITTEXT        IDC_P1_MVARG,53,190,220,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P1_MVARG_BROWSE,277,190,12,12,WS_GROUP
-    CONTROL         "&Hosszú név támogatása",IDC_P1_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,79,12
+    CONTROL         "&Hosszú név támogatása",IDC_P1_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,93,12
     CONTROL         "&Fájllista ANSI karakterkészlettel",IDC_P1_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,124,12
 END
 
@@ -1062,7 +1069,7 @@ BEGIN
     LTEXT           "P&araméterek:",IDC_STATIC_5,10,192,42,8
     EDITTEXT        IDC_P2_EXARG,53,190,220,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P2_EXARG_BROWSE,277,190,12,12,WS_GROUP
-    CONTROL         "&Hosszú név támogatása",IDC_P2_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,80,12
+    CONTROL         "&Hosszú név támogatása",IDC_P2_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,93,12
     CONTROL         "&Fájllista ANSI karakterkészlettel",IDC_P2_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,124,12
 END
 
@@ -1074,11 +1081,11 @@ BEGIN
     LTEXT           "Külső &archiválók",IDC_P3_NAME,1,3,70,8
     LISTBOX         IDC_P3_LIST,1,13,295,143,LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT           "&Lista és kibontás:",IDC_STATIC_1,7,175,58,8
-    EDITTEXT        IDC_P3_VIEW,71,173,202,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P3_VIEW,74,173,199,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P3_VIEW_BROWSE,277,173,12,12
-    EDITTEXT        IDC_P3_EDIT,71,191,202,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P3_EDIT,74,191,199,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P3_EDIT_BROWSE,277,191,12,12
-    LTEXT           "&Törlés és tömörítés:",IDC_STATIC_2,7,193,60,8
+    LTEXT           "&Törlés és tömörítés:",IDC_STATIC_2,7,193,65,8
     GROUPBOX        " Külső archiválók helye ",IDC_STATIC_3,1,161,295,51
     LTEXT           "Beállítások/Archiválók auto-beállítása paranccsal külső archiválókat kereshet.",IDC_STATIC_4,1,216,275,8
 END
@@ -1090,12 +1097,12 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Fájl kit&erjesztése",IDC_P4_NAME,1,6,60,8
     LISTBOX         IDC_P4_LIST,1,16,295,147,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    RTEXT           "kiterjesztési maszk tipp",IDC_FILEMASK_HINT,223,165,72,8,WS_TABSTOP
+    RTEXT           "kiterjesztési maszk tipp",IDC_FILEMASK_HINT,218,165,77,8,WS_TABSTOP
     LTEXT           "&Lista és kibontás:",IDC_STATIC_2,7,189,57,8
     COMBOBOX        IDC_P4_VIEW,79,187,210,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     COMBOBOX        IDC_P4_EDIT,79,205,210,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     GROUPBOX        " Társított archívumok ",IDC_STATIC_3,1,177,295,47
-    LTEXT           "&Törlés és tömörítés:",IDC_STATIC_4,7,207,60,8
+    LTEXT           "&Törlés és tömörítés:",IDC_STATIC_4,7,207,65,8
 END
 
 IDD_CFGPAGE_MAINWINDOW DIALOGEX 67, 23, 299, 231
@@ -1120,17 +1127,17 @@ CAPTION "Megjelenés"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Teljes so&r kijelölve (csak Részletes és Levél módban)",IDC_FULLROWSELECT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,169,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,185,12
     CONTROL         "Fókuszált sor &kiemelve (csak Részletes módban)",IDC_FULLROWHIGHLIGHT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,161,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,172,12
     CONTROL         "Elem &egy-kattintásos megnyitása (kijelölés rámutatással)",IDC_SINGLECLICK,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,27,160,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,27,200,12
     CONTROL         "Ikon tinktúra a panelban (rend&szer/rejtett/kijelölt/fókuszált elemek)",IDC_ICONTINCTURE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,39,240,12
     CONTROL         "&Panel felirat a Mappa sorban",IDC_PANELCAPTION,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,133,12
     CONTROL         "&Maximalizáló/visszaállító gomb a Mappa sorban",IDC_PANELZOOM,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,169,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,173,12
     GROUPBOX        " Betűtípusok ",IDC_STATIC_2,1,81,295,54
     PUSHBUTTON      "Panel betűtíp&usa…",IDB_PANELFONT,7,93,110,14,WS_GROUP
     EDITTEXT        IDE_PANELFONT,122,93,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
@@ -1140,9 +1147,9 @@ BEGIN
     EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
     GROUPBOX        " Bé&lyegképek ",IDC_STATIC_4,1,176,295,30
-    LTEXT           "Méret:",IDC_STATIC_5,8,190,19,8
-    EDITTEXT        IDC_THUMBNAILSIZE,29,188,33,12,ES_AUTOHSCROLL
-    LTEXT           "pixel",IDC_STATIC_6,66,190,22,8,NOT WS_GROUP
+    LTEXT           "Méret:",IDC_STATIC_5,8,190,23,8
+    EDITTEXT        IDC_THUMBNAILSIZE,33,188,33,12,ES_AUTOHSCROLL
+    LTEXT           "pixel",IDC_STATIC_6,70,190,22,8,NOT WS_GROUP
     GROUPBOX        " Alkalmazás megjelenése ",IDC_STATIC_7,1,214,295,74
     LTEXT           "&Téma:",IDC_STATIC_8,8,228,62,8
     COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
@@ -1169,10 +1176,22 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Billentyűzet"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Az Sally ezen verziójában nem módosíthatók a parancsok.",IDC_STATIC_1,2,4,264,8
+    LTEXT           "Válassza ki az egyes billentyűparancsokhoz tartozó parancsértelmezőt.",IDC_STATIC_1,2,4,264,8
     LTEXT           "A billentyűzet parancsok átfogó listája megtekinthető a",IDC_STATIC_2,2,17,196,8
-    LTEXT           "súgóban",IDC_KEYBOARD_SHORTCUTS,198,17,17,8,WS_TABSTOP
+    LTEXT           "súgóban",IDC_KEYBOARD_SHORTCUTS,198,17,30,8,WS_TABSTOP
     LTEXT           "Megadhat billentyűzet parancsokat a plugin-oknak:\r  1. A Plugin menüben válassza a Plugin kezelőt\r  2. Válasszon plugin-t\r  3. Kattintson a Billentyűzet gombra",IDC_STATIC_3,2,31,282,32
+    GROUPBOX        "Parancsértelmező",IDC_SHELL_GROUP,2,76,295,149
+    LTEXT           "Alapértelmezett &parancsértelmező:",IDC_SHELL_DEFAULT_LABEL,10,91,115,8
+    COMBOBOX        IDC_SHELL_DEFAULT,127,88,160,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Ctrl+Num /:",IDC_SHELL_CTRL_LABEL,10,116,103,8
+    COMBOBOX        IDC_SHELL_CTRL,127,113,160,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Shift+Num /:",IDC_SHELL_SHIFT_LABEL,10,140,103,8
+    COMBOBOX        IDC_SHELL_SHIFT,127,137,160,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Alt+Num /:",IDC_SHELL_ALT_LABEL,10,164,103,8
+    COMBOBOX        IDC_SHELL_ALT,127,161,160,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Profilok &frissítése",IDC_SHELL_REFRESH,203,187,84,14
+    LTEXT           "Minden parancsértelmező az aktív panel mappájában nyílik meg.",IDC_SHELL_NOTE,10,189,185,16
+    LTEXT           "",IDC_SHELL_STATUS,10,207,277,16
 END
 
 IDD_FILELIST DIALOGEX 61, 53, 304, 136
@@ -1506,23 +1525,23 @@ BEGIN
     PUSHBUTTON      "&Súgó",IDHELP,241,130,50,14
 END
 
-IDD_SLGSELECTOR DIALOGEX 107, 84, 276, 220
+IDD_LANGUAGESELECTOR DIALOGEX 107, 84, 276, 220
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Nyelv választása"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Válasszon a telepített nyelvek közül.",IDC_STATIC_1,5,7,240,8
-    CONTROL         "",IDC_SLG_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,266,101
+    CONTROL         "",IDC_LANGUAGE_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,266,101
     GROUPBOX        "Nyelvi verzió névjegy",IDC_STATIC_2,5,124,266,69,WS_GROUP
     LTEXT           "Készítő:",IDC_STATIC_3,13,138,30,8
-    EDITTEXT        IDC_SLG_AUTHOR,66,138,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    EDITTEXT        IDC_LANGUAGE_AUTHOR,66,138,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
     LTEXT           "Web:",IDC_STATIC_5,13,166,22,8
-    LTEXT           "",IDC_SLG_WEB,68,166,194,8,WS_TABSTOP
+    LTEXT           "",IDC_LANGUAGE_WEB,68,166,194,8,WS_TABSTOP
     LTEXT           "Megjegyzés:",IDC_STATIC_6,13,177,37,8
-    LTEXT           "",IDC_SLG_COMMENT,68,177,194,8
+    LTEXT           "",IDC_LANGUAGE_COMMENT,68,177,194,8
     DEFPUSHBUTTON   "OK",IDOK,164,199,50,14,WS_GROUP
     PUSHBUTTON      "Mégse",IDCANCEL,220,199,50,14
-    LTEXT           "Nyelv",IDC_SLG_DESCR,19,31,46,8
+    LTEXT           "Nyelv",IDC_LANGUAGE_DESCR,19,31,46,8
 END
 
 IDD_SKILLLEVEL DIALOGEX 137, 77, 239, 132
@@ -1548,16 +1567,16 @@ CAPTION "Előzmény"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Választhatja, hogy elmenti az utoljára használt értékeket (előzmény) a regisztrációs adatbázisba, ahogy az Sally és plugin-ok beállításai is vannak.",IDC_STATIC_2,1,4,254,16
-    CONTROL         "Előzmény menté&se",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,54,12
+    CONTROL         "Előzmény menté&se",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,78,12
     CONTROL         "&Munkamappák listájának mentése",IDC_HISTORY_WORKDIRS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,118,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,127,12
     LTEXT           "A parancssori előzményhez (ha jelszót tartalmazhat) választhat haladó beállítást.",IDC_STATIC_3,1,60,228,16
     CONTROL         "Parancssori előzmény &engedélyezése",IDC_HISTORY_ENABLECMDLINE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,80,247,12
     CONTROL         "P&arancssori előzmény mentése",IDC_HISTORY_SAVECMDLINE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,93,247,12
-    LTEXT           "Most törölhet minden eddigi előzmény adatot.",IDC_STATIC_4,1,116,144,8
-    PUSHBUTTON      "E&lőzmény törlése...",IDC_HISTORY_CLEARHISTORY,1,126,60,14
+    LTEXT           "Most törölhet minden eddigi előzmény adatot.",IDC_STATIC_4,1,116,155,8
+    PUSHBUTTON      "E&lőzmény törlése...",IDC_HISTORY_CLEARHISTORY,1,126,69,14
 END
 
 IDD_SHARES DIALOGEX 12, 24, 344, 238
@@ -1833,22 +1852,22 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Testre szabhatja a Meghajtó váltása menüt és a Meghajtó sort.",IDC_STATIC_1,1,3,221,8
     GROUPBOX        " Meghajtók ",IDC_STATIC_2,1,18,294,73,WS_GROUP
-    LTEXT           "Vála&sszon meghajtót, amely látható legyen:",IDC_STATIC_3,9,31,120,8
+    LTEXT           "Vála&sszon meghajtót, amely látható legyen:",IDC_STATIC_3,9,31,143,8
     LISTBOX         IDL_CHD_DRIVES,9,41,277,12,LBS_MULTIPLESEL | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | LBS_DISABLENOSCROLL | LBS_NODATA | WS_TABSTOP
     LTEXT           "Válasszon m&eghajtót, amely után elválasztó legyen:",IDC_STATIC_4,9,60,172,8
     LISTBOX         IDL_CHD_SEPARATORS,9,70,277,12,LBS_MULTIPLESEL | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | LBS_DISABLENOSCROLL | LBS_NODATA | WS_TABSTOP
     GROUPBOX        " Kiegészítő elemek ",IDC_STATIC_5,1,99,294,73,WS_GROUP
-    CONTROL         "&Dokumentumok",IDC_CHD_SHOWMYDOC,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,113,55,12
+    CONTROL         "&Dokumentumok",IDC_CHD_SHOWMYDOC,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,113,69,12
     CONTROL         "&Felhős társzolgáltatások",IDC_CHD_SHOWCLOUDSTORAGE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,126,100,12
-    CONTROL         "&Hálózatok",IDC_CHD_SHOWNET,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,139,44,12
+    CONTROL         "&Hálózatok",IDC_CHD_SHOWNET,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,139,48,12
     CONTROL         "&Másik panelé (csak a Meghajtó menü módosításában)",IDC_CHD_SHOWANOTHER,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,152,161,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,152,192,12
     LTEXT           "Hogy tudom módosítani a ",IDC_STATIC_6,1,181,91,8
     LTEXT           "Gyors elérési út",IDS_CHD_HOTPATHS,92,181,30,8,WS_TABSTOP
     LTEXT           "és",IDC_STATIC_7,125,181,15,8
     LTEXT           "Plugin FS",IDS_CHD_PLUGINS,142,181,33,8,WS_TABSTOP
-    LTEXT           "elemek láthatóságát.",IDC_STATIC_8,175,181,22,8
+    LTEXT           "elemek láthatóságát.",IDC_STATIC_8,175,181,69,8
 END
 
 IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 231
@@ -1857,15 +1876,15 @@ CAPTION "Panelek"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Re&jtett vagy rendszer attribútumú fájlok és mappák rejtése (Ctrl+H)",IDC_NOTHIDDENSYSTEM,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,232,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,235,12
     CONTROL         "Almappákat is kijelölés/kijelölés törlése művelet&nél",IDC_INCLUDEDIRS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,173,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,183,12
     LTEXT           "Név mutatá&sa:",IDC_STATIC_1,1,33,48,8
-    COMBOBOX        IDC_NAMEMANGLE,50,31,243,72,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Méret mutatás&a:",IDC_STATIC_5,1,49,42,8
-    COMBOBOX        IDC_SIZEFORMAT,50,47,243,49,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Billentyűzet",IDC_STATIC_2,1,67,34,8
-    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,37,71,260,1
+    COMBOBOX        IDC_NAMEMANGLE,58,31,235,72,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Méret mutatás&a:",IDC_STATIC_5,1,49,55,8
+    COMBOBOX        IDC_SIZEFORMAT,58,47,235,49,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Billentyűzet",IDC_STATIC_2,1,67,40,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,43,71,254,1
     CONTROL         "Gépelés átirán&yítása panelről Parancssorra (ALT-ot nyomva Gyors keresés)",IDC_QUICKSEARCH_ALT,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,78,256,12
     CONTROL         "Shift+szám a Gyors elérési útra &ugráshoz (gond lehet a nemzetközi bill.kiosztás)",IDC_SHIFTFORHOTPATHS,
@@ -1873,23 +1892,23 @@ BEGIN
     LTEXT           "Egér",IDC_STATIC_3,1,105,24,8
     CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,27,109,270,1
     CONTROL         "Jobb gombbal menü megnyitása (CTRL-ot nyomva kijelöl/kijelölés tö&rlése)",IDE_PRIMARYCTXMENU,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,116,228,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,116,260,12
     CONTROL         "Átn&evezés a kétszeri lassú néven kattintáskor",IDC_CLICKTORENAME,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,128,153,12
-    CONTROL         "Fog&d és vidd művelet megszakítása, ha rövidebb:",IDC_DISABLEDANDD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,128,163,12
+    CONTROL         "Fog&d és vidd megszakítása, ha rövidebb:",IDC_DISABLEDANDD,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,140,170,12
     EDITTEXT        IDE_DRAGDROPDELAY,181,140,28,12,ES_AUTOHSCROLL
-    LTEXT           "ezredmásodperc",IDC_STATIC_4,213,142,13,8,NOT WS_GROUP
-    LTEXT           "Rendezés",IDC_STATIC_6,1,156,26,8
-    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,29,160,268,1
+    LTEXT           "ezredmásodperc",IDC_STATIC_4,213,142,56,8,NOT WS_GROUP
+    LTEXT           "Rendezés",IDC_STATIC_6,1,156,33,8
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,36,160,261,1
     CONTROL         "Karakterek rendezése a Területi beállítás&ok alapján",IDC_SORTUSESLOCALE,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,166,163,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,166,181,12
     CONTROL         "Nu&merikus rendezés a számokat tartalmazó karakterekhez",IDC_SORTDETECTNUMBERS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,178,186,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,178,206,12
     CONTROL         "Rendezés időrend szerin&t: újabb elemek felül",IDC_SORTNEWERONTOP,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,190,146,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,190,163,12
     CONTROL         "Rendezés &idő szerint: mappák rendezése név szerint",IDC_SORTDIRSBYNAME,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,141,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,186,12
     CONTROL         "Mint&ha a mappáknak kiterjesztése lenne (kiterjesztés látszik a Kit oszlopban)",IDC_SORTDIRSBYEXT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,265,12
 END
@@ -4229,4 +4248,24 @@ BEGIN
     IDS_LONGPATH_RESTART "A Windows beállítása megváltozott. Indítsa újra az alkalmazásokat; a Windows újraindítására is szükség lehet."
     IDS_LONGPATH_CONFIRM "Azonnal módosítja ezt a Windows-beállítást minden felhasználónál? A konfiguráció Mégse gombja nem vonja vissza. Rendszergazdai jóváhagyás szükséges. Ezután indítsa újra az alkalmazásokat; a Windows újraindítására is szükség lehet."
     IDS_LONGPATH_FAILED "A Windows nem erősítette meg a hosszú elérési utak kért beállítását. Ellenőrizze a rendszergazdai jogosultságokat, vagy forduljon a rendszergazdához."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_SHELL_NOT_ASSIGNED "Nincs hozzárendelve"
+    IDS_SHELL_UNAVAILABLE_LABEL "nem érhető el"
+    IDS_SHELL_SHORTCUT_CONFLICT "A kiválasztott billentyűparancsot egy bővítmény használja. Törölje a hozzárendelést, vagy módosítsa a bővítmény billentyűparancsát."
+    IDS_SHELL_PROFILE_UNAVAILABLE "Egy hozzárendelt profil nem érhető el. A mentett kijelölés megmarad."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_UM_SHOWWHEN_NOTE_ON "Ha egy szabály nem illeszkedik, a parancs rejtve marad az Egyéni menü sorban és az F9 Egyéni menüben."
+    IDS_UM_SHOWWHEN_NOTE_OFF "Kikapcsolva: a parancs mindig látható. A maszkok megmaradnak."
+    IDS_UM_SHOWWHEN_NOTE_NESTED "A szabályok csak a legfelső szintű parancsokra és almenükre vonatkoznak."
+    IDS_UM_FOLDERMASK_INCORRECT "A mappanév maszk szintaktikailag hibás."
+    IDS_UM_FILEMASK_CUE "*.png;*.jpg  (üres = bármely fájl)"
+    IDS_UM_FOLDERMASK_CUE "Fotók;src  (üres = bármely mappa)"
+    IDS_UM_SHOWWHEN_FILE_HINT "%s esetén"
+    IDS_UM_SHOWWHEN_FOLDER_HINT "%s mappában"
 END

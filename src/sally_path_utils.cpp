@@ -2010,6 +2010,42 @@ void CUserMenuIconBkgndReader::LeaveCSAfterUMIconsUpdate()
     HANDLES(LeaveCriticalSection(&CS));
 }
 
+std::vector<Sally::UserMenuConditions::Entry> UserMenuConditionEntries(CUserMenuItems& items, int count,
+                                                                      const Sally::UserMenuConditions::Context& context)
+{
+    using namespace Sally::UserMenuConditions;
+    std::vector<Entry> entries;
+    entries.reserve(count > 0 ? count : 0);
+    for (int i = 0; i < count && i < items.Count; i++)
+    {
+        CUserMenuItem* item = items.At(i);
+        Entry entry;
+        switch (item->Type)
+        {
+        case umitSubmenuBegin:
+            entry.Kind = EntryKind::SubmenuBegin;
+            break;
+        case umitSubmenuEnd:
+            entry.Kind = EntryKind::SubmenuEnd;
+            break;
+        case umitSeparator:
+            entry.Kind = EntryKind::Separator;
+            break;
+        default:
+            entry.Kind = EntryKind::Command;
+            break;
+        }
+        entry.OnToolbar = item->ShowInToolbar != FALSE;
+        // An Unknown context filters nothing and never touches the rule caches, so Find's
+        // thread can build its User Menu while the main thread uses them.
+        if (context.Panel != PanelKind::Unknown && item->ShowWhenEnabled &&
+            (entry.Kind == EntryKind::Command || entry.Kind == EntryKind::SubmenuBegin))
+            entry.RuleHides = !item->ShowWhenCache.IsVisible(item->ShowWhen(), context);
+        entries.push_back(entry);
+    }
+    return entries;
+}
+
 //
 // ****************************************************************************
 // CUserMenuItem
@@ -2052,6 +2088,7 @@ CUserMenuItem::CUserMenuItem(CUserMenuItem& item, CUserMenuIconDataArr* bkgndRea
     UseWindow = item.UseWindow;
     ShowInToolbar = item.ShowInToolbar;
     Type = item.Type;
+    CopyShowWhen(item);
     Set(item.ItemName.c_str(), item.UMCommand.c_str(), item.Arguments.c_str(), item.InitDir.c_str(), item.Icon.c_str());
     if (Type == umitItem)
     {

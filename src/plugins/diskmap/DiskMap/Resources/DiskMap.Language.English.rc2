@@ -140,7 +140,7 @@ STRINGTABLE
 BEGIN
     IDS_PLUGIN_NAME,            "DiskMap"
     IDS_PLUGIN_DESCRIPTION,     "Displays a treemap of files on your disk."
-    IDS_PLUGIN_ABOUT,           "About Salamander DiskMap Plugin"
+    IDS_PLUGIN_ABOUT,           "About Sally DiskMap Plugin"
     IDS_PLUGIN_MENU,            "Show &DiskMap"
     IDS_CLOSE_CONFIRMATION,     "Do you want to close DiskMap?"
     IDS_CLOSE_CONFIRMATION_CHECKBOX, "Don't show this message again and close DiskMap without asking"

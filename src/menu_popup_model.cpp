@@ -7,6 +7,7 @@
 #include "menu.h"
 #include "menu_item_text.h"
 #include "darkmode.h"
+#include "windows_terminal_ui.h"
 
 #define UPDOWN_TIMER_ID 1  // timer id
 #define UPDOWN_TIMER_TO 50 // time out [ms]
@@ -1620,7 +1621,8 @@ void CMenuPopup::OnKeyReturn(BOOL* leaveMenu, DWORD* retValue)
         return;
     }
     *leaveMenu = TRUE;
-    *retValue = selectedItem->ID;
+    *retValue = CaptureCommandShellMenuSelection(selectedItem->ID, SharedRes->HParent,
+        SharedRes->MenuBar != NULL && SharedRes->MenuBar->HelpMode);
     if (SharedRes->MenuBar != NULL)              // we were opened from the menubar
         SharedRes->MenuBar->ExitMenuLoop = TRUE; // so we exit it
 }
@@ -2357,7 +2359,8 @@ void CMenuPopup::DoDispatchMessage(MSG* msg, BOOL* leaveMenu, DWORD* retValue, B
                         if (msg->message == WM_LBUTTONUP || msg->message == WM_RBUTTONUP)
                         {
                             *leaveMenu = TRUE;
-                            *retValue = item->ID;
+                            *retValue = CaptureCommandShellMenuSelection(item->ID, SharedRes->HParent,
+                                SharedRes->MenuBar != NULL && SharedRes->MenuBar->HelpMode);
                             if (SharedRes->MenuBar != NULL)              // we were opened from the menubar
                                 SharedRes->MenuBar->ExitMenuLoop = TRUE; // so we exit it
                         }

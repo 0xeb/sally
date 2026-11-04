@@ -49,7 +49,7 @@ BEGIN
     BEGIN
         MENUITEM "Durchsuchen…",                     ID_BROWSE
         MENUITEM SEPARATOR
-        MENUITEM "Sally Verzeichnis",        ID_SALDIR
+        MENUITEM "Sally-Verzeichnis",        ID_SALDIR
         MENUITEM "Umgebungsvariable",        ID_ENVVAR
     END
 END
@@ -105,6 +105,6 @@ STRINGTABLE
 BEGIN
     IDS_ABORTCAPTION        "Skript abbrechen"
     IDS_ABORTTIP            "Laufendes Skript abbrechen\tStrg+Untbr"
-    IDS_MAINWINDOWLOCKED    "Das Fenster des Sally ist durch das Automation-Plugin blockiert. Bitte beenden Sie das laufende Skript."
+    IDS_MAINWINDOWLOCKED    "Das Fenster von Sally ist durch das Automation-Plugin blockiert. Bitte beenden Sie das laufende Skript."
     IDS_ENGINECREATEFAIL    "Fehler bei der Initialisierung des Scriptmoduls."
 END

@@ -10,6 +10,8 @@
 #include <vector>
 #include <windows.h>
 
+class IShell;
+
 struct CommandShellRequest
 {
     std::wstring comspec;
@@ -29,6 +31,8 @@ struct CommandShellRequest
     bool usePosition = false;
     DWORD x = 0;
     DWORD y = 0;
+    bool runAsAdministrator = false;
+    HWND owner = nullptr;
 };
 
 struct CommandShellResult
@@ -112,7 +116,8 @@ public:
 class CCommandShellService : public ICommandShellService
 {
 public:
-    CCommandShellService(IProcess* process = nullptr, IEnvironment* environment = nullptr);
+    CCommandShellService(IProcess* process = nullptr, IEnvironment* environment = nullptr,
+                        IShell* shell = nullptr);
 
     CommandShellResult LaunchShell(const CommandShellRequest& request) override;
     CommandShellResult LaunchCommand(const CommandShellRequest& request) override;
@@ -122,12 +127,13 @@ private:
     IProcess* ResolveProcess() const;
     IEnvironment* ResolveEnvironment() const;
     CommandShellResult LaunchBuiltCommand(const CommandShellRequest& request,
-                                          const std::wstring& commandLine);
+                                          const std::wstring& commandLine, const std::wstring& comspec);
     bool ResolveComspec(const CommandShellRequest& request, std::wstring& comspec,
                         DWORD& errorCode) const;
 
     IProcess* Process;
     IEnvironment* Environment;
+    IShell* Shell;
 };
 
 extern ICommandShellService* gCommandShellService;

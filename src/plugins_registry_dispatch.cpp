@@ -3392,7 +3392,10 @@ void CPlugins::RemoveHotKey(WORD hotKey, const CPluginData* ignorePlugin)
 BOOL CPlugins::QueryHotKey(WPARAM wParam, LPARAM lParam, int* pluginIndex, int* menuItemIndex)
 {
     CALL_STACK_MESSAGE3("CPlugins::QueryHotKey(0x%IX, 0x%IX, , )", wParam, lParam);
-    BYTE vk = UpperCase[(BYTE)wParam]; // we should be case-insensitive; the user might accidentally have caps lock on and the hotkey edit line always treats the key as uppercase
+    // WM_KEYDOWN carries virtual-key codes, including uppercase VK_A..VK_Z.
+    // Character case conversion corrupts keypad/OEM keys (VK_DIVIDE is 0x6f,
+    // which CharUpper treats as the letter 'o').
+    BYTE vk = static_cast<BYTE>(wParam);
     if (vk == 0)
         return FALSE; // hotkeys with vk == 0 are disabled for plugins
     BOOL controlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;

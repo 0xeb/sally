@@ -86,7 +86,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,295,12
     CONTROL         "&Houd omgevingsvariabelen bijgewerkt op systeem waarden",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,295,12
-    CONTROL         "Mapnamen &voorstellen tijdens het typen van een pad (F5, F6, Shift+F7)",IDC_SUGGESTPATHNAMES,
+    CONTROL         "Map- en bestandsnamen &voorstellen tijdens het typen van een pad (F5–F7, Shift+F7)",IDC_SUGGESTPATHNAMES,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,295,12
     LTEXT           "Controleren op &updates:",IDC_UPDATECHECK_LABEL,1,178,120,8
     COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
@@ -136,24 +136,24 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "U kunt kiezen of gewiste bestanden en mappen in de prullenbak gelegd worden of dat ze permanent van de schijf gewist worden.",IDC_STATIC_1,1,4,278,16
     GROUPBOX        "    ",IDC_STATIC_11,2,28,295,57
-    LTEXT           "Houdt SHIFT vast om bestanden en mappen permanent te wissen.",IDC_STATIC_4,9,42,186,8,NOT WS_GROUP
-    LTEXT           "Bevestigingen worden conform de 'prullenbak' instellingen gehandhaafd.",IDC_STATIC_5,9,51,174,8,NOT WS_GROUP
-    LTEXT           "De 'wis' operaties worden via Windows uitgevoerd, geavanceerde functies",IDC_STATIC_6,9,60,227,8,NOT WS_GROUP
-    LTEXT           "zoals progressbar, overslaan en herhalen worden niet ondersteund.",IDC_STATIC_7,9,69,220,8,NOT WS_GROUP
+    LTEXT           "Houdt SHIFT vast om bestanden en mappen permanent te wissen.",IDC_STATIC_4,9,42,219,8,NOT WS_GROUP
+    LTEXT           "Bevestigingen worden conform de 'prullenbak' instellingen gehandhaafd.",IDC_STATIC_5,9,51,243,8,NOT WS_GROUP
+    LTEXT           "De 'wis' operaties worden via Windows uitgevoerd, geavanceerde functies",IDC_STATIC_6,9,60,245,8,NOT WS_GROUP
+    LTEXT           "zoals progressbar, overslaan en herhalen worden niet ondersteund.",IDC_STATIC_7,9,69,222,8,NOT WS_GROUP
     GROUPBOX        "    ",IDC_STATIC_10,2,95,295,37
-    LTEXT           "Houd SHIFT vast om bestanden en mappen naar de prullenbak te verplaatsen.",IDC_STATIC_2,9,107,202,8,NOT WS_GROUP
-    LTEXT           "Bevestigingen worde gehanteerd conform de 'Bevestigingen' pagina.",IDC_STATIC_3,9,116,164,8,NOT WS_GROUP
+    LTEXT           "Houd SHIFT vast om bestanden en mappen naar de prullenbak te verplaatsen.",IDC_STATIC_2,9,107,258,8,NOT WS_GROUP
+    LTEXT           "Bevestigingen worde gehanteerd conform de 'Bevestigingen' pagina.",IDC_STATIC_3,9,116,229,8,NOT WS_GROUP
     GROUPBOX        "    ",IDC_STATIC_12,2,142,295,57
     CONTROL         "&Alle gewiste bestanden en mappen naar de prullenbak verplaatsen",IDR_RECYCLE2,
-                    "Button",BS_AUTORADIOBUTTON | BS_VCENTER | WS_GROUP | WS_TABSTOP,9,27,196,12
+                    "Button",BS_AUTORADIOBUTTON | BS_VCENTER | WS_GROUP | WS_TABSTOP,9,27,235,12
     CONTROL         "&Bestanden en mappen permanent wissen",IDR_RECYCLE1,
                     "Button",BS_AUTORADIOBUTTON,9,93,197,12
     CONTROL         "Verplaats &volgende bestanden naar de prullenbak. Wis andere permanent",IDR_RECYCLE3,
-                    "Button",BS_AUTORADIOBUTTON,9,141,232,12
-    LTEXT           "Houd SHIFT toets om bestanden en mappen permanent te wissen.",IDC_STATIC_8,9,175,186,8,NOT WS_GROUP
-    LTEXT           "Bevestigingen worde gehanteerd conform de 'Bevestigingen' pagina.",IDC_STATIC_9,9,184,164,8,NOT WS_GROUP
+                    "Button",BS_AUTORADIOBUTTON,9,141,257,12
+    LTEXT           "Houd SHIFT toets om bestanden en mappen permanent te wissen.",IDC_STATIC_8,9,175,220,8,NOT WS_GROUP
+    LTEXT           "Bevestigingen worde gehanteerd conform de 'Bevestigingen' pagina.",IDC_STATIC_9,9,184,229,8,NOT WS_GROUP
     EDITTEXT        IDE_RECYCLEMASKS,9,156,279,12,ES_AUTOHSCROLL | WS_GROUP
-    RTEXT           "masker hints",IDC_FILEMASK_HINT,250,169,38,8,NOT WS_GROUP | WS_TABSTOP
+    RTEXT           "masker hints",IDC_FILEMASK_HINT,245,169,43,8,NOT WS_GROUP | WS_TABSTOP
 END
 
 IDD_CFGPAGE_VIEWS DIALOGEX 51, 24, 299, 231
@@ -161,22 +161,22 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Weergave"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Gedefinieërde &Weergaven:",IDC_VIEWLIST_HEADER,1,26,60,8
+    LTEXT           "Gedefinieërde &Weergaven:",IDC_VIEWLIST_HEADER,1,26,89,8
     CONTROL         "",IDC_VIEW_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,1,36,177,99
-    LTEXT           "Beschikbare &Kolommen:",IDC_VIEWLIST_HEADER2,182,26,65,8
+    LTEXT           "Beschikbare &Kolommen:",IDC_VIEWLIST_HEADER2,182,26,80,8
     CONTROL         "",IDC_VIEW_LIST2,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,182,36,114,99
     LTEXT           "In gedetailleerde modus kunnen alle beschikbare kolommen aanwezig zijn.",IDC_VIEW_TEXT1,1,2,269,8
-    LTEXT           "Kies de kolommen uit deze lijst die u in de geselecteerde weergave wilt zien.",IDC_VIEW_TEXT3,1,12,252,8
+    LTEXT           "Kies de kolommen uit deze lijst die u in de geselecteerde weergave wilt zien.",IDC_VIEW_TEXT3,1,12,254,8
     GROUPBOX        " Breedte van de geselecteerde kolom uit de Beschikbare Lijst definiëren: ",IDC_VIEW_TEXT4,1,141,295,50,WS_GROUP
-    CONTROL         "&Vaste kolom breedte in linker paneel:",IDC_VIEW_LEFT_FIXED,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,152,122,12
-    EDITTEXT        IDC_VIEW_LEFT_WIDTH,138,152,26,12,ES_AUTOHSCROLL | WS_GROUP
-    LTEXT           "pixels (in de Kopregel slepen)",IDC_VIEW_TEXT2,167,154,114,8
-    CONTROL         "V&aste kolom breedte in rechter paneel:",IDC_VIEW_RIGHT_FIXED,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,166,128,12
-    EDITTEXT        IDC_VIEW_RIGHT_WIDTH,138,166,26,12,ES_AUTOHSCROLL | WS_GROUP
-    LTEXT           "pixels (in de Kopregel slepen)",IDC_VIEW_TEXT5,167,168,114,8
-    LTEXT           "Tip: niet aangevinkt = kolom breedte past zich aan de langste waarde aan",IDC_VIEW_TEXT6,9,180,231,8
+    CONTROL         "&Vaste kolombreedte linkerpaneel:",IDC_VIEW_LEFT_FIXED,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,152,126,12
+    EDITTEXT        IDC_VIEW_LEFT_WIDTH,141,152,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "pixels (in de Kopregel slepen)",IDC_VIEW_TEXT2,170,154,114,8
+    CONTROL         "V&aste kolombreedte rechterpaneel:",IDC_VIEW_RIGHT_FIXED,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,166,130,12
+    EDITTEXT        IDC_VIEW_RIGHT_WIDTH,141,166,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "pixels (in de Kopregel slepen)",IDC_VIEW_TEXT5,170,168,114,8
+    LTEXT           "Tip: niet aangevinkt = kolom breedte past zich aan de langste waarde aan",IDC_VIEW_TEXT6,9,180,244,8
     GROUPBOX        " Slimme modus (smalle Naam kolom) voor geselecteerde weergave in: ",IDC_VIEW_TEXT7,1,194,295,37,WS_GROUP
     CONTROL         "&Linker paneel (alleen voor variabele breedte van Naam kolom; gebruik Ctrl+N)",IDC_VIEW_LEFT_SMARTMODE,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,204,274,12
@@ -189,8 +189,8 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Interne Viewer"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Regel einde",IDC_STATIC_1,1,4,35,8
-    CONTROL         "",IDC_STATIC_15,"Static",SS_ETCHEDHORZ | WS_GROUP,38,8,258,1
+    LTEXT           "Regel einde",IDC_STATIC_1,1,4,40,8
+    CONTROL         "",IDC_STATIC_15,"Static",SS_ETCHEDHORZ | WS_GROUP,43,8,253,1
     CONTROL         "C&R/LF",IDC_CRLFEOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,15,35,12
     CONTROL         "&CR",IDC_CREOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,27,24,12
     CONTROL         "&LF",IDC_LFEOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,63,15,23,12
@@ -200,33 +200,33 @@ BEGIN
     LTEXT           "NULL = Null Karakter",IDC_STATIC_4,210,17,78,8
     LTEXT           "Venster positie",IDC_STATIC_5,1,43,57,8
     CONTROL         "",IDC_STATIC_16,"Static",SS_ETCHEDHORZ | WS_GROUP,60,47,236,1
-    CONTROL         "&Opslaan bij sluiten",IDC_SAVEONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,10,54,63,12
-    CONTROL         "Zelfde &positie als Sally hoofd venster",IDC_SETBYMAINWINDOW,
+    CONTROL         "&Opslaan bij einde",IDC_SAVEONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,10,54,72,12
+    CONTROL         "Zelfde &positie als het Sally-hoofdvenster",IDC_SETBYMAINWINDOW,
                     "Button",BS_AUTORADIOBUTTON,86,54,163,12
-    LTEXT           "Algemene Opties",IDC_STATIC_6,1,71,56,8
-    CONTROL         "",IDC_STATIC_17,"Static",SS_ETCHEDHORZ | WS_GROUP,59,75,237,1
+    LTEXT           "Algemene Opties",IDC_STATIC_6,1,71,58,8
+    CONTROL         "",IDC_STATIC_17,"Static",SS_ETCHEDHORZ | WS_GROUP,61,75,235,1
     CONTROL         "Bij &zoeken met interne viewer de tekst uit de 'Zoek' dialoog overnemen",IDC_COPYFINDTEXT,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,83,264,12
-    LTEXT           "&Tab grootte:",IDC_STATIC_7,10,100,34,8
-    EDITTEXT        IDC_TABSIZE,45,98,23,12,ES_AUTOHSCROLL | WS_GROUP
-    LTEXT           "Additionele Regels voor de automatische View Modus",IDC_STATIC_14,1,116,156,8
-    CONTROL         "",IDC_STATIC_18,"Static",SS_ETCHEDHORZ | WS_GROUP,159,120,137,1
-    LTEXT           "Tekst modus voor bestanden:",IDC_STATIC_12,10,132,88,8
-    EDITTEXT        IDC_VIEW_INTEXT,99,130,195,12,WS_GROUP
-    LTEXT           "Hex mode voor bestanden:",IDC_STATIC_13,10,147,87,8
-    EDITTEXT        IDC_VIEW_INHEX,99,145,195,12,WS_GROUP
+    LTEXT           "&Tab grootte:",IDC_STATIC_7,10,100,41,8
+    EDITTEXT        IDC_TABSIZE,53,98,23,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Additionele Regels voor de automatische View Modus",IDC_STATIC_14,1,116,179,8
+    CONTROL         "",IDC_STATIC_18,"Static",SS_ETCHEDHORZ | WS_GROUP,182,120,114,1
+    LTEXT           "Tekst modus voor bestanden:",IDC_STATIC_12,10,132,98,8
+    EDITTEXT        IDC_VIEW_INTEXT,110,130,184,12,WS_GROUP
+    LTEXT           "Hex mode voor bestanden:",IDC_STATIC_13,10,147,98,8
+    EDITTEXT        IDC_VIEW_INHEX,110,145,184,12,WS_GROUP
     RTEXT           "masker hints",IDC_FILEMASK_HINT,247,159,46,8,WS_TABSTOP
     LTEXT           "Weegave",IDC_STATIC_9,1,175,42,8
     CONTROL         "",IDC_STATIC_19,"Static",SS_ETCHEDHORZ | WS_GROUP,45,179,251,1
     PUSHBUTTON      "&Font",IDB_VIEWERFONT,10,189,52,14,WS_GROUP
     EDITTEXT        IDE_VIEWERFONT,66,189,228,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    LTEXT           "Normale tekst kleur",IDC_STATIC_10,10,212,60,8
+    LTEXT           "Tekstkleur",IDC_STATIC_10,10,212,60,8
     PUSHBUTTON      "tekst",IDC_IV_NORMAL_TEXT,72,209,30,14
-    LTEXT           "Geselecteerde tekst kleur",IDC_STATIC_11,197,212,64,8
+    LTEXT           "Selectiekleur",IDC_STATIC_11,197,212,64,8
     PUSHBUTTON      "tekst",IDC_IV_SELECTED_TEXT,263,209,30,14
 END
 
-IDD_CFGPAGE_USERMENU DIALOGEX 53, 64, 299, 231
+IDD_CFGPAGE_USERMENU DIALOGEX 53, 64, 299, 295
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Gebruikers menu"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -234,21 +234,28 @@ BEGIN
     LTEXT           "M&enu Inhoud:",IDS_USHEADER,1,6,55,8
     LISTBOX         IDL_MENUITEMS,1,16,295,108,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     CONTROL         "Su&bmenu",IDC_UM_SUBMENU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,131,47,12
-    CONTROL         "&Scheidingsteken",IDC_UM_SEPARATOR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,131,47,12
-    PUSHBUTTON      "&Icon veranderen...",IDB_UM_CHANGEICON,233,130,63,14
+    CONTROL         "&Scheidingsteken",IDC_UM_SEPARATOR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,131,69,12
+    PUSHBUTTON      "&Icon wijzigen...",IDB_UM_CHANGEICON,233,130,63,14
     LTEXT           "&Opdracht:",IDC_STATIC_1,1,153,39,8
     EDITTEXT        IDE_COMMAND,57,151,222,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDB_BROWSECOMMAND,284,151,12,12,WS_GROUP
-    LTEXT           "&Argumenten:",IDC_STATIC_2,1,169,42,8
+    LTEXT           "&Argumenten:",IDC_STATIC_2,1,169,44,8
     EDITTEXT        IDE_ARGUMENTS,57,167,222,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDB_BROWSEARGUMENTS,284,167,12,12,WS_GROUP
     LTEXT           "Initiele &map:",IDC_STATIC_3,1,185,55,8
     EDITTEXT        IDE_INITDIR,57,183,222,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDB_BROWSEINITDIR,284,183,12,12,WS_GROUP
     CONTROL         "Via shell &uitvoeren",IDC_THROUGHSHELL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,202,85,12
-    CONTROL         "S&hell venster openen",IDC_OUTPUTWND,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,125,202,76,12
-    CONTROL         "Shell venster s&luiten",IDC_CLOSESHELL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,214,76,12
-    CONTROL         "Laat item in &Gebruikers menubalk zien",IDC_UM_TOOLBAR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,214,108,12
+    CONTROL         "S&hell venster openen",IDC_OUTPUTWND,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,125,202,85,12
+    CONTROL         "Shell venster s&luiten",IDC_CLOSESHELL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,214,82,12
+    CONTROL         "Laat item in &Gebruikers menubalk zien",IDC_UM_TOOLBAR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,214,142,12
+    CONTROL         "Alleen to&nen als",IDC_UM_SHOWWHEN,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,231,72,10
+    GROUPBOX        "",IDC_UM_SHOWWHEN_GROUP,1,232,295,60
+    LTEXT           "Ge&focusseerd bestand:",IDC_UM_SHOWWHEN_FILE_LABEL,8,244,88,8
+    EDITTEXT        IDE_UM_SHOWWHEN_FILE,100,242,190,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "In map genaam&d:",IDC_UM_SHOWWHEN_FOLDER_LABEL,8,260,88,8
+    EDITTEXT        IDE_UM_SHOWWHEN_FOLDER,100,258,190,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "",IDC_UM_SHOWWHEN_NOTE,8,273,284,16,SS_NOPREFIX
 END
 
 IDD_CFGPAGE_HOTPATH DIALOGEX 93, 62, 299, 231
@@ -260,11 +267,11 @@ BEGIN
     LTEXT           "&Pad:",IDC_STATIC_1,1,179,19,8
     EDITTEXT        IDC_HOTPATH_PATH,22,177,258,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDC_HOTPATH_BROWSE,284,177,12,12,WS_GROUP
-    LTEXT           "Aangevinkte favorieten worden ook in het ""wijzig station"" menu weergegeven.",IDC_STATIC_2,1,193,215,8
-    LTEXT           "Favorieten kunnen ook via Ctrl+Shift+nummer in het paneel gezet worden.",IDC_STATIC_3,1,205,214,8
+    LTEXT           "Aangevinkte favorieten worden ook in het ""wijzig station"" menu weergegeven.",IDC_STATIC_2,1,193,260,8
+    LTEXT           "Favorieten kunnen ook via Ctrl+Shift+nummer in het paneel gezet worden.",IDC_STATIC_3,1,205,249,8
     CONTROL         "&Deze pagina openen wanneer favorieten vanuit paneel toegewezen worden",IDC_HOTPATH_AUTOCONFIG,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,218,193,12
-    LTEXT           "&Gedefinieërde favorieten:",IDC_HOTPATH_HEADER,1,6,67,8
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,218,265,12
+    LTEXT           "&Gedefinieërde favorieten:",IDC_HOTPATH_HEADER,1,6,85,8
 END
 
 IDD_COPYMOVEDIALOG DIALOGEX 10, 24, 227, 65
@@ -787,19 +794,19 @@ BEGIN
     PUSHBUTTON      "",IDC_C_ITEM4_C,265,47,30,12
     RTEXT           "dummy",IDC_C_ITEM5_L,172,63,88,8
     PUSHBUTTON      "",IDC_C_ITEM5_C,265,61,30,12
-    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,225,80,71,1
-    LTEXT           "Additionele regels om bestanden en mappen in panelen te markeren",IDC_STATIC_5,3,76,220,8
-    LTEXT           "Maskers Prioriteiten &Lijst:",IDC_C_LIST_HEADER,3,94,66,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,234,80,62,1
+    LTEXT           "Additionele regels om bestanden en mappen in panelen te markeren",IDC_STATIC_5,3,76,229,8
+    LTEXT           "Maskers Prioriteiten &Lijst:",IDC_C_LIST_HEADER,3,94,83,8
     LISTBOX         IDC_C_LIST,3,104,292,49,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Als naam met masker overeenkomt, attributen testen:",IDC_STATIC_3,3,157,157,8
+    LTEXT           "Als naam bij masker past, attributen testen:",IDC_STATIC_3,3,157,172,8
     CONTROL         "A&rchief",IDC_C_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,3,166,39,12
-    CONTROL         "&Alleen lezen",IDC_C_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,3,178,49,12
-    CONTROL         "&Verborgen",IDC_C_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,3,190,39,12
-    CONTROL         "S&ysteem",IDC_C_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,3,202,38,12
-    CONTROL         "&Gecomprimeerd",IDC_C_COMPRESSED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,166,55,12
+    CONTROL         "&Alleen lezen",IDC_C_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,3,178,56,12
+    CONTROL         "&Verborgen",IDC_C_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,3,190,50,12
+    CONTROL         "S&ysteem",IDC_C_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,3,202,43,12
+    CONTROL         "&Gecomprimeerd",IDC_C_COMPRESSED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,166,69,12
     CONTROL         "Versleutel&d",IDC_C_ENCRYPTED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,178,55,12
     CONTROL         "&Map",IDC_C_DIRECTORY,"Button",BS_AUTO3STATE | WS_TABSTOP,69,190,55,12
-    LTEXT           "Aanwijzing: 3de mogelijkheid = irrelevant",IDC_STATIC_6,3,216,103,8
+    LTEXT           "Aanwijzing: 3de mogelijkheid = irrelevant",IDC_STATIC_6,3,216,138,8
     RTEXT           "dummy",IDC_C_MASK1_L,178,160,82,8
     PUSHBUTTON      "",IDC_C_MASK1_C,265,158,30,12
     RTEXT           "dummy",IDC_C_MASK2_L,178,174,82,8
@@ -828,26 +835,26 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Stations"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "&Floppy station",IDC_STATIC_10,1,1,46,8
-    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,49,5,244,1
+    LTEXT           "&Floppy station",IDC_STATIC_10,1,1,48,8
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,51,5,242,1
     CONTROL         "Automatisch vernieuwen",IDC_DRVSPEC_FLOPPYMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,11,104,12
-    CONTROL         "Eenvoudige pictogrammen",IDC_DRVSPEC_FLOPPYSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,11,69,12
-    LTEXT           "Andere &verwisselbare stations (b.v. USB flash station, ZIP en JAZ stations)",IDC_STATIC_2,1,31,225,8
-    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,228,35,65,1
+    CONTROL         "Eenvoudige pictogrammen",IDC_DRVSPEC_FLOPPYSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,11,105,12
+    LTEXT           "Andere &verwisselbare stations (b.v. USB flash station, ZIP en JAZ stations)",IDC_STATIC_2,1,31,239,8
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,242,35,51,1
     CONTROL         "Automatisch vernieuwen",IDC_DRVSPEC_REMOVABLEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,41,104,12
-    CONTROL         "Eenvoudige pictogrammen",IDC_DRVSPEC_REMOVABLESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,41,69,12
-    LTEXT           "V&aste stations (b.v. lokale harde schijven)",IDC_STATIC_4,1,61,114,8
-    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,117,65,176,1
+    CONTROL         "Eenvoudige pictogrammen",IDC_DRVSPEC_REMOVABLESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,41,105,12
+    LTEXT           "V&aste stations (b.v. lokale harde schijven)",IDC_STATIC_4,1,61,135,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,138,65,155,1
     CONTROL         "Automatisch vernieuwen",IDC_DRVSPEC_FIXEDMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,71,104,12
-    CONTROL         "Eenvoudige pictogrammen",IDC_DRVSPEC_FIXEDSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,71,69,12
-    LTEXT           "&CD-ROM of DVD-ROM stations",IDC_STATIC_6,1,91,98,8
-    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,101,95,192,1
+    CONTROL         "Eenvoudige pictogrammen",IDC_DRVSPEC_FIXEDSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,71,105,12
+    LTEXT           "&CD-ROM of DVD-ROM stations",IDC_STATIC_6,1,91,104,8
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,107,95,186,1
     CONTROL         "Automatisch vernieuwen",IDC_DRVSPEC_CDROMMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,101,104,12
-    CONTROL         "Eenvoudige pictogrammen",IDC_DRVSPEC_CDROMSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,101,69,12
-    LTEXT           "Netwerk stations",IDC_STATIC_8,1,121,52,8
-    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,55,125,238,1
+    CONTROL         "Eenvoudige pictogrammen",IDC_DRVSPEC_CDROMSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,101,105,12
+    LTEXT           "Netwerk stations",IDC_STATIC_8,1,121,56,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,59,125,234,1
     CONTROL         "Au&tomatisch vernieuwen",IDC_DRVSPEC_REMOTEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,131,104,12
-    CONTROL         "Eenvoudige &pictogrammen",IDC_DRVSPEC_REMOTESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,143,69,12
+    CONTROL         "Eenvoudige &pictogrammen",IDC_DRVSPEC_REMOTESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,143,105,12
     CONTROL         "&Niet vernieuwen bij start van Sally (missch. manueel vernieuwen nodig)",IDC_DRVSPEC_REMOTEACT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,155,276,12
     LTEXT           "Als pad ontoegankelijk, &ga naar:",IDC_STATIC_9,1,180,128,8
@@ -868,10 +875,10 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Viewers"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Prioriteits lijst met &maskers voor bestandsnamen",IDS_MASKSHDR,1,6,74,8
+    LTEXT           "Prioriteits lijst met &maskers voor bestandsnamen",IDS_MASKSHDR,1,6,160,8
     LISTBOX         IDL_FILEMASKS,1,16,295,120,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Gerelateerde &viewer:",IDC_STATIC_1,1,144,65,8
-    COMBOBOX        IDC_VIEW_TYPE,69,142,226,67,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Gerelateerde &viewer:",IDC_STATIC_1,1,144,69,8
+    COMBOBOX        IDC_VIEW_TYPE,72,142,223,67,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     GROUPBOX        " Externe viewer ",IDC_STATIC_2,1,162,295,62
     LTEXT           "&Opdracht:",IDC_STATIC_3,7,175,39,8
     EDITTEXT        IDE_COMMAND,67,173,205,12,ES_AUTOHSCROLL | WS_GROUP
@@ -889,7 +896,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Editoren"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Prioriteits &lijst met maskers voor bestandsnamen",IDS_MASKSHDR,1,6,74,8
+    LTEXT           "Prioriteits &lijst met maskers voor bestandsnamen",IDS_MASKSHDR,1,6,160,8
     LISTBOX         IDL_FILEMASKS,1,16,295,153,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT           "&Opdracht:",IDC_STATIC_1,1,178,39,8
     EDITTEXT        IDE_COMMAND,59,176,220,12,ES_AUTOHSCROLL | WS_GROUP
@@ -1005,9 +1012,9 @@ CAPTION "Archiveringsprogrammas"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Gebruik eenvoudige &pictogrammen in archieven",IDC_ARCH_SIMPLEICONS,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,4,106,12
-    CONTROL         "&Archiveer naar ander paneel",IDC_ARCH_ANOTHERPANELP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,99,12
-    CONTROL         "&de-archiveer naar ander paneel",IDC_ARCH_ANOTHERPANELU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,28,109,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,4,175,12
+    CONTROL         "&Archiveer naar ander paneel",IDC_ARCH_ANOTHERPANELP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,108,12
+    CONTROL         "&de-archiveer naar ander paneel",IDC_ARCH_ANOTHERPANELU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,28,118,12
     CONTROL         "De-archiveer naar &submap volgens archiefnaam",IDC_ARCH_ARCHIVENAME,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,40,175,12
 END
@@ -1019,28 +1026,28 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "&Naam",IDC_P1_NAME,1,6,66,8
     LISTBOX         IDC_P1_LIST,1,16,295,70,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Inpakken met:",IDC_STATIC_1,1,92,37,8
-    COMBOBOX        IDC_P1_TYPE,53,90,100,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Inpakken met:",IDC_STATIC_1,1,92,48,8
+    COMBOBOX        IDC_P1_TYPE,56,90,97,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Default &extensie:",IDC_STATIC_2,195,92,62,8
     EDITTEXT        IDC_P1_EXT,261,90,35,12,ES_AUTOHSCROLL
     GROUPBOX        " Inpakken naar archief ",IDC_STATIC_3,1,108,295,48,WS_GROUP
     LTEXT           "&Opdracht:",IDC_STATIC_4,10,123,39,8
-    EDITTEXT        IDC_P1_CPCMD,53,121,220,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P1_CPCMD,56,121,217,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P1_CPCMD_BROWSE,277,121,12,12,WS_GROUP
-    LTEXT           "A&rgumenten:",IDC_STATIC_5,10,138,42,8
-    EDITTEXT        IDC_P1_CPARG,53,136,220,12,ES_AUTOHSCROLL
+    LTEXT           "A&rgumenten:",IDC_STATIC_5,10,138,44,8
+    EDITTEXT        IDC_P1_CPARG,56,136,217,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P1_CPARG_BROWSE,277,136,12,12,WS_GROUP
     GROUPBOX        "   ",IDC_STATIC_6,1,162,295,48,WS_GROUP
     CONTROL         "Inpakken naar archief en van schijf &wissen",IDC_P1_MOVE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,161,152,12
     LTEXT           "O&pdracht:",IDC_STATIC_7,10,177,39,8
-    EDITTEXT        IDC_P1_MVCMD,53,175,220,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P1_MVCMD,56,175,217,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P1_MVCMD_BROWSE,277,175,12,12,WS_GROUP
-    LTEXT           "Arg&umenten:",IDC_STATIC_8,10,192,42,8
-    EDITTEXT        IDC_P1_MVARG,53,190,220,12,ES_AUTOHSCROLL
+    LTEXT           "Arg&umenten:",IDC_STATIC_8,10,192,44,8
+    EDITTEXT        IDC_P1_MVARG,56,190,217,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P1_MVARG_BROWSE,277,190,12,12,WS_GROUP
-    CONTROL         "Ondersteuning &lange namen",IDC_P1_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,79,12
-    CONTROL         "Benodigd li&jst van bestanden in ANSI karakterset",IDC_P1_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,124,12
+    CONTROL         "&Lange namen mogelijk",IDC_P1_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,102,12
+    CONTROL         "Benodigd li&jst van bestanden in ANSI karakterset",IDC_P1_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,175,12
 END
 
 IDD_CFGPAGE_UNPACKERS DIALOGEX 85, 24, 299, 231
@@ -1050,20 +1057,20 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "&Naam",IDC_P2_NAME,1,6,60,8
     LISTBOX         IDC_P2_LIST,1,16,295,116,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Uitpakken met:",IDC_STATIC_1,1,139,46,8
-    COMBOBOX        IDC_P2_TYPE,53,137,100,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Bestands&masker:",IDC_STATIC_2,178,139,40,8
-    EDITTEXT        IDC_P2_EXT,221,137,75,12,ES_AUTOHSCROLL
-    RTEXT           "masker hint",IDC_FILEMASK_HINT,257,150,38,8,WS_TABSTOP
+    LTEXT           "&Uitpakken met:",IDC_STATIC_1,1,139,53,8
+    COMBOBOX        IDC_P2_TYPE,56,137,97,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Bestands&masker:",IDC_STATIC_2,178,139,56,8
+    EDITTEXT        IDC_P2_EXT,236,137,60,12,ES_AUTOHSCROLL
+    RTEXT           "masker hint",IDC_FILEMASK_HINT,255,150,40,8,WS_TABSTOP
     GROUPBOX        " Archief uitpakken ",IDC_STATIC_3,1,162,295,48
     LTEXT           "&Opdracht:",IDC_STATIC_4,10,177,39,8
-    EDITTEXT        IDC_P2_EXCMD,53,175,220,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P2_EXCMD,56,175,217,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P2_EXCMD_BROWSE,277,175,12,12,WS_GROUP
-    LTEXT           "&Argumenten:",IDC_STATIC_5,10,192,42,8
-    EDITTEXT        IDC_P2_EXARG,53,190,220,12,ES_AUTOHSCROLL
+    LTEXT           "&Argumenten:",IDC_STATIC_5,10,192,44,8
+    EDITTEXT        IDC_P2_EXARG,56,190,217,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P2_EXARG_BROWSE,277,190,12,12,WS_GROUP
-    CONTROL         "Ondersteuning &lange namen",IDC_P2_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,80,12
-    CONTROL         "Benodigd li&jst van bestanden in ANSI karakterset",IDC_P2_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,124,12
+    CONTROL         "&Lange namen mogelijk",IDC_P2_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,102,12
+    CONTROL         "Benodigd li&jst van bestanden in ANSI karakterset",IDC_P2_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,175,12
 END
 
 IDD_CFGPAGE_ARCHIVERSLOCATIONS DIALOGEX 64, 22, 299, 231
@@ -1071,14 +1078,14 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Locatie van Externe archief programma's"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Externe &Archief programma's",IDC_P3_NAME,1,3,70,8
+    LTEXT           "Externe &Archief programma's",IDC_P3_NAME,1,3,96,8
     LISTBOX         IDC_P3_LIST,1,13,295,143,LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Lijst en Uitpakken:",IDC_STATIC_1,7,175,58,8
-    EDITTEXT        IDC_P3_VIEW,71,173,202,12,ES_AUTOHSCROLL
+    LTEXT           "&Lijst en Uitpakken:",IDC_STATIC_1,7,175,60,8
+    EDITTEXT        IDC_P3_VIEW,78,173,195,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P3_VIEW_BROWSE,277,173,12,12
-    EDITTEXT        IDC_P3_EDIT,71,191,202,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P3_EDIT,78,191,195,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P3_EDIT_BROWSE,277,191,12,12
-    LTEXT           "&Wissen en Inpakken:",IDC_STATIC_2,7,193,60,8
+    LTEXT           "&Wissen en Inpakken:",IDC_STATIC_2,7,193,69,8
     GROUPBOX        " Locatie van Externe archief programma's ",IDC_STATIC_3,1,161,295,51
     LTEXT           "Gebruik Autoconfiguratie om naar externe archief programma's te zoeken.",IDC_STATIC_4,1,216,275,8
 END
@@ -1088,14 +1095,14 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Archief Associaties in Schermen"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Bestands &Extensies",IDC_P4_NAME,1,6,60,8
+    LTEXT           "Bestands &Extensies",IDC_P4_NAME,1,6,63,8
     LISTBOX         IDC_P4_LIST,1,16,295,147,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     RTEXT           "masker hints",IDC_FILEMASK_HINT,223,165,72,8,WS_TABSTOP
-    LTEXT           "&Lijst en Uitpakken:",IDC_STATIC_2,7,189,57,8
+    LTEXT           "&Lijst en Uitpakken:",IDC_STATIC_2,7,189,61,8
     COMBOBOX        IDC_P4_VIEW,79,187,210,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     COMBOBOX        IDC_P4_EDIT,79,205,210,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     GROUPBOX        " Geassocieerde Archiefprogramma's ",IDC_STATIC_3,1,177,295,47
-    LTEXT           "&Wissen en Inpakken:",IDC_STATIC_4,7,207,60,8
+    LTEXT           "&Wissen en Inpakken:",IDC_STATIC_4,7,207,68,8
 END
 
 IDD_CFGPAGE_MAINWINDOW DIALOGEX 67, 23, 299, 231
@@ -1103,7 +1110,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Hoofd venster"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         "Welkomst&scherm tijdens start tonen",IDC_SPLASHSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,113,12
+    CONTROL         "Welkomst&scherm tijdens start tonen",IDC_SPLASHSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,133,12
     CONTROL         "Sally p&ictogram in de Taskbar tonen",IDC_STATUSAREA,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,17,217,12
     CONTROL         "&Huidig pad in hoofdvenster laten zien als:",IDC_TITLEBAR_PATH,
@@ -1120,13 +1127,13 @@ CAPTION "Weergave"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Volledige &rij selecteren (gedetailleerde en verkorte modus)",IDC_FULLROWSELECT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,169,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,208,12
     CONTROL         "&Gefocusseerde rij markeren (gedetailleerde modus)",IDC_FULLROWHIGHLIGHT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,161,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,184,12
     CONTROL         "Open item met Enkele-&klik (selecteren via aanwijzen)",IDC_SINGLECLICK,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,27,160,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,27,189,12
     CONTROL         "Gekleurde pi&ctogrammen (systeem/verborgen/geselecteerd/gefocusseerd)",IDC_ICONTINCTURE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,39,240,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,39,260,12
     CONTROL         "kopregel met &achtergrondkleuren",IDC_PANELCAPTION,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,133,12
     CONTROL         "&maximize/restore knop in kopregel",IDC_PANELZOOM,
@@ -1140,9 +1147,9 @@ BEGIN
     EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
     GROUPBOX        " Mi&niaturen ",IDC_STATIC_4,1,176,295,30
-    LTEXT           "Grootte:",IDC_STATIC_5,8,190,19,8
-    EDITTEXT        IDC_THUMBNAILSIZE,29,188,33,12,ES_AUTOHSCROLL
-    LTEXT           "pixels",IDC_STATIC_6,66,190,22,8,NOT WS_GROUP
+    LTEXT           "Grootte:",IDC_STATIC_5,8,190,28,8
+    EDITTEXT        IDC_THUMBNAILSIZE,38,188,33,12,ES_AUTOHSCROLL
+    LTEXT           "pixels",IDC_STATIC_6,75,190,22,8,NOT WS_GROUP
     GROUPBOX        " Uiterlijk van toepassing ",IDC_STATIC_7,1,214,295,74
     LTEXT           "&Thema:",IDC_STATIC_8,8,228,62,8
     COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
@@ -1169,10 +1176,22 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Toetsenbord"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Sneltoetsen voor Sally kommandos kunnen niet veranderd worden.",IDC_STATIC_1,2,4,264,8
+    LTEXT           "Kies voor elke sneltoets een opdrachtshell.",IDC_STATIC_1,2,4,264,8
     LTEXT           "Een uitgebreide lijst met sneltoetsen staat ter beschikking in",IDC_STATIC_2,2,17,196,8
-    LTEXT           "'hulp'",IDC_KEYBOARD_SHORTCUTS,198,17,17,8,WS_TABSTOP
+    LTEXT           "'hulp'",IDC_KEYBOARD_SHORTCUTS,198,17,20,8,WS_TABSTOP
     LTEXT           "U kunt sneltoetsen voor de plugin kommandos definiëren:\r 1. Uit het Plugin menu kies Plugins Manager\r  2. Kies de gewenste plugin\r  3. Klik de knop 'Toetsenbord'",IDC_STATIC_3,2,31,282,32
+    GROUPBOX        "Opdrachtshell",IDC_SHELL_GROUP,2,76,295,149
+    LTEXT           "Standaard&shell:",IDC_SHELL_DEFAULT_LABEL,10,91,103,8
+    COMBOBOX        IDC_SHELL_DEFAULT,116,88,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Ctrl+Num /:",IDC_SHELL_CTRL_LABEL,10,116,103,8
+    COMBOBOX        IDC_SHELL_CTRL,116,113,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Shift+Num /:",IDC_SHELL_SHIFT_LABEL,10,140,103,8
+    COMBOBOX        IDC_SHELL_SHIFT,116,137,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Alt+Num /:",IDC_SHELL_ALT_LABEL,10,164,103,8
+    COMBOBOX        IDC_SHELL_ALT,116,161,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Profielen &vernieuwen",IDC_SHELL_REFRESH,203,187,84,14
+    LTEXT           "Elke shell wordt geopend in de map van het actieve paneel.",IDC_SHELL_NOTE,10,189,185,16
+    LTEXT           "",IDC_SHELL_STATUS,10,207,277,16
 END
 
 IDD_FILELIST DIALOGEX 61, 53, 304, 136
@@ -1506,23 +1525,23 @@ BEGIN
     PUSHBUTTON      "&Help",IDHELP,241,130,50,14
 END
 
-IDD_SLGSELECTOR DIALOGEX 107, 84, 276, 220
+IDD_LANGUAGESELECTOR DIALOGEX 107, 84, 276, 220
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Taal selecteren"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Selecteer een van de geïnstalleerde talen.",IDC_STATIC_1,5,7,240,8
-    CONTROL         "",IDC_SLG_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,266,101
+    CONTROL         "",IDC_LANGUAGE_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,266,101
     GROUPBOX        "Over de taal versie",IDC_STATIC_2,5,124,266,69,WS_GROUP
     LTEXT           "Auteuren:",IDC_STATIC_3,13,138,30,8
-    EDITTEXT        IDC_SLG_AUTHOR,66,138,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    EDITTEXT        IDC_LANGUAGE_AUTHOR,66,138,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
     LTEXT           "Web:",IDC_STATIC_5,13,166,22,8
-    LTEXT           "",IDC_SLG_WEB,68,166,194,8,WS_TABSTOP
+    LTEXT           "",IDC_LANGUAGE_WEB,68,166,194,8,WS_TABSTOP
     LTEXT           "Commentaar:",IDC_STATIC_6,13,177,37,8
-    LTEXT           "",IDC_SLG_COMMENT,68,177,194,8
+    LTEXT           "",IDC_LANGUAGE_COMMENT,68,177,194,8
     DEFPUSHBUTTON   "OK",IDOK,164,199,50,14,WS_GROUP
     PUSHBUTTON      "Annuleren",IDCANCEL,220,199,50,14
-    LTEXT           "Language",IDC_SLG_DESCR,19,31,46,8
+    LTEXT           "Language",IDC_LANGUAGE_DESCR,19,31,46,8
 END
 
 IDD_SKILLLEVEL DIALOGEX 137, 77, 239, 132
@@ -1548,16 +1567,16 @@ CAPTION "Geschiedenis"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "U kunt kiezen of recente waardes (geschiedenis) als deel van de Sally configuratie in het register bewaard moeten worden.",IDC_STATIC_2,1,4,254,16
-    CONTROL         "&Geschiedenis bewaren",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,54,12
+    CONTROL         "&Geschiedenis bewaren",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,89,12
     CONTROL         "&Lijst van gebruikte mappen bewaren",IDC_HISTORY_WORKDIRS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,118,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,135,12
     LTEXT           "Er zijn speciale opties voor de opdrachtregel geschiedenis.",IDC_STATIC_3,1,60,228,16
     CONTROL         "&Opdracht regel geschiedenis activeren",IDC_HISTORY_ENABLECMDLINE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,80,247,12
     CONTROL         "Opdracht regel geschiedenis bew&aren",IDC_HISTORY_SAVECMDLINE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,93,247,12
     LTEXT           "Geschiedenis nu wissen.",IDC_STATIC_4,1,116,144,8
-    PUSHBUTTON      "Geschiedenis &wissen...",IDC_HISTORY_CLEARHISTORY,1,126,60,14
+    PUSHBUTTON      "Geschiedenis &wissen...",IDC_HISTORY_CLEARHISTORY,1,126,80,14
 END
 
 IDD_SHARES DIALOGEX 12, 24, 344, 238
@@ -1831,24 +1850,24 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Wissel Station Menu en Station Balk"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "U kunt de inhoud van ""Wissel Station Menu en Station Balk"" aanpassen.",IDC_STATIC_1,1,3,221,8
+    LTEXT           "U kunt de inhoud van ""Wissel Station Menu en Station Balk"" aanpassen.",IDC_STATIC_1,1,3,237,8
     GROUPBOX        " Stations ",IDC_STATIC_2,1,18,294,73,WS_GROUP
-    LTEXT           "&Selecteer stations die getoond moeten worden:",IDC_STATIC_3,9,31,120,8
+    LTEXT           "&Selecteer stations die getoond moeten worden:",IDC_STATIC_3,9,31,157,8
     LISTBOX         IDL_CHD_DRIVES,9,41,277,12,LBS_MULTIPLESEL | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | LBS_DISABLENOSCROLL | LBS_NODATA | WS_TABSTOP
-    LTEXT           "S&electeer stations die door een scheidingsteken gevolgd moeten worden:",IDC_STATIC_4,9,60,172,8
+    LTEXT           "S&electeer stations die door een scheidingsteken gevolgd moeten worden:",IDC_STATIC_4,9,60,243,8
     LISTBOX         IDL_CHD_SEPARATORS,9,70,277,12,LBS_MULTIPLESEL | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | LBS_DISABLENOSCROLL | LBS_NODATA | WS_TABSTOP
     GROUPBOX        " Additionele items ",IDC_STATIC_5,1,99,294,73,WS_GROUP
-    CONTROL         "&Documenten",IDC_CHD_SHOWMYDOC,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,113,55,12
+    CONTROL         "&Documenten",IDC_CHD_SHOWMYDOC,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,113,58,12
     CONTROL         "&Cloud Opslag Services",IDC_CHD_SHOWCLOUDSTORAGE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,126,100,12
     CONTROL         "&Netwerk",IDC_CHD_SHOWNET,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,139,44,12
     CONTROL         "Zoals &Ander Paneel (alleen in Wissel Station Menu)",IDC_CHD_SHOWANOTHER,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,152,161,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,152,182,12
     LTEXT           "Hoe kan ik de weergave van ",IDC_STATIC_6,1,181,91,8
     LTEXT           "Favorieten",IDS_CHD_HOTPATHS,92,181,30,8,WS_TABSTOP
     LTEXT           "en",IDC_STATIC_7,125,181,15,8
     LTEXT           "Plugin FS",IDS_CHD_PLUGINS,142,181,33,8,WS_TABSTOP
-    LTEXT           "items veranderen.",IDC_STATIC_8,175,181,22,8
+    LTEXT           "items veranderen.",IDC_STATIC_8,175,181,60,8
 END
 
 IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 231
@@ -1857,29 +1876,29 @@ CAPTION "Schermen"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Bestanden en mappen met '&verborgen' of 'systeem' attribuut verbergen (Ctrl+H)",IDC_NOTHIDDENSYSTEM,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,232,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,280,12
     CONTROL         "Ma&ppen aan selecteer/deselecteer operaties toevoegen",IDC_INCLUDEDIRS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,173,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,198,12
     LTEXT           "&Namen tonen:",IDC_STATIC_1,1,33,48,8
-    COMBOBOX        IDC_NAMEMANGLE,50,31,243,72,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Grootte tonen:",IDC_STATIC_5,1,49,42,8
-    COMBOBOX        IDC_SIZEFORMAT,50,47,243,49,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_NAMEMANGLE,52,31,241,72,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Grootte tonen:",IDC_STATIC_5,1,49,49,8
+    COMBOBOX        IDC_SIZEFORMAT,52,47,241,49,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Keyboard",IDC_STATIC_2,1,67,34,8
     CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,37,71,260,1
     CONTROL         "Invoer van paneel naar opdrachtregel &omleiden (houd ALT voor Snel Zoeken)",IDC_QUICKSEARCH_ALT,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,78,256,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,78,269,12
     CONTROL         "Shi&ft+nummer om uit de favorieten te kiezen",IDC_SHIFTFORHOTPATHS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,90,282,12
     LTEXT           "Mouse",IDC_STATIC_3,1,105,24,8
     CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,27,109,270,1
     CONTROL         "&Rechts-klik om snelmenu te openen (houd CTRL om te [de]selecteren)",IDE_PRIMARYCTXMENU,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,116,228,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,116,246,12
     CONTROL         "Naam &wijzigen door langzame dubbel klik op de naam",IDC_CLICKTORENAME,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,128,153,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,128,195,12
     CONTROL         "&drag-and-drop operaties korter dan:",IDC_DISABLEDANDD,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,140,170,12
     EDITTEXT        IDE_DRAGDROPDELAY,181,140,28,12,ES_AUTOHSCROLL
-    LTEXT           "ms. afbreken",IDC_STATIC_4,213,142,13,8,NOT WS_GROUP
+    LTEXT           "ms. afbreken",IDC_STATIC_4,213,142,44,8,NOT WS_GROUP
     LTEXT           "Sorting",IDC_STATIC_6,1,156,26,8
     CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,29,160,268,1
     CONTROL         "&strings volgens regionale settings sorteren",IDC_SORTUSESLOCALE,
@@ -1887,11 +1906,11 @@ BEGIN
     CONTROL         "Getallen in strings n&umerisch sorteren",IDC_SORTDETECTNUMBERS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,178,186,12
     CONTROL         "Sorteren volgens &Tijd: nieuwe items bovenaan",IDC_SORTNEWERONTOP,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,190,146,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,190,167,12
     CONTROL         "Sorteren volgens Tijd: mappen volgens n&aam sorteren",IDC_SORTDIRSBYNAME,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,141,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,193,12
     CONTROL         "Mappen behandelen alsof ze e&xtensies hebben(laat extensies in Ext kolom zien)",IDC_SORTDIRSBYEXT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,265,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,278,12
 END
 
 IDD_CANNOTSETATTRSINFO DIALOGEX 15, 33, 353, 89
@@ -1964,7 +1983,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "&Aangepaste pictogram overlay tonen (van Shell extensies)",IDC_ICONOVRLS_ENABLE,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,210,12
-    LTEXT           "Aangepaste &pictogram Overlay handlers:",IDC_ICONOVRLS_HEADER,1,26,106,8
+    LTEXT           "Aangepaste &pictogram Overlay handlers:",IDC_ICONOVRLS_HEADER,1,26,134,8
     CONTROL         "",IDC_ICONOVRLS_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,1,36,295,175
 END
 
@@ -1976,7 +1995,7 @@ BEGIN
     GROUPBOX        " Hoofd Wachtwoord ",IDC_STATIC_1,1,4,293,77
     LTEXT           "",IDC_STATIC_2,9,20,267,32
     CONTROL         "&Gebruik Hoofd Wachtwoord",IDC_SEC_ENABLE_MASTERPWD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,60,168,12
-    PUSHBUTTON      "Hoofd &Wachtwoord veranderen...",IDC_SEC_CHANGE_MASTERPWD,180,59,104,14
+    PUSHBUTTON      "Wijzig hoofd&wachtwoord...",IDC_SEC_CHANGE_MASTERPWD,180,59,110,14
 END
 
 IDD_CHANGE_MASTERPWD DIALOGEX 77, 59, 221, 137
@@ -4229,4 +4248,24 @@ BEGIN
     IDS_LONGPATH_RESTART "Windows-instelling gewijzigd. Herstart toepassingen en zo nodig Windows."
     IDS_LONGPATH_CONFIRM "Deze Windows-instelling direct voor alle gebruikers wijzigen? Annuleren in de configuratie maakt dit niet ongedaan. Goedkeuring van een beheerder is vereist. Herstart daarna toepassingen en zo nodig Windows."
     IDS_LONGPATH_FAILED "Windows heeft de gevraagde instelling voor lange paden niet bevestigd. Controleer beheerdersrechten of neem contact op met uw beheerder."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_SHELL_NOT_ASSIGNED "Niet toegewezen"
+    IDS_SHELL_UNAVAILABLE_LABEL "niet beschikbaar"
+    IDS_SHELL_SHORTCUT_CONFLICT "Een geselecteerde sneltoets wordt door een plugin gebruikt. Wis deze toewijzing of wijzig de sneltoets van de plugin."
+    IDS_SHELL_PROFILE_UNAVAILABLE "Een toegewezen profiel is niet beschikbaar. De opgeslagen keuze blijft behouden."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_UM_SHOWWHEN_NOTE_ON "Als een regel niet overeenkomt, wordt de opdracht verborgen in de Gebruikers Menu Balk en het F9 Gebruikers Menu."
+    IDS_UM_SHOWWHEN_NOTE_OFF "Uit: de opdracht wordt altijd getoond. De maskers blijven bewaard."
+    IDS_UM_SHOWWHEN_NOTE_NESTED "Regels gelden alleen voor opdrachten en submenu's op het hoogste niveau."
+    IDS_UM_FOLDERMASK_INCORRECT "Mapnaam masker is syntactisch foutief."
+    IDS_UM_FILEMASK_CUE "*.png;*.jpg  (leeg = elk bestand)"
+    IDS_UM_FOLDERMASK_CUE "Foto's;src  (leeg = elke map)"
+    IDS_UM_SHOWWHEN_FILE_HINT "als %s"
+    IDS_UM_SHOWWHEN_FOLDER_HINT "in %s"
 END

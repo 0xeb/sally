@@ -1,0 +1,126 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for checksum. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/checksum/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\checksum.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CALCULATE DIALOGEX 0, 0, 344, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+CAPTION "체크섬 계산"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,334,54
+    LTEXT           "계산 중:",IDC_LABEL,5,68,40,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,48,68,107,8
+    PUSHBUTTON      "설정(&F)...",IDC_BUTTON_CONFIGURE,162,65,55,14,WS_CLIPSIBLINGS
+    PUSHBUTTON      "저장(&S)...",IDC_BUTTON_SAVE,223,65,55,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "중지(&S)",IDC_BUTTON_CLOSE,284,65,55,14,WS_CLIPSIBLINGS
+    LTEXT           "클립보드 힌트",IDC_LABEL_HINT,5,68,45,8,WS_CLIPSIBLINGS
+END
+
+IDD_VERIFY DIALOGEX 0, 0, 260, 84
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_VISIBLE
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "List1",IDC_LIST_FILES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA | WS_CLIPSIBLINGS | WS_BORDER | WS_TABSTOP,5,5,250,54
+    LTEXT           "확인 중:",IDC_LABEL,5,68,40,8,WS_CLIPSIBLINGS
+    CONTROL         "Progress1",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_CLIPSIBLINGS | WS_BORDER,48,68,95,8
+    LTEXT           "",IDC_LABEL_RESULT,5,68,140,8,WS_CLIPSIBLINGS
+    PUSHBUTTON      "포커스(&F)",IDC_BUTTON_FOCUS,149,65,50,14,WS_CLIPSIBLINGS
+    DEFPUSHBUTTON   "중지(&S)",IDC_BUTTON_CLOSE,205,65,50,14,WS_CLIPSIBLINGS
+END
+
+IDD_CONFIGURATION DIALOGEX 22, 38, 189, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "체크섬 설정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " 체크섬 계산 ",IDC_STATIC_1,8,5,174,76,WS_GROUP
+    CONTROL         "CRC/SFV(&C)",IDC_CFG_CRC,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,15,16,105,10
+    CONTROL         "MD5(&M)",IDC_CFG_MD5,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,28,105,10
+    CONTROL         "SHA-1(&1)",IDC_CFG_SHA1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,40,105,10
+    CONTROL         "SHA-256(&2)",IDC_CFG_SHA256,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,52,105,10
+    CONTROL         "SHA-512(&5)",IDC_CFG_SHA512,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,64,105,10
+    DEFPUSHBUTTON   "확인",IDOK,14,88,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,69,88,50,14
+    PUSHBUTTON      "도움말",IDHELP,124,88,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "체크섬"
+ IDS_ABOUTTITLE "플러그인 정보"
+ IDS_PLUGIN_DESCRIPTION "SFV, MD5, SHA-1, SHA-256, SHA-512 체크섬 확인 및 계산 도구입니다."
+ IDS_OUTOFMEM "메모리 부족"
+ IDS_ERROROPENING, "파일 열기 오류"
+ IDS_READERROR "읽기 오류"
+ IDS_WRITEERROR "쓰기 오류"
+ IDS_SKIPPED "건너뜀"
+ IDS_CALCULATING "계산 중..."
+ IDS_CANCELED "취소됨"
+ IDS_HINT "항목을 마우스 오른쪽 단추로 클릭하면 체크섬을 클립보드로 복사할 수 있습니다."
+ IDS_COPYTOCBOARD_CRC "CRC 값을 클립보드로 복사(&C)\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "MD5 체크섬을 클립보드로 복사(&M)\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "SHA-1 체크섬을 클립보드로 복사(&1)\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "SHA-256 체크섬을 클립보드로 복사(&2)\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "SHA-512 체크섬을 클립보드로 복사(&5)\tCtrl+5"
+ IDS_REMOVEITEM "항목 제거(&R)\tDelete"
+ IDS_SAVE_TITLE  "체크섬 파일 저장"
+ IDS_SAVE_FILTER_CRC  "SFV 파일 (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "MD5 파일 (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "SHA-1 파일 (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "SHA-256 파일 (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "SHA-512 파일 (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "파일 '%s'이(가) 이미 있습니다.\n덮어쓰시겠습니까?"
+ IDS_ERRORCREATINGFILE "파일을 만드는 중 오류가 발생했습니다."
+ IDS_SKIPPEDFILES "계산 중에 건너뛰거나 취소한 파일은 저장되지 않았습니다."
+ IDS_ERROROPENING2 "파일 '%s'을(를) 여는 중 오류가 발생했습니다."
+ IDS_MISSING "없음"
+ IDS_BADEXT "선택한 파일의 확장명이 SFV, MD5, SHA1, SHA256, SHA512 중 어느 것도 아닙니다. 그래도 계속하시겠습니까?"
+ IDS_BADFILE "선택한 파일은 올바른 SFV, MD5, SHA-1, SHA-256, SHA-512 파일이 아닙니다."
+ IDS_VERIFYING "확인 중..."
+ IDS_OK "정상"
+ IDS_CORRUPT "손상됨"
+ IDS_MENU_CALCULATE "체크섬 계산(&C)..."
+ IDS_MENU_VERIFY "체크섬 확인(&V)..."
+ IDS_CONFIG_CONFLICT "설정이 이미 열려 있습니다."
+ IDS_CONFIG_CHANGES_EFFECT "변경 내용은 다음에 '체크섬 계산' 창을 열 때 적용됩니다."
+ IDS_ALLOK "모든 파일 정상"
+ IDS_RESULT "손상 %d개, 없음 %d개, 건너뜀 %d개"
+ IDS_BUSY "Sally가 사용 중입니다. 요청한 명령을 수행할 수 없으니 나중에 다시 시도하십시오."
+ IDS_CLOSE "닫기(&C)"
+ IDS_READINGTREE "디렉터리 트리를 읽는 중입니다. 잠시 기다려 주십시오..."
+ IDS_ERRORREADINGDIR "디렉터리 읽기 오류"
+ IDS_NOFILES "파일 없음"
+ IDS_VERIFYTITLE "체크섬 확인"
+ IDS_VERIFY_CRC "CRC 확인"
+ IDS_VERIFY_MD5 "MD5 확인"
+ IDS_VERIFY_SHA1 "SHA-1 확인"
+ IDS_VERIFY_SHA256 "SHA-256 확인"
+ IDS_VERIFY_SHA512 "SHA-512 확인"
+ IDS_COLUMN_FILE "파일"
+ IDS_COLUMN_SIZE "크기"
+ IDS_COLUMN_STATUS "상태"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "이름이 너무 길어서 작업을 완료할 수 없습니다."
+}

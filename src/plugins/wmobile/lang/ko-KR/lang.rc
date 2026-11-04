@@ -1,0 +1,133 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for wmobile. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/wmobile/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\wmobile.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_PROGRESSDLG DIALOGEX 18, 80, 353, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,8,11,32,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,11,305,8
+    RTEXT           "전체:",IDC_STATIC_1,11,35,24,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,39,34,301,12
+    PUSHBUTTON      "취소",IDCANCEL,151,57,50,14
+END
+
+IDD_PROGRESS2DLG DIALOGEX 10, 30, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPERATION,3,11,37,8
+    CONTROL         "",IDT_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,11,305,8
+    RTEXT           "",IDT_OPERATION2,8,23,32,8
+    CONTROL         "",IDT_FILENAME2,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,43,23,305,8
+    RTEXT           "파일:",IDC_STATIC_1,18,41,22,8
+    CONTROL         "",IDP_PROGRESSBAR2,"Static",0,43,40,297,12
+    RTEXT           "전체:",IDC_STATIC_2,16,56,24,8
+    CONTROL         "",IDP_PROGRESSBAR,"Static",0,43,55,297,12
+    PUSHBUTTON      "취소",IDCANCEL,155,78,50,14
+END
+
+IDD_ATTRIBUTES DIALOGEX 30, 29, 181, 203
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "특성 변경"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,48,12,127,1
+    LTEXT           "특성 설정",IDC_STATIC_2,9,8,37,8
+    CONTROL         "보관(&A)",IDC_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,18,41,12
+    CONTROL         "숨김(&H)",IDC_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,75,18,40,12
+    CONTROL         "읽기 전용(&R)",IDC_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,16,30,49,12
+    CONTROL         "시스템(&Y)",IDC_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,75,30,40,12
+    CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,73,58,102,1
+    LTEXT           "날짜 및 시간 변경",IDC_STATIC_4,9,54,62,8
+    LTEXT           "수정한 날짜(&M)",IDC_STATIC_5,16,71,31,8
+    CONTROL         "",IDC_ATTR_MODIFIED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,51,69,66,12
+    CONTROL         "",IDC_ATTR_MODIFIED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,123,69,50,12
+    LTEXT           "만든 날짜(&T)",IDC_STATIC_6,16,87,30,8
+    CONTROL         "",IDC_ATTR_CREATED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,51,85,66,12
+    CONTROL         "",IDC_ATTR_CREATED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,123,85,50,12
+    LTEXT           "액세스한 날짜(&D)",IDC_STATIC_7,16,103,30,8
+    CONTROL         "",IDC_ATTR_ACCESSED_DATE,"SysDateTimePick32",DTS_SHOWNONE | WS_TABSTOP,51,101,66,12
+    CONTROL         "",IDC_ATTR_ACCESSED_TIME,"SysDateTimePick32",DTS_UPDOWN | WS_TABSTOP | 0x8,123,101,50,12
+    PUSHBUTTON      "현재 시간(&U)",IDC_ATTR_CURRENT,116,118,57,14
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,31,141,144,1
+    LTEXT           "옵션",IDC_STATIC_9,9,137,20,8
+    CONTROL         "하위 디렉터리 포함(&S)",IDC_RECURSESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,147,87,12
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,9,172,166,1
+    DEFPUSHBUTTON   "확인",IDOK,9,181,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,65,181,50,14
+    PUSHBUTTON      "도움말",IDHELP,121,181,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Windows Mobile"
+  IDS_PLUGIN_DESCRIPTION, "Windows Mobile 장치의 파일에 액세스합니다."
+  IDS_ABOUT, "플러그인 정보"
+}
+
+STRINGTABLE
+BEGIN
+  IDS_WMPLUGINTITLE          "Windows Mobile 플러그인"
+  IDS_WMPLUGINTITLE_ERROR    "Windows Mobile 플러그인 오류"
+  IDS_WMPLUGINTITLE_QUESTION "Windows Mobile 플러그인 질문"
+  IDS_ERR_CONNECTION         "장치에 연결할 수 없습니다.\n\n기본 전송 프로그램(예: ActiveSync)이 설치되어 있고 장치가 연결되어 있는지 확인하십시오."
+  IDS_CONNECTING             "장치에 연결하는 중입니다. 잠시 기다려 주십시오..."
+  IDS_PATH_ERROR             "경로: %s\n오류: %s"
+  IDS_YESNO_CANCEL           "이 작업을 취소하시겠습니까?"
+  IDS_ERR_MEMORYLOW          "메모리가 부족합니다."
+  IDS_ERR_PATHTOOLONG        "경로가 너무 길어서 작업을 완료할 수 없습니다."
+  IDS_ERR_CREATEDIR          "디렉터리 ""%s""을(를) 만들 수 없습니다."
+  IDS_YESNO_CREATEDIR        "디렉터리 ""%s""이(가) 없습니다.\n\n만드시겠습니까?"
+  IDS_ERR_DIRNAMEISFILE      "이름 ""%s""은(는) 이미 파일에 사용되고 있습니다."
+  IDS_ERR_INVALIDDATEFORMAT  "날짜 형식이 잘못되었습니다."
+  IDS_ERR_NAMETOOLONG        "이름이 너무 길어서 작업을 완료할 수 없습니다."
+  IDS_ERR_FILEINPATH         "지정한 경로에 파일 경로가 포함되어 있습니다. 파일을 열 수 없습니다."
+  IDS_YESNO_CONNETCLOSEPLUGIN "장치에 연결할 수 없습니다.\r\n\r\n플러그인을 닫으시겠습니까?"
+  IDS_SORRY_CREATEDIR1        "죄송합니다. 이 플러그인은 디스크 또는 압축 파일 경로에 디렉터리를 만들 수 없습니다."
+  IDS_SORRY_CREATEDIR2        "죄송합니다. 이 플러그인은 지정한 파일 시스템에 디렉터리를 만들 수 없습니다."
+  IDS_SORRY_CREATEDIR3        "죄송합니다. 이 플러그인은 현재 열려 있는 드라이브 외부에 디렉터리를 만들 수 없습니다."
+  IDS_ERR_INVALIDPATH         "지정한 경로가 잘못되었습니다."
+  IDS_READ                    "읽기"
+  IDS_READING                 "읽는 중"
+  IDS_WAIT_READINGDIRTREE     "디렉터리 트리를 읽는 중입니다. 잠시 기다려 주십시오..."
+  IDS_DELETE                  "삭제"
+  IDS_DELETING                "삭제 중"
+  IDS_YESNO_DELETENOEMPTYDIR  "디렉터리 ""%s""이(가) 비어 있지 않습니다.\n삭제하시겠습니까?"
+  IDS_YESNO_DELETEHIDDENFILE  "시스템 또는 숨김 특성이 있는 파일을 삭제하시겠습니까?"
+  IDS_YESNO_DELETEHIDDENDIR   "시스템 또는 숨김 특성이 있는 디렉터리를 삭제하시겠습니까?"
+  IDS_ERR_TARGETPATHNOEXISTS  "대상 경로가 없습니다. Windows Mobile 플러그인은 대상 경로 만들기를 지원하지 않습니다."
+  IDS_ERR_COPYTOOTHERFS       "Windows Mobile 플러그인은 다른 플러그인 파일 시스템으로의 복사나 이동을 지원하지 않습니다."
+  IDS_ERR_COPYTOARCHIVES      "Windows Mobile 플러그인은 압축 파일로의 복사나 이동을 지원하지 않습니다."
+  IDS_COPY                    "복사"
+  IDS_COPYING                 "복사 중"
+  IDS_MOVE                    "이동"
+  IDS_MOVING                  "이동 중"
+  IDS_TO                      "대상"
+  IDS_ERR_COPYDIRTOITSELF     "디렉터리를 자기 자신에게 복사할 수 없습니다."
+  IDS_ERR_COPYFILETOITSELF    "파일을 자기 자신에게 복사할 수 없습니다."
+  IDS_YESNO_OVERWRITEHIDDENFILE "시스템 또는 숨김 특성이 있는 파일을 덮어쓰시겠습니까?"
+  IDS_ERR_MOVEDIRTOITSELF     "디렉터리를 자기 자신으로 이동할 수 없습니다."
+  IDS_ERR_MOVEFILETOITSELF    "파일을 자기 자신으로 이동할 수 없습니다."
+  IDS_ATTRIBUTES              "특성"
+  IDS_CHANGING                "변경 중"
+END

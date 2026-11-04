@@ -470,6 +470,8 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (DirectoryHelper) // a target folder is typed here (not a new name)
             AttachPathSuggestions(HWindow, IDE_PATH);
+        else if (NewDirectorySuggestions)
+            AttachPathSuggestions(HWindow, IDE_PATH, true);
         CreateKeyForwarder(HWindow, IDE_PATH); // so that we receive WM_USER_KEYDOWN
         if (DirectoryHelper)
         {
@@ -1020,7 +1022,16 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         MoreButton = new CButton(HWindow, IDC_MORE, BTF_MORE | BTF_CHECKBOX);
         SetOptionsButtonState(TRUE);
 
-        AttachPathSuggestions(HWindow, IDE_PATH); // before the key forwarder subclasses the edit
+        if (FileSuggestions) // before the key forwarder subclasses the edit
+        {
+            PathSuggestionOptions suggestions;
+            suggestions.Kinds = Sally::PathCompletion::CandidateKinds::FoldersAndFiles;
+            suggestions.AcceptOnlyWhileVisible = true;
+            suggestions.BaseDirectory = SuggestionBaseDirectory;
+            AttachPathSuggestions(HWindow, IDE_PATH, suggestions);
+        }
+        else
+            AttachPathSuggestions(HWindow, IDE_PATH); // before the key forwarder subclasses the edit
         CreateKeyForwarder(HWindow, IDE_PATH);                  // so that we receive WM_USER_KEYDOWN
         ChangeToIconButton(HWindow, IDB_BROWSE, IDI_DIRECTORY); // the button will have a folder icon and an arrow to the right
 

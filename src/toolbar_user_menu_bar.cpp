@@ -386,24 +386,22 @@ public:
                     CUserMenuItem* item = new CUserMenuItem(name.c_str(), buff.c_str(), emptyBuffer, fullPathBuffer, emptyBuffer,
                                                             shell, FALSE, FALSE, TRUE, umitItem, NULL);
 
-                    // find the place where the item should be inserted
-                    int count = 0;
-                    int i;
-                    for (i = 0; i < MainWindow->UserMenuItems->Count; i++)
+                    // find the place where the item should be inserted: before the entry of the
+                    // button it was dropped on (#50: buttons of hidden commands do not count),
+                    // or at the end after the last button
+                    const std::vector<size_t>& shown = UserMenuBar->GetShownEntries();
+                    int i = 0;
+                    if (insertIndex >= 0 && insertIndex < (int)shown.size())
+                        i = (int)shown[insertIndex];
+                    else if (!shown.empty())
                     {
-                        CUserMenuItem* item2 = MainWindow->UserMenuItems->At(i);
-                        if (count >= insertIndex)
-                            break;
-
-                        if (item2->Type == umitSubmenuBegin)
+                        int last = (int)shown.back();
+                        if (MainWindow->UserMenuItems->At(last)->Type == umitSubmenuBegin)
                         {
-                            int endIndex = MainWindow->UserMenuItems->GetSubmenuEndIndex(i);
-                            if (endIndex != -1)
-                                i = endIndex;
+                            const int endIndex = MainWindow->UserMenuItems->GetSubmenuEndIndex(last);
+                            last = endIndex != -1 ? endIndex : MainWindow->UserMenuItems->Count - 1;
                         }
-
-                        if (item2->ShowInToolbar)
-                            count++;
+                        i = last + 1;
                     }
                     MainWindow->UserMenuItems->Insert(i, item);
 
@@ -473,6 +471,11 @@ CUserMenuBar::CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin)
 
       BOOL CUserMenuBar::CreateButtons()
 {
+    return CreateButtons(MainWindow->GetUserMenuContext());
+}
+
+BOOL CUserMenuBar::CreateButtons(const Sally::UserMenuConditions::Context& context)
+{
     CALL_STACK_MESSAGE1("CUserMenuBar::CreateButtons()");
     if (HWindow == NULL)
         return FALSE;
@@ -481,62 +484,50 @@ CUserMenuBar::CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin)
     SetStyle(TLB_STYLE_IMAGE | (Configuration.UserMenuToolbarLabels ? TLB_STYLE_TEXT : 0));
 
     // load icons into own toolbar
-    // insert only items and submenus from the top level; the rest will expand as submenus
-    int level = 0;
+    // insert only items and submenus from the top level; the rest will expand as submenus.
+    // #50: commands whose "Show only when" rule does not match 'context' are left out; button
+    // IDs keep the User Menu index, so a click still runs the command it shows.
+    CUserMenuItems& items = *MainWindow->UserMenuItems;
+    ShownEntries = Sally::UserMenuConditions::ToolbarEntries(UserMenuConditionEntries(items, items.Count, context));
     TLBI_ITEM_INFO2 tii;
-    int i;
-    for (i = 0; i < MainWindow->UserMenuItems->Count; i++)
+    for (size_t entry : ShownEntries)
     {
-        CUserMenuItem* item = MainWindow->UserMenuItems->At(i);
-        switch (item->Type)
+        const int i = static_cast<int>(entry);
+        CUserMenuItem* item = items.At(i);
+        if (item->Type == umitSeparator)
         {
-        case umitSubmenuEnd:
-        {
-            if (level > 0)
-                level--;
-            break;
+            tii.Mask = TLBI_MASK_STYLE;
+            tii.Style = TLBI_STYLE_SEPARATOR;
+            InsertItem2(0xFFFFFFFF, TRUE, &tii);
+            continue;
         }
-
-        case umitSeparator:
-        {
-            if (level == 0 && item->ShowInToolbar)
-            {
-                tii.Mask = TLBI_MASK_STYLE;
-                tii.Style = TLBI_STYLE_SEPARATOR;
-                InsertItem2(0xFFFFFFFF, TRUE, &tii);
-            }
-            break;
-        }
-
-        case umitItem:
-        case umitSubmenuBegin:
-        {
-            if (level == 0 && item->ShowInToolbar)
-            {
-                tii.Mask = TLBI_MASK_STYLE | TLBI_MASK_TEXT | TLBI_MASK_ICON |
-                           TLBI_MASK_ID | TLBI_MASK_ENABLER;
-                tii.Style = TLBI_STYLE_SHOWTEXT | TLBI_STYLE_NOPREFIX;
-                if (item->Type == umitSubmenuBegin)
-                    tii.Style |= TLBI_STYLE_WHOLEDROPDOWN | TLBI_STYLE_DROPDOWN;
-                std::wstring text = item->ItemName;
-                RemoveAmpersands(text.data());
-                text.resize(wcslen(text.c_str()));
-                tii.Text = text.data();
-                tii.HIcon = item->UMIcon;
-                tii.ID = CM_USERMENU_MIN + i;
-                tii.Enabler = &EnablerOnDisk;
-                InsertItem2(0xFFFFFFFF, TRUE, &tii);
-            }
-            if (item->Type == umitSubmenuBegin)
-                level++;
-            break;
-        }
-        }
+        tii.Mask = TLBI_MASK_STYLE | TLBI_MASK_TEXT | TLBI_MASK_ICON |
+                   TLBI_MASK_ID | TLBI_MASK_ENABLER;
+        tii.Style = TLBI_STYLE_SHOWTEXT | TLBI_STYLE_NOPREFIX;
+        if (item->Type == umitSubmenuBegin)
+            tii.Style |= TLBI_STYLE_WHOLEDROPDOWN | TLBI_STYLE_DROPDOWN;
+        std::wstring text = item->ItemName;
+        RemoveAmpersands(text.data());
+        text.resize(wcslen(text.c_str()));
+        tii.Text = text.data();
+        tii.HIcon = item->UMIcon;
+        tii.ID = CM_USERMENU_MIN + i;
+        tii.Enabler = &EnablerOnDisk;
+        InsertItem2(0xFFFFFFFF, TRUE, &tii);
     }
 
     UpdateItemsState();
 
     return TRUE;
+}
+
+void CUserMenuBar::RefreshForContext(const Sally::UserMenuConditions::Context& context)
+{
+    if (HWindow == NULL)
+        return;
+    CUserMenuItems& items = *MainWindow->UserMenuItems;
+    if (Sally::UserMenuConditions::ToolbarEntries(UserMenuConditionEntries(items, items.Count, context)) != ShownEntries)
+        CreateButtons(context);
 }
 
 void CUserMenuBar::ToggleLabels()

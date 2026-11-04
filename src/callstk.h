@@ -27,6 +27,11 @@
 
 typedef void (*FPrintLine)(void* param, const char* txt, BOOL tab);
 
+namespace sally::diagnostic
+{
+struct PluginLoadDiagnostic;
+}
+
 BOOL StartSalmonProcess(BOOL enableRestartAS);
 
 #if (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
@@ -64,6 +69,7 @@ protected:
                                   // (NULL if it is sally.exe)
     int PluginDLLNameUses;        // the Pop() operation count at which PluginDLLName should be set to NULL
                                   // (nesting level)
+    const sally::diagnostic::PluginLoadDiagnostic* LoadingPlugin = nullptr;
 
     static DWORD TlsIndex;                        // TLS index always storing 'this'
     static BOOL SectionOK;                        // is the critical section initialized?
@@ -134,6 +140,8 @@ public:
     }
 
     const wchar_t* GetPluginDLLName() { return PluginDLLName; }
+    const sally::diagnostic::PluginLoadDiagnostic* GetLoadingPlugin() const { return LoadingPlugin; }
+    const sally::diagnostic::PluginLoadDiagnostic** LoadingPluginSlot() { return &LoadingPlugin; }
 
     void Reset() // start enumerating lines
     {

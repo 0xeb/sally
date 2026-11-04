@@ -328,6 +328,7 @@ CConfiguration::CConfiguration()
     CommandShellTargetKind = 0;
     CommandShellProfileGuid.clear();
     CommandShellProfileName.clear();
+    CommandShellShortcuts = Sally::ShellProfiles::EmptyShortcuts();
     //  FastDirectoryMove = TRUE;
     SortUsesLocale = TRUE;
     SortDetectNumbers = TRUE;
@@ -560,8 +561,8 @@ CConfiguration::CConfiguration()
     FindColNameWidth = -1; // let it be set according to the window size
 
     // Language
-    LoadedSLGName.clear();
-    SLGName.clear();
+    LoadedLanguageTag.clear();
+    LanguageTag.clear();
 
     // the ConversionTable variable is not loaded from the configuration
     ConversionTable = L"*";
@@ -741,6 +742,7 @@ CConfigurationDlg::CConfigurationDlg(HWND parent, CUserMenuItems* userMenuItems,
                                                               : mode == 3   ? 21
                                                               : mode == 4   ? 12
                                                               : mode == 5   ? 1
+                                                              : mode == 7   ? 8
                                                                             : 11 /* mode == 6 */,
                       PSH_NOAPPLYNOW | PSH_HASHELP,
                       &Configuration.LastFocusedPage,
@@ -805,7 +807,7 @@ sally::configuration::DraftState CConfigurationDlg::CaptureDraft(int page)
     if (selected->HWindow == NULL || selected == &PageSecurity)
         return state; // Master-password operations are separately confirmed, immediate actions.
     const bool modelPage = selected == &PageView || selected == &PageUserMenu || selected == &PageHotPath ||
-                           selected == &PageColors || selected == &Page13 || selected == &Page14 || selected == &Page15 ||
+                           selected == &PageColors || selected == &PageKeyboard || selected == &Page13 || selected == &Page14 || selected == &Page15 ||
                            selected == &PageP1 || selected == &PageP2 || selected == &PageP3 || selected == &PageP4;
     sally::configuration::CaptureDraftControls(selected->HWindow, state, modelPage, selected == &PageGeneral ? IDC_LONGPATH_ENABLE : 0);
     if (selected == &PageAppear)
@@ -814,6 +816,11 @@ sally::configuration::DraftState CConfigurationDlg::CaptureDraft(int page)
         sally::configuration::CaptureDraftFont(PageAppear.LocalPanelLogFont, state);
         state.Add(PageAppear.LocalUseCustomConfigurationFont);
         sally::configuration::CaptureDraftFont(PageAppear.LocalConfigurationLogFont, state);
+    }
+    else if (selected == &PageKeyboard)
+    {
+        for (const auto& target : PageKeyboard.LocalShellTargets)
+            state.Append(static_cast<int>(target.kind), target.profileGuid, target.profileName);
     }
     else if (selected == &PageViewer)
     {
@@ -834,7 +841,8 @@ sally::configuration::DraftState CConfigurationDlg::CaptureDraft(int page)
         {
             const auto& item = *PageUserMenu.UserMenuItems->At(row);
             state.Append(item.ItemName, item.UMCommand, item.Arguments, item.InitDir, item.Icon,
-                         item.ThroughShell, item.CloseShell, item.UseWindow, item.ShowInToolbar, item.Type);
+                         item.ThroughShell, item.CloseShell, item.UseWindow, item.ShowInToolbar, item.Type,
+                         item.ShowWhenEnabled, item.ShowWhenFile, item.ShowWhenFolder);
         }
     }
     else if (selected == &PageHotPath)
@@ -934,7 +942,8 @@ bool CConfigurationDlg::LayoutPage(HWND window, SIZE available, SIZE& content, b
     const bool drives = window == PageDrives.HWindow;
     const bool viewer = window == PageViewer.HWindow;
     const bool colors = window == PageColors.HWindow;
-    if (!main && !drives && !viewer && !colors) return false;
+    const bool keyboard = window == PageKeyboard.HWindow;
+    if (!main && !drives && !viewer && !colors && !keyboard) return false;
     RECT units = {0, 0, 200, 14};
     Sally::Appearance::MapCurrentDialogRect(window, units);
     const int width = (std::max<int>)(units.right, available.cx);
@@ -953,14 +962,45 @@ bool CConfigurationDlg::LayoutPage(HWND window, SIZE available, SIZE& content, b
         wchar_t name[32] = {};
         GetClassNameW(control, name, ARRAYSIZE(name));
         const bool check = _wcsicmp(name, L"button") == 0;
-        RECT bounds = {0, 0, (std::max<int>)(1, targetWidth - (check ? button : 0)), 0};
+        const int textWidth = (std::max<int>)(1, targetWidth - (check ? button : 0));
+        RECT bounds = {0, 0, textWidth, 0};
         DrawTextW(dc, text.c_str(), length, &bounds, DT_CALCRECT | DT_WORDBREAK);
+        if (keyboard && id == IDC_SHELL_STATUS)
+        {
+            // Reserve both translated states even while the status is empty.
+            // Selection/Refresh can then reveal a wrapped warning without clipping
+            // it or changing the layout under the user's current selection.
+            for (int message : {IDS_SHELL_SHORTCUT_CONFLICT, IDS_SHELL_PROFILE_UNAVAILABLE})
+            {
+                RECT warning = {0, 0, textWidth, 0};
+                const auto caption = LoadStrOwned(message);
+                DrawTextW(dc, caption.c_str(), static_cast<int>(caption.size()), &warning, DT_CALCRECT | DT_WORDBREAK);
+                bounds.bottom = (std::max)(bounds.bottom, warning.bottom);
+            }
+        }
         SelectObject(dc, old);
         ReleaseDC(control, dc);
         return (std::max<int>)(button * 2 / 3, bounds.bottom + (check ? gap : 0));
     };
     sally::configuration::PageRows rows(width, gap, button * 2 / 3, button, measure);
-    if (main)
+    if (keyboard)
+    {
+        rows.Text(IDC_STATIC_1);
+        rows.Color(IDC_STATIC_2, IDC_KEYBOARD_SHORTCUTS, button * 3);
+        rows.Text(IDC_STATIC_3);
+        rows.Space();
+        const int groupTop = rows.Position();
+        rows.Space();
+        rows.Space();
+        rows.InlineField(IDC_SHELL_DEFAULT_LABEL, IDC_SHELL_DEFAULT);
+        rows.InlineField(IDC_SHELL_CTRL_LABEL, IDC_SHELL_CTRL);
+        rows.InlineField(IDC_SHELL_SHIFT_LABEL, IDC_SHELL_SHIFT);
+        rows.InlineField(IDC_SHELL_ALT_LABEL, IDC_SHELL_ALT);
+        rows.Color(IDC_SHELL_NOTE, IDC_SHELL_REFRESH, button * 7);
+        rows.Text(IDC_SHELL_STATUS);
+        rows.Place(IDC_SHELL_GROUP, 0, groupTop, width, rows.Position() - groupTop + gap);
+    }
+    else if (main)
     {
         rows.Text(IDC_SPLASHSCREEN, true);
         rows.Text(IDC_STATUSAREA, true);
@@ -1466,6 +1506,15 @@ void CConfigurationDlg::IndexPageResource(int page, const void* source, std::siz
         pluginChoices(IDC_P4_VIEW, &CPlugins::GetPanelViewIndex);
         pluginChoices(IDC_P4_EDIT, &CPlugins::GetPanelEditIndex);
     }
+    else if (At(page) == &PageKeyboard)
+    {
+        for (int control : {IDC_SHELL_DEFAULT, IDC_SHELL_CTRL, IDC_SHELL_SHIFT, IDC_SHELL_ALT})
+            choices(control, {IDS_SHELL_COMSPEC, IDS_SHELL_WT_DEFAULT, IDS_SHELL_NOT_ASSIGNED});
+        if (gWindowsTerminalService != nullptr)
+            for (const auto& profile : gWindowsTerminalService->Refresh(false).profiles)
+                for (int control : {IDC_SHELL_DEFAULT, IDC_SHELL_CTRL, IDC_SHELL_SHIFT, IDC_SHELL_ALT})
+                    ConfigurationSearch.AddOptionValue(page, control, profile.name);
+    }
     else if (At(page) == &PageColors)
         IndexColorSearchMetadata(ConfigurationSearch, page);
     else if (At(page) == &PageSecurity)
@@ -1793,14 +1842,14 @@ CCfgPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CCfgPageRegional::CCfgPageRegional()
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_REGIONAL, IDD_CFGPAGE_REGIONAL, PSP_USETITLE, NULL)
 {
-    SLGName = Configuration.SLGName;
+    LanguageTag = Configuration.LanguageTag;
     DirName = Configuration.ConversionTable;
 }
 
 void CCfgPageRegional::LoadControls()
 {
     CLanguage language;
-    if (language.Init(sally::languages::LangIdFromPersistedName(SLGName.c_str())))
+    if (language.Init(sally::languages::LangIdFromTag(LanguageTag.c_str())))
         SetDlgItemTextW(HWindow, IDE_LANGUAGE, language.DisplayName.c_str());
 }
 
@@ -1812,10 +1861,10 @@ void CCfgPageRegional::Transfer(CTransferInfo& ti)
     }
     else
     {
-        if (StrICmpW(Configuration.SLGName.c_str(), SLGName.c_str()) != 0)
+        if (StrICmpW(Configuration.LanguageTag.c_str(), LanguageTag.c_str()) != 0)
         {
             gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_LANGUAGE_CHANGE));
-            Configuration.SLGName = SLGName;
+            Configuration.LanguageTag = LanguageTag;
         }
         // if the table has changed and the old one is already loaded we need to restart Salamander
         if (StrICmpW(Configuration.ConversionTable.c_str(), DirName.c_str()) != 0)
@@ -1840,7 +1889,7 @@ CCfgPageRegional::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDB_LANGUAGE:
         {
-            CLanguageSelectorDialog dlg(HWindow, SLGName);
+            CLanguageSelectorDialog dlg(HWindow, LanguageTag);
             dlg.Initialize();
             if (dlg.Execute() == IDOK)
             {
@@ -2973,7 +3022,91 @@ void CCfgPageUserMenu::Validate(CTransferInfo& ti)
                 return;
             }
         }
+        // #50: a ticked rule must prepare; an unticked one keeps its text unchecked. Rules
+        // of nested entries cannot be edited and are ignored, so they are not checked either.
+        if (CanHaveShowWhen(i))
+        {
+            Sally::UserMenuConditions::RuleError ruleError;
+            if (!Sally::UserMenuConditions::Validate(item->ShowWhen(), ruleError))
+            {
+                const BOOL folder = ruleError.Field == Sally::UserMenuConditions::RuleField::FolderMask;
+                const int control = folder ? IDE_UM_SHOWWHEN_FOLDER : IDE_UM_SHOWWHEN_FILE;
+                EditLB->SetCurSel(i);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                     LoadStrW(folder ? IDS_UM_FOLDERMASK_INCORRECT : IDS_INCORRECTSYNTAX));
+                ti.ErrorOn(control);
+                PostMessage(GetDlgItem(HWindow, control), EM_SETSEL, ruleError.Position, ruleError.Position + 1);
+                return;
+            }
+        }
     }
+}
+
+void FitUserMenuShowWhenTitle(HWND page)
+{
+    HWND check = GetDlgItem(page, IDC_UM_SHOWWHEN);
+    HWND group = GetDlgItem(page, IDC_UM_SHOWWHEN_GROUP);
+    if (check == NULL || group == NULL)
+        return;
+    const std::wstring caption = GetWindowTextStringW(check);
+    HDC dc = GetDC(check);
+    HGDIOBJ old = SelectObject(dc, reinterpret_cast<HGDIOBJ>(SendMessageW(check, WM_GETFONT, 0, 0)));
+    RECT text = {0, 0, 0, 0};
+    DrawTextW(dc, caption.c_str(), -1, &text, DT_CALCRECT | DT_SINGLELINE); // '&' is an access key, not text
+    SelectObject(dc, old);
+    ReleaseDC(check, dc);
+    RECT units = {0, 0, 14, 4}; // the box with its gap, and spare room, in dialog units
+    MapDialogRect(page, &units);
+    RECT checkRect, groupRect;
+    GetWindowRect(check, &checkRect);
+    GetWindowRect(group, &groupRect);
+    MapWindowPoints(NULL, page, reinterpret_cast<POINT*>(&checkRect), 2);
+    MapWindowPoints(NULL, page, reinterpret_cast<POINT*>(&groupRect), 2);
+    const LONG width = (std::min)(text.right + units.right + units.bottom, groupRect.right - checkRect.left - units.bottom);
+    SetWindowPos(check, NULL, 0, 0, width, checkRect.bottom - checkRect.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+BOOL CCfgPageUserMenu::CanHaveShowWhen(int index)
+{
+    if (index < 0 || index >= UserMenuItems->Count)
+        return FALSE;
+    const CUserMenuItemType type = UserMenuItems->At(index)->Type;
+    if (type != umitItem && type != umitSubmenuBegin)
+        return FALSE;
+    int level = 0; // the same nesting the User Menu bar and the F9 menu use
+    for (int i = 0; i < index; i++)
+    {
+        if (UserMenuItems->At(i)->Type == umitSubmenuBegin)
+            level++;
+        else if (UserMenuItems->At(i)->Type == umitSubmenuEnd && level > 0)
+            level--;
+    }
+    return level == 0;
+}
+
+std::wstring CCfgPageUserMenu::ShowWhenSummary(int index)
+{
+    if (!CanHaveShowWhen(index))
+        return std::wstring();
+    const CUserMenuItem* item = UserMenuItems->At(index);
+    if (!Sally::UserMenuConditions::IsActive(item->ShowWhen()))
+        return std::wstring();
+    const auto trimmed = [](const std::wstring& text) {
+        const size_t first = text.find_first_not_of(L" \t");
+        return first == std::wstring::npos ? std::wstring() : text.substr(first, text.find_last_not_of(L" \t") - first + 1);
+    };
+    std::wstring summary;
+    const std::wstring file = trimmed(item->ShowWhenFile);
+    const std::wstring folder = trimmed(item->ShowWhenFolder);
+    if (!file.empty())
+        summary = FormatStrW(LoadStrW(IDS_UM_SHOWWHEN_FILE_HINT), file.c_str());
+    if (!folder.empty())
+    {
+        if (!summary.empty())
+            summary += L" \x00B7 ";
+        summary += FormatStrW(LoadStrW(IDS_UM_SHOWWHEN_FOLDER_HINT), folder.c_str());
+    }
+    return summary;
 }
 
 void CCfgPageUserMenu::Transfer(CTransferInfo& ti)
@@ -3065,6 +3198,21 @@ void CCfgPageUserMenu::EnableButtons()
                     validItem & throughShell & openShell & !separator & !submenu, TRUE);
 
     EnableWindow(GetDlgItem(HWindow, IDC_UM_TOOLBAR), validItem);
+
+    // #50: the rule's text stays in its fields while they are disabled.
+    int index = -1;
+    EditLB->GetCurSel(index);
+    const BOOL canRule = validItem && !separator && CanHaveShowWhen(index);
+    const BOOL ruleOn = canRule && IsDlgButtonChecked(HWindow, IDC_UM_SHOWWHEN) == BST_CHECKED;
+    EnableWindow(GetDlgItem(HWindow, IDC_UM_SHOWWHEN), canRule);
+    EnableWindow(GetDlgItem(HWindow, IDC_UM_SHOWWHEN_FILE_LABEL), ruleOn);
+    EnableWindow(GetDlgItem(HWindow, IDE_UM_SHOWWHEN_FILE), ruleOn);
+    EnableWindow(GetDlgItem(HWindow, IDC_UM_SHOWWHEN_FOLDER_LABEL), ruleOn);
+    EnableWindow(GetDlgItem(HWindow, IDE_UM_SHOWWHEN_FOLDER), ruleOn);
+    const wchar_t* note = LoadStrW(!canRule ? IDS_UM_SHOWWHEN_NOTE_NESTED : ruleOn ? IDS_UM_SHOWWHEN_NOTE_ON : IDS_UM_SHOWWHEN_NOTE_OFF);
+    if (GetWindowTextStringW(GetDlgItem(HWindow, IDC_UM_SHOWWHEN_NOTE)) != note) // EN_CHANGE calls this per keystroke
+        SetDlgItemTextW(HWindow, IDC_UM_SHOWWHEN_NOTE, note);
+    EnableWindow(GetDlgItem(HWindow, IDC_UM_SHOWWHEN_NOTE), canRule);
     DisableNotification = oldDisableNotification;
 }
 
@@ -3101,6 +3249,9 @@ void CCfgPageUserMenu::LoadControls()
     CheckDlgButton(HWindow, IDC_THROUGHSHELL, (!empty && (item->ThroughShell)) ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(HWindow, IDC_CLOSESHELL, (!empty && (item->CloseShell)) ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(HWindow, IDC_UM_TOOLBAR, (!empty && (item->ShowInToolbar)) ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(HWindow, IDC_UM_SHOWWHEN, (!empty && item->ShowWhenEnabled) ? BST_CHECKED : BST_UNCHECKED);
+    SetDlgItemTextW(HWindow, IDE_UM_SHOWWHEN_FILE, empty ? L"" : item->ShowWhenFile.c_str());
+    SetDlgItemTextW(HWindow, IDE_UM_SHOWWHEN_FOLDER, empty ? L"" : item->ShowWhenFolder.c_str());
     DisableNotification = FALSE;
 }
 
@@ -3142,6 +3293,17 @@ void CCfgPageUserMenu::StoreControls()
         item->ThroughShell = (IsDlgButtonChecked(HWindow, IDC_THROUGHSHELL) == BST_CHECKED);
         item->CloseShell = (IsDlgButtonChecked(HWindow, IDC_CLOSESHELL) == BST_CHECKED);
         item->ShowInToolbar = (IsDlgButtonChecked(HWindow, IDC_UM_TOOLBAR) == BST_CHECKED);
+
+        const BOOL showWhen = IsDlgButtonChecked(HWindow, IDC_UM_SHOWWHEN) == BST_CHECKED;
+        std::wstring showWhenFile = GetWindowTextStringW(GetDlgItem(HWindow, IDE_UM_SHOWWHEN_FILE));
+        std::wstring showWhenFolder = GetWindowTextStringW(GetDlgItem(HWindow, IDE_UM_SHOWWHEN_FOLDER));
+        if (item->ShowWhenEnabled != showWhen || item->ShowWhenFile != showWhenFile || item->ShowWhenFolder != showWhenFolder)
+        {
+            item->ShowWhenEnabled = showWhen;
+            item->ShowWhenFile = std::move(showWhenFile);
+            item->ShowWhenFolder = std::move(showWhenFolder);
+            EditLB->RedrawFocusedItem(); // the row's rule note
+        }
     }
 }
 
@@ -3182,6 +3344,9 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         ChangeToArrowButton(HWindow, IDB_BROWSEARGUMENTS);
         ChangeToArrowButton(HWindow, IDB_BROWSEINITDIR);
         EditLB->MakeHeader(IDS_USHEADER);
+        FitUserMenuShowWhenTitle(HWindow);
+        SendDlgItemMessageW(HWindow, IDE_UM_SHOWWHEN_FILE, EM_SETCUEBANNER, TRUE, (LPARAM)LoadStrW(IDS_UM_FILEMASK_CUE));
+        SendDlgItemMessageW(HWindow, IDE_UM_SHOWWHEN_FOLDER, EM_SETCUEBANNER, TRUE, (LPARAM)LoadStrW(IDS_UM_FOLDERMASK_CUE));
         //      SmallIcon = new CSmallIconWindow(HWindow, IDC_UM_ICON);
         //      if (SmallIcon == NULL) TRACE_E(LOW_MEMORY);
 
@@ -3366,6 +3531,8 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     CUserMenuItem* item = (CUserMenuItem*)dispInfo->ItemID;
                     *dispInfo->Text = item->ItemName;
                     dispInfo->HIcon = item->UMIcon;
+                    RowNote = ShowWhenSummary(dispInfo->Index);
+                    dispInfo->Note = RowNote.c_str();
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;
                 }

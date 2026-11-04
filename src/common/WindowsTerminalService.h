@@ -14,6 +14,7 @@
 
 enum class ShellTargetKind : DWORD
 {
+    Unassigned = 3, // Optional shortcut slots only; never the default shell.
     ComSpec = 0,
     WindowsTerminalDefault = 1,
     WindowsTerminalProfile = 2,
@@ -50,7 +51,11 @@ struct WindowsTerminalLaunchRequest
     bool usePosition = false;
     int x = 0;
     int y = 0;
+    bool runAsAdministrator = false;
+    HWND owner = nullptr;
 };
+
+bool IsCanonicalWindowsTerminalGuid(const std::wstring& value);
 
 bool ResolveWindowsTerminalTarget(const WindowsTerminalCatalog& catalog,
                                   const ShellTarget& requested,
@@ -62,7 +67,7 @@ public:
     CWindowsTerminalService(IExecutableLocator* executableLocator = nullptr,
                             IEnvironment* environment = nullptr,
                             IFileSystem* fileSystem = nullptr,
-                            IProcess* process = nullptr);
+                            IProcess* process = nullptr, IShell* shell = nullptr);
 
     const WindowsTerminalCatalog& Refresh(bool force);
     bool ResolveTarget(const ShellTarget& requested, ShellTarget& resolved) const;
@@ -75,6 +80,8 @@ public:
     static std::wstring BuildCommandLine(const std::wstring& executablePath,
                                          const ShellTarget& target,
                                          const WindowsTerminalLaunchRequest& request);
+    static std::wstring BuildParameters(const ShellTarget& target,
+                                        const WindowsTerminalLaunchRequest& request);
 
 private:
     IExecutableLocator* ResolveExecutableLocator() const;
@@ -90,6 +97,7 @@ private:
     IEnvironment* Environment;
     IFileSystem* FileSystem;
     IProcess* Process;
+    IShell* Shell;
     WindowsTerminalCatalog Catalog;
     FILETIME CachedSettingsWriteTime{};
     bool CachedSettingsFilePresent = false;

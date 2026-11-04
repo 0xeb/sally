@@ -77,7 +77,7 @@ BEGIN
     EDITTEXT        IDE_CFG_FONT,69,23,200,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
     GROUPBOX        "Window position",IDC_STATIC_2,6,48,270,27,WS_GROUP
     CONTROL         "&Save on close",IDC_CFG_SAVEPOSONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,58,63,12
-    CONTROL         "S&et to position of Salamander's main window",IDC_CFG_SETBYMAINWINDOW,
+    CONTROL         "S&et to position of Sally's main window",IDC_CFG_SETBYMAINWINDOW,
                     "Button",BS_AUTORADIOBUTTON,107,58,163,12
     PUSHBUTTON      "CSV Options...",IDB_CFG_CSVOPTIONS,13,85,60,14,WS_GROUP
     DEFPUSHBUTTON   "OK",IDOK,113,85,50,14

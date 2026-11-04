@@ -64,7 +64,7 @@ BEGIN
     CONTROL         "&Konfiguration beim Beenden speichern",IDC_AUTOSAVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,295,12
     CONTROL         "Schreibs&chutz-Attribute beim Kopieren von CD ROM entfernen",IDC_CLEARREADONLY,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,295,12
-    CONTROL         "Nur eine &Instanz des Sally zur gleichen Zeit erlauben",IDC_ONLYONEINSTANCE,
+    CONTROL         "Nur eine &Instanz von Sally zur gleichen Zeit erlauben",IDC_ONLYONEINSTANCE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,295,12
     CONTROL         "&Lautsprechersignal, wenn ein Hintergrundprozess seine Arbeit beendet hat",IDC_MINBEEPWHENDONE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,295,12
@@ -73,7 +73,7 @@ BEGIN
     CONTROL         "&Verzeichnisvergleich: Zeitunterschiede bis zu",IDC_TIMERESOLUTION,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,68,182,12
     EDITTEXT        IDE_TIMERESOLUTION,184,68,28,12,ES_AUTOHSCROLL
-    LTEXT           "s  ignorieren",IDC_STATIC_2,216,70,6,8,NOT WS_GROUP
+    LTEXT           "s  ignorieren",IDC_STATIC_2,216,70,43,8,NOT WS_GROUP
     CONTROL         "Ver&zeichnisvergleich: Zeitunterschiede von genau ein oder zwei Stunden ignorieren",IDC_IGNOREDSTSHIFTS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,81,295,12
     CONTROL         "Dateinamenerweiterung bei den Befehlen '&Umbenennen' und 'Packen' auswählen",IDC_QUICKRENAME_SELALL,
@@ -86,7 +86,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,295,12
     CONTROL         "U&mgebungsvariablen den Systemwerten automatisch anpassen",IDC_RELOADENVVARS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,295,12
-    CONTROL         "B&eim Eingeben eines Pfades Ordnernamen vorschlagen (F5, F6, Umschalt+F7)",IDC_SUGGESTPATHNAMES,
+    CONTROL         "B&eim Eingeben von Pfaden Ordner und Dateien vorschlagen (F5, F6, F7, Umschalt+F7)",IDC_SUGGESTPATHNAMES,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,295,12
     LTEXT           "Nach U&pdates suchen:",IDC_UPDATECHECK_LABEL,1,178,120,8
     COMBOBOX        IDC_UPDATECHECK,125,176,110,90,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
@@ -124,9 +124,9 @@ BEGIN
     PUSHBUTTON      "&Sprache...",IDB_LANGUAGE,8,41,52,14,WS_GROUP
     EDITTEXT        IDE_LANGUAGE,65,41,224,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
     GROUPBOX        " Codepage-Konvertierungstabellen ",IDC_STATIC_2,1,77,295,40
-    LTEXT           "Klicken sie auf 'Details' um die Konvertierungstabelle für die Dateibetrachter und Konvertierungsbefehle anzuzeigen oder zu ändern.",IDC_STATIC_3,8,91,220,16
+    LTEXT           "Tabellen für Betrachter und Konvertieren über 'Details' anzeigen oder ändern.",IDC_STATIC_3,8,91,220,16
     PUSHBUTTON      "&Details...",IDB_CONVERSION,237,93,52,14,WS_GROUP
-    LTEXT           "Wählen Sie eine Sprache für den Sally. Diese Einstellung wirkt sich auf die Texte in Dialogboxen, Menüs, Symbolleisten und der Hilfe aus.",IDC_STATIC_4,8,17,281,16
+    LTEXT           "Wählen Sie eine Sprache für Sally. Diese Einstellung wirkt sich auf die Texte in Dialogboxen, Menüs, Symbolleisten und der Hilfe aus.",IDC_STATIC_4,8,17,281,16
 END
 
 IDD_CFGPAGE_SYSTEM DIALOGEX 71, 58, 299, 231
@@ -136,24 +136,24 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Sie können wählen ob gelöschte Dateien und Verzeichnisse in den Papierkorb verschoben oder endgültig vom Datenträger gelöscht werden sollen.",IDC_STATIC_1,1,4,278,16
     GROUPBOX        "    ",IDC_STATIC_11,2,28,295,57
-    LTEXT           "Halten Sie die UMSCHALT-Taste zum endgültigen Löschen der Dateien und Verzeich-",IDC_STATIC_4,9,42,186,8,NOT WS_GROUP
-    LTEXT           "nisse. Bestätigungen erfolgen entsprechend den Papierkorbeigenschaften.",IDC_STATIC_5,9,51,174,8,NOT WS_GROUP
-    LTEXT           "Das Löschen wird von WINDOWS ausgeführt, erweiterte Funktionen wie 'Fort-",IDC_STATIC_6,9,60,227,8,NOT WS_GROUP
-    LTEXT           "schrittsbalken', 'Überspringen' und 'Wiederholen' werden nicht unterstützt.",IDC_STATIC_7,9,69,220,8,NOT WS_GROUP
+    LTEXT           "Halten Sie die UMSCHALT-Taste zum endgültigen Löschen der Dateien und Verzeich-",IDC_STATIC_4,9,42,281,8,NOT WS_GROUP
+    LTEXT           "nisse. Bestätigungen erfolgen entsprechend den Papierkorbeigenschaften.",IDC_STATIC_5,9,51,245,8,NOT WS_GROUP
+    LTEXT           "Das Löschen wird von WINDOWS ausgeführt, erweiterte Funktionen wie 'Fort-",IDC_STATIC_6,9,60,257,8,NOT WS_GROUP
+    LTEXT           "schrittsbalken', 'Überspringen' und 'Wiederholen' werden nicht unterstützt.",IDC_STATIC_7,9,69,247,8,NOT WS_GROUP
     GROUPBOX        "    ",IDC_STATIC_10,2,95,295,37
-    LTEXT           "Halten Sie die UMSCHALT-Taste zum Verschieben der Dateien und Verzeichnisse",IDC_STATIC_2,9,107,202,8,NOT WS_GROUP
-    LTEXT           "in den Papierkorb. Es gelten die Einstellungen unter 'Bestätigungen'.",IDC_STATIC_3,9,116,164,8,NOT WS_GROUP
+    LTEXT           "Halten Sie die UMSCHALT-Taste zum Verschieben der Dateien und Verzeichnisse",IDC_STATIC_2,9,107,265,8,NOT WS_GROUP
+    LTEXT           "in den Papierkorb. Es gelten die Einstellungen unter 'Bestätigungen'.",IDC_STATIC_3,9,116,226,8,NOT WS_GROUP
     GROUPBOX        "    ",IDC_STATIC_12,2,142,295,57
     CONTROL         "Gelöschte D&ateien und Verzeichnisse in den Papierkorb verschieben",IDR_RECYCLE2,
-                    "Button",BS_AUTORADIOBUTTON | BS_VCENTER | WS_GROUP | WS_TABSTOP,9,27,196,12
+                    "Button",BS_AUTORADIOBUTTON | BS_VCENTER | WS_GROUP | WS_TABSTOP,9,27,238,12
     CONTROL         "Dateien und Ve&rzeichnisse endgültig löschen",IDR_RECYCLE1,
                     "Button",BS_AUTORADIOBUTTON,9,93,197,12
     CONTROL         "&Folgende Dateien in den Papierkorb verschieben, andere endgültig löschen",IDR_RECYCLE3,
-                    "Button",BS_AUTORADIOBUTTON,9,141,232,12
-    LTEXT           "Halten Sie die UMSCHALT-Taste zum endgültigen Löschen",IDC_STATIC_8,9,175,186,8,NOT WS_GROUP
-    LTEXT           "der Dateien und Verzeichnisse. Es gelten die Einstellungen unter 'Bestätigungen'.",IDC_STATIC_9,9,184,164,8,NOT WS_GROUP
+                    "Button",BS_AUTORADIOBUTTON,9,141,263,12
+    LTEXT           "Halten Sie die UMSCHALT-Taste zum endgültigen Löschen",IDC_STATIC_8,9,175,193,8,NOT WS_GROUP
+    LTEXT           "der Dateien und Verzeichnisse. Es gelten die Einstellungen unter 'Bestätigungen'.",IDC_STATIC_9,9,184,268,8,NOT WS_GROUP
     EDITTEXT        IDE_RECYCLEMASKS,9,156,279,12,ES_AUTOHSCROLL | WS_GROUP
-    RTEXT           "Masken Hinweise",IDC_FILEMASK_HINT,250,169,38,8,NOT WS_GROUP | WS_TABSTOP
+    RTEXT           "Masken Hinweise",IDC_FILEMASK_HINT,229,169,59,8,NOT WS_GROUP | WS_TABSTOP
 END
 
 IDD_CFGPAGE_VIEWS DIALOGEX 51, 24, 299, 231
@@ -161,25 +161,25 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Ansichten"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Definierte &Ansichten:",IDC_VIEWLIST_HEADER,1,26,60,8
+    LTEXT           "Definierte &Ansichten:",IDC_VIEWLIST_HEADER,1,26,70,8
     CONTROL         "",IDC_VIEW_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,1,36,177,99
     LTEXT           "Verfügbare &Spalten:",IDC_VIEWLIST_HEADER2,182,26,65,8
     CONTROL         "",IDC_VIEW_LIST2,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,182,36,114,99
-    LTEXT           "Im detaillierten Modus können alle Spalten aus 'Verfügbare Spalten' enthalten sein.",IDC_VIEW_TEXT1,1,2,269,8
-    LTEXT           "Wählen Sie die Spalten aus der Liste, die in der Ansicht angezeigt werden sollen.",IDC_VIEW_TEXT3,1,12,252,8
+    LTEXT           "Im detaillierten Modus können alle Spalten aus 'Verfügbare Spalten' enthalten sein.",IDC_VIEW_TEXT1,1,2,276,8
+    LTEXT           "Wählen Sie die Spalten aus der Liste, die in der Ansicht angezeigt werden sollen.",IDC_VIEW_TEXT3,1,12,265,8
     GROUPBOX        " Breite der in 'Verfügbare Spalten' ausgewählten Spalte festlegen: ",IDC_VIEW_TEXT4,1,141,295,50,WS_GROUP
-    CONTROL         "&Feste Spaltenbreite im linken Fenster:",IDC_VIEW_LEFT_FIXED,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,152,122,12
+    CONTROL         "&Feste Spaltenbreite links:",IDC_VIEW_LEFT_FIXED,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,152,126,12
     EDITTEXT        IDC_VIEW_LEFT_WIDTH,138,152,26,12,ES_AUTOHSCROLL | WS_GROUP
     LTEXT           "Pixel (Breite in Kopfzeile wählen)",IDC_VIEW_TEXT2,167,154,114,8
-    CONTROL         "F&este Spaltenbreite im rechten Fenster:",IDC_VIEW_RIGHT_FIXED,
+    CONTROL         "F&este Spaltenbreite rechts:",IDC_VIEW_RIGHT_FIXED,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,166,128,12
     EDITTEXT        IDC_VIEW_RIGHT_WIDTH,138,166,26,12,ES_AUTOHSCROLL | WS_GROUP
     LTEXT           "Pixel (Breite in Kopfzeile wählen)",IDC_VIEW_TEXT5,167,168,114,8
-    LTEXT           "Hinweis: kein Haken - Breite wird automatisch an den längsten Eintrag angepasst",IDC_VIEW_TEXT6,9,180,231,8
+    LTEXT           "Hinweis: kein Haken - Breite wird automatisch an den längsten Eintrag angepasst",IDC_VIEW_TEXT6,9,180,267,8
     GROUPBOX        " Intelligenter Spaltenmodus (schmale Namensspalte) für gewählte Ansicht festlegen: ",IDC_VIEW_TEXT7,1,194,295,37,WS_GROUP
     CONTROL         "&Linkes Fenster (nur wenn Breite der Namensspalte nicht fest ist; benutze Strg+N)",IDC_VIEW_LEFT_SMARTMODE,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,204,274,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,204,281,12
     CONTROL         "&Rechtes Fenster (nur wenn Breite der Namensspalte nicht fest ist; benutze Strg+N)",IDC_VIEW_RIGHT_SMARTMODE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,217,285,12
 END
@@ -189,53 +189,53 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Interner Dateibetrachter"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Zeilenende",IDC_STATIC_1,1,4,35,8
-    CONTROL         "",IDC_STATIC_15,"Static",SS_ETCHEDHORZ | WS_GROUP,38,8,258,1
+    LTEXT           "Zeilenende",IDC_STATIC_1,1,4,38,8
+    CONTROL         "",IDC_STATIC_15,"Static",SS_ETCHEDHORZ | WS_GROUP,41,8,255,1
     CONTROL         "C&R/LF",IDC_CRLFEOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,15,35,12
     CONTROL         "&CR",IDC_CREOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,27,24,12
     CONTROL         "&LF",IDC_LFEOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,63,15,23,12
     CONTROL         "&NULL",IDC_NULLEOL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,63,27,34,12
     LTEXT           "CR = Zeilenumbruch",IDC_STATIC_2,118,17,75,8
-    LTEXT           "LF = Zeilenvorschub",IDC_STATIC_3,118,29,53,8
+    LTEXT           "LF = Zeilenvorschub",IDC_STATIC_3,118,29,68,8
     LTEXT           "NULL = Null Zeichen",IDC_STATIC_4,210,17,78,8
     LTEXT           "Fensterposition",IDC_STATIC_5,1,43,57,8
     CONTROL         "",IDC_STATIC_16,"Static",SS_ETCHEDHORZ | WS_GROUP,60,47,236,1
-    CONTROL         "Beim &Beenden speichern",IDC_SAVEONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,10,54,63,12
-    CONTROL         "Position am Salamand&er Hauptfenster ausrichten",IDC_SETBYMAINWINDOW,
+    CONTROL         "&Bei Ende merken",IDC_SAVEONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,10,54,72,12
+    CONTROL         "Position am Sally-Hauptf&enster ausrichten",IDC_SETBYMAINWINDOW,
                     "Button",BS_AUTORADIOBUTTON,86,54,163,12
-    LTEXT           "Allgemeine Optionen",IDC_STATIC_6,1,71,56,8
-    CONTROL         "",IDC_STATIC_17,"Static",SS_ETCHEDHORZ | WS_GROUP,59,75,237,1
+    LTEXT           "Allgemeine Optionen",IDC_STATIC_6,1,71,72,8
+    CONTROL         "",IDC_STATIC_17,"Static",SS_ETCHEDHORZ | WS_GROUP,75,75,221,1
     CONTROL         "Bei S&uche im internem Dateibetrachter Text aus Dateisuche übernehmen",IDC_COPYFINDTEXT,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,83,264,12
-    LTEXT           "&Tabulatorgröße:",IDC_STATIC_7,10,100,34,8
-    EDITTEXT        IDC_TABSIZE,45,98,23,12,ES_AUTOHSCROLL | WS_GROUP
-    LTEXT           "Zusätzliche Regeln für die automatische Wahl des Betrachtermodus",IDC_STATIC_14,1,116,156,8
-    CONTROL         "",IDC_STATIC_18,"Static",SS_ETCHEDHORZ | WS_GROUP,159,120,137,1
-    LTEXT           "Immer Textmodus für Dateien:",IDC_STATIC_12,10,132,88,8
-    EDITTEXT        IDC_VIEW_INTEXT,99,130,195,12,WS_GROUP
-    LTEXT           "Immer Hexmodus für Dateien:",IDC_STATIC_13,10,147,87,8
-    EDITTEXT        IDC_VIEW_INHEX,99,145,195,12,WS_GROUP
-    RTEXT           "Masken Hinweise",IDC_FILEMASK_HINT,247,159,46,8,WS_TABSTOP
+    LTEXT           "&Tabulatorgröße:",IDC_STATIC_7,10,100,52,8
+    EDITTEXT        IDC_TABSIZE,64,98,23,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Zusätzliche Regeln für die automatische Wahl des Betrachtermodus",IDC_STATIC_14,1,116,223,8
+    CONTROL         "",IDC_STATIC_18,"Static",SS_ETCHEDHORZ | WS_GROUP,226,120,70,1
+    LTEXT           "Immer Textmodus für Dateien:",IDC_STATIC_12,10,132,101,8
+    EDITTEXT        IDC_VIEW_INTEXT,113,130,181,12,WS_GROUP
+    LTEXT           "Immer Hexmodus für Dateien:",IDC_STATIC_13,10,147,101,8
+    EDITTEXT        IDC_VIEW_INHEX,113,145,181,12,WS_GROUP
+    RTEXT           "Masken Hinweise",IDC_FILEMASK_HINT,234,159,59,8,WS_TABSTOP
     LTEXT           "Darstellung",IDC_STATIC_9,1,175,42,8
     CONTROL         "",IDC_STATIC_19,"Static",SS_ETCHEDHORZ | WS_GROUP,45,179,251,1
     PUSHBUTTON      "&Schrift",IDB_VIEWERFONT,10,189,52,14,WS_GROUP
     EDITTEXT        IDE_VIEWERFONT,66,189,228,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    LTEXT           "Farbe normaler Text",IDC_STATIC_10,10,212,60,8
+    LTEXT           "Textfarbe normal",IDC_STATIC_10,10,212,60,8
     PUSHBUTTON      "text",IDC_IV_NORMAL_TEXT,72,209,30,14
-    LTEXT           "Farbe markierter Text",IDC_STATIC_11,197,212,64,8
+    LTEXT           "Textfarbe markiert",IDC_STATIC_11,197,212,64,8
     PUSHBUTTON      "text",IDC_IV_SELECTED_TEXT,263,209,30,14
 END
 
-IDD_CFGPAGE_USERMENU DIALOGEX 53, 64, 299, 231
+IDD_CFGPAGE_USERMENU DIALOGEX 53, 64, 299, 295
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Benutzermenü"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "M&enüeinträge:",IDS_USHEADER,1,6,55,8
     LISTBOX         IDL_MENUITEMS,1,16,295,108,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    CONTROL         "&Untermenü",IDC_UM_SUBMENU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,131,47,12
+    CONTROL         "&Untermenü",IDC_UM_SUBMENU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,131,53,12
     CONTROL         "&Trennlinie",IDC_UM_SEPARATOR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,131,47,12
-    PUSHBUTTON      "Anderes S&ymbol...",IDB_UM_CHANGEICON,233,130,63,14
+    PUSHBUTTON      "Neues S&ymbol...",IDB_UM_CHANGEICON,233,130,63,14
     LTEXT           "&Befehl:",IDC_STATIC_1,1,153,39,8
     EDITTEXT        IDE_COMMAND,57,151,222,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDB_BROWSECOMMAND,284,151,12,12,WS_GROUP
@@ -245,10 +245,17 @@ BEGIN
     LTEXT           "&Ausführen in:",IDC_STATIC_3,1,185,55,8
     EDITTEXT        IDE_INITDIR,57,183,222,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDB_BROWSEINITDIR,284,183,12,12,WS_GROUP
-    CONTROL         "In Ko&mmandozeile ausführen",IDC_THROUGHSHELL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,202,85,12
-    CONTROL         "Kommandozeile öf&fnen",IDC_OUTPUTWND,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,125,202,76,12
-    CONTROL         "Komman&dozeile schließen",IDC_CLOSESHELL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,214,76,12
-    CONTROL         "Eintrag in Benut&zermenüleiste anzeigen",IDC_UM_TOOLBAR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,214,108,12
+    CONTROL         "In Ko&mmandozeile ausführen",IDC_THROUGHSHELL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,202,112,12
+    CONTROL         "Kommandozeile öf&fnen",IDC_OUTPUTWND,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,125,202,93,12
+    CONTROL         "Komman&dozeile schließen",IDC_CLOSESHELL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,214,101,12
+    CONTROL         "Eintrag in Benut&zermenüleiste anzeigen",IDC_UM_TOOLBAR,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,125,214,146,12
+    CONTROL         "&Nur anzeigen, wenn",IDC_UM_SHOWWHEN,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,231,78,10
+    GROUPBOX        "",IDC_UM_SHOWWHEN_GROUP,1,232,295,60
+    LTEXT           "A&ktuelle Datei passt zu:",IDC_UM_SHOWWHEN_FILE_LABEL,8,244,88,8
+    EDITTEXT        IDE_UM_SHOWWHEN_FILE,100,242,190,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Im &Ordner namens:",IDC_UM_SHOWWHEN_FOLDER_LABEL,8,260,88,8
+    EDITTEXT        IDE_UM_SHOWWHEN_FOLDER,100,258,190,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "",IDC_UM_SHOWWHEN_NOTE,8,273,284,16,SS_NOPREFIX
 END
 
 IDD_CFGPAGE_HOTPATH DIALOGEX 93, 62, 299, 231
@@ -260,10 +267,10 @@ BEGIN
     LTEXT           "&Pfad:",IDC_STATIC_1,1,179,19,8
     EDITTEXT        IDC_HOTPATH_PATH,22,177,258,12,ES_AUTOHSCROLL | WS_GROUP
     PUSHBUTTON      "",IDC_HOTPATH_BROWSE,284,177,12,12,WS_GROUP
-    LTEXT           "Favoriten mit Haken werden auch im 'Laufwerk wechseln' Menü angezeigt.",IDC_STATIC_2,1,193,215,8
-    LTEXT           "Favoriten können auch durch Strg+Umschalt+Ziffer im Dateifenster gesetzt werden.",IDC_STATIC_3,1,205,214,8
+    LTEXT           "Favoriten mit Haken werden auch im 'Laufwerk wechseln' Menü angezeigt.",IDC_STATIC_2,1,193,247,8
+    LTEXT           "Favoriten können auch durch Strg+Umschalt+Ziffer im Dateifenster gesetzt werden.",IDC_STATIC_3,1,205,277,8
     CONTROL         "Diese &Seite öffnen wenn Favoriten vom Dateifenster aus zugewiesen werden",IDC_HOTPATH_AUTOCONFIG,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,218,193,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,218,268,12
     LTEXT           "Definierte &Favoriten:",IDC_HOTPATH_HEADER,1,6,67,8
 END
 
@@ -787,19 +794,19 @@ BEGIN
     PUSHBUTTON      "",IDC_C_ITEM4_C,265,47,30,12
     RTEXT           "dummy",IDC_C_ITEM5_L,172,63,88,8
     PUSHBUTTON      "",IDC_C_ITEM5_C,265,61,30,12
-    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,225,80,71,1
-    LTEXT           "Zusätzliche Regeln für das Hervorheben von Dateien und Verzeichnissen im Fenster",IDC_STATIC_5,3,76,220,8
-    LTEXT           "Prioritäts&liste der Masken:",IDC_C_LIST_HEADER,3,94,66,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,282,80,14,1
+    LTEXT           "Zusätzliche Regeln für das Hervorheben von Dateien und Verzeichnissen im Fenster",IDC_STATIC_5,3,76,277,8
+    LTEXT           "Prioritäts&liste der Masken:",IDC_C_LIST_HEADER,3,94,85,8
     LISTBOX         IDC_C_LIST,3,104,292,49,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Wenn der Name zur Maske passt, prüfe die Attribute:",IDC_STATIC_3,3,157,157,8
+    LTEXT           "Passt der Name zur Maske, Attribute prüfen:",IDC_STATIC_3,3,157,172,8
     CONTROL         "&Archiv",IDC_C_ARCHIVE,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,3,166,39,12
-    CONTROL         "&Schreibgeschützt",IDC_C_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,3,178,49,12
-    CONTROL         "&Versteckt",IDC_C_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,3,190,39,12
+    CONTROL         "&Schreibschutz",IDC_C_READONLY,"Button",BS_AUTO3STATE | WS_TABSTOP,3,178,62,12
+    CONTROL         "&Versteckt",IDC_C_HIDDEN,"Button",BS_AUTO3STATE | WS_TABSTOP,3,190,45,12
     CONTROL         "S&ystem",IDC_C_SYSTEM,"Button",BS_AUTO3STATE | WS_TABSTOP,3,202,38,12
     CONTROL         "&Komprimiert",IDC_C_COMPRESSED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,166,55,12
-    CONTROL         "Ve&rschlüsselt",IDC_C_ENCRYPTED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,178,55,12
+    CONTROL         "Ve&rschlüsselt",IDC_C_ENCRYPTED,"Button",BS_AUTO3STATE | WS_TABSTOP,69,178,57,12
     CONTROL         "Ver&zeichnis",IDC_C_DIRECTORY,"Button",BS_AUTO3STATE | WS_TABSTOP,69,190,55,12
-    LTEXT           "Hinweis: dritte Möglichkeit = irrelevant",IDC_STATIC_6,3,216,103,8
+    LTEXT           "Hinweis: dritte Möglichkeit = irrelevant",IDC_STATIC_6,3,216,129,8
     RTEXT           "dummy",IDC_C_MASK1_L,178,160,82,8
     PUSHBUTTON      "",IDC_C_MASK1_C,265,158,30,12
     RTEXT           "dummy",IDC_C_MASK2_L,178,174,82,8
@@ -818,8 +825,8 @@ CAPTION "Bestätigungen"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "",IDC_CNFRM_TREE,"SysTreeView32",TVS_LINESATROOT | TVS_DISABLEDRAGDROP | WS_BORDER | WS_VSCROLL | WS_TABSTOP,1,2,295,174
-    LTEXT           "Tip1: Sie wird ignoriert, wenn der Papierkorb für alle Einträge benutzt wird (s. 'Papierkorb').",IDC_STATIC_2,2,180,295,8
-    LTEXT           "Tip2: Sie wird ignoriert, wenn der Papierkorb für alle Einträge benutzt wird und in Archiven.",IDC_STATIC_3,2,190,295,8
+    LTEXT           "Tip1: Wird ignoriert, wenn alle Einträge in den Papierkorb gehen (s. 'Papierkorb').",IDC_STATIC_2,2,180,295,8
+    LTEXT           "Tip2: Wird in Archiven ignoriert und wenn alle Einträge in den Papierkorb gehen.",IDC_STATIC_3,2,190,295,8
     LTEXT           "Um die Löschbestätigung des Papierkorbes zu aktivieren: Rechtsklick auf das Papierkorbsymbol Ihres Desktops und im Kontextmenü 'Eigenschaften' wählen.",IDC_STATIC_4,2,207,284,16
 END
 
@@ -828,27 +835,27 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Laufwerke"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "&Diskettenlaufwerke",IDC_STATIC_10,1,1,46,8
-    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,49,5,244,1
-    CONTROL         "Benutze automatische Aktualisierung",IDC_DRVSPEC_FLOPPYMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,11,104,12
-    CONTROL         "Benutze einfache Symbole",IDC_DRVSPEC_FLOPPYSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,11,69,12
+    LTEXT           "&Diskettenlaufwerke",IDC_STATIC_10,1,1,64,8
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,67,5,226,1
+    CONTROL         "Automatisch aktualisieren",IDC_DRVSPEC_FLOPPYMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,11,128,12
+    CONTROL         "Benutze einfache Symbole",IDC_DRVSPEC_FLOPPYSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,11,103,12
     LTEXT           "&Entfernbare Laufwerke (z.B. USB-, ZIP- und JAZ-Laufwerke)",IDC_STATIC_2,1,31,225,8
     CONTROL         "",IDC_STATIC_3,"Static",SS_ETCHEDHORZ | WS_GROUP,228,35,65,1
-    CONTROL         "Benutze automatische Aktualisierung",IDC_DRVSPEC_REMOVABLEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,41,104,12
-    CONTROL         "Benutze einfache Symbole",IDC_DRVSPEC_REMOVABLESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,41,69,12
-    LTEXT           "&Fixe Laufwerke (z.B. lokale Festplatten)",IDC_STATIC_4,1,61,114,8
-    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,117,65,176,1
-    CONTROL         "Benutze automatische Aktualisierung",IDC_DRVSPEC_FIXEDMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,71,104,12
-    CONTROL         "Benutze einfache Symbole",IDC_DRVSPEC_FIXEDSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,71,69,12
-    LTEXT           "&CD-ROM oder DVD-ROM Laufwerke",IDC_STATIC_6,1,91,98,8
-    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,101,95,192,1
-    CONTROL         "Benutze automatische Aktualisierung",IDC_DRVSPEC_CDROMMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,101,104,12
-    CONTROL         "Benutze einfache Symbole",IDC_DRVSPEC_CDROMSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,101,69,12
-    LTEXT           "Netzwerklaufwerke",IDC_STATIC_8,1,121,52,8
-    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,55,125,238,1
-    CONTROL         "Benutze automa&tische Aktualisierung",IDC_DRVSPEC_REMOTEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,131,104,12
-    CONTROL         "Benutze einfache &Symbole",IDC_DRVSPEC_REMOTESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,143,69,12
-    CONTROL         "&Keine Aktualisierung bei Start des Sally (ggf. manuelle Akt. notwendig)",IDC_DRVSPEC_REMOTEACT,
+    CONTROL         "Automatisch aktualisieren",IDC_DRVSPEC_REMOVABLEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,41,128,12
+    CONTROL         "Benutze einfache Symbole",IDC_DRVSPEC_REMOVABLESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,41,103,12
+    LTEXT           "&Fixe Laufwerke (z.B. lokale Festplatten)",IDC_STATIC_4,1,61,127,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,130,65,163,1
+    CONTROL         "Automatisch aktualisieren",IDC_DRVSPEC_FIXEDMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,71,128,12
+    CONTROL         "Benutze einfache Symbole",IDC_DRVSPEC_FIXEDSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,71,103,12
+    LTEXT           "&CD-ROM oder DVD-ROM Laufwerke",IDC_STATIC_6,1,91,120,8
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,123,95,170,1
+    CONTROL         "Automatisch aktualisieren",IDC_DRVSPEC_CDROMMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,101,128,12
+    CONTROL         "Benutze einfache Symbole",IDC_DRVSPEC_CDROMSIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,145,101,103,12
+    LTEXT           "Netzwerklaufwerke",IDC_STATIC_8,1,121,64,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,67,125,226,1
+    CONTROL         "Benutze automa&tische Aktualisierung",IDC_DRVSPEC_REMOTEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,131,137,12
+    CONTROL         "Benutze einfache &Symbole",IDC_DRVSPEC_REMOTESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,143,103,12
+    CONTROL         "&Keine Aktualisierung bei Aktivierung von Sally (ggf. manuelle Akt. notwendig)",IDC_DRVSPEC_REMOTEACT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,155,276,12
     LTEXT           "Falls kein Zugriff auf &Pfad, gehe zu:",IDC_STATIC_9,1,180,128,8
     EDITTEXT        IDE_DRVSPEC_ONERRGOTO,130,178,146,12,ES_AUTOHSCROLL | WS_GROUP
@@ -860,7 +867,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Dateibetrachter und Editoren"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Bitte wählen Sie einen Unterpunkt aus der Liste",IDC_STATIC_1,87,86,125,8
+    LTEXT           "Bitte wählen Sie einen Unterpunkt aus der Liste",IDC_STATIC_1,87,86,157,8
 END
 
 IDD_CFGPAGE_VIEWERS DIALOGEX 51, 24, 299, 231
@@ -868,10 +875,10 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Dateibetrachter"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Prioritäts&liste der Masken für Dateinamen",IDS_MASKSHDR,1,6,74,8
+    LTEXT           "Prioritäts&liste der Masken für Dateinamen",IDS_MASKSHDR,1,6,137,8
     LISTBOX         IDL_FILEMASKS,1,16,295,120,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Zugehöriger Be&trachter:",IDC_STATIC_1,1,144,65,8
-    COMBOBOX        IDC_VIEW_TYPE,69,142,226,67,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Zugehöriger Be&trachter:",IDC_STATIC_1,1,144,79,8
+    COMBOBOX        IDC_VIEW_TYPE,82,142,213,67,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     GROUPBOX        " Externer Dateibetrachter ",IDC_STATIC_2,1,162,295,62
     LTEXT           "&Befehl:",IDC_STATIC_3,7,175,39,8
     EDITTEXT        IDE_COMMAND,67,173,205,12,ES_AUTOHSCROLL | WS_GROUP
@@ -889,7 +896,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Editoren"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Prioritäts&liste der Masken für Dateinamen",IDS_MASKSHDR,1,6,74,8
+    LTEXT           "Prioritäts&liste der Masken für Dateinamen",IDS_MASKSHDR,1,6,137,8
     LISTBOX         IDL_FILEMASKS,1,16,295,153,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
     LTEXT           "&Befehl:",IDC_STATIC_1,1,178,39,8
     EDITTEXT        IDE_COMMAND,59,176,220,12,ES_AUTOHSCROLL | WS_GROUP
@@ -1005,11 +1012,11 @@ CAPTION "Packprogramme"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Einfache &Symbole in Archiven benutzen",IDC_ARCH_SIMPLEICONS,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,4,106,12
-    CONTROL         "In das andere &Dateifenster packen",IDC_ARCH_ANOTHERPANELP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,99,12
-    CONTROL         "In das andere Datei&fenster entpacken",IDC_ARCH_ANOTHERPANELU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,28,109,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,4,146,12
+    CONTROL         "In das andere &Dateifenster packen",IDC_ARCH_ANOTHERPANELP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,128,12
+    CONTROL         "In das andere Datei&fenster entpacken",IDC_ARCH_ANOTHERPANELU,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,28,138,12
     CONTROL         "In ein &Unterverzeichnis mit dem Namen des Archivs entpacken",IDC_ARCH_ARCHIVENAME,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,40,175,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,40,222,12
 END
 
 IDD_CFGPAGE_PACKERS DIALOGEX 64, 22, 299, 231
@@ -1019,9 +1026,9 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "&Name",IDC_P1_NAME,1,6,66,8
     LISTBOX         IDC_P1_LIST,1,16,295,70,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Packen mit:",IDC_STATIC_1,1,92,37,8
+    LTEXT           "&Packen mit:",IDC_STATIC_1,1,92,39,8
     COMBOBOX        IDC_P1_TYPE,53,90,100,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Standarder&weiterung:",IDC_STATIC_2,195,92,62,8
+    LTEXT           "&Standardendung:",IDC_STATIC_2,195,92,62,8
     EDITTEXT        IDC_P1_EXT,261,90,35,12,ES_AUTOHSCROLL
     GROUPBOX        " In Archiv packen ",IDC_STATIC_3,1,108,295,48,WS_GROUP
     LTEXT           "Be&fehl:",IDC_STATIC_4,10,123,39,8
@@ -1032,15 +1039,15 @@ BEGIN
     PUSHBUTTON      "",IDC_P1_CPARG_BROWSE,277,136,12,12,WS_GROUP
     GROUPBOX        "   ",IDC_STATIC_6,1,162,295,48,WS_GROUP
     CONTROL         "In &Archiv packen und anschließend von dem Datenträger löschen",IDC_P1_MOVE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,161,152,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,161,230,12
     LTEXT           "&Befehl:",IDC_STATIC_7,10,177,39,8
     EDITTEXT        IDC_P1_MVCMD,53,175,220,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P1_MVCMD_BROWSE,277,175,12,12,WS_GROUP
     LTEXT           "Para&meter:",IDC_STATIC_8,10,192,42,8
     EDITTEXT        IDC_P1_MVARG,53,190,220,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P1_MVARG_BROWSE,277,190,12,12,WS_GROUP
-    CONTROL         "Unterstützt &lange Dateinamen",IDC_P1_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,79,12
-    CONTROL         "Benötigt die Dat&eiliste im ANSI-Zeichensatz",IDC_P1_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,124,12
+    CONTROL         "Unterstützt &lange Namen",IDC_P1_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,102,12
+    CONTROL         "Benötigt die Dat&eiliste im ANSI-Zeichensatz",IDC_P1_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,159,12
 END
 
 IDD_CFGPAGE_UNPACKERS DIALOGEX 85, 24, 299, 231
@@ -1050,11 +1057,11 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "&Name",IDC_P2_NAME,1,6,60,8
     LISTBOX         IDC_P2_LIST,1,16,295,116,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Entpacken mit:",IDC_STATIC_1,1,139,46,8
+    LTEXT           "&Entpacker:",IDC_STATIC_1,1,139,48,8
     COMBOBOX        IDC_P2_TYPE,53,137,100,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Datei&masken:",IDC_STATIC_2,178,139,40,8
-    EDITTEXT        IDC_P2_EXT,221,137,75,12,ES_AUTOHSCROLL
-    RTEXT           "Masken Hinweise",IDC_FILEMASK_HINT,257,150,38,8,WS_TABSTOP
+    LTEXT           "Datei&masken:",IDC_STATIC_2,178,139,45,8
+    EDITTEXT        IDC_P2_EXT,225,137,71,12,ES_AUTOHSCROLL
+    RTEXT           "Masken Hinweise",IDC_FILEMASK_HINT,236,150,59,8,WS_TABSTOP
     GROUPBOX        " Archiv entpacken ",IDC_STATIC_3,1,162,295,48
     LTEXT           "&Befehl:",IDC_STATIC_4,10,177,39,8
     EDITTEXT        IDC_P2_EXCMD,53,175,220,12,ES_AUTOHSCROLL
@@ -1062,8 +1069,8 @@ BEGIN
     LTEXT           "&Parameter:",IDC_STATIC_5,10,192,42,8
     EDITTEXT        IDC_P2_EXARG,53,190,220,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P2_EXARG_BROWSE,277,190,12,12,WS_GROUP
-    CONTROL         "Unterstützt &lange Dateinamen",IDC_P2_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,80,12
-    CONTROL         "Benötigt die &Dateiliste im ANSI-Zeichensatz",IDC_P2_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,124,12
+    CONTROL         "Unterstützt &lange Namen",IDC_P2_LONG,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,214,102,12
+    CONTROL         "Benötigt die &Dateiliste im ANSI-Zeichensatz",IDC_P2_ANSI,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,214,159,12
 END
 
 IDD_CFGPAGE_ARCHIVERSLOCATIONS DIALOGEX 64, 22, 299, 231
@@ -1071,16 +1078,16 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Position ext. Packprogramme"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Externe &Packprogramme",IDC_P3_NAME,1,3,70,8
+    LTEXT           "Externe &Packprogramme",IDC_P3_NAME,1,3,81,8
     LISTBOX         IDC_P3_LIST,1,13,295,143,LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Auflisten u. entpacken:",IDC_STATIC_1,7,175,58,8
-    EDITTEXT        IDC_P3_VIEW,71,173,202,12,ES_AUTOHSCROLL
+    LTEXT           "&Auflisten u. entpacken:",IDC_STATIC_1,7,175,76,8
+    EDITTEXT        IDC_P3_VIEW,85,173,188,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P3_VIEW_BROWSE,277,173,12,12
-    EDITTEXT        IDC_P3_EDIT,71,191,202,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_P3_EDIT,85,191,188,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_P3_EDIT_BROWSE,277,191,12,12
-    LTEXT           "&Löschen und packen:",IDC_STATIC_2,7,193,60,8
+    LTEXT           "&Löschen und packen:",IDC_STATIC_2,7,193,76,8
     GROUPBOX        " Position externer Packprogramme ",IDC_STATIC_3,1,161,295,51
-    LTEXT           "Autokonfig. Packprogramme verwenden um nach installierten ext. Packern zu suchen.",IDC_STATIC_4,1,216,275,8
+    LTEXT           "Autokonfig. Packprogramme verwenden um nach installierten ext. Packern zu suchen.",IDC_STATIC_4,1,216,282,8
 END
 
 IDD_CFGPAGE_ASSOCIATIONS DIALOGEX 67, 23, 299, 231
@@ -1088,14 +1095,14 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Zuordnungen von Archiven"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Datei&erweiterungen",IDC_P4_NAME,1,6,60,8
+    LTEXT           "Datei&erweiterungen",IDC_P4_NAME,1,6,66,8
     LISTBOX         IDC_P4_LIST,1,16,295,147,LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_DISABLENOSCROLL | WS_VSCROLL | WS_TABSTOP
-    RTEXT           "Zusätzliche Masken Hinweise",IDC_FILEMASK_HINT,223,165,72,8,WS_TABSTOP
-    LTEXT           "&Auflisten u. entpacken:",IDC_STATIC_2,7,189,57,8
-    COMBOBOX        IDC_P4_VIEW,79,187,210,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_P4_EDIT,79,205,210,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    RTEXT           "Zusätzliche Masken Hinweise",IDC_FILEMASK_HINT,198,165,97,8,WS_TABSTOP
+    LTEXT           "&Auflisten u. entpacken:",IDC_STATIC_2,7,189,76,8
+    COMBOBOX        IDC_P4_VIEW,85,187,204,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_P4_EDIT,85,205,204,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     GROUPBOX        " Zugeordnete Packprogramme ",IDC_STATIC_3,1,177,295,47
-    LTEXT           "&Löschen und packen:",IDC_STATIC_4,7,207,60,8
+    LTEXT           "&Löschen und packen:",IDC_STATIC_4,7,207,76,8
 END
 
 IDD_CFGPAGE_MAINWINDOW DIALOGEX 67, 23, 299, 231
@@ -1103,14 +1110,14 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Hauptfenster"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         "&Begrüßungsbildschirm beim Programmstart zeigen",IDC_SPLASHSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,113,12
-    CONTROL         "Symbol des Sally im &Infobereich der Taskleiste zeigen",IDC_STATUSAREA,
+    CONTROL         "&Begrüßungsbildschirm beim Programmstart zeigen",IDC_SPLASHSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,182,12
+    CONTROL         "Sally-Symbol im &Infobereich der Taskleiste zeigen",IDC_STATUSAREA,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,17,217,12
     CONTROL         "Aktuellen Pfa&d in der Titelleiste zeigen als:",IDC_TITLEBAR_PATH,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,31,162,12
     COMBOBOX        IDC_TITLEBAR_MODE,164,31,130,55,CBS_DROPDOWNLIST | WS_TABSTOP
     CONTROL         "Benutzerdefinierter &Präfix in der Titelleiste:",IDC_TITLEBAR_PREFIX,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,146,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,45,155,12
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
@@ -1120,17 +1127,17 @@ CAPTION "Darstellung"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Auswählen über gesamte &Zeile (nur im Detail- und Kurzmodus)",IDC_FULLROWSELECT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,169,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,223,12
     CONTROL         "&Aktuelle Zeile hervorheben (nur im Detailmodus)",IDC_FULLROWHIGHLIGHT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,161,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,177,12
     CONTROL         "&Eintrag mit Einzelklick öffnen (Auswahl durch Zeigen mit der Maus)",IDC_SINGLECLICK,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,27,160,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,27,236,12
     CONTROL         "&Farbige Symbole im Dateifenster anzeigen (System-/Versteckt-/Auswahlobjekt)",IDC_ICONTINCTURE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,39,240,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,39,273,12
     CONTROL         "Farbige &Beschriftung des Dateifensters in der Verzeichnisleiste anzeigen",IDC_PANELCAPTION,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,133,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,251,12
     CONTROL         "Schaltfläche 'Maximieren/&Wiederherstellen' in der Verzeichnisleiste anzeigen",IDC_PANELZOOM,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,169,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,267,12
     GROUPBOX        " Schriftarten ",IDC_STATIC_2,1,81,295,54
     PUSHBUTTON      "Dateifensters&chrift…",IDB_PANELFONT,7,93,110,14,WS_GROUP
     EDITTEXT        IDE_PANELFONT,122,93,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
@@ -1140,9 +1147,9 @@ BEGIN
     EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
     PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
     GROUPBOX        " &Miniaturansicht ",IDC_STATIC_4,1,176,295,30
-    LTEXT           "Größe:",IDC_STATIC_5,8,190,19,8
-    EDITTEXT        IDC_THUMBNAILSIZE,29,188,33,12,ES_AUTOHSCROLL
-    LTEXT           "Pixel",IDC_STATIC_6,66,190,22,8,NOT WS_GROUP
+    LTEXT           "Größe:",IDC_STATIC_5,8,190,23,8
+    EDITTEXT        IDC_THUMBNAILSIZE,33,188,33,12,ES_AUTOHSCROLL
+    LTEXT           "Pixel",IDC_STATIC_6,70,190,22,8,NOT WS_GROUP
     GROUPBOX        " Anwendungsdarstellung ",IDC_STATIC_7,1,214,295,74
     LTEXT           "&Design:",IDC_STATIC_8,8,228,62,8
     COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
@@ -1169,10 +1176,22 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Tastatur"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Die Tastaturbelegung für Sally Befehle kann nicht geändert werden.",IDC_STATIC_1,2,4,264,8
+    LTEXT           "Wählen Sie die Befehls-Shell für die folgenden Tastenkombinationen.",IDC_STATIC_1,2,4,264,8
     LTEXT           "Eine umfangreiche Liste der Tastaturbelegung finden Sie in der",IDC_STATIC_2,2,17,196,8
     LTEXT           "Hilfe",IDC_KEYBOARD_SHORTCUTS,198,17,17,8,WS_TABSTOP
     LTEXT           "Sie können für die Plugin-Befehle die Tastaturbelegung festlegen:\r  1. Wählen Sie 'Plugins anpassen' im Plugins-Menü\r  2. Wählen Sie das gewünschte Plugin\r  3. Klicken Sie die Schaltfläche 'Tastatur'",IDC_STATIC_3,2,31,282,32
+    GROUPBOX        "Befehls-Shell",IDC_SHELL_GROUP,2,76,295,149
+    LTEXT           "Stan&dard-Shell:",IDC_SHELL_DEFAULT_LABEL,10,91,103,8
+    COMBOBOX        IDC_SHELL_DEFAULT,116,88,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Ctrl+Num /:",IDC_SHELL_CTRL_LABEL,10,116,103,8
+    COMBOBOX        IDC_SHELL_CTRL,116,113,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Shift+Num /:",IDC_SHELL_SHIFT_LABEL,10,140,103,8
+    COMBOBOX        IDC_SHELL_SHIFT,116,137,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Alt+Num /:",IDC_SHELL_ALT_LABEL,10,164,103,8
+    COMBOBOX        IDC_SHELL_ALT,116,161,171,110,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Profile &aktualisieren",IDC_SHELL_REFRESH,203,187,84,14
+    LTEXT           "Jede Shell öffnet sich im Ordner des aktiven Panels.",IDC_SHELL_NOTE,10,189,185,16
+    LTEXT           "",IDC_SHELL_STATUS,10,207,277,16
 END
 
 IDD_FILELIST DIALOGEX 61, 53, 304, 136
@@ -1201,7 +1220,7 @@ STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPT
 CAPTION "Prozessliste"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "&Liste der laufenden Sally Prozesse:",IDC_STATIC_1,6,4,150,8
+    LTEXT           "&Liste der laufenden Sally-Prozesse:",IDC_STATIC_1,6,4,150,8
     LISTBOX         IDC_SALAMLIST,6,14,252,129,LBS_NOINTEGRALHEIGHT | WS_GROUP | WS_TABSTOP
     DEFPUSHBUTTON   "&Hervorheben",IDB_SHOWTASK,267,14,50,14,WS_GROUP
     PUSHBUTTON      "&Unterbrechen...",IDB_BREAKTASK,267,33,50,14
@@ -1506,23 +1525,23 @@ BEGIN
     PUSHBUTTON      "&Hilfe",IDHELP,241,130,50,14
 END
 
-IDD_SLGSELECTOR DIALOGEX 107, 84, 276, 220
+IDD_LANGUAGESELECTOR DIALOGEX 107, 84, 276, 220
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Sprachauswahl"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Wählen Sie eine der installierten Sprachen aus.",IDC_STATIC_1,5,7,240,8
-    CONTROL         "",IDC_SLG_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,266,101
+    CONTROL         "",IDC_LANGUAGE_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,5,17,266,101
     GROUPBOX        "Über die Sprachversion",IDC_STATIC_2,5,124,266,69,WS_GROUP
     LTEXT           "Autoren:",IDC_STATIC_3,13,138,30,8
-    EDITTEXT        IDC_SLG_AUTHOR,66,138,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    EDITTEXT        IDC_LANGUAGE_AUTHOR,66,138,196,24,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
     LTEXT           "Web:",IDC_STATIC_5,13,166,22,8
-    LTEXT           "",IDC_SLG_WEB,68,166,194,8,WS_TABSTOP
+    LTEXT           "",IDC_LANGUAGE_WEB,68,166,194,8,WS_TABSTOP
     LTEXT           "Kommentar:",IDC_STATIC_6,13,177,37,8
-    LTEXT           "",IDC_SLG_COMMENT,68,177,194,8
+    LTEXT           "",IDC_LANGUAGE_COMMENT,68,177,194,8
     DEFPUSHBUTTON   "OK",IDOK,164,199,50,14,WS_GROUP
     PUSHBUTTON      "Abbrechen",IDCANCEL,220,199,50,14
-    LTEXT           "Sprache",IDC_SLG_DESCR,19,31,46,8
+    LTEXT           "Sprache",IDC_LANGUAGE_DESCR,19,31,46,8
 END
 
 IDD_SKILLLEVEL DIALOGEX 137, 77, 239, 132
@@ -1539,7 +1558,7 @@ BEGIN
     DEFPUSHBUTTON   "OK",IDOK,36,109,50,14,WS_GROUP
     PUSHBUTTON      "Abbrechen",IDCANCEL,94,109,50,14
     PUSHBUTTON      "Hilfe",IDHELP,152,109,50,14
-    LTEXT           "Während Sie Ihren Kenntnisstand verbessern bekommen Sie Schritt für Schritt die volle Kontrolle über den Sally.",IDC_STATIC_2,6,28,224,16
+    LTEXT           "Während Sie Ihren Kenntnisstand verbessern bekommen Sie Schritt für Schritt die volle Kontrolle über Sally.",IDC_STATIC_2,6,28,224,16
 END
 
 IDD_CFGPAGE_HISTORY DIALOGEX 65, 18, 299, 231
@@ -1547,17 +1566,17 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Verlauf"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Sie können einstellen ob vor kurzem verwendete Werte (Verlauf) in der Registry als Teil der Konfiguration des Sally gespeichert werden sollen.",IDC_STATIC_2,1,4,254,16
-    CONTROL         "Verlauf &speichern",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,54,12
+    LTEXT           "Sie können einstellen ob vor kurzem verwendete Werte (Verlauf) in der Registry als Teil der Konfiguration von Sally gespeichert werden sollen.",IDC_STATIC_2,1,4,254,16
+    CONTROL         "Verlauf &speichern",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,72,12
     CONTROL         "Liste der ver&wendeten Verzeichnisse speichern",IDC_HISTORY_WORKDIRS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,118,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,168,12
     LTEXT           "Für den Befehlszeilenverlauf (kann Passwörter enthalten!) können Sie spezifische Optionen wählen.",IDC_STATIC_3,1,60,228,16
     CONTROL         "Verlauf der B&efehlszeile aktivieren",IDC_HISTORY_ENABLECMDLINE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,80,247,12
     CONTROL         "Verlauf der Befehlszeile s&peichern",IDC_HISTORY_SAVECMDLINE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,93,247,12
-    LTEXT           "Sie können auch alle relevanten Daten des Verlaufes löschen.",IDC_STATIC_4,1,116,144,8
-    PUSHBUTTON      "Verlauf &löschen...",IDC_HISTORY_CLEARHISTORY,1,126,60,14
+    LTEXT           "Sie können auch alle relevanten Daten des Verlaufes löschen.",IDC_STATIC_4,1,116,203,8
+    PUSHBUTTON      "Verlauf &löschen...",IDC_HISTORY_CLEARHISTORY,1,126,63,14
 END
 
 IDD_SHARES DIALOGEX 12, 24, 344, 238
@@ -1721,7 +1740,7 @@ END
 
 IDD_EXITINGOPENSAL DIALOGEX 10, 24, 259, 88
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Beenden Sally"
+CAPTION "Sally wird beendet"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "Abbrechen",IDCANCEL,195,67,50,14
@@ -1739,15 +1758,15 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "&Ja",IDOK,71,127,50,14,WS_GROUP
     PUSHBUTTON      "&Nein",IDCANCEL,132,127,50,14
-    LTEXT           "Der Sally soll im Kompatibilitätsmodus ausgeführt werden.",IDC_STATIC_1,8,7,234,8
+    LTEXT           "Sally wird anscheinend im Kompatibilitätsmodus ausgeführt.",IDC_STATIC_1,8,7,234,8
     LTEXT           "Dies kann zu Instabilität oder anderen Problemen führen.",IDC_STATIC_2,8,16,239,8
     LTEXT           "Sie können den Kompatibilitätsmodus ausschalten:",IDC_STATIC_3,8,31,131,8
-    LTEXT           "1) Rechtsklick auf das Symbol des Sally",IDC_STATIC_4,17,41,184,8
+    LTEXT           "1) Rechtsklick auf das Sally-Symbol",IDC_STATIC_4,17,41,184,8
     LTEXT           "2) Klicken Sie dann auf Eigenschaften",IDC_STATIC_5,17,50,130,8
     LTEXT           "3) Klicken Sie dann den Reiter Kompatibilität",IDC_STATIC_9,17,59,118,8
     LTEXT           "4) deaktivieren Sie ""Programm im Kompatibilitätsmodus ausführen""",IDC_STATIC_6,17,69,223,8
-    LTEXT           "Tip: Können Sie dieses Problem nicht beheben, starten Sie den Sally, öffnen Sie das Hilfemenü, wechseln in den Technischen Support und senden uns einen Fehlerbericht.",IDC_STATIC_7,8,85,239,16
-    LTEXT           "Möchten Sie den Sally wirklich starten?",IDC_STATIC_8,8,109,137,8
+    LTEXT           "Tip: Können Sie dieses Problem nicht beheben, starten Sie Sally, öffnen Sie das Hilfemenü, wechseln in den Technischen Support und senden uns einen Fehlerbericht.",IDC_STATIC_7,8,85,239,16
+    LTEXT           "Möchten Sie Sally wirklich starten?",IDC_STATIC_8,8,109,137,8
 END
 
 IDD_CONFIRMADSLOSS DIALOGEX 15, 34, 352, 100
@@ -1831,24 +1850,24 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Laufwerkmenü"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Sie können den Inhalt des Laufwerkmenüs und der Laufwerkleiste ändern.",IDC_STATIC_1,1,3,221,8
+    LTEXT           "Sie können den Inhalt des Laufwerkmenüs und der Laufwerkleiste ändern.",IDC_STATIC_1,1,3,244,8
     GROUPBOX        " Laufwerke ",IDC_STATIC_2,1,18,294,73,WS_GROUP
-    LTEXT           "&Auswahl der Laufwerke, die angezeigt werden sollen:",IDC_STATIC_3,9,31,120,8
+    LTEXT           "&Auswahl der Laufwerke, die angezeigt werden sollen:",IDC_STATIC_3,9,31,175,8
     LISTBOX         IDL_CHD_DRIVES,9,41,277,12,LBS_MULTIPLESEL | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | LBS_DISABLENOSCROLL | LBS_NODATA | WS_TABSTOP
-    LTEXT           "Auswahl d&er Laufwerke nach denen eine Trennlinie sein soll:",IDC_STATIC_4,9,60,172,8
+    LTEXT           "Auswahl d&er Laufwerke nach denen eine Trennlinie sein soll:",IDC_STATIC_4,9,60,199,8
     LISTBOX         IDL_CHD_SEPARATORS,9,70,277,12,LBS_MULTIPLESEL | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT | LBS_MULTICOLUMN | LBS_DISABLENOSCROLL | LBS_NODATA | WS_TABSTOP
     GROUPBOX        " Weitere Elemente ",IDC_STATIC_5,1,99,294,73,WS_GROUP
-    CONTROL         "Eigene &Dateien",IDC_CHD_SHOWMYDOC,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,113,55,12
+    CONTROL         "Eigene &Dateien",IDC_CHD_SHOWMYDOC,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,113,65,12
     CONTROL         "&Cloud-Speicherdienste",IDC_CHD_SHOWCLOUDSTORAGE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,126,100,12
-    CONTROL         "&Netzwerkumgebung",IDC_CHD_SHOWNET,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,139,44,12
+    CONTROL         "&Netzwerkumgebung",IDC_CHD_SHOWNET,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,139,83,12
     CONTROL         "&Fenster angleichen",IDC_CHD_SHOWANOTHER,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,152,161,12
     LTEXT           "Ändern der Sichtbarkeit für ",IDC_STATIC_6,1,181,91,8
     LTEXT           "Favoriten",IDS_CHD_HOTPATHS,92,181,30,8,WS_TABSTOP
     LTEXT           "und",IDC_STATIC_7,125,181,15,8
     LTEXT           "Plugin FS",IDS_CHD_PLUGINS,142,181,33,8,WS_TABSTOP
-    LTEXT           "Elemente.",IDC_STATIC_8,175,181,22,8
+    LTEXT           "Elemente.",IDC_STATIC_8,175,181,34,8
 END
 
 IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 231
@@ -1857,9 +1876,9 @@ CAPTION "Dateifenster"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Dateien/Verzeichnisse mit &Versteckt- oder System-Attribut ausblenden (Strg+H)",IDC_NOTHIDDENSYSTEM,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,232,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,276,12
     CONTROL         "Verzeich&nisse bei Auswahl-Operationen mit einbeziehen",IDC_INCLUDEDIRS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,173,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,15,201,12
     LTEXT           "&Zeige Namen:",IDC_STATIC_1,1,33,48,8
     COMBOBOX        IDC_NAMEMANGLE,50,31,243,72,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Zei&ge Größe:",IDC_STATIC_5,1,49,42,8
@@ -1867,31 +1886,31 @@ BEGIN
     LTEXT           "Tastatur",IDC_STATIC_2,1,67,34,8
     CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,37,71,260,1
     CONTROL         "&Eingaben im Fenster in die Befehlszeile umleiten (ALT drücken für Schnellsuche)",IDC_QUICKSEARCH_ALT,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,78,256,12
-    CONTROL         "Mit Umschalt+Ziffer F&avoriten wählen (bei Konflikten mit nationalem Tastaturlayout)",IDC_SHIFTFORHOTPATHS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,90,282,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,78,279,12
+    CONTROL         "Umschalt+Ziffer wählt F&avoriten (Konflikt mit nationalen Tastaturlayouts)",IDC_SHIFTFORHOTPATHS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,90,285,12
     LTEXT           "Maus",IDC_STATIC_3,1,105,24,8
     CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,27,109,270,1
     CONTROL         "&Rechtsklick öffnet Kontextmenü (STRG drücken für Auswählen)",IDE_PRIMARYCTXMENU,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,116,228,12
     CONTROL         "&Umbenennen durch langsamen Doppelklick auf den Namen",IDC_CLICKTORENAME,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,128,153,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,128,213,12
     CONTROL         "&Drag && Drop Vorgänge kürzer als:",IDC_DISABLEDANDD,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,140,170,12
     EDITTEXT        IDE_DRAGDROPDELAY,181,140,28,12,ES_AUTOHSCROLL
-    LTEXT           "ms abbrechen",IDC_STATIC_4,213,142,13,8,NOT WS_GROUP
-    LTEXT           "Sortierung",IDC_STATIC_6,1,156,26,8
-    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,29,160,268,1
+    LTEXT           "ms abbrechen",IDC_STATIC_4,213,142,48,8,NOT WS_GROUP
+    LTEXT           "Sortierung",IDC_STATIC_6,1,156,36,8
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,39,160,258,1
     CONTROL         "Regionale Einstellung bei S&ortierung von Zeichenketten berücksichtigen",IDC_SORTUSESLOCALE,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,166,163,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,166,253,12
     CONTROL         "Ziffern innerhalb von Zeichenketten nu&merisch sortieren",IDC_SORTDETECTNUMBERS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,178,186,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,178,202,12
     CONTROL         "Bei Sor&tierung nach Zeit: neuere Einträge nach oben",IDC_SORTNEWERONTOP,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,190,146,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,190,188,12
     CONTROL         "Bei Sortierung nach Ze&it: Verzeichnisse nach Namen sortieren",IDC_SORTDIRSBYNAME,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,141,12
-    CONTROL         "Verzeichnisse wie Er&weiterungen behandeln (Erweiterungen in Erw-Spalte anzeigen)",IDC_SORTDIRSBYEXT,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,265,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,217,12
+    CONTROL         "Er&weiterungen auch bei Verzeichnissen beachten (in Spalte 'Erw' anzeigen)",IDC_SORTDIRSBYEXT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,285,12
 END
 
 IDD_CANNOTSETATTRSINFO DIALOGEX 15, 33, 353, 89
@@ -1963,8 +1982,8 @@ CAPTION "Überlagerte Symbole"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "&Anzeige der benutzerdef. Overlay-Symbole (unterstützter Shell-Erweiterungen)",IDC_ICONOVRLS_ENABLE,
-                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,210,12
-    LTEXT           "&Benutzerdefinierte Overlay-Symbole Handler:",IDC_ICONOVRLS_HEADER,1,26,106,8
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,274,12
+    LTEXT           "&Benutzerdefinierte Overlay-Symbole Handler:",IDC_ICONOVRLS_HEADER,1,26,150,8
     CONTROL         "",IDC_ICONOVRLS_LIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,1,36,295,175
 END
 
@@ -2784,7 +2803,7 @@ STRINGTABLE
  IDS_PASTE_CHANGE_DIRECTORY, "Verzeichnis wechseln"
 
  IDS_ALWAYSONTOP, "Immer im &Vordergrund"
- IDS_WANTALWAYSONTOP, "'Immer im Vordergrund' bewirkt das alle anderen Anwendungen hinter dem Fenster des Sally ausgeführt werden. Sie können diese Fenster erst dann nach vorne holen, wenn Sie 'Immer im Vordergrund' auschalten."
+ IDS_WANTALWAYSONTOP, "'Immer im Vordergrund' bewirkt, dass alle anderen Anwendungen hinter dem Fenster von Sally ausgeführt werden. Sie können diese Fenster erst dann nach vorne holen, wenn Sie 'Immer im Vordergrund' ausschalten."
 
  IDS_EMPTYHOTPATHS, "Leer (Verwenden Sie Strg+Umschalt+Ziffertaste um einen Favoriten zuzuweisen)"
  IDS_NEWHOTPATH, "(Neuer Favorit)\tStrg+Umschalt++"
@@ -2842,7 +2861,7 @@ STRINGTABLE
  IDS_EXECUTE_FULLPATH,    "Vollständiger Pfad"
  IDS_EXECUTE_WINDIR,      "Windows-Verzeichnis"
  IDS_EXECUTE_SYSDIR,      "System-Verzeichnis"
- IDS_EXECUTE_SALDIR,      "Sally Verzeichnis"
+ IDS_EXECUTE_SALDIR,      "Sally-Verzeichnis"
  IDS_EXECUTE_BROWSE,      "Durchsuchen..."
  IDS_EXECUTE_DOSFULLPATH, "DOS vollständiger Pfad"
  IDS_EXECUTE_DOSWINDIR,   "DOS Windows-Verzeichnis"
@@ -3110,7 +3129,7 @@ STRINGTABLE
  IDS_TEXTCOPIED, "Der Text wurde in die Zwischenablage kopiert."
  IDS_COPYTOCLIPBOARD, "In &Zwischenablage kopieren"
 
- IDS_CONFIGHOWTOIMPORT, "Das Importieren der Konfiguration ist ganz einfach. Suchen Sie die Konfigurationsdatei und öffnen Sie diese (durch Eingabetaste oder Doppelklick). Sie sollte im Registrierungs-Editor geöffnet werden. Wenn die Frage angezeigt wird, ob Sie die Informationen zur Registrierung hinzufügen möchten, sollten Sie alle aktiven Instanzen des Sally schließen. Damit wird das Überschreiben der neu importierten Konfiguration durch das automatische Speichern beim Beenden des Sally verhindert. Wenn kein Sally aktiv ist, drücken Sie im Dialogfeld des Registrierungs-Editors auf ""Ja"", dann wird die Konfiguration aus der Datei in die Registrierung importiert."
+ IDS_CONFIGHOWTOIMPORT, "Das Importieren der Konfiguration ist ganz einfach. Suchen Sie die Konfigurationsdatei und öffnen Sie diese (durch Eingabetaste oder Doppelklick). Sie sollte im Registrierungs-Editor geöffnet werden. Wenn die Frage angezeigt wird, ob Sie die Informationen zur Registrierung hinzufügen möchten, sollten Sie alle aktiven Instanzen von Sally schließen. Damit wird das Überschreiben der neu importierten Konfiguration durch das automatische Speichern beim Beenden von Sally verhindert. Wenn keine Instanz von Sally aktiv ist, drücken Sie im Dialogfeld des Registrierungs-Editors auf ""Ja"", dann wird die Konfiguration aus der Datei in die Registrierung importiert."
 
  IDS_ERRORUNPACK, "Beim Entpacken ist ein Fehler aufgetreten"
 
@@ -3484,12 +3503,12 @@ STRINGTABLE
  IDS_DROPCANCEL, "Abbrechen"
 
  IDS_UNABLETOLOADPLUGIN, "Laden des Plugins %s (%s) oder einer seiner Komponenten nicht möglich.\nFehler: %s\nPrüfen Sie die Angaben unter 'Plugins'/'Plugins anpassen')."
- IDS_UNABLETOFINDPLUGINENTRY, "Diese SPL Datei %s ist kein Sally Plugin."
+ IDS_UNABLETOFINDPLUGINENTRY, "Diese SPL Datei %s ist kein Sally-Plugin."
  IDS_REINSTALLPLUGIN, "%s-Plugin (%s) wurde geändert. Bitte installieren ('Entfernen' und 'Hinzufügen') Sie das Plugin neu (im Menu 'Plugins'/'Plugins anpassen')."
- IDS_PLUGININVALID, "%s-Plugin (%s) wurde nicht geladen. Plugin ist kein Sally Plugin oder das Plugin hat einen internen Fehler."
+ IDS_PLUGININVALID, "%s-Plugin (%s) wurde nicht geladen. Plugin ist kein Sally-Plugin oder das Plugin hat einen internen Fehler."
  IDS_PLUGININVALID2, "Das Plugin (%s) wurde nicht geladen. Das Plugin ist enweder kein gültiges Sally-Plugin oder ein plugin-interner Fehler ist aufgetreten."
-IDS_OLDPLUGINVERSION, "%s-Plugin (%s) wird von dieser Version des Sally nicht unterstützt. Bitte laden Sie eine aktualisierte Version des Plugins."
-IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht unterstützt. Bitte laden Sie eine aktualisierte Version des Plugins."
+IDS_OLDPLUGINVERSION, "%s-Plugin (%s) wird von dieser Sally-Version nicht unterstützt. Bitte laden Sie eine aktualisierte Version des Plugins."
+IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Sally-Version nicht unterstützt. Bitte laden Sie eine aktualisierte Version des Plugins."
 
  IDS_UPDATEFAILED, "Das Hinzufügen der aktualisierten Datei(en) in das Archiv ist fehlgeschlagen. Wollen Sie es erneut versuchen? Wählen Sie 'Nein', um zum Packer-Aktualisierungsmenü zurückzukehren, dann können Sie die aktualisierte(n) Datei(en) in das gewählte Verzeichnis kopieren (um sie später dem Archiv hinzuzufügen)."
 
@@ -3520,8 +3539,8 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_EMPTYNAMENOTALLOWED, "Ein leerer Name macht hier keinen Sinn."
  IDS_INCOMLETEFILENAME, "Der angegebene Pfad ist unvollständig, bitte geben Sie einen vollständigen Pfad an."
 
- IDS_SALAMANDBUSY, "Die laufende Instanz des Sally ist ausgelastet.\nMöchten Sie eine neuen Instanz starten?"
- IDS_SALAMANDBUSY2, "Der Sally ist ausgelastet. Der Befehl kann nicht ausgeführt werden, versuchen Sie es später noch einmal."
+ IDS_SALAMANDBUSY, "Die laufende Instanz von Sally ist ausgelastet.\nMöchten Sie eine neue Instanz starten?"
+ IDS_SALAMANDBUSY2, "Sally ist ausgelastet. Der Befehl kann nicht ausgeführt werden, versuchen Sie es später noch einmal."
 
  IDS_VIEWERCOPYTOFILE, "In Datei kopieren"
 
@@ -3565,7 +3584,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_ERRORCREATINGROOTDIR, "Das Verzeichnis ist das Wurzelverzeichnis."
  IDS_ERR_FILEOPEN, "Fehler beim Auslesen der Datei-Eigenschaften."
 
- IDS_NOTARCHIVEPATH, "Der angegebene Pfad beinhaltet den Pfad zu einer Datei. Diese Datei ist keine registrierte Archivdatei (siehe 'Konfiguration/Packprogramme/Zuordnung von Archiven'), der Sally weiß nicht wie er diese Datei öffnen kann."
+ IDS_NOTARCHIVEPATH, "Der angegebene Pfad beinhaltet den Pfad zu einer Datei. Diese Datei ist keine registrierte Archivdatei (siehe 'Konfiguration/Packprogramme/Zuordnung von Archiven'), daher kann Sally diese Datei nicht öffnen."
  IDS_PATHNOTFOUND, "Der angegebene Pfad wurde nicht gefunden."
  IDS_NOTPLUGINFS, "Der angegebene Pfad beinhaltet ein unbekanntes Dateisystem-Plugin (sein Name steht vor ':',\nsiehe 'Plugins'/'Plugins anpassen' für bekannte Dateisystem-Plugins)."
 
@@ -3585,7 +3604,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_SAVINGCONFIGURATION, "Konfiguration wird in der Registrierung gespeichert, bitte warten..."
  IDS_DELETINGCONFIGURATION, "Löschen der alten Konfiguration aus der Registrierung, bitte warten..."
 
- IDS_SAVECFG_EXPFILEEXISTS, "Die Datei ""%s"" wurde gefunden. Diese Datei enthält die exportierte Konfiguration, die bei jedem Start des Sally geladen wird. Wenn diese Konfiguration nicht geladen werden soll, ändern Sie den Namen oder löschen Sie diese Datei. Drücken Sie 'OK' zum Speichern der Konfiguration oder 'Abbrechen' zum Markieren der Datei."
+ IDS_SAVECFG_EXPFILEEXISTS, "Die Datei ""%s"" wurde gefunden. Diese Datei enthält die exportierte Konfiguration, die bei jedem Start von Sally geladen wird. Wenn diese Konfiguration nicht geladen werden soll, ändern Sie den Namen oder löschen Sie diese Datei. Drücken Sie 'OK' zum Speichern der Konfiguration oder 'Abbrechen' zum Markieren der Datei."
 
  IDS_FSFORCECLOSE, "Das Schließen des Pfades ""%s"" wurde verweigert.\nMöchten Sie das Schließen erzwingen?"
 
@@ -3606,7 +3625,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
 
  IDS_NEWISNOTAVAILABLE, "Menü 'Neu' ist nicht vorhanden."
 
- IDS_TMPDIRERROR, "Das in den Umgebungsvariablen TMP oder TEMP angegebene Verzeichnis existiert nicht oder es kann nicht darauf zugegriffen werden. Der Sally wird das Systemverzeichnis für temporäre Dateien verwenden."
+ IDS_TMPDIRERROR, "Das in den Umgebungsvariablen TMP oder TEMP angegebene Verzeichnis existiert nicht oder es kann nicht darauf zugegriffen werden. Sally wird das Systemverzeichnis für temporäre Dateien verwenden."
 
  IDS_UPDIRTYPENAME, "Oberes Verzeichnis"
 
@@ -3628,7 +3647,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
 
  IDS_PLUGINSUFFIX, " (Plugin)"
 
- IDS_CURRENTPROCESSBREAK, "Sie können diesen Prozess nicht unterbrechen (macht keinen Sinn). Versuchen Sie mit einem anderen Sally diesen Prozess zu unterbrechen."
+ IDS_CURRENTPROCESSBREAK, "Sie können diesen Prozess nicht unterbrechen (macht keinen Sinn). Versuchen Sie mit einer anderen Sally-Instanz diesen Prozess zu unterbrechen."
  IDS_CURRENTPROCESSTERMINATE, "Möchten Sie den laufenden Prozess wirklich beenden?\n\nAchtung: Alle nicht gesicherten Daten des laufenden Prozesses gehen verloren!"
  IDS_CONFIRM_TERMINATE, "Möchten Sie den angegebenen Prozess wirklich beenden?\n\nAchtung: Alle nicht gesicherten Daten des angegebenen Prozesses gehen verloren!"
  IDS_CONFIRM_BREAK, "Möchten Sie den angegebenen Prozess wirklich abbrechen und einen Fehlerbericht senden?\n\nAchtung: Alle nicht gesicherten Daten des laufenden Prozesses gehen verloren!"
@@ -3644,14 +3663,14 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
 
  IDS_INVALIDNUMBER, "Ungültige Zahl."
 
- IDS_CLEARHISTORY_CNFRM, "Sind Sie sicher, dass Sie alle gespeicherten Daten des Verlaufes des Sally löschen möchten?\n\nVerlauf der Befehlszeile, Kopieren, Verschieben, Auswahl, verwendete Verzeichnisse, geöffnete Dateien, Suche, Plugins usw. werden gelöscht."
- IDS_HISTORY_WAS_CLEARED, "Alle gespeicherten Daten des Verlaufs werden aus dem Speicher gelöscht.\n\nBitte sichern Sie die Sally Konfiguration,\ndamit die Verlaufsdaten auch aus der Registrierung entfernt werden können."
+ IDS_CLEARHISTORY_CNFRM, "Sind Sie sicher, dass Sie alle gespeicherten Daten des Verlaufs von Sally löschen möchten?\n\nVerlauf der Befehlszeile, Kopieren, Verschieben, Auswahl, verwendete Verzeichnisse, geöffnete Dateien, Suche, Plugins usw. werden gelöscht."
+ IDS_HISTORY_WAS_CLEARED, "Alle gespeicherten Daten des Verlaufs werden aus dem Speicher gelöscht.\n\nBitte sichern Sie die Sally-Konfiguration,\ndamit die Verlaufsdaten auch aus der Registrierung entfernt werden können."
 
  IDS_UNPACK_ONLYDISK, "Das Entpacken in Archive oder Dateisystem-Plugins wird nicht unterstützt."
  IDS_UNPACK_OPMASKSNOTSUP, "Auswahlmasken werden beim Entpacken aus dem Archiv nicht unterstützt (Der Zielpfad muss existieren oder am Ende ein \\ haben)."
 
- IDS_LANGUAGE_CHANGE, "Sprachänderungen wirken sich erst nach einem Neustart des Sally aus."
- IDS_CONVERSION_CHANGE, "Änderungen der Konvertierungstabelle wirken sich erst nach einem Neustart des Sally aus."
+ IDS_LANGUAGE_CHANGE, "Sprachänderungen wirken sich erst nach einem Neustart von Sally aus."
+ IDS_CONVERSION_CHANGE, "Änderungen der Konvertierungstabelle wirken sich erst nach einem Neustart von Sally aus."
 
  IDS_FSCOPYMOVE_ONLYDISK_A, "Das Dateisystem-Plugin unterstützt das Kopieren oder Verschieben in ein Archiv nicht."
  IDS_FSCOPYMOVE_ONLYDISK_FS, "Das Dateisystem-Plugin unterstützt das Kopieren oder Verschieben zum ausgewählten Dateisystem-Plugin nicht."
@@ -3675,7 +3694,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_CONFIRM_DELETE, "Möchten Sie %s wirklich löschen?"
  IDS_CONFIRM_DELETE2, "Möchten Sie %s wirklich löschen?\n\nAlle Dateien die zur Maske für Papierkorb passen werden in den Papierkorb geschoben."
 
- IDS_DELETETMPSALDIRS, "{!} Soll{1:|1|en} %d temporär{1:es|1|e} Verzeichni{s|1|sse} von einer vorherigen Instanz des Sally gelöscht werden?"
+ IDS_DELETETMPSALDIRS, "{!} Soll{1:|1|en} %d temporär{1:es|1|e} Verzeichni{s|1|sse} von einer vorherigen Instanz von Sally gelöscht werden?"
  IDS_DELETETMPSALDIRS_YES, "&Ja";
  IDS_DELETETMPSALDIRS_NO, "&Nein";
  IDS_DELETETMPSALDIRS_FOCUS, "&Fokus";
@@ -3747,7 +3766,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_UNABLETOEDITDUPFILES, "Öffnen oder Bearbeiten der Datei aus dem Archiv nicht möglich. Der Name der Datei wird von mehreren Dateien im Archiv benutzt (diese Dateien können nur im Dateibetrachter geöffnet werden)."
  IDS_UNABLETOEDITINVFILES, "Öffnen oder Bearbeiten der Datei aus dem Archiv nicht möglich. Name der Datei ist im Windows Dateisystems ungültig (diese Dateien können nur im Dateibetrachter geöffnet werden)."
 
- IDS_EDITPACKNOTSUPPORTED, "Das Packen in diesen Archivtyp wird nicht unterstützt. Der Sally kann die Datei im Archiv nicht aktualisieren.\n\nMöchten Sie diese Datei trotzdem bearbeiten?"
+ IDS_EDITPACKNOTSUPPORTED, "Das Packen in diesen Archivtyp wird nicht unterstützt. Sally kann die Datei im Archiv nicht aktualisieren.\n\nMöchten Sie diese Datei trotzdem bearbeiten?"
 
  IDS_UNPACKINGFILEFROMARC, "Entpacke Datei aus dem Archiv, bitte warten..."
  IDS_LISTINGARCHIVE, "Lese die Liste der Dateien und Verzeichnissen des Archivs, bitte warten..."
@@ -3824,8 +3843,8 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
 
  IDS_ARCFILESNOTFOUND, "Entpacken der in der Zwischenablage aufgeführten Dateien und Verzeichnisse ist nicht möglich. Sie sind nicht mehr in dem Archiv."
  IDS_ARCFILESNOTFOUND2, "Einige Dateien oder Verzeichnisse aus der Zwischenablage wurden im Archiv nicht gefunden.\n\nMöchten Sie weiter machen?"
- IDS_ARCUNABLETOPASTE1, "Einfügen von Dateien oder Verzeichnisse aus der Zwischenablage hier nicht möglich. Das Sally's\nHauptfenster muss zum Einfügen verfügbar sein."
- IDS_ARCUNABLETOPASTE2, "Einfügen von Dateien oder Verzeichnisse aus der Zwischenablage jetzt nicht möglich. Das Sally's\nHauptfenster muss zum Einfügen verfügbar sein."
+ IDS_ARCUNABLETOPASTE1, "Einfügen von Dateien oder Verzeichnisse aus der Zwischenablage hier nicht möglich. Das Sally-Hauptfenster\nmuss zum Einfügen verfügbar sein."
+ IDS_ARCUNABLETOPASTE2, "Einfügen von Dateien oder Verzeichnisse aus der Zwischenablage jetzt nicht möglich. Das Sally-Hauptfenster\nmuss zum Einfügen verfügbar sein."
 
  IDS_INFODLGFLAG7, "unterstützt benannte Datenströme"
  IDS_INFODLGFLAG8, "Datenträger ist schreibgeschützt"
@@ -3842,7 +3861,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
 
  IDS_EDITNEWALREADYEX, "Die Datei existiert bereits. Möchten Sie die existierende Datei bearbeiten?"
 
- IDS_SRCPATHUNICODEONLY, "Der Quellpfad kann nicht von Unicode zu Multibyte konvertiert werden, somit kann der Sally nicht damit arbeiten."
+ IDS_SRCPATHUNICODEONLY, "Der Quellpfad kann nicht von Unicode zu Multibyte konvertiert werden, somit kann Sally nicht damit arbeiten."
  IDS_SRCFILESNOTFOUND, "Einige angegebende Dateien oder Verzeichnisse des Drag&Drop Vorgangs / des Zwischenablage-Befehls wurden nicht gefunden.\n\nMöchten Sie weitermachen?"
 
  IDS_PLUGINPACKERNOTFOUND, "Kein Packer für das %s-Plugin gefunden (siehe 'Packprogramme'/'Packer im Dialogfenster' in der Konfiguration)."
@@ -3914,21 +3933,21 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_CNFRM_STOPFIND, "Möchten Sie die Suche beenden? (Dateien und Verzeichnisse suchen)"
  IDS_CNFRM_CREATEPATH, "Möchten Sie den Zielpfad erstellen? (Kopieren/Verschieben)"
  IDS_CNFRM_ALWAYSONTOP, "Möchten Sie 'Immer im Vordergrund' aktivieren?"
- IDS_CNFRM_ONSALCLOSE, "Möchten Sie den Sally beenden?"
+ IDS_CNFRM_ONSALCLOSE, "Möchten Sie Sally beenden?"
  IDS_CNFRM_ONSENDEMAIL, "Möchten Sie die ausgewählten Dateien per E-Mail versenden?"
  IDS_CNFRM_ONADDTOARCHIVE, "Möchten Sie die Dateien zu einem existierenden Archiv hinzufügen?"
  IDS_CNFRM_ONCREATEDIR, "Das Verzeichnis existiert nicht. Möchten Sie es erstellen?"
  IDS_CNFRM_COPYMOVEOPTNS, "In Archive Kopieren/Verschieben und Plugin FS: Optionen werden ignoriert."
 
- IDS_CANCLOSESALAMANDER, "Möchten Sie den Sally beenden?"
+ IDS_CANCLOSESALAMANDER, "Möchten Sie Sally beenden?"
 
  IDS_PLUGINURLNONE, "(keine)"
 
- IDS_SHELLEXTBREAK, "Das Hauptfenster des Sally wurde durch eine fehlerhafte Shellweiterung zerstört. Senden Sie uns bitte den folgenden Fehlerbericht zu, um uns zu helfen dieses Problem zu beheben.\n\nDrücken Sie 'OK', um das Dialogfeld 'Bug-Reporter' zu öffnen."
+ IDS_SHELLEXTBREAK, "Das Hauptfenster von Sally wurde durch eine fehlerhafte Shellerweiterung zerstört. Senden Sie uns bitte den folgenden Fehlerbericht zu, um uns zu helfen dieses Problem zu beheben.\n\nDrücken Sie 'OK', um das Dialogfeld 'Bug-Reporter' zu öffnen."
  IDS_SHELLEXTBREAK2, "Eine fehlerhafte Shellerweiterung hat Ihr Fenster zerstört. Senden Sie uns bitte den folgenden Fehlerbericht zu, um uns zu helfen dieses Problem zu beheben.\n\nDrücken Sie 'OK', um das Dialogfeld 'Bug-Reporter' zu öffnen."
  IDS_SHELLEXTCRASH, "Sally wird auf Grund einer fehlerhaften Shellerweiterung instabil. Senden Sie uns bitte den folgenden Fehlerbericht zu, um uns zu helfen dieses Problem zu beheben.\n\nDrücken Sie 'OK', um das Dialogfeld 'Bug-Reporter' zu öffnen."
- IDS_SHELLEXTBREAK3, "Das Fenster kann nicht geschlossen werden solange ein Prozess ausgeführt wird der dieses Fenster benötigt. Drücken Sie 'Weiter' und warten Sie, bis der Prozess beendet ist.\n\nWenn es keinen anderen Prozess gibt, drücken Sie 'Abbrechen' und senden Sie uns den Fehlerreport zur Korrektur des Fehlers. Der Sally wird beendet."
- IDS_SHELLEXTBREAK4, "Bevor der alte Prozess nicht beendet ist, kann kein neuer Prozess  ausgeführt werden. Drücken Sie 'Weiter' und warten Sie bis der vorherige Prozess beendet ist.\n\nWenn es keinen andern Prozess gibt, drücken Sie 'Abbrechen' und senden Sie uns den Fehlerreport zur Korrektur des Fehlers. Der Sally wird beendet."
+ IDS_SHELLEXTBREAK3, "Das Fenster kann nicht geschlossen werden solange ein Prozess ausgeführt wird der dieses Fenster benötigt. Drücken Sie 'Weiter' und warten Sie, bis der Prozess beendet ist.\n\nWenn es keinen anderen Prozess gibt, drücken Sie 'Abbrechen' und senden Sie uns den Fehlerreport zur Korrektur des Fehlers. Sally wird beendet."
+ IDS_SHELLEXTBREAK4, "Bevor der alte Prozess nicht beendet ist, kann kein neuer Prozess  ausgeführt werden. Drücken Sie 'Weiter' und warten Sie bis der vorherige Prozess beendet ist.\n\nWenn es keinen andern Prozess gibt, drücken Sie 'Abbrechen' und senden Sie uns den Fehlerreport zur Korrektur des Fehlers. Sally wird beendet."
 
  IDS_NEWLYCREATEDFILE, "Diese Datei existiert bereits. Möchten Sie sie ersetzen?"
 
@@ -3953,7 +3972,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_NAMEMANGLE_LOWERCASE, "In Kleinbuchstaben"
  IDS_NAMEMANGLE_UPPERCASE, "In Großbuchstaben"
 
- IDS_SIZEMODE_BYTES, "In Bytes (Sally Standard)"
+ IDS_SIZEMODE_BYTES, "In Bytes (Sally-Standard)"
  IDS_SIZEMODE_KB, "In KBytes (Windows Explorer Standard)"
  IDS_SIZEMODE_MIXED, "Im Kurzformat (zum Beispiel 15 B, 3.41 KB, oder 12.5 MB)"
 
@@ -4001,9 +4020,9 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_MSGBOXBTN_FOCUS, "&Fokus"
 
 
- IDS_CORRUPTEDCONFIGFOUND, "Die in der Registrierung gespeicherte Konfiguration ist defekt und kann deshalb nicht geladen werden. Der Sally wurde wahrscheinlich während dem Speichern der Konfiguration beendet. Dies geschieht überwiegend wenn der Sally beim Herunterfahren (oder Abmelden) noch läuft. Um dieses Problem zu verhindern, beenden Sie bitte den Sally vor dem Herunterfahren (oder Abmelden).\n\nSie können jetzt von den defekten Daten ein Backup anlegen (Rufen Sie RegEdit.exe auf und benennen Sie den Schlüssel HKEY_CURRENT_USER\\%s um). Später können Sie von diesem Backup die Einstellungen wieder einspielen (Benutzermenü, Favoriten, FTP Adressen, etc.), Besuchen Sie bitte github.com/0xeb/sally/discussions für weitere Details.\n\nDie defekte Konfiguration muss aus der Registrierung entfernt werden bevor Sie den Sally starten."
+ IDS_CORRUPTEDCONFIGFOUND, "Die in der Registrierung gespeicherte Konfiguration ist defekt und kann deshalb nicht geladen werden. Sally wurde wahrscheinlich während dem Speichern der Konfiguration beendet. Dies geschieht überwiegend wenn Sally beim Herunterfahren (oder Abmelden) noch läuft. Um dieses Problem zu verhindern, beenden Sie bitte Sally vor dem Herunterfahren (oder Abmelden).\n\nSie können jetzt von den defekten Daten ein Backup anlegen (Rufen Sie RegEdit.exe auf und benennen Sie den Schlüssel HKEY_CURRENT_USER\\%s um). Später können Sie von diesem Backup die Einstellungen wieder einspielen (Benutzermenü, Favoriten, FTP Adressen, etc.), Besuchen Sie bitte github.com/0xeb/sally/discussions für weitere Details.\n\nDie defekte Konfiguration muss aus der Registrierung entfernt werden bevor Sie Sally starten."
  IDS_CORRUPTEDCONFIGREMOVEBTN, "&Entferne Konfiguration"
- IDS_CHANGEDSHUTDOWNPARS, "Sie benutzen vom Standard abweichende Werte für die nachfolgenden Parameter die während des Abmeldens oder Herunterfahrens benötigt werden. Das aknn zu einer defekten Konfiguration des Sally führen (er bricht während des Speicherns der Konfiguration ab).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout sollte auf 20000 stehen.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks sollte auf 0 stehen."
+ IDS_CHANGEDSHUTDOWNPARS, "Sie benutzen vom Standard abweichende Werte für die nachfolgenden Parameter die während des Abmeldens oder Herunterfahrens benötigt werden. Das kann zu einer defekten Konfiguration von Sally führen (Sally wird während des Speicherns der Konfiguration beendet).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout sollte auf 20000 stehen.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks sollte auf 0 stehen."
 
  IDS_COMPAREFILESORDIRS, "Bitte geben Sie an ob Dateien oder Verzeichnisse verglichen werden sollen."
  IDS_MSGBOXBTN_FILES, "&Dateien"
@@ -4013,7 +4032,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
 
  IDS_INVALIDESCAPEPATH, "Der Pfad, zu dem gewechselt werden soll wenn kein Zugriff auf den aktuellen Pfad des Dateifensters besteht, ist ungültig. Bitte korrigieren Sie diesen Pfad unter 'Konfiguration/Laufwerke')."
  
- IDS_SHEXT_NOTLOADEDYET, "Drag&Drop Operation aus Archiv oder Dateisystem-Plugin ist fehlgeschlagen. Bitte entfernen Sie das unnötig angelegte Verzeichnis DROPFAKE im Zielverzeichnis (falls vorhanden).\n\nDas sollte nur unmittelbar nach der Installation passieren oder wenn weder der Windows Explorer noch der Sally das Drop-Ziel sind. Falls der Windows Explorer das Drop-Ziel war starten Sie Windows bitte neu (Erfahrende Benutzer können auch den Prozess 'explorer.exe' beenden und neu starten)."
+ IDS_SHEXT_NOTLOADEDYET, "Drag&Drop Operation aus Archiv oder Dateisystem-Plugin ist fehlgeschlagen. Bitte entfernen Sie das unnötig angelegte Verzeichnis DROPFAKE im Zielverzeichnis (falls vorhanden).\n\nDas sollte nur unmittelbar nach der Installation passieren oder wenn weder der Windows Explorer noch Sally das Drop-Ziel sind. Falls der Windows Explorer das Drop-Ziel war starten Sie Windows bitte neu (Erfahrene Benutzer können auch den Prozess 'explorer.exe' beenden und neu starten)."
  
  IDS_SALAMANDERICON_DEFAULT, "Standard"
  IDS_SALAMANDERICON_RED, "Rot"
@@ -4057,12 +4076,12 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  
  IDS_ICONOVRLS_NAME, "Name"
  IDS_ICONOVRLS_DESCR, "Beschreibung"
- IDS_ICONOVRLS_CHANGE, "Die Änderung der überlagerten Symbole wirkt sich erst nach einem Neustart des Sally aus."
- IDS_ICONOVRLS_CRASH, "Sally wurde instabil. Eine unerwartete Ausnahmebedingung trat im %s-Handler für überlagerte Symbole auf. Sie können ähnlichen Abstürzen vorbeugen indem der Sally diesen Handler nicht mehr benutzt (drücken Sie die Schaltfläche 'Diesen') oder indem die Anzeige aller benutzerdefinierten überlagerten Symbole verhindert wird (drücken Sie die Schaltfläche 'Alle'). Sie können auch prüfen ob für diesen Handler eine Aktualisierung bereitgestellt wurde (Durchsuchen Sie github.com/0xeb/sally/discussions für weitere Informationen).\n\nWelchen Handler für überlagerte Symbole wollen Sie abschalten?\n\nHinweis: Sie können überlagerte Symbole in der Konfiguration bearbeiten (siehe Seite 'Überlagerte Symbole')."
+ IDS_ICONOVRLS_CHANGE, "Die Änderung der überlagerten Symbole wirkt sich erst nach einem Neustart von Sally aus."
+ IDS_ICONOVRLS_CRASH, "Sally wurde instabil. Eine unerwartete Ausnahmebedingung trat im %s-Handler für überlagerte Symbole auf. Sie können ähnlichen Abstürzen vorbeugen indem Sally diesen Handler nicht mehr benutzt (drücken Sie die Schaltfläche 'Diesen') oder indem die Anzeige aller benutzerdefinierten überlagerten Symbole verhindert wird (drücken Sie die Schaltfläche 'Alle'). Sie können auch prüfen ob für diesen Handler eine Aktualisierung bereitgestellt wurde (Durchsuchen Sie github.com/0xeb/sally/discussions für weitere Informationen).\n\nWelchen Handler für überlagerte Symbole wollen Sie abschalten?\n\nHinweis: Sie können überlagerte Symbole in der Konfiguration bearbeiten (siehe Seite 'Überlagerte Symbole')."
  IDS_ICONOVRLS_DISTHIS, "&Diese"
  IDS_ICONOVRLS_DISALL, "&Alle"
  
- IDS_IMPORTCFGFROMFILESKIPPED, "Die config.reg Datei (oder die mit dem -c Parameter angegebene Datei) wurde wegen des Imports einer Konfiguration einer älteren Sally Version nicht in die Registrierung importiert. Bitte beenden Sie jetzt Sally und starten ihn neu um das Problem zu lösen."
+ IDS_IMPORTCFGFROMFILESKIPPED, "Die config.reg Datei (oder die mit dem -c Parameter angegebene Datei) wurde wegen des Imports einer Konfiguration einer älteren Sally-Version nicht in die Registrierung importiert. Bitte beenden Sie jetzt Sally und starten Sie es neu, um das Problem zu lösen."
  IDS_NOTALLPLUGINSCFGIMPORTED, "Sie haben Sally auf eine neue Version aktualisiert. Es wird jetzt die Konfiguration der alten Version geladen. Die alte Version enthält einige Plugins (unten aufgelistet) die in der neuen Version fehlen (oder die nicht funktionieren), darum kann deren Konfiguration jetzt nicht importiert werden. Sie können jetzt Sally ohne diese Plugins starten (die Konfiguration der älteren Version bleibt in der Registrierung erhalten, darum können Sie sie später importieren). Oder Sie beenden jetzt Sally, installieren die fehlenden Plugins, und starten Sally erneut.\n\nFehlende (oder nicht funktionierende) Plugins: %s%s."
  IDS_NUMOFSKIPPEDPLUGINNAMES, ", %d weitere Plugins übersprungen"
  IDS_STARTWITHOUTMISSINGPLUGINS, "&Starte ohne fehlende Plugins"
@@ -4170,7 +4189,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  
  IDS_RECYCLEBINERROR, "Die Datei oder das Verzeichnis konnte nicht in den Papierkorb verschoben werden, da der Name ungültig ist.\n\nUngültiger Teil des Namens:  ""%s""\n\nTip: Versuchen Sie die Datei, bevor Sie diese in den Papierkorb verschieben, umzubenennen, oder löschen Sie diese dauerhaft (Umschalt+Entf Taste benutzen)."
  
- IDS_PLUGINISX86ONLY, "Das %s-Plugin kann nicht geladen werden. Dieses Plugin is nur in der x86-Version (32-Bit) des Sally verfügbar. Starten Sie die x86-Version des Sally um dieses Plugin zu benutzen. Bitte entschuldigen Sie die Unannehmlichkeiten."
+ IDS_PLUGINISX86ONLY, "Das %s-Plugin kann nicht geladen werden. Dieses Plugin ist nur in der x86-Version (32-Bit) von Sally verfügbar. Starten Sie die x86-Version von Sally um dieses Plugin zu benutzen. Bitte entschuldigen Sie die Unannehmlichkeiten."
  
  IDS_UNABLETORESOLVELINK, "Link kann nicht aufgelöst werden"
  IDS_VOLMOUNTPOINT, "Volume Mount Point"
@@ -4186,7 +4205,7 @@ IDS_OLDPLUGINVERSION2, "Das Plugin (%s) wird von dieser Version des Sally nicht 
  IDS_LANGMETA_AUTHOR, "Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss"
  IDS_LANGMETA_WEB, "https://github.com/0xeb/sally/discussions"
  IDS_LANGMETA_COMMENT, "Deutsche Version"
- IDS_EXITING_RUNNING_INFO, "Sally kann nicht beendet werden solange nicht alle Datenträger- operationen abgeschlossen wurden. Warten Sie bitte bis die Prozesse beendet wurden oder brechen Sie sie ab. Wenn Sie den Sally jetzt nicht beenden möchten, drücken Sie die Schaltfläche 'Abbrechen'."
+ IDS_EXITING_RUNNING_INFO, "Sally kann nicht beendet werden solange nicht alle Datenträger- operationen abgeschlossen wurden. Warten Sie bitte bis die Prozesse beendet wurden oder brechen Sie sie ab. Wenn Sie Sally jetzt nicht beenden möchten, drücken Sie die Schaltfläche 'Abbrechen'."
  IDS_UPDATECHECK_NEVER, "Niemals"
  IDS_UPDATECHECK_DAY, "Jeden Tag"
  IDS_UPDATECHECK_WEEK, "Jede Woche"
@@ -4229,4 +4248,24 @@ BEGIN
     IDS_LONGPATH_RESTART "Windows-Einstellung geändert. Starten Sie Anwendungen und gegebenenfalls Windows neu."
     IDS_LONGPATH_CONFIRM "Diese Windows-Einstellung sofort für alle Benutzer ändern? Abbrechen in der Konfiguration macht dies nicht rückgängig. Administratorrechte sind erforderlich. Starten Sie danach Anwendungen und gegebenenfalls Windows neu."
     IDS_LONGPATH_FAILED "Windows hat die angeforderte Einstellung für lange Pfade nicht bestätigt. Prüfen Sie die Administratorrechte oder wenden Sie sich an Ihren Administrator."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_SHELL_NOT_ASSIGNED "Nicht zugewiesen"
+    IDS_SHELL_UNAVAILABLE_LABEL "nicht verfügbar"
+    IDS_SHELL_SHORTCUT_CONFLICT "Eine gewählte Tastenkombination wird von einem Plugin verwendet. Entfernen Sie diese Zuweisung oder ändern Sie die Tastenkombination des Plugins."
+    IDS_SHELL_PROFILE_UNAVAILABLE "Ein zugewiesenes Profil ist nicht verfügbar. Die gespeicherte Auswahl bleibt erhalten."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_UM_SHOWWHEN_NOTE_ON "Passt eine Regel nicht, wird der Befehl in der Benutzermenüleiste und im Benutzermenü (F9) ausgeblendet."
+    IDS_UM_SHOWWHEN_NOTE_OFF "Aus: Der Befehl wird immer angezeigt. Die Masken bleiben erhalten."
+    IDS_UM_SHOWWHEN_NOTE_NESTED "Regeln gelten nur für Befehle und Untermenüs der obersten Ebene."
+    IDS_UM_FOLDERMASK_INCORRECT "Die Maske für Ordnernamen hat einen Syntax-Fehler."
+    IDS_UM_FILEMASK_CUE "*.png;*.jpg  (leer = jede Datei)"
+    IDS_UM_FOLDERMASK_CUE "Fotos;src  (leer = jeder Ordner)"
+    IDS_UM_SHOWWHEN_FILE_HINT "wenn %s"
+    IDS_UM_SHOWWHEN_FOLDER_HINT "in %s"
 END

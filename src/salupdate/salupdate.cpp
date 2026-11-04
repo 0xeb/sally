@@ -154,14 +154,14 @@ namespace
 // languages Sally has, else English.
 void ChooseLanguage()
 {
-    std::wstring configuredName;
+    std::wstring configuredTag;
     // The configuration of the Sally that started us (a -profile has its own), else the usual one.
     const std::wstring root = Sally::Supporter::ResolveProfileRoot();
     IRegistry& registry = *GetWin32Registry();
     HKEY key = nullptr;
     if (registry.OpenKeyRead(HKEY_CURRENT_USER, (root + L"\\Configuration").c_str(), key).success)
     {
-        registry.GetString(key, L"Language", configuredName);
+        registry.GetString(key, L"Language", configuredTag);
         registry.CloseKey(key);
     }
     std::vector<LANGID> available;
@@ -183,7 +183,7 @@ void ChooseLanguage()
             }
         }
     }
-    Language = sally::languages::ChooseConfiguredOrDefault(configuredName.c_str(), available, preferred);
+    Language = sally::languages::ChooseConfiguredOrDefault(configuredTag.c_str(), available, preferred);
 }
 
 } // namespace

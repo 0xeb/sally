@@ -24,6 +24,10 @@ struct CrashSummary
     std::string Exception;           // "access violation: read on 0x0000000000000010"
     std::string Location;            // "sally.exe+0x1A2B3"
     std::string Plugin;              // the plugin the crashing thread was in, empty for Sally itself
+    std::string LoadingPluginDll;    // basename, available before the plugin registers its name
+    std::string LoadingPluginVersion; // cached registration, not a verified version of the DLL on disk
+    std::string LoadingPluginSdk;
+    std::string PluginPhase;         // loading context, not the module responsible for the crash
     bool Break = false;              // the report was made on request, not by an exception
     std::vector<std::string> Frames; // the crashing thread's call stack, innermost first, names only
 };

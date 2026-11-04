@@ -252,17 +252,17 @@ BOOL DirExists(const wchar_t* dirName)
 //
 
 BOOL ParseCommandLine(const wchar_t* cmdLine, wchar_t* fileMappingName, size_t fileMappingNameCapacity,
-                      std::wstring& slgName) noexcept
+                      std::wstring& languageTag) noexcept
 {
     std::wstring mappingName;
-    std::wstring parsedSlgName;
-    if (!sally::salmon::ParseCommandLine(cmdLine, mappingName, parsedSlgName) ||
+    std::wstring parsedLanguageTag;
+    if (!sally::salmon::ParseCommandLine(cmdLine, mappingName, parsedLanguageTag) ||
         mappingName.size() >= fileMappingNameCapacity)
         return FALSE;
     try
     {
         memcpy(fileMappingName, mappingName.c_str(), (mappingName.size() + 1) * sizeof(wchar_t));
-        slgName.swap(parsedSlgName);
+        languageTag.swap(parsedLanguageTag);
         return TRUE;
     }
     catch (...)
@@ -273,17 +273,17 @@ BOOL ParseCommandLine(const wchar_t* cmdLine, wchar_t* fileMappingName, size_t f
 
 //*****************************************************************************
 //
-// LoadSLG
+// LoadSalmonLanguage
 //
 
-// Salmon's texts and dialogs are among the language resources built into sally.exe. 'slgName' is
-// the persisted name of Sally's UI language (e.g. "czech.slg", see common/BuiltinLanguages.h);
+// Salmon's texts and dialogs are among the language resources built into sally.exe. 'languageTag' is
+// the BCP-47 tag of Sally's UI language (e.g. "cs-CZ", see common/BuiltinLanguages.h);
 // empty or unknown = the language closest to the user's Windows display languages. Makes the
 // resource loader pick that language in this process and returns sally.exe loaded as a resource
 // module (FreeLibrary it), or NULL.
-HINSTANCE LoadSLG(const wchar_t* slgName)
+HINSTANCE LoadSalmonLanguage(const wchar_t* languageTag)
 {
-    LANGID langID = sally::languages::LangIdFromPersistedName(slgName);
+    LANGID langID = sally::languages::LangIdFromTag(languageTag);
     if (langID == 0)
     {
         std::vector<LANGID> available;
@@ -305,7 +305,7 @@ HINSTANCE LoadSLG(const wchar_t* slgName)
     SetProcessPreferredUILanguages(MUI_LANGUAGE_NAME, preferred.c_str(), &count);
 
     // salmon.exe is in <Sally>\utils
-    HINSTANCE hSLG = NULL;
+    HINSTANCE module = NULL;
     std::wstring modulePath;
     if (GetCurrentModulePath(modulePath))
     {
@@ -317,15 +317,15 @@ HINSTANCE LoadSLG(const wchar_t* slgName)
             if (rootSeparator != std::wstring::npos)
             {
                 const std::wstring sallyExe = JoinPath(modulePath.substr(0, rootSeparator), L"sally.exe");
-                hSLG = LoadLibraryExW(sallyExe.c_str(), NULL, LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE);
+                module = LoadLibraryExW(sallyExe.c_str(), NULL, LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_AS_IMAGE_RESOURCE);
             }
         }
     }
-    if (hSLG == NULL)
+    if (module == NULL)
         // wide: English-only diagnostic, no LoadStr involved - same shape as
         // salmoncl.cpp's fix (194) in this same module family.
         MessageBoxW(NULL, (std::wstring(L"Internal error: cannot load the language resources from sally.exe. Please report at ") + (Sally::Urls::Issues + 8) + L".").c_str(), L"Sally Bug Reporter", MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
-    return hSLG;
+    return module;
 }
 
 //------------------------------------------------------------------------------------------------
@@ -635,13 +635,13 @@ BOOL SaveDescription()
 // LoadHLanguageVerbose
 //
 
-BOOL LoadHLanguageVerbose(const wchar_t* slgName)
+BOOL LoadHLanguageVerbose(const wchar_t* languageTag)
 {
-    HINSTANCE hLanguage = LoadSLG(slgName);
+    HINSTANCE hLanguage = LoadSalmonLanguage(languageTag);
     if (hLanguage == NULL)
     {
         // wide: same MessageBoxW shape as this file's other diagnostic (202);
-        const std::wstring message = FormatText(L"Failed to load resources for language %s.", slgName);
+        const std::wstring message = FormatText(L"Failed to load resources for language %s.", languageTag);
         MessageBoxW(NULL, message.c_str(), APP_NAME, MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
         return FALSE;
     }
@@ -984,7 +984,7 @@ void SetThreadNameInVCAndTrace(const wchar_t* name)
     SetThreadNameInVC(name);
 }
 
-void ChechForBugs(CSalmonSharedMemory* mem, const wchar_t* slgName)
+void ChechForBugs(CSalmonSharedMemory* mem, const wchar_t* languageTag)
 {
     if (DirExists(BugReportPath.c_str()))
     {
@@ -993,7 +993,7 @@ void ChechForBugs(CSalmonSharedMemory* mem, const wchar_t* slgName)
             if (GetBugReportNames())
             {
                 // we need to display the GUI, we must load the language resources
-                if (LoadHLanguageVerbose(slgName))
+                if (LoadHLanguageVerbose(languageTag))
                 {
                     OpenMainDialog(FALSE);
                 }
@@ -1041,11 +1041,11 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
     MainDialogMutex.Init();
 
     wchar_t fileMappingName[SALMON_FILEMAPPIN_NAME_SIZE] = {}; // frozen command/IPC rendezvous contract
-    std::wstring slgName; // persisted name of Sally's UI language (e.g. "english.slg"; no file) for HLanguage; can be empty (then a default is chosen)
+    std::wstring languageTag; // BCP-47 tag of Sally's UI language (e.g. "en-US") for HLanguage; can be empty (then a default is chosen)
 
-    if (!ParseCommandLine(cmdLine, fileMappingName, _countof(fileMappingName), slgName) || fileMappingName[0] == 0)
+    if (!ParseCommandLine(cmdLine, fileMappingName, _countof(fileMappingName), languageTag) || fileMappingName[0] == 0)
     {
-        HINSTANCE hLanguage = LoadSLG(slgName.c_str()); // load the language resources so that we can display possible errors
+        HINSTANCE hLanguage = LoadSalmonLanguage(languageTag.c_str()); // load the language resources so that we can display possible errors
         if (hLanguage != NULL)
             MessageBoxW(NULL, LoadStr(IDS_SALMON_WRONG_CMDLINE, hLanguage).c_str(), LoadStr(IDS_SALMON_TITLE, hLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
         MainDialogMutex.Done(); // see Done()'s comment - must run before static destruction
@@ -1060,7 +1060,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
     {
         if (fm != NULL)
             CloseHandle(fm);
-        HINSTANCE hLanguage = LoadSLG(slgName.c_str()); // load the language resources so that we can display possible errors
+        HINSTANCE hLanguage = LoadSalmonLanguage(languageTag.c_str()); // load the language resources so that we can display possible errors
         if (hLanguage != NULL)
             MessageBoxW(NULL, LoadStr(IDS_SALMON_WRONG_CMDLINE, hLanguage).c_str(), LoadStr(IDS_SALMON_TITLE, hLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
         MainDialogMutex.Done(); // see Done()'s comment - must run before static destruction
@@ -1071,7 +1071,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
     {
         UnmapViewOfFile(mem);
         CloseHandle(fm);
-        HINSTANCE hLanguage = LoadSLG(slgName.c_str()); // load the language resources so that we can display possible errors
+        HINSTANCE hLanguage = LoadSalmonLanguage(languageTag.c_str()); // load the language resources so that we can display possible errors
         if (hLanguage != NULL)
             MessageBoxW(NULL, LoadStr(IDS_SALMON_WRONG_CMDLINE, hLanguage).c_str(), LoadStr(IDS_SALMON_TITLE, hLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
         MainDialogMutex.Done(); // see Done()'s comment - must run before static destruction
@@ -1081,7 +1081,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
     HANDLE arr[4];
     arr[0] = mem->Process;
     arr[1] = mem->Fire;
-    arr[2] = mem->SetSLG;
+    arr[2] = mem->SetLanguage;
     arr[3] = mem->CheckBugs;
 
     SalmonSharedMemory = mem; // set the global pointer so we do not have to thread it through parameters
@@ -1120,7 +1120,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
             // or Salamander crashed before the exception handler was installed and the minidump was captured by WER,
             // which we have redirected to our bug report directory (Vista+)
             // Salamander could also have crashed in a way that bypassed the exception handler (typically caused by faulty shell extensions)
-            ChechForBugs(mem, slgName.c_str());
+            ChechForBugs(mem, languageTag.c_str());
 
             run = FALSE;
             break;
@@ -1129,7 +1129,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
         case WAIT_OBJECT_0 + 1: // sharedMemory->Fire
         {
             // the parent process wants us to generate a minidump
-            if (LoadHLanguageVerbose(slgName.c_str())) // we need to display the GUI, we must load the language resources
+            if (LoadHLanguageVerbose(languageTag.c_str())) // we need to display the GUI, we must load the language resources
             {
                 // if we manage to lock the mutex, release it later; we do not want
                 // additional processes started afterwards to pop up their windows during ours
@@ -1142,13 +1142,13 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
             break;
         }
 
-        case WAIT_OBJECT_0 + 2: // sharedMemory->SetSLG
+        case WAIT_OBJECT_0 + 2: // sharedMemory->SetLanguage
         {
             // Salamander chose its UI language and lets us know we should switch to it
             // store its name; actively loading it now makes no sense yet
-            if (!sally::salmon::ReadFrozenWideString(mem->SLGName, _countof(mem->SLGName), slgName))
-                slgName.clear();
-            ResetEvent(mem->SetSLG);
+            if (!sally::salmon::ReadFrozenWideString(mem->LanguageTag, _countof(mem->LanguageTag), languageTag))
+                languageTag.clear();
+            ResetEvent(mem->SetLanguage);
             SetEvent(mem->Done); // let Salamander know we have taken over the language name
             break;
         }
@@ -1157,7 +1157,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR cmdLine, int cmdSh
         {
             // Salamander informs us that the main window is open and it is time to check whether
             // there are old files in the bug report directory that we should send to the server
-            ChechForBugs(mem, slgName.c_str());
+            ChechForBugs(mem, languageTag.c_str());
             break;
         }
 

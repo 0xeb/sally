@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/UserMenuConditions.h"
+
 #define USRMNUARGS_MAXLEN 32772    // buffer size (+1 versus max string length) (=32776 (Vista/Win7 via .bat) - 5 ("C:\\a ") + 1)
 #define USRMNUCMDLINE_MAXLEN 32777 // buffer size (+1 versus max string length)
 
@@ -123,6 +125,14 @@ struct CUserMenuItem
 
     CUserMenuItemType Type;
 
+    // #50 "Show only when": top-level commands and submenus only. Unticked keeps the masks and
+    // always shows the command. Persisted as "Show When Enabled/File/Folder"; absent means off.
+    int ShowWhenEnabled = FALSE;
+    std::wstring ShowWhenFile;
+    std::wstring ShowWhenFolder;
+    // The masks above, prepared when first needed; never copied with the item.
+    Sally::UserMenuConditions::RuleCache ShowWhenCache;
+
     HICON UMIcon;
 
     CUserMenuItem(const wchar_t* name, const wchar_t* umCommand, const wchar_t* arguments, const wchar_t* initDir, const wchar_t* icon,
@@ -151,6 +161,21 @@ struct CUserMenuItem
     BOOL Set(const wchar_t* name, const wchar_t* umCommand, const wchar_t* arguments, const wchar_t* initDir, const wchar_t* icon);
     void SetType(CUserMenuItemType type);
     BOOL IsGood() { return TRUE; }
+
+    Sally::UserMenuConditions::Rule ShowWhen() const
+    {
+        Sally::UserMenuConditions::Rule rule;
+        rule.Enabled = ShowWhenEnabled != FALSE;
+        rule.FileMask = ShowWhenFile;
+        rule.FolderMask = ShowWhenFolder;
+        return rule;
+    }
+    void CopyShowWhen(const CUserMenuItem& item)
+    {
+        ShowWhenEnabled = item.ShowWhenEnabled;
+        ShowWhenFile = item.ShowWhenFile;
+        ShowWhenFolder = item.ShowWhenFolder;
+    }
 };
 
 //****************************************************************************
@@ -177,3 +202,12 @@ public:
     // Move an owned item (or complete submenu) one position without relocating its objects.
     int MoveItem(int index, int direction);
 };
+
+// #50: the "Show When Enabled/File/Folder" values of one User Menu item key. Saving writes nothing
+// for an item without a rule; loading treats absent values as off and empty.
+void SaveUserMenuShowWhen(HKEY itemKey, const CUserMenuItem& item);
+void LoadUserMenuShowWhen(HKEY itemKey, CUserMenuItem& item);
+
+// #50: the first 'count' entries of 'items' as the "Show only when" rules see them in 'context'.
+std::vector<Sally::UserMenuConditions::Entry> UserMenuConditionEntries(CUserMenuItems& items, int count,
+                                                                      const Sally::UserMenuConditions::Context& context);

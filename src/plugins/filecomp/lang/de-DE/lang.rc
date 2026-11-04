@@ -135,7 +135,7 @@ BEGIN
     EDITTEXT        IDE_FONT,65,134,181,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
     LTEXT           "Sonstiges",IDC_STATIC_10,6,156,34,8
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,42,160,222,1
-    CONTROL         "&Plugin beim Start des Sally laden",IDC_LOADONSTART,
+    CONTROL         "&Plugin beim Start von Sally laden",IDC_LOADONSTART,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,166,170,12
 END
 
@@ -350,8 +350,8 @@ STRINGTABLE
   IDS_NOTVALIDFILE, "Fehler beim Öffnen der Datei '%s'."
   IDS_INVALIDARGS, "Ungültige Parameter. Beispiel:\n\tfilecomp.exe [Optionen] erste zweite\nOptionen sind:\n\t-w\tWarte bis der Dateivergleich beendet ist.\n\t--wait\tWarte bis der Dateivergleich beendet ist."
   IDS_MSGERR, "Kann keine Nachricht an das Dateivergleich-Plugin senden."
-  IDS_LAUNCHSAL, "Kann den Sally nicht starten."
-  IDS_MSGERR2, "Kann keine Nachricht an das Dateivergleich Plugin senden. Überprüfen Sie, ob die Option 'Plugin beim Start des Sally laden' in der Dateivergleich-Konfiguration eingeschaltet ist."
+  IDS_LAUNCHSAL, "Kann Sally nicht starten."
+  IDS_MSGERR2, "Kann keine Nachricht an das Dateivergleich Plugin senden. Überprüfen Sie, ob die Option 'Plugin beim Start von Sally laden' in der Dateivergleich-Konfiguration eingeschaltet ist."
   IDS_ERRORUNICODE, "Konvertierung nach Unicode ist gescheitert."
   IDS_ENCMENU_AUTO, "Automatisch"
   IDS_ENCMENU_ASCII8, "ASCII-8"

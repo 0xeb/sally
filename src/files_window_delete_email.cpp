@@ -23,6 +23,7 @@
 #include "common/widepath.h"
 #include "common/IEnvironment.h"
 #include "common/IShell.h"
+#include "common/PathCompletion.h"
 
 //
 // ****************************************************************************
@@ -342,6 +343,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         }
 
         CFileData* f = NULL;
+        BOOL singleItemIsFile = FALSE; // the one item of a Copy/Move is a file, not a folder
         std::wstring formatedFileNameW;
         std::wstring expandedW;
         BOOL deleteLink = FALSE;
@@ -365,6 +367,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     return;
                 }
                 BOOL isDir = i < Dirs->Count;
+                singleItemIsFile = !isDir;
                 f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
                 if (type == atDelete && recycle != 1 && (f->Attr & FILE_ATTRIBUTE_REPARSE_POINT))
                 { // it's a link (junction, symlink or volume mount point)
@@ -475,6 +478,12 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                                (type == atCopy) ? IDD_COPYDIALOG : IDD_MOVEDIALOG,
                                                Configuration.CopyHistory, COPY_HISTORY_SIZE,
                                                &criteria, havePermissions, supportsADS);
+                // #51: one file copied or moved may take an existing file's name; otherwise the
+                // target is a folder. The text typed is parsed below exactly as before.
+                if (Sally::PathCompletion::SuggestionKindsFor(count == 0 ? 1 : (size_t)count, singleItemIsFile != FALSE,
+                                                              Is(ptDisk) != FALSE) ==
+                    Sally::PathCompletion::CandidateKinds::FoldersAndFiles)
+                    copyMoveDlg.EnableFileSuggestions(GetPathW());
                 res = (int)copyMoveDlg.Execute();
                 if (!havePermissions)
                     criteria.CopySecurity = FALSE;

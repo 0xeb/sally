@@ -1,0 +1,325 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for regedt. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/regedt/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\regedt.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_CREATEKEY DIALOGEX 10, 24, 227, 75
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "키 만들기"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "키 이름(&K):",IDS_TEXT,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "경로를 플러그인에 직접 보내기(&S)",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    DEFPUSHBUTTON   "확인",IDOK,58,53,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,118,53,50,14
+END
+
+IDD_RENAME DIALOGEX 10, 24, 227, 65
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "확인",IDOK,58,43,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,118,43,50,14
+END
+
+IDD_COPY DIALOGEX 10, 24, 227, 76
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDS_TEXT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,10,208,8
+    COMBOBOX        IDE_NAME,10,20,208,106,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_TABSTOP
+    CONTROL         "경로를 플러그인에 직접 보내기(&S)",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,35,189,12
+    DEFPUSHBUTTON   "확인",IDOK,58,54,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,118,54,50,14
+END
+
+IDD_NEWVALUE DIALOGEX 14, 22, 227, 109
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "새 값"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "값 이름(&V):",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    CONTROL         "경로를 플러그인에 직접 보내기(&S)",IDC_DIRECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,34,189,12
+    LTEXT           "값 형식(&T):",IDC_STATIC_2,10,53,56,8
+    COMBOBOX        IDC_TYPE,10,63,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "확인",IDOK,58,87,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,118,87,50,14
+END
+
+IDD_EDITVAL DIALOGEX 14, 22, 227, 134
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "값 편집"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_DATA,10,79,208,12,ES_AUTOHSCROLL
+    LTEXT           "단위:",IDS_BASE,124,69,60,8
+    CONTROL         "16진수(&H)",IDR_HEX,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,78,81,12
+    CONTROL         "10진수(&C)",IDR_DEC,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,124,90,73,12
+    DEFPUSHBUTTON   "확인",IDOK,58,112,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,118,112,50,14
+    LTEXT           "값 이름:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "값 형식(&T):",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "값 데이터(&D):",IDC_STATIC_3,10,69,60,8
+END
+
+IDD_RAWEDITVAL DIALOGEX 14, 22, 227, 145
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "값 원시 편집"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "값 이름:",IDC_STATIC_1,10,10,56,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "값 형식(&T):",IDC_STATIC_2,10,39,56,8
+    COMBOBOX        IDC_TYPE,10,49,208,115,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "편집기 실행(&L)",IDB_EDIT,10,69,75,14
+    LTEXT           "외부 편집기에서 편집을 마치고 변경 내용을 저장한 다음, 확인을 눌러 변경 내용을 레지스트리에 저장하거나 취소를 눌러 저장하지 않고 끝내십시오.",IDS_MESSAGE,10,89,206,24,NOT WS_VISIBLE
+    DEFPUSHBUTTON   "확인",IDOK,58,123,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,118,123,50,14
+END
+
+IDD_SEARCH DIALOGEX 9, 20, 333, 240
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Windows 레지스트리 검색"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "찾을 내용(&S):",IDC_STATIC_1,6,10,41,8
+    COMBOBOX        IDC_PATTERN,61,8,198,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "지금 찾기(&F)",IDOK,264,7,54,14,WS_GROUP
+    LTEXT           "찾는 위치(&L):",IDC_STATIC_2,6,27,49,8
+    COMBOBOX        IDC_LOOKIN,61,25,198,132,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "도움말(&H)",IDHELP,264,24,54,14,WS_GROUP
+    CONTROL         "옵션 표시(&O)",IDC_OPTIONS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,258,42,60,12
+    CONTROL         "하위 키 포함(&B)",IDC_SUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,42,86,12
+    LTEXT           "검색 대상:",IDS_LOOKAT,6,60,41,8
+    CONTROL         "키(&K)",IDC_KEYS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,58,55,12
+    CONTROL         "값(&V)",IDC_VALUES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,58,55,12
+    CONTROL         "데이터(&D)",IDC_DATA,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,217,58,55,12
+    LTEXT           "옵션:",IDS_OPTIONS,6,76,41,8
+    CONTROL         "16진수 모드(&X)",IDC_HEX,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,74,60,12
+    CONTROL         "대/소문자 구분(&T)",IDC_CASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,74,84,12
+    CONTROL         "단어 단위로(&W)",IDC_WHOLEWORDS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,87,60,12
+    CONTROL         "정규식(&G)",IDC_REGEXP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,139,87,75,12
+    LTEXT           "이후(같은 시간 포함)(&N):",IDS_NEWER,61,105,76,8
+    EDITTEXT        IDC_MINTIME,139,103,80,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.yyyy",IDS_FORMAT1,225,105,81,8
+    LTEXT           "이전(같은 시간 포함)(&R):",IDS_OLDER,61,121,76,8
+    EDITTEXT        IDC_MAXTIME,139,119,80,12,ES_AUTOHSCROLL
+    LTEXT           "hh:mm:ss dd.mm.yyyy",IDS_FORMAT2,225,121,81,8
+    LTEXT           "찾은 항목(&I):",IDC_FOUND_FILES,6,132,109,8
+    CONTROL         "",IDC_RESULTS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | WS_CLIPCHILDREN | WS_BORDER | WS_TABSTOP,6,142,309,57
+END
+
+IDD_CONFIG DIALOGEX 86, 38, 280, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "레지스트리 편집기 설정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "외부 편집기 설정. 외부 편집기는 레지스트리 값을 원시 편집하는 데 사용됩니다.",IDC_STATIC_1,10,10,260,8
+    LTEXT           "명령(&C):",IDC_STATIC_2,20,27,48,8
+    EDITTEXT        IDE_COMMAND,69,25,184,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_BROWSE,257,25,13,12
+    LTEXT           "인수(&A):",IDC_STATIC_3,20,43,48,8
+    EDITTEXT        IDE_ARGUMENTS,69,41,184,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_ARGHELP,257,41,13,12
+    LTEXT           "시작 디렉터리(&I):",IDC_STATIC_4,20,59,48,8
+    EDITTEXT        IDE_INITDIR,69,57,184,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDB_INITDIRHELP,257,57,13,12
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,10,79,260,1
+    DEFPUSHBUTTON   "확인",IDOK,166,84,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,220,84,50,14
+END
+
+IDD_EXPORT DIALOGEX 14, 22, 227, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "내보내기"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "내보낼 경로(&E):",IDC_STATIC_1,10,10,83,8
+    EDITTEXT        IDE_NAME,10,20,208,12,ES_AUTOHSCROLL
+    LTEXT           "대상 파일(&T):",IDC_STATIC_2,10,39,56,8
+    EDITTEXT        IDE_FILE,10,49,191,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDB_BROWSE,205,49,13,12
+    DEFPUSHBUTTON   "확인",IDOK,58,72,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,118,72,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "레지스트리 편집기"
+  IDS_DESCRIPTION, "Windows 레지스트리를 탐색하고 보고 수정합니다."
+  IDS_ABOUT, "플러그인 정보"
+  IDS_REGEDTERR, "레지스트리 편집기 - 오류"
+  IDS_LOWMEM, "메모리가 부족합니다."
+  IDS_DRIVEMENUTEXT, "\tWindows 레지스트리"
+  IDS_DEFAULTVALUE, "(기본값)"
+  IDS_TYPE, "형식/날짜"
+  IDS_DATA, "데이터/시간"
+  IDS_SIZE, "크기"
+  IDS_KEY, "키"
+  IDS_EMPTY, "여기에는 빈 문자열을 사용할 수 없습니다."
+  IDS_ERROR, "오류"
+  IDS_NEWKEYINROOT, "레지스트리 루트에는 새 키를 만들 수 없습니다."
+  IDS_LONGNAME, "경로 이름이 너무 길어 작업을 완료할 수 없습니다."
+  IDS_NEWKEY, "새 키를 만들 수 없습니다: "
+  IDS_KEYEXISTS, "키가 이미 있습니다."
+  IDS_DELVAL, "레지스트리 값 삭제 오류"
+  IDS_DELKEY, "레지스트리 키 삭제 오류"
+  IDS_CONFIRNNONEMPTYDELETE, "키 ""%s""이(가) 비어 있지 않습니다.\n삭제하시겠습니까?"
+  IDS_QUESTION, "질문"
+  IDS_DELKEYINROOT, "레지스트리 루트의 키는 삭제할 수 없습니다."
+  IDS_MENUNEWKEY, "새 키(&K)..."
+  IDS_MENUNEWVAL, "새 값(&V)..."
+  //IDS_MENUOPEN, "&Open\tEnter"
+  IDS_EDIT, "편집(&E)..."
+  IDS_RAWEDIT, "원시 편집(&W)..."
+  //IDS_MENUDELETE, "&Delete\tF8"
+  //IDS_MENURENAME, "&Rename\tF2"
+  IDS_NEWVAL, "새 값을 만들 수 없습니다: "
+  IDS_REPLACEVAL, "값 ""%s""이(가) 이미 있습니다.\n바꾸시겠습니까?"
+  IDS_INVALIDHEXVALUE, "16진수 값이 잘못되었습니다."
+  IDS_INVALIDDECVALUE, "10진수 값이 잘못되었습니다."
+  IDS_QUERYVAL, "값을 조회할 수 없습니다: "
+  IDS_SETVAL, "값을 설정할 수 없습니다: "
+  IDS_BADPATH, "경로 이름이 잘못되었습니다. "
+  IDS_NOTREGEDTPATH, "여기서는 다른 파일 시스템의 경로를 사용할 수 없습니다."
+  IDS_OPENKEY, "레지스트리 키 ""%ls""을(를) 열 수 없습니다. "
+  IDS_OPENKEY2, "레지스트리 키 ""%ls\\%ls""을(를) 열 수 없습니다. "
+  IDS_ENUMKEY, "하나 이상의 하위 키 또는 값을 나열할 수 없습니다 - %s\n계속 나열하시겠습니까?"
+  IDS_EXPORT, "내보내기(&E)..."
+  IDS_SEARCH, "검색(&S)..."
+  IDS_QUICKRENAMEKEY, "키 ""%s""의 새 이름"
+  IDS_QUICKRENAMEVAL, "값 ""%s""의 새 이름"
+  IDS_QUICKRENAME, "빠른 이름 바꾸기"
+  IDS_COPY, "복사"
+  IDS_MOVE, "이동"
+  IDS_COPYORMOVE1, "%s - 값 ""%s""의 대상"
+  IDS_COPYORMOVE2, "%s - 키 ""%s""의 대상"
+  IDS_COPYORMOVE3, "{!}%s - 값 %d개{}의 대상"
+  IDS_COPYORMOVE4, "{!}%s - 키 %d개{}의 대상"
+  IDS_COPYORMOVE5, "{!}%s - 값 %d개{}와 키 %d개{}의 대상"
+  IDS_MOVERENAME, "이동/이름 바꾸기"
+  IDS_SAMETARGET, "이 작업은 의미가 없습니다. 선택한 모든 파일과 디렉터리의 대상 이름이 같습니다(서로 덮어쓰게 됩니다)."
+  IDS_ACCESS, "레지스트리 키 ""%ls\\%ls""에 액세스할 수 없습니다. "
+  IDS_CANTCOPYTOITSELF, "키나 값을 자기 자신에게 복사할 수 없습니다."
+  IDS_CANTMOVETOITSELF, "키나 값을 자기 자신에게 이동할 수 없습니다."
+  IDS_CREATE, "레지스트리 키를 만들 수 없습니다. "
+  IDS_OPEN, "레지스트리 키를 열 수 없습니다. "
+  IDS_ACCESS2, "레지스트리 키에 액세스할 수 없습니다. "
+  IDS_DELETE, "레지스트리 키를 삭제할 수 없습니다. "
+  IDS_COPYKEY, "레지스트리 키 복사 오류"
+  IDS_MOVEKEY, "레지스트리 키 이동 오류"
+  IDS_SETVAL2, "레지스트리 키 값을 설정할 수 없습니다. "
+  IDS_REMOVESOURCE, "원래 레지스트리 키를 제거할 수 없습니다. "
+  IDS_COPYVALUE, "레지스트리 키 값 복사 오류"
+  IDS_MOVEVALUE, "레지스트리 키 값 이동 오류"
+  IDS_REMOVESOURCE2, "원본 키에서 값을 제거할 수 없습니다. "
+  IDS_CANTCOPYTOITSELF2, "이름:\t%ls\n\n오류:\t키를 자기 자신에게 복사할 수 없습니다."
+  IDS_CANTMOVETOITSELF2, "이름:\t%ls\n\n오류:\t키를 자기 자신에게 이동할 수 없습니다."
+  IDS_COPYCLASSNAME, "키의 클래스 이름은 대상 키로 복사할 수 없습니다.\n계속하시겠습니까?"
+  IDS_WARNING, "경고"
+  IDS_CANNOTRENAME, "키 이름을 바꿀 수 없습니다. 지정한 키 이름이 이미 사용 중입니다."
+  IDS_RENAMEKEY, "레지스트리 키 이름 바꾸기 오류"
+  IDS_RENAMEVAL, "레지스트리 값 이름 바꾸기 오류"
+  IDS_SAMECASEKEY, "키 이름을 바꿀 수 없습니다. 원래 이름과 새 이름이 대/소문자만 다릅니다."
+  IDS_SAMECASEVAL, "값 이름을 바꿀 수 없습니다. 원래 이름과 새 이름이 대/소문자만 다릅니다."
+  IDS_SYNTAX, "키 이름 구문이 잘못되었습니다."
+  IDS_CREATETARGET, "대상 키 ""%ls\\%ls""이(가) 없습니다. 만드시겠습니까?"
+  IDS_COPYPROGRESS, "레지스트리 항목을 복사하는 중입니다. 잠시 기다려 주십시오(취소하려면 Esc를 누르십시오)..."
+  IDS_MOVEPROGRESS, "레지스트리 항목을 이동하는 중입니다. 잠시 기다려 주십시오(취소하려면 Esc를 누르십시오)..."
+  IDS_DELETEPROGRESS, "레지스트리 항목을 삭제하는 중입니다. 잠시 기다려 주십시오(취소하려면 Esc를 누르십시오)..."
+  IDS_CANCEL, "이 작업을 취소하시겠습니까?"
+  IDS_COPYTOTROOT, "레지스트리 루트로 키를 복사할 수 없습니다."
+  //IDS_WINDOWSREGISTRY, "Windows Registry"
+  IDS_STOP, "중지(&P)"
+  IDS_START, "지금 찾기(&F)"
+  IDS_FOUNDITEMS1, "찾은 항목(&I):"
+  IDS_FOUNDITEMS2, "찾은 항목(&I) (%d):"
+  IDS_NOFILESFOUND, "찾은 파일 없음"
+  IDS_STOPPED, "검색 중지됨"
+  IDS_NAME_COLUMN, "이름"
+  IDS_TYPE_COLUMN, "형식"
+  IDS_DATA_COLUMN, "데이터"
+  IDS_PATH_COLUMN, "경로"
+  IDS_SIZE_COLUMN, "크기"
+  IDS_DATE_COLUMN, "날짜"
+  IDS_TIME_COLUMN, "시간"
+  IDS_FIND, "Windows 레지스트리에서 검색(&S)..."
+  IDS_SEARCHERROR, "Windows 레지스트리 검색 오류"
+  IDS_BADHEXSTRING, "문자열이 올바른 16진수 패턴이 아닙니다."
+  IDS_REGEXPERR, "정규식 클래스 오류: %s"
+  IDS_SEARCHING, "검색 중: %s\\"
+  IDS_SUBSTRINGHELP, "문자열, 10진수 또는 0x로 시작하는 16진수를 입력하십시오. 빈 문자열은 모든 항목과 일치합니다."
+  IDS_HEXHELP, "16진수 패턴을 1a 2b ""foo"" 3c 형식으로 입력하십시오. Unicode 문자열 패턴에는 ""를, ASCII 문자열 패턴에는 '를 사용하십시오."
+  IDS_REGEXPHELP, "정규식을 입력하십시오. 정규식에 대한 자세한 내용은 Sally 설명서를 참조하십시오."
+  IDS_LONGDATA, "데이터가 너무 길어 작업을 완료할 수 없습니다."
+  IDS_BADTIMEFORMAT, "날짜/시간 형식이 잘못되었습니다. 날짜는 dd.mm.yyyy 형식으로, 날짜와 시간은 hh:mm:ss dd.mm.yyyy 형식으로 입력하십시오."
+  IDS_CREATETEMP, "임시 파일을 만들 수 없습니다. "
+  IDS_WRITETEMP, "임시 파일에 쓸 수 없습니다. "
+  IDS_EXP_FULLNAME, "전체 이름"
+  IDS_EXP_DRIVE, "드라이브"
+  IDS_EXP_PATH, "경로"
+  IDS_EXP_NAME, "이름"
+  IDS_EXP_NAMEPART, "이름 부분"
+  IDS_EXP_EXTPART, "확장명 부분"
+  IDS_EXP_FULLPATH, "전체 경로"
+  IDS_EXP_WINDIR, "Windows 디렉터리"
+  IDS_EXP_SYSDIR, "시스템 디렉터리"
+  IDS_EXP_BROWSE, "찾아보기..."
+  IDS_EXP_SALDIR, "Sally 디렉터리"
+  IDS_EXP_DOSFULLNAME, "DOS 전체 이름"
+  IDS_EXP_DOSDRIVE, "DOS 드라이브"
+  IDS_EXP_DOSPATH, "DOS 경로"
+  IDS_EXP_DOSNAME, "DOS 이름"
+  IDS_EXP_DOSNAMEPART, "DOS 이름 부분"
+  IDS_EXP_DOSEXTPART, "DOS 확장명 부분"
+  IDS_EXP_DOSFULLPATH, "DOS 전체 경로"
+  IDS_EXP_DOSWINDIR, "DOS Windows 디렉터리"
+  IDS_EXP_DOSSYSDIR, "DOS 시스템 디렉터리"
+  IDS_EXP_ENVVAR, "환경 변수"
+  IDS_EXEFILES, "실행 파일 (*.exe, *.pif, *.com)\t*.exe;*.pif;*.com\t모든 파일 (*.*)\t*.*\t\t"
+  IDS_OPENTEMP, "임시 파일을 열 수 없습니다. "
+  IDS_SIZEOFTEMP, "임시 파일의 크기를 가져올 수 없습니다. "
+  IDS_READTEMP, "임시 파일에서 읽을 수 없습니다. "
+  IDS_PROCESS, "외부 편집기를 시작할 수 없습니다. 레지스트리 편집기 설정에서 외부 편집기 설정을 확인하십시오.\n"
+  IDS_NOTDWORD, "숫자가 너무 커서 DWORD로 저장할 수 없습니다."
+  IDS_REGFILES, "등록 파일 (*.reg)\t*.reg\t모든 파일 (*.*)\t*.*\t\t"
+  IDS_FILENAMEISDIR, "대상 파일 이름이 이미 디렉터리 이름으로 사용되고 있습니다."
+  IDS_OVERWRITE, "대상 파일이 이미 있습니다. 기존 파일을 바꾸시겠습니까?"
+  IDS_OVERWRITETITLE, "파일 덮어쓰기 확인"
+  IDS_REPLACEERROR, "기존 파일을 바꿀 수 없습니다."
+  IDS_PROCESS2, "%s을(를) 시작할 수 없습니다."
+  IDS_BADEXPORT, "레지스트리 데이터를 내보내는 동안 오류가 발생했습니다."
+  IDS_EXPORTING, "레지스트리 데이터를 내보내는 중입니다. 잠시 기다려 주십시오..."
+  IDS_SELECTED1, "{!}선택한 값 %d개{}"
+  IDS_SELECTED2, "{!}선택한 키 %d개{}"
+  IDS_SELECTED3, "{!}선택한 값 %d개{}와 선택한 키 %d개{}"
+  IDS_SELECTEDSIZE, "{!}<%d>바이트{} - "
+  IDS_CANNOTRENAMEDEFVAL, "기본값의 이름을 바꿀 수 없습니다. 값이 정의되어 있지 않습니다."
+  IDS_COPYNAME, "이름을 텍스트로 복사"
+  IDS_COPYFULLNAME, "전체 이름을 텍스트로 복사"
+  IDS_COPYPATH, "전체 경로를 텍스트로 복사"
+  IDS_BUSY, "Sally가 사용 중입니다. 요청한 명령을 수행할 수 없습니다. 나중에 다시 시도하십시오."
+}

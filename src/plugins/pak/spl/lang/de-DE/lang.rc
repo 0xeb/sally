@@ -81,7 +81,7 @@ STRINGTABLE
  IDS_TOOLONGNAME2, "Kann die Datei nicht hinzufügen, der Dateiname ist zu lang."
  IDS_PACKING, "Packe: "
  IDS_UNABLEREAD, "Kann die Datei nicht lesen: "
- IDS_ERRCONNECT, "Kann das Plugin nicht mit dem Sally verbinden."
+ IDS_ERRCONNECT, "Kann das Plugin nicht mit Sally verbinden."
  IDS_OPTIMIZING, "Optimiere, bitte warten..."
  IDS_OPTPROGTITLE, "Optimiere PAK-Archiv - %s"
  IDS_NEEDOPT, "Das Löschen der Dateien wurde nicht erfolgreich beendet. Sie müssen die PAK-Optimierung u.U. nochmals vom PAK-Pluginmenü starten, um überflüssigen Plattenplatz frei zu machen."

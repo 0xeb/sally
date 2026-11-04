@@ -4,13 +4,14 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <vector>
 
 class IFileEnumerator;
 
-// Folder suggestions while a path is typed (F5/F6 targets, Shift+F7): the part typed up to the
-// last '\' or '/' names a folder; its subfolders are offered as completions of what follows.
+// Path suggestions while a path is typed (F5/F6 targets, Shift+F7, F7): the part typed up to the
+// last '\' or '/' names a folder; its entries are offered as completions of what follows.
 // A relative path is resolved against the source panel's folder, as F5/F6 resolve their target.
 namespace Sally::PathCompletion
 {
@@ -33,8 +34,33 @@ Target Resolve(const std::wstring& typedHead, const std::wstring& baseDirectory)
 // 'maxCount'.
 std::vector<std::wstring> Candidates(const std::wstring& head, std::vector<std::wstring> names, size_t maxCount);
 
-// The subfolders of target.Directory as completions (Head + name), through 'enumerator'.
-std::vector<std::wstring> ListFolderCandidates(IFileEnumerator& enumerator, const Target& target, size_t maxCount);
+enum class CandidateKinds
+{
+    Folders,         // destinations of several items, folders, Shift+F7, F7
+    FoldersAndFiles, // Copy/Move of one disk file: an existing file name may be the new name
+};
+
+struct CandidateOptions
+{
+    CandidateKinds Kinds = CandidateKinds::Folders;
+    // New-directory dialogs offer existing folders as parents: accepting one leaves a trailing
+    // separator so the user can type a new leaf. Files never receive a separator.
+    bool AppendFolderSeparator = false;
+    // Files for which this returns true are not offered (the name alone, without the head).
+    // Called on the caller's thread; it must not touch state the UI thread can change.
+    std::function<bool(const std::wstring& fileName)> ExcludeFile;
+};
+
+// The entries of target.Directory as completions (Head + name), through 'enumerator': folders
+// first, then files when the options ask for them, each group sorted without regard to case.
+// Each group has its own cap of 'maxCount', so a folder holding many files still offers its
+// subfolders, and a huge folder is never read to the end.
+std::vector<std::wstring> ListCandidates(IFileEnumerator& enumerator, const Target& target, size_t maxCount,
+                                         const CandidateOptions& options = {});
+
+// Which names a Copy/Move target offers: files as well only when exactly one item is copied or
+// moved, that item is a file, and the source is a disk folder.
+CandidateKinds SuggestionKindsFor(size_t operationItemCount, bool singleItemIsFile, bool sourceIsDisk);
 
 constexpr size_t MaxSuggestions = 1000;
 

@@ -6,14 +6,12 @@
 // The languages compiled into sally.exe and every plugin DLL (each one under its own
 // LANGUAGE in the module's resources), and how Sally picks one of them.
 //
-// A language is identified three ways:
+// A language is identified two ways:
 // - its LANGID, the LANGUAGE of its resources (what EnumResourceLanguages reports);
 // - its BCP-47 tag, what SetProcessPreferredUILanguages takes to make the Win32 resource
-//   loader pick that copy of every string, dialog and menu;
-// - its persisted name, what the registry value Configuration\Language stores, e.g.
-//   "czech.slg". The name is only an identifier now: there is no such file. It keeps the
-//   form older Sally versions used for their language files, so one configuration works with
-//   both (an older Sally reading the value still finds its czech.slg).
+//   loader pick that copy of every string, dialog and menu. The registry value
+//   Configuration\Language stores the tag too, e.g. "cs-CZ"; any other value names no
+//   language, so Sally picks one as on a first start.
 //
 // No UI and no Win32 calls here: callers enumerate the built-in languages and query the user's
 // preferred UI languages, and this header decides.
@@ -30,23 +28,23 @@ namespace sally::languages
 struct BuiltinLanguage
 {
     LANGID LangId;
-    const wchar_t* Tag;           // BCP-47, e.g. L"cs-CZ"
-    const wchar_t* PersistedName; // Configuration\Language value, e.g. L"czech.slg"
+    const wchar_t* Tag; // BCP-47, e.g. L"cs-CZ"; also the Configuration\Language value
 };
 
 // English first: it is the fallback for everything.
 inline constexpr BuiltinLanguage kBuiltinLanguages[] = {
-    {0x0409, L"en-US", L"english.slg"},
-    {0x0405, L"cs-CZ", L"czech.slg"},
-    {0x041B, L"sk-SK", L"slovak.slg"},
-    {0x0407, L"de-DE", L"german.slg"},
-    {0x040C, L"fr-FR", L"french.slg"},
-    {0x0C0A, L"es-ES", L"spanish.slg"},
-    {0x0413, L"nl-NL", L"dutch.slg"},
-    {0x040E, L"hu-HU", L"hungarian.slg"},
-    {0x0418, L"ro-RO", L"romanian.slg"},
-    {0x0419, L"ru-RU", L"russian.slg"},
-    {0x0804, L"zh-CN", L"chinesesimplified.slg"},
+    {0x0409, L"en-US"},
+    {0x0405, L"cs-CZ"},
+    {0x041B, L"sk-SK"},
+    {0x0407, L"de-DE"},
+    {0x040C, L"fr-FR"},
+    {0x0C0A, L"es-ES"},
+    {0x0413, L"nl-NL"},
+    {0x040E, L"hu-HU"},
+    {0x0418, L"ro-RO"},
+    {0x0419, L"ru-RU"},
+    {0x0804, L"zh-CN"},
+    {0x0412, L"ko-KR"},
 };
 
 inline constexpr LANGID kEnglishLangId = 0x0409;
@@ -113,17 +111,6 @@ inline const BuiltinLanguage* FindByLangId(LANGID langId)
     return nullptr;
 }
 
-// Case-insensitive: "Czech.SLG" is czech. Returns 0 for an unknown or empty name.
-inline LANGID LangIdFromPersistedName(const wchar_t* persistedName)
-{
-    for (const BuiltinLanguage& language : kBuiltinLanguages)
-    {
-        if (detail::EqualsNoCase(language.PersistedName, persistedName))
-            return language.LangId;
-    }
-    return 0;
-}
-
 // Case-insensitive. Returns 0 for a tag that is not exactly one of the built-in languages.
 inline LANGID LangIdFromTag(const wchar_t* tag)
 {
@@ -133,13 +120,6 @@ inline LANGID LangIdFromTag(const wchar_t* tag)
             return language.LangId;
     }
     return 0;
-}
-
-// NULL for a LANGID that is not a built-in language.
-inline const wchar_t* PersistedNameFromLangId(LANGID langId)
-{
-    const BuiltinLanguage* language = FindByLangId(langId);
-    return language != nullptr ? language->PersistedName : nullptr;
 }
 
 // NULL for a LANGID that is not a built-in language.
@@ -201,11 +181,11 @@ inline LANGID ChooseDefault(const std::vector<LANGID>& available,
 }
 
 // A valid configured language, including English, takes precedence over Windows' preference.
-inline LANGID ChooseConfiguredOrDefault(const wchar_t* persistedName,
+inline LANGID ChooseConfiguredOrDefault(const wchar_t* configuredTag,
                                        const std::vector<LANGID>& available,
                                        const std::vector<std::wstring>& userPreferredTags)
 {
-    const LANGID configured = LangIdFromPersistedName(persistedName);
+    const LANGID configured = LangIdFromTag(configuredTag);
     return configured != 0 && Contains(available, configured)
                ? configured
                : ChooseDefault(available, userPreferredTags, nullptr);

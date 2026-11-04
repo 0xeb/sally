@@ -1,0 +1,214 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for undelete. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/undelete/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\undelete.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "삭제 취소"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,12,12,323,8
+    LTEXT           "",IDC_PROGRESSBAR,35,32,292,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "취소",IDCANCEL,144,54,50,14
+    LTEXT           "전체:",IDC_STATIC_1,12,33,22,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "삭제 취소"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "분석할 디스크 선택(&D)",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "디스크 이미지(&I)",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,56,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,361,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "찾아보기(&B)...",IDC_BUTTON_BROWSE,379,178,50,14,WS_GROUP
+    CONTROL         "FAT 파티션의 빈 클러스터 검사(&V)",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,184,10
+    CONTROL         "기존 파일 및 디렉터리 표시(&X)",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "크기가 0인 파일 표시(&Z)",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "빈 디렉터리 표시(&E)",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "메타파일 표시(&M)",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "파일 손상 정도 예측(&F)",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "확인",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "도움말",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "삭제 취소"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "복구 중",IDC_LABEL_UNDELETING,3,11,54,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,61,11,287,8
+    RTEXT           "대상",IDC_STATIC_1,3,23,40,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,61,23,287,8
+    RTEXT           "파일:",IDC_STATIC_2,3,41,40,8
+    LTEXT           "",IDC_PROGRESS_FILE,47,40,293,12,NOT WS_GROUP
+    RTEXT           "전체:",IDC_STATIC_3,3,56,40,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,47,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "취소",IDCANCEL,151,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 235, 66
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "손상된 파일 이름"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "다음 파일 이름의 첫 글자를 복구할 수 없습니다. 원래 문자를 입력하십시오.",IDC_STATIC_1,7,9,221,8
+    EDITTEXT        IDC_EDIT_FILENAME,7,19,221,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "확인",IDOK,66,45,50,14
+    PUSHBUTTON      "모두(&A)",IDC_BUTTON_ALL,122,45,50,14
+    PUSHBUTTON      "취소",IDCANCEL,178,45,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 257, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "삭제 취소 설정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "파일 보기에 사용할 대체 임시 디렉터리(&T):",IDC_STATIC_1,7,7,163,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,222,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,235,17,16,14,WS_GROUP
+    CONTROL         "FAT에서 이전 클러스터 검사 정보를 항상 다시 사용(&R)",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,194,10
+    CONTROL         "같은 논리 디스크로 복구할 때 경고 안 함(&S)",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,193,10
+    CONTROL         "암호화된 파일을 FAT 또는 exFAT로 복구하기 전에 경고 안 함(&E)",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,223,10
+    DEFPUSHBUTTON   "확인",IDOK,91,80,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,146,80,50,14
+    PUSHBUTTON      "도움말",IDHELP,201,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 276, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "백업에서 암호화된 파일 복원"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "이 기능은 FAT처럼 EFS(파일 시스템 암호화)를 지원하지 않는 파티션으로 이전에 복구한 암호화된 파일을 복원합니다. 일반 파일(*.bak 이외의 파일)은 수정 없이 복사됩니다.",IDC_STATIC_1,7,7,262,16
+    LTEXT           "%s 복원 위치(&R):",IDC_LABEL_SOURCE,7,33,262,8
+    EDITTEXT        IDC_EDIT_TARGET,7,43,244,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,255,43,14,14,WS_GROUP
+    DEFPUSHBUTTON   "확인",IDOK,57,66,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,113,66,50,14
+    PUSHBUTTON      "도움말",IDHELP,169,66,50,14
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_LOWMEM, "메모리가 부족합니다."
+  IDS_ERRORREADINGMFT, "MFT 클러스터를 읽는 중 오류가 발생했습니다."
+  IDS_MFTRECORDDAMAGED, "MFT를 읽는 중 오류가 발생했습니다: 첫 번째 레코드가 손상되었습니다."
+  IDS_ROOTNOTFOUND, "루트 디렉터리를 찾을 수 없습니다."
+  IDS_VDIRECTORY, "디렉터리%06d"
+  IDS_ALLDELETEDFILES, "{삭제된 모든 파일}"
+  IDS_ERRORNOTNTFS, "내부 오류: 볼륨이 NTFS가 아닙니다."
+  IDS_ERRORNOTOPEN, "내부 오류: 볼륨이 열려 있지 않습니다."
+  IDS_ERROROPENINGVOLUME, "볼륨을 여는 중 오류가 발생했습니다."
+  IDS_ERRORREADINGBOOT, "부트 섹터를 읽는 중 오류가 발생했습니다."
+  IDS_ERRORVOLUMETYPE, "인식할 수 없는 볼륨 형식입니다. FAT 12, 16, 32 및 NTFS 볼륨만 지원됩니다."
+  IDS_READINGMFT, "MFT를 읽는 중..."
+  IDS_ERRORREADINGFAT, "FAT를 읽는 중 오류가 발생했습니다."
+  IDS_ERRORREADINGDIRCLUSTERS, "디렉터리 클러스터를 읽는 중 오류가 발생했습니다."
+  IDS_ERRORNOTFAT, "내부 오류: 볼륨이 FAT가 아닙니다."
+  IDS_LOADINGFAT, "FAT를 읽는 중..."
+  IDS_READINGDIRS, "디렉터리를 읽는 중..."
+  IDS_READINGEXISTINGDIRS, "기존 디렉터리를 읽는 중..."
+  IDS_READINGDELETEDDIRS, "삭제된 디렉터리를 읽는 중..."
+  IDS_SCANNINGVACANTCLUSTERS, "빈 클러스터를 검사하는 중..."
+  IDS_REUSESCANNEDINFO, "이전 클러스터 검사 정보를 다시 사용하시겠습니까?"
+  IDS_RELOADINGCLUSTERS, "이전에 찾은 클러스터를 다시 불러오는 중..."
+  IDS_FLOPPY350, "3.5 플로피"
+  IDS_FLOPPY525, "5.25 플로피"
+  IDS_FLOPPY800, "8.0 플로피"
+  IDS_COMPACT_DISK, "CD"
+  IDS_LOCAL_DISK, "로컬 디스크"
+  IDS_REMOVABLE_DISK, "이동식 디스크"
+  IDS_ANALYZINGDIRS, "디렉터리를 분석하는 중..."
+  IDS_INCOMPLETEMFT, "MFT(마스터 파일 테이블) 전체를 검사하지 못했습니다. 일부 결과를 표시하시겠습니까?"
+  IDS_BITMAPNOTFOUND, "이 볼륨에서 $Bitmap을 찾지 못했습니다. 파일 손상 예측을 중단했습니다."
+  IDS_BITMAPNOSTREAM, "$Bitmap 파일의 기본 스트림을 찾지 못했습니다. 파일 손상 예측을 중단했습니다."
+  IDS_LOWMEMBITMAP, "클러스터 비트맵 파일을 불러올 메모리가 부족합니다. 파일 손상 예측을 중단합니다."
+  IDS_ERRORREADINGBMP, "$Bitmap 파일을 읽는 중 오류가 발생했습니다. 파일 손상 예측을 중단했습니다."
+  IDS_BITMAPISEMPTY, "$Bitmap의 크기가 0입니다. 파일 손상 예측을 중단했습니다."
+}
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "삭제 취소"
+  IDS_DESCRIPTION, "FAT 또는 NTFS 파티션에서 삭제된 파일을 복구합니다."
+  IDS_ABOUTTITLE, "플러그인 정보"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{메타파일}"
+  IDS_PATHDISK, "경로에 디스크가 포함되어야 합니다."
+  IDS_PATHFILE, "경로가 파일을 가리킵니다. 파일을 열 수 없습니다."
+  IDS_PATHNOTFOUND, "경로를 찾을 수 없습니다."
+  IDS_IMAGENOTFOUND, "지정한 파일을 찾을 수 없습니다."
+  IDS_ERROROPENINGPROGRESS, "진행률 대화 상자를 여는 중 오류가 발생했습니다."
+  IDS_VOLENUMERATE, "시스템 볼륨을 열거하는 중 오류가 발생했습니다."
+  IDS_OPENINGVOLUME, "볼륨을 여는 중..."
+  IDS_SCANNINGFOUND, "{!}빈 클러스터를 검사하는 중... (디렉터리 클러스터 %d개{} 찾음)"
+  IDS_ALWAYSCHOOSEYES, "항상 예 선택(필요하면 설정 대화 상자에서 다시 설정할 수 있음)"
+  IDS_PATHTOOLONG, "대상 경로가 너무 깁니다."
+  IDS_QUESTION, "질문"
+  IDS_WANTCANCEL, "이 작업을 취소하시겠습니까?"
+  IDS_BADPATH, "압축 파일이나 플러그인 파일 시스템으로는 복구할 수 없습니다."
+  IDS_ERROR, "오류" // title of error messages
+  IDS_VIEW, "보기" // the function "F3"
+  IDS_TEMPDIR, "%c:의 파일을 보려면 %c:가 아닌 다른 논리 디스크에 대체 임시 디렉터리를 지정해야 합니다."
+  IDS_WAIT, "임시 디렉터리로 파일을 복구하는 중입니다. 잠시 기다려 주십시오."
+  IDS_ENCRYPTEDWARNING, "대상 볼륨이 EFS(파일 시스템 암호화)를 지원하지 않습니다.\n\n암호화된 파일은 백업 형식으로 복구되며, 나중에 ""플러그인/삭제 취소/백업에서 암호화된 파일 복원"" 명령을 사용하여 NTFS 파티션으로 복원할 수 있습니다."
+  IDS_DONTSHOWAGAIN, "다시 표시 안 함"
+  IDS_CHOOSETEMPDIR, "대체 임시 디렉터리 선택:"
+  IDS_SAMEPARTITION, "삭제된 파일이 있는 논리 디스크와 같은 디스크로 복구하려는 것 같습니다. 항상 다른 파티션으로 복구해야 합니다. 그렇지 않으면 복구 중인 파일이 자신을 덮어쓰거나 다른 삭제된 파일을 잃을 수 있습니다.\n\n팁: 파티션이 하나뿐이면 플로피 디스크나 USB 디스크로 복구할 수도 있습니다."
+  IDS_UNDELETECMD, "삭제된 파일 및 디렉터리 복구(&R)..."
+  IDS_ERRORENCRYPTED, "암호화된 파일을 복구할 수 없습니다: "
+  IDS_RESTORECMD, "백업에서 암호화된 파일 복원(&E)..."
+  IDS_CANNOTVIEW, "파일을 볼 수 없습니다. 임시 디렉터리가 EFS(파일 시스템 암호화)를 지원하지 않습니다."
+  IDS_CHOOSETARGET, "대상 디렉터리 선택"
+  IDS_RESTORE, "복원" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "복원 중" // label inside the progress dialog
+  IDS_READINGTREE, "디렉터리 트리를 읽는 중..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "대상 볼륨이 EFS(파일 시스템 암호화)를 지원하지 않습니다."
+  IDS_VOLUME_MOUNT, "탑재 지점"
+  IDS_VOLUME_NAME, "이름"
+  IDS_VOLUME_FORMAT, "형식"
+  IDS_VOLUME_SIZE, "크기"
+  IDS_VOLUME_FREE, "사용 가능"
+  IDS_VOLUME_FREEPROC, "사용 가능 %"
+  IDS_VOLUME_VOLID, "GUID 경로"
+  IDS_CONDITION, "상태"
+  IDS_CONDITIONDESC, "파일 손상 예측"
+  IDS_CONDITION_GOOD, "양호"
+  IDS_CONDITION_FAIR, "보통"
+  IDS_CONDITION_POOR, "나쁨"
+  IDS_CONDITION_LOST, "손실"
+  IDS_CONDITION_UNKNOWN, "알 수 없음"
+  IDS_UNDELETEINCHDRVMENU, "\t삭제 취소"
+  IDS_PARTIALRECOVER, "다음 파일을 완전히 복구할 수 없습니다: %s\n\n파일의 일부만 복구하시겠습니까?"
+  IDS_PARTIALRECOVER_DONTASK, "다음에도 같은 대답 선택"
+  IDS_ERRORRECOVER, "파일 %s을(를) 복구하는 중 오류가 발생했습니다."
+    IDS_SELECTVOLUME, "볼륨을 선택하거나 디스크 이미지를 선택하십시오."
+}

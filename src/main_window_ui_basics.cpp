@@ -1621,12 +1621,16 @@ void CMainWindow::SetEnvFont()
     }
 }
 
-void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max, BOOL submenu)
+void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max, BOOL submenu,
+                                const std::vector<bool>* shown)
 {
     MENU_ITEM_INFO mii;
     int added = 0;
     for (; *iterator < max; (*iterator)++)
     {
+        // #50: a hidden submenu's whole block, closing marker included, is left out
+        if (shown != NULL && *iterator < (int)shown->size() && !(*shown)[*iterator])
+            continue;
         switch (UserMenuItems->At(*iterator)->Type)
         {
         case umitSeparator:
@@ -1666,7 +1670,7 @@ void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max, BOOL s
             menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
             // recursion
             (*iterator)++;
-            FillUserMenu2(popup, iterator, max, TRUE);
+            FillUserMenu2(popup, iterator, max, TRUE, shown);
             added++;
             break;
         }
@@ -1694,10 +1698,48 @@ ESCAPE:
 
 void CMainWindow::FillUserMenu(CMenuPopup* menu, BOOL customize)
 {
+    FillUserMenu(menu, customize, GetUserMenuContext());
+}
+
+Sally::UserMenuConditions::Context CMainWindow::GetUserMenuContext()
+{
+    using namespace Sally::UserMenuConditions;
+    Context context;
+    CFilesWindow* panel = GetActivePanel();
+    if (panel == NULL)
+        return context; // Unknown: nothing to describe, nothing is filtered
+    if (panel->Is(ptDisk))
+    {
+        context.Panel = PanelKind::Disk;
+        context.Path = panel->GetPathW();
+    }
+    else
+        context.Panel = panel->Is(ptZIPArchive) ? PanelKind::Archive : PanelKind::PluginFS;
+    const int caret = panel->GetCaretIndex();
+    if (caret >= 0 && caret < panel->Dirs->Count + panel->Files->Count)
+    {
+        if (caret < panel->Dirs->Count)
+        {
+            context.FocusName = panel->Dirs->At(caret).Name;
+            context.Focus = caret == 0 && context.FocusName == L".." ? FocusKind::Parent : FocusKind::Folder;
+        }
+        else
+        {
+            context.FocusName = panel->Files->At(caret - panel->Dirs->Count).Name;
+            context.Focus = FocusKind::File;
+        }
+    }
+    return context;
+}
+
+void CMainWindow::FillUserMenu(CMenuPopup* menu, BOOL customize, const Sally::UserMenuConditions::Context& context)
+{
     int max = min(CM_USERMENU_MAX - CM_USERMENU_MIN, UserMenuItems->Count);
 
+    const std::vector<bool> shown =
+        Sally::UserMenuConditions::MenuEntriesShown(UserMenuConditionEntries(*UserMenuItems, max, context));
     int iterator = 0;
-    FillUserMenu2(menu, &iterator, max);
+    FillUserMenu2(menu, &iterator, max, FALSE, &shown);
 
     if (customize)
     {
@@ -3165,7 +3207,12 @@ void CMainWindow::OnEnterIdle()
 
     // check if someone requested a state update
     if (IdleRefreshStates)
+    {
         RefreshCommandStates();
+        // #50: the focus or the path changed, which may change the commands the bar shows
+        if (UMToolBar != NULL)
+            UMToolBar->RefreshForContext(GetUserMenuContext());
+    }
 
     // update plugin bar and drives bar if needed
     if (!SalamanderBusy && PluginsStatesChanged)

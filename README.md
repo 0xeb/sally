@@ -149,9 +149,9 @@ Sally is not a one-off binary drop. The release machinery is part of the product
 
 ### Localization Is Alive
 
-Sally ships 10 maintained UI languages across supported release packages:
+Sally ships 11 maintained UI languages across supported release packages:
 
-Chinese (Simplified), Czech, Dutch, French, German, Hungarian, Romanian, Russian, Slovak, and Spanish.
+Chinese (Simplified), Czech, Dutch, French, German, Hungarian, Korean, Romanian, Russian, Slovak, and Spanish.
 
 Every language is built into `sally.exe` and the plugins, so there are no
 language packs to download or keep in sync. Translations live next to the English

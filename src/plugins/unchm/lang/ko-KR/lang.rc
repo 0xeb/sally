@@ -1,0 +1,48 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for unchm. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/unchm/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\unchm.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "파일을 열 수 없습니다."
+    IDS_UNKNOW_ERROR            "지정되지 않은 오류입니다."
+    IDS_UNPACKING_ARCHIVE       "CHM 압축 파일 압축 풀기"
+    IDS_ERROR_UNPACKING         "파일의 압축을 푸는 중 오류가 발생했습니다."
+    IDS_CANT_HANDLE_FILE        "이 파일을 처리할 수 없습니다."
+    IDS_INSUFFICIENT_MEMORY     "메모리가 부족합니다."
+    IDS_ABOUT                   "플러그인 정보"
+    IDS_PLUGIN_DESCRIPTION      "CHM 파일을 찾아보고 추출합니다."
+    IDS_CANT_CREATE_TEMP        "임시 디렉터리를 만들 수 없습니다."
+    IDS_CANT_DELETE_TEMP_FILE   "임시 파일을 삭제할 수 없습니다."
+    IDS_UNKNOWN_FILE_FORMAT     "알 수 없는 파일 형식이거나 올바른 CHM 이미지가 아닙니다.\n\n올바른 CHM 이미지가 확실하면 https://github.com/0xeb/sally/issues 에 이슈를 등록하여 이 형식을 지원할 수 있도록 도와주십시오."
+    IDS_CANT_OPEN_FILE          "이 파일을 열 수 없습니다."
+    IDS_ERR_TMP                 "임시 파일을 만들지 못했습니다."
+    IDS_CANT_SET_ATTRS          "파일 특성을 설정할 수 없습니다."
+    IDS_CANT_CREATE_DIR         "디렉터리 '%s'을(를) 만들 수 없습니다."
+    IDS_YES                     "예"
+    IDS_NO                      "아니요"
+    IDS_ERROR                   "오류"
+    IDS_WARNING                 "경고"
+    IDS_READERROR               "읽기 오류"
+    IDS_WRITEERROR              "쓰기 오류"
+    IDS_INTERNAL_PLUGIN_ERROR   "플러그인 내부 오류입니다."
+    IDS_INVALIDNUMBER           "잘못된 숫자입니다."
+    IDS_CANCELOPER              "작업을 취소하는 중입니다. 잠시 기다려 주십시오..."
+    IDS_CHMLIBCOPYRIGHT         "CHMLIB 라이브러리 Copyright © 2001-2010 Jed Wing"
+}

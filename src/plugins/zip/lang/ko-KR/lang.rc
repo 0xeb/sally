@@ -1,0 +1,660 @@
+﻿// SPDX-FileCopyrightText: 1997-2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// Korean (ko-KR) resources for zip. Translation: Sally contributors (AI-assisted).
+// Translate by editing the text and, if needed, the size/position of controls; keep every ID,
+// style and control in the same order as the English source (src/plugins/zip/lang/lang.rc).
+
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+#include "winresrc.h"
+#include "..\..\zip.rh2"
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+/////////////////////////////////////////////////////////////////////////////
+// Dialogs
+
+IDD_EXPACKOPTIONS DIALOGEX 41, 41, 308, 201
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "확장 압축 옵션"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "압축 파일:",IDC_STATIC_1,17,9,30,8
+    CONTROL         "",IDC_ARCHIVE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,50,9,250,8
+    LTEXT           "",IDC_STATIC_2,8,24,292,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "다중 볼륨 압축 파일 만들기(&M)",IDC_MULTIVOL,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,31,106,12
+    LTEXT           "볼륨 크기(&V):",IDC_STATIC_3,172,33,41,8,NOT WS_GROUP
+    COMBOBOX        IDC_VOLSIZE,216,31,51,110,CBS_DROPDOWN | WS_DISABLED | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_UNITS,272,31,27,34,CBS_DROPDOWNLIST | WS_DISABLED | WS_TABSTOP
+    CONTROL         "파일 이름에 일련번호 붙이기(&N)",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,17,45,90,12
+    LTEXT           "",IDC_STATIC_4,8,63,292,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "자동 압축 풀림 파일 만들기(&S)",IDC_SELFEXTR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,70,110,12
+    PUSHBUTTON      "고급(&A)...",IDC_ADVANCED,244,70,55,14,WS_DISABLED
+    LTEXT           "",IDC_STATIC_5,8,90,292,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "파일 암호화(&E)",IDC_ENCRYPT,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,97,58,12
+    LTEXT           "암호(&P):",IDC_STATIC_6,28,113,32,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD1,79,111,125,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    LTEXT           "암호 확인(&O):",IDC_STATIC_7,28,129,50,8,NOT WS_GROUP
+    EDITTEXT        IDC_PASSWORD2,79,127,125,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_DISABLED
+    GROUPBOX        " 암호화 방법 ",IDC_STATIC_8,213,97,86,50
+    CONTROL         "ZIP 2.0 호환(약함)(&Z)",IDC_ENC_ZIP20,"Button",BS_AUTORADIOBUTTON | WS_DISABLED | WS_GROUP,218,108,70,12
+    CONTROL         "128비트 AES(&1)",IDC_ENC_AES128,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,218,120,53,12
+    CONTROL         "256비트 AES(&2)",IDC_ENC_AES256,"Button",BS_AUTORADIOBUTTON | WS_DISABLED,218,132,55,12
+    LTEXT           "",IDC_STATIC_9,8,154,292,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "이 대화 상자를 다시 표시 안 함(나중에 설정 대화 상자에서 변경 가능)(&D)",IDC_DONTSHOW,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,17,161,260,12
+    DEFPUSHBUTTON   "확인",IDOK,32,180,55,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,95,180,55,14
+    PUSHBUTTON      "설정(&C)...",IDC_CONFIG,158,180,55,14
+    PUSHBUTTON      "도움말",IDHELP,221,180,55,14
+END
+
+IDD_CONFIG DIALOGEX 50, 37, 312, 277
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP 설정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "압축 풀기",IDC_STATIC_1,7,6,28,8
+    LTEXT           "",IDC_STATIC_2,37,10,270,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "고정 디스크에 저장된 다중 볼륨 압축 파일 자동 확장(&A)",IDC_AUTOEXPANDMV,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,17,170,12
+    LTEXT           "압축",IDC_STATIC_3,7,35,20,8
+    LTEXT           "",IDC_STATIC_4,29,39,278,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "압축 파일 수정 시 임시 사본 사용(권장, 오류 시 안전)(&T)",IDC_BACKUP,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,46,206,12
+    CONTROL         "ZIP 압축 파일에 빈 디렉터리 저장 안 함(&E)",IDC_NOEMPTYDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,58,141,12
+    CONTROL         "압축 파일 수정 시 압축 파일 시간을 최신 파일 시간으로 설정(&N)",IDC_SETFILETIME,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,70,213,12
+    CONTROL         "다중 볼륨 압축 파일에 WinZip 호환 파일 이름 사용(항상 Sally 이름 규칙을",IDC_WINZIPNAMES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,82,206,12
+    LTEXT           "사용하는 자동 압축 풀림 파일은 제외)",IDC_STATIC_5,26,94,230,8
+    LTEXT           "압축 수준(0 - 9, 9는 최고 압축률, 가장 오래 걸림)(&L):",IDC_STATIC_6,14,107,158,8
+    EDITTEXT        IDC_LEVEL,173,105,16,12
+    LTEXT           "자동 압축 풀림 기본 언어(&S):",IDC_STATIC_7,14,120,76,8
+    COMBOBOX        IDC_LANGUAGE,91,118,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "확인 메시지",IDC_STATIC_8,7,136,20,8
+    LTEXT           "",IDC_STATIC_9,29,140,278,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "SFX 언어를 변경할 때",IDC_STATIC_10,14,148,179,49
+    CONTROL         "텍스트를 변경하기 전에 항상 묻기(&W)",IDC_ASK,"Button",BS_AUTORADIOBUTTON | WS_GROUP,20,158,104,12
+    CONTROL         "텍스트를 기본값으로 자동 바꾸기(&R)",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,20,170,136,12
+    CONTROL         "묻지 않고 텍스트를 항상 그대로 두기(&U)",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,20,182,136,12
+    CONTROL         "압축 전에 확장 옵션 대화 상자 표시(&O)",IDC_SHOWEXOPTIONS,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,200,128,12
+    LTEXT           "패널 설정",IDC_STATIC_11,7,217,37,8
+    LTEXT           "",IDC_STATIC_12,46,221,261,1,SS_ETCHEDHORZ | WS_GROUP
+    CONTROL         "압축 파일 목록에 ""압축 크기"" 열 표시(&P)",IDC_CFG_LISTINFOPACKEDSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,228,132,12
+    LTEXT           "",IDC_STATIC_13,6,247,301,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "확인",IDOK,21,256,63,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,90,256,63,14
+    PUSHBUTTON      "기본값으로 설정(&D)",IDC_DEFAULT,159,256,63,14
+    PUSHBUTTON      "도움말",IDHELP,228,256,63,14
+END
+
+IDD_PASSWORD DIALOGEX 6, 15, 271, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP 암호 입력"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK,21,10,18,20
+    LTEXT           "이 파일은 암호화되어 있습니다. 해독할 암호를 입력하십시오.",IDC_STATIC_1,57,10,202,8
+    LTEXT           "파일:",IDC_STATIC_2,57,23,22,8
+    CONTROL         "",IDC_FILE,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,80,23,179,8
+    LTEXT           "암호(&P):",IDC_STATIC_3,57,36,32,8
+    EDITTEXT        IDC_PASSWORD,90,34,169,12,ES_PASSWORD | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "확인",IDOK,19,55,53,14,WS_GROUP
+    PUSHBUTTON      "건너뛰기(&S)",IDC_SKIP,79,55,53,14
+    PUSHBUTTON      "모두 건너뛰기(&K)",IDC_SKIPALL,139,55,53,14
+    PUSHBUTTON      "취소",IDCANCEL,199,55,53,14
+END
+
+IDD_LOWFREESPACE DIALOGEX 13, 54, 355, 94
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "디스크 여유 공간 부족"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "경고: 디스크 여유 공간이 지정한 볼륨 크기보다 작습니다.",IDC_TEXT,50,9,291,8
+    RTEXT           "경로:",IDC_STATIC_1,6,26,39,8
+    LTEXT           "여유 공간:",IDC_PATH,50,26,292,8
+    RTEXT           "여유 공간:",IDC_STATIC_2,6,39,39,8
+    LTEXT           "볼륨 크기:",IDC_FREESPACE,50,39,292,8
+    RTEXT           "볼륨 크기:",IDC_STATIC_3,6,52,39,8
+    LTEXT           "",IDC_VOLUMESIZE,50,52,292,8
+    DEFPUSHBUTTON   "무시(&I)",IDC_IGNORE,56,73,54,14
+    PUSHBUTTON      "모두 무시(&A)",IDC_ALL,119,73,54,14
+    PUSHBUTTON      "다시 시도(&R)",IDC_RETRY,182,73,54,14
+    PUSHBUTTON      "취소",IDCANCEL,245,73,54,14
+END
+
+IDD_CHANGEDISK DIALOGEX 24, 40, 199, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "디스크 교체"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,173,24
+    LTEXT           "준비되면 확인을 누르십시오.",IDC_STATIC_1,13,39,173,8
+    DEFPUSHBUTTON   "확인",IDOK,44,57,50,14
+    PUSHBUTTON      "취소",IDCANCEL,104,57,50,14
+END
+
+IDD_OVERWRITE DIALOGEX 6, 15, 350, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "파일 덮어쓰기 확인"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "덮어쓸 파일:",IDC_STATIC_1,6,14,39,8
+    LTEXT           "",IDC_FILE,50,14,285,8
+    LTEXT           "",IDC_FILEATTR,50,24,285,8
+    LTEXT           "파일이 디스크에 이미 있습니다. 덮어쓰시겠습니까?",IDC_STATIC_2,50,39,174,8
+    DEFPUSHBUTTON   "예(&Y)",IDC_YES,63,56,50,14
+    PUSHBUTTON      "모두(&A)",IDC_ALL,121,56,50,14
+    PUSHBUTTON      "다시 시도(&R)",IDC_RETRY,179,56,50,14
+    PUSHBUTTON      "취소",IDCANCEL,237,56,50,14
+END
+
+IDD_CHANGEDISK2 DIALOGEX 24, 40, 210, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "ZIP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "이 파일은 다중 볼륨 압축 파일의 일부이거나 손상된 파일입니다.",IDC_STATIC_1,13,8,184,8
+    LTEXT           "다중 볼륨 압축 파일이라고 생각되면 압축 파일의 마지막 부분이 들어 있는 디스크를 넣거나 고정 디스크에서 해당 파일을 찾으십시오. 준비되면 확인을 누르십시오.",IDC_STATIC_2,13,23,184,24
+    LTEXT           "압축 파일의 마지막 부분(&L):",IDC_STATIC_3,13,53,89,8
+    EDITTEXT        IDC_FILENAME,13,63,168,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,185,63,13,12
+    DEFPUSHBUTTON   "확인",IDOK,50,81,50,14
+    PUSHBUTTON      "취소",IDCANCEL,110,81,50,14
+END
+
+IDD_CHANGEDISK3 DIALOGEX 24, 40, 222, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "디스크 교체"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_CHDISKTEXT,13,8,201,8
+    LTEXT           "준비되면 확인을 누르십시오.",IDC_STATIC_1,13,23,184,8
+    CONTROL         "파일 이름에 일련번호가 붙어 있음(&S)",IDC_SEQNAME,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,35,135,12
+    CONTROL         "확장명에 디스크 번호 포함(&E)",IDC_WINZIP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,47,114,12
+    CONTROL         "묻지 않고 모든 볼륨 처리(&A)",IDC_PROCEEDALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,59,129,12
+    LTEXT           "파일 이름(&F):",IDC_STATIC_2,13,76,60,8
+    EDITTEXT        IDC_FILENAME,13,86,180,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BROWSE,197,86,13,12
+    DEFPUSHBUTTON   "확인",IDOK,49,104,50,14
+    PUSHBUTTON      "취소",IDCANCEL,111,104,50,14
+END
+
+IDD_ADVANCEDSE DIALOGEX 37, 14, 305, 303
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "자동 압축 풀림 설정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDC_STATIC_1,0,0,305,1,SS_ETCHEDHORZ | WS_GROUP
+    GROUPBOX        "파일을 추출할 디렉터리",IDC_STATIC_2,7,7,292,81,WS_GROUP
+    LTEXT           "추출 위치(&X):",IDC_STATIC_3,20,19,50,8,NOT WS_GROUP
+    EDITTEXT        IDC_TARGETDIR,20,29,249,12,ES_AUTOHSCROLL | ES_NOHIDESEL
+    PUSHBUTTON      ">",IDC_SPECDIR,272,29,12,12
+    LTEXT           "참고: 상대 경로를 입력하면 자동 압축 풀림 파일을 실행할 때 현재 디렉터리와 결합되며, 전체 경로를 입력할 수도 있습니다. 현재 디렉터리에 추출하려면 비워 두십시오.",IDC_STATIC_4,20,47,260,16,NOT WS_GROUP
+    CONTROL         "사용자가 디렉터리를 변경할 수 있도록 허용(&U)",IDC_ALLOWUSER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,69,146,12
+    LTEXT           "실행할 명령 또는 열 문서(&E):",IDC_STATIC_5,20,105,132,8,NOT WS_GROUP
+    EDITTEXT        IDC_EXECUTE,20,115,264,12,ES_AUTOHSCROLL
+    CONTROL         "추출한 파일 제거(&R)",IDC_REMOVE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,131,131,12
+    PUSHBUTTON      "대기(&W)...",IDC_WAITFOR,234,130,50,14
+    GROUPBOX        "인터페이스",IDC_STATIC_6,7,155,292,53,WS_GROUP
+    PUSHBUTTON      "텍스트(&T)...",IDC_TEXTS,20,169,50,14
+    LTEXT           "언어(&L):",IDC_STATIC_7,20,190,32,8,NOT WS_GROUP
+    COMBOBOX        IDC_LANGUAGE,74,188,64,57,CBS_DROPDOWNLIST | CBS_SORT | WS_TABSTOP
+    LTEXT           "아이콘:",IDC_STATIC_8,170,190,22,8,NOT WS_GROUP
+    LTEXT           "",IDC_EXEICON,193,186,19,18,NOT WS_GROUP
+    PUSHBUTTON      "아이콘 변경(&I)...",IDC_CHANGEICON,220,188,64,14
+    GROUPBOX        "확인 메시지 및 기타 옵션",IDC_STATIC_9,7,213,292,57
+    CONTROL         "자동으로 추출 시작(&O)",IDC_AUTO,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,20,226,76,12
+    CONTROL         "자동 압축 풀림 기본 대화 상자 숨기기(&H)",IDC_HIDEMAINDLG,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,238,118,12
+    CONTROL         "대상 디렉터리 자동으로 만들기(&C)",IDC_AUTODIR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,20,250,93,12
+    CONTROL         "작업 요약 대화 상자 표시(&S)",IDC_SUMDLG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,226,101,12
+    CONTROL         "파일 자동으로 덮어쓰기(&A)",IDC_OVEWRITE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,238,76,12
+    CONTROL         "관리자 권한 필요(&P) ",IDC_REQSADMIN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,160,250,86,12
+    DEFPUSHBUTTON   "확인",IDOK,66,275,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,127,275,50,14
+    PUSHBUTTON      "도움말",IDHELP,188,275,50,14
+    GROUPBOX        "추출이 끝난 후",IDC_STATIC_10,7,93,292,57,WS_GROUP
+END
+
+IDD_OVERWRITE2 DIALOGEX 6, 15, 350, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "파일 덮어쓰기 확인"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "덮어쓸 파일:",IDC_STATIC_1,6,14,39,8
+    LTEXT           "",IDC_FILE,50,14,280,8
+    LTEXT           "",IDC_FILEATTR,50,24,280,8
+    LTEXT           "파일이 디스크에 이미 있습니다. 덮어쓰시겠습니까?",IDC_STATIC_2,50,39,174,8
+    DEFPUSHBUTTON   "예(&Y)",IDC_YES,89,56,50,14
+    PUSHBUTTON      "아니요(&N)",IDC_NO_,150,56,50,14
+    PUSHBUTTON      "취소",IDCANCEL,211,56,50,14
+END
+
+IDD_RENAMEFAVSET DIALOGEX 100, 37, 194, 99
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "새 즐겨찾기 설정"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "이름(&N):",IDC_STATIC_1,14,8,60,8
+    EDITTEXT        IDC_NAME,14,18,164,12,ES_AUTOHSCROLL
+    LTEXT           "참고: 이 즐겨찾기 설정의 메뉴 단축키를 정의하려면 단축키로 사용할 문자 바로 앞에 앰퍼샌드(&&)를 입력하십시오.",IDC_STATIC_2,14,41,161,24
+    LTEXT           "",IDC_STATIC_3,7,74,181,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "확인",IDOK,39,80,50,14
+    PUSHBUTTON      "취소",IDCANCEL,99,80,50,14
+END
+
+IDD_CREATESFX DIALOGEX 6, 15, 204, 113
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "자동 압축 풀림 파일 만들기"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "다음 압축 파일로 자동 압축 풀림 파일 만들기(&C):",IDC_SOURCE,16,11,167,8
+    EDITTEXT        IDC_ARCHIVE,16,21,172,12,ES_AUTOHSCROLL
+    LTEXT           "새 자동 압축 풀림 파일의 파일 이름(&F):",IDC_TARGET,16,39,152,8
+    EDITTEXT        IDC_NEWARCHIVE,16,49,172,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "고급(&A)...",IDC_ADVANCED,128,68,60,14
+    LTEXT           "",IDC_STATIC_1,7,87,191,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "확인",IDOK,18,94,50,14
+    PUSHBUTTON      "취소",IDCANCEL,77,94,50,14
+    PUSHBUTTON      "도움말",IDHELP,136,94,50,14
+END
+
+IDD_COMMENT DIALOGEX 9, 34, 340, 180
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "ZIP 압축 파일 주석"
+MENU IDM_COMMENTMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_COMMENT,0,0,340,180,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL
+END
+
+IDD_SFXTEXTS DIALOGEX 94, 18, 260, 336
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "자동 압축 풀림 텍스트"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "메시지 상자 ",IDC_STATIC_1,8,5,245,142
+    LTEXT           "이 메시지 상자는 기본 대화 상자보다 먼저, 압축 풀기를 시작하기 전에 표시됩니다.",IDC_STATIC_2,20,18,221,8,NOT WS_GROUP
+    LTEXT           "메시지를 표시하지 않으려면 '제목' 및 '메시지' 필드를 비워 두십시오.",IDC_STATIC_3,20,30,221,8,NOT WS_GROUP
+    LTEXT           "단추(&B):",IDC_STATIC_4,20,45,32,8
+    COMBOBOX        IDC_MBOXBUTTONS,54,43,94,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "종류(&T):",IDC_STATIC_5,20,61,33,8,NOT WS_GROUP
+    COMBOBOX        IDC_MBOXICON,54,59,94,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "제목(&L):",IDC_STATIC_6,20,76,145,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTITLE,20,86,221,12,ES_AUTOHSCROLL
+    LTEXT           "메시지(&M):",IDC_STATIC_7,20,101,34,8,NOT WS_GROUP
+    EDITTEXT        IDC_MBOXTEXT,20,111,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    GROUPBOX        "기본 대화 상자",IDC_STATIC_8,8,153,245,158
+    LTEXT           "제목(&E):",IDC_STATIC_9,20,163,32,8
+    EDITTEXT        IDC_TITLE,20,173,221,12,ES_AUTOHSCROLL
+    LTEXT           "대화 상자에 표시할 텍스트(&D):",IDC_STATIC_10,20,189,112,8,NOT WS_GROUP
+    EDITTEXT        IDC_TEXT,20,199,221,29,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT           "'추출' 단추의 텍스트(&X):",IDC_STATIC_11,20,231,94,8,NOT WS_GROUP
+    EDITTEXT        IDC_BUTTONTEXT,20,241,68,12,ES_AUTOHSCROLL
+    LTEXT           "공급업체 이름(&V):",IDS_VENDOR,20,256,174,8
+    EDITTEXT        IDE_VENDOR,20,266,184,12,ES_AUTOHSCROLL
+    LTEXT           "WWW 링크(&W):",IDS_WWW,20,281,174,8
+    EDITTEXT        IDE_WWW,20,291,108,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "확인",IDOK,24,317,50,14,WS_GROUP
+    PUSHBUTTON      "취소",IDCANCEL,78,317,50,14
+    PUSHBUTTON      "다시 설정(&R)",IDC_RESET,132,317,50,14
+    PUSHBUTTON      "도움말",IDHELP,186,317,50,14
+END
+
+IDD_MANFAVS DIALOGEX 59, 61, 225, 123
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "즐겨찾기 관리"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "즐겨찾기(&F):",IDC_STATIC_1,9,4,60,8
+    LISTBOX         IDC_FAVORITIES,9,14,142,100,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP
+    PUSHBUTTON      "이름 바꾸기(&N)",IDC_RENAME,161,13,55,14,WS_GROUP
+    PUSHBUTTON      "제거(&R)",IDC_REMOVE,161,32,55,14
+    PUSHBUTTON      "모두 제거(&A)",IDC_REMOVEALL,161,51,55,14
+    DEFPUSHBUTTON   "닫기",IDOK,161,100,55,14
+END
+
+IDD_WAITFOR DIALOGEX 15, 24, 227, 131
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "대기"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "이 옵션을 사용하면 '명령' 필드에 지정한 프로세스가 아닌 다른 프로세스를 기다릴 수 있습니다. 이 프로세스가 끝나면 자동 압축 풀림 프로그램이 임시 파일을 제거하고 종료합니다.",IDC_STATIC_1,12,9,200,24
+    LTEXT           "",IDC_STATIC_2,12,41,200,24
+    LTEXT           "실행 파일의 파일 이름(&F):",IDC_STATIC_3,12,73,103,8
+    EDITTEXT        IDC_FILENAME,12,83,200,12,ES_AUTOHSCROLL
+    LTEXT           "",IDC_STATIC_4,3,105,221,1,SS_ETCHEDHORZ | WS_GROUP
+    DEFPUSHBUTTON   "확인",IDOK,28,112,50,14
+    PUSHBUTTON      "취소",IDCANCEL,88,112,50,14
+    PUSHBUTTON      "도움말",IDHELP,148,112,50,14
+END
+
+IDD_CHANGELANG DIALOGEX 6, 15, 248, 106
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "자동 압축 풀림 텍스트 변경"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "자동 압축 풀림 언어를 변경했습니다. '자동 압축 풀림 텍스트' 대화 상자에 입력한 사용자 지정 텍스트를 선택한 언어에 해당하는 기본값으로 바꾸시겠습니까?",IDC_STATIC_1,11,8,214,24
+    DEFPUSHBUTTON   "예",IDOK,40,40,50,14
+    PUSHBUTTON      "아니요",IDCANCEL,99,40,50,14
+    PUSHBUTTON      "도움말",IDHELP,158,40,50,14
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,3,62,242,1
+    CONTROL         "텍스트를 변경하기 전에 항상 묻기(&A)",IDC_ASK,"Button",BS_AUTORADIOBUTTON,11,66,127,12
+    CONTROL         "앞으로 텍스트를 기본값으로 자동 바꾸기(&R)",IDC_REPLACE,
+                    "Button",BS_AUTORADIOBUTTON,11,78,228,12
+    CONTROL         "앞으로 묻지 않고 텍스트를 항상 그대로 두기(&U)",IDC_LEAVE,
+                    "Button",BS_AUTORADIOBUTTON,11,90,205,12
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// Menus
+
+IDM_SFXMENU MENU 
+BEGIN
+    POPUP "파일(&F)"
+    BEGIN
+        MENUITEM "설정 내보내기(&E)...\tCtrl+E", CM_SFX_EXPORT
+        MENUITEM "설정 가져오기(&I)...\tCtrl+I", CM_SFX_IMPORT
+    END
+    POPUP "보기(&V)"
+    BEGIN
+        MENUITEM "SFX 대화 상자 미리 보기(&V)...\tCtr+V", CM_SFX_PREVIEW
+    END
+    POPUP "옵션(&O)"
+    BEGIN
+        MENUITEM "모두 다시 설정(&R)\tCtrl+Shift+R",    CM_SFX_RESETALL
+        MENUITEM "값 다시 설정(&V)\tCtrl+R",       CM_SFX_RESETVALUES
+        MENUITEM "텍스트 다시 설정(&T)\tCtrl+T",        CM_SFX_RESETTEXTS
+        MENUITEM SEPARATOR
+        MENUITEM "즐겨찾기에 추가(&A)...\tCtrl+A", CM_SFX_ADD
+        MENUITEM "즐겨찾기(&F)\tCtrl+F",          CM_SFX_FAVORITIES
+        MENUITEM SEPARATOR
+        MENUITEM "마지막 사용(&L)\tCtrl+L",          CM_SFX_LASTUSED
+    END
+END
+
+IDM_FAVMANMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "이름 바꾸기(&R)",                     CM_FAVRENAME
+        MENUITEM "삭제(&D)",                     CM_FAVDELETE
+        MENUITEM SEPARATOR
+        MENUITEM "모두 제거(&A)",                 CM_FAVREMOVEALL
+    END
+END
+
+IDM_COMMENTMENU MENU 
+BEGIN
+    POPUP "파일(&F)"
+    BEGIN
+        MENUITEM "저장(&S)",                       CM_SAVE
+        MENUITEM SEPARATOR
+        MENUITEM "닫기(&C)\tAlt+F4",              CM_CLOSE
+    END
+END
+
+IDM_SPECDIR MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "임시 디렉터리(&T)",        CM_TEMP
+        MENUITEM "Program Files(&P)",              CM_PROGFILES
+        MENUITEM "Windows 디렉터리(&W)",          CM_WINDIR
+        MENUITEM "시스템 디렉터리(&S)",           CM_SYSDIR
+        MENUITEM SEPARATOR
+        MENUITEM "환경 변수(&E)",       CM_ENVVAR
+        MENUITEM "레지스트리 항목(&R)",             CM_REGENTRY
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+// String tables
+
+STRINGTABLE
+{
+  IDS_ABOUTPLUGINTITLE, "플러그인 정보"
+  IDS_PLUGIN_DESCRIPTION, "ZIP 압축 파일을 만들고, 찾아보고, 추출합니다."
+  IDS_ERROPEN, "파일을 열 수 없습니다."
+  IDS_ERRFORMAT, "데이터 형식이 잘못되었습니다."
+  IDS_ERREOCENTRDIR, "중앙 디렉터리 끝 서명을 찾을 수 없습니다. 파일이 손상되었을 수 있습니다."
+  IDS_LOWMEM, "메모리가 부족합니다."
+  IDS_ERRADDFILE, "목록에 파일을 추가할 수 없습니다."
+  IDS_ERRADDFILE_TOOLONG, "목록에 하나 이상의 파일을 추가할 수 없습니다. 전체 경로가 너무 깁니다.\n압축 파일 목록에서 일부 디렉터리나 파일이 누락되었을 수 있습니다."
+  IDS_ERRADDDIR, "목록에 디렉터리를 추가할 수 없습니다."
+  IDS_ERRADDDIR_TOOLONG, "목록에 하나 이상의 디렉터리를 추가할 수 없습니다. 전체 경로가 너무 깁니다.\n압축 파일 목록에서 일부 디렉터리나 파일이 누락되었을 수 있습니다."
+  IDS_PLUGINNAME, "ZIP"
+  IDS_TOOBIG, "4GB보다 큰 파일은 지원되지 않습니다."
+  IDS_ERRACCESS, "파일에 액세스할 수 없습니다."
+  IDS_ERRREAD, "파일에서 읽을 수 없습니다."
+  IDS_EOF, "예기치 않은 파일 끝입니다."
+  IDS_NODISPLAY, "오류 메시지가 이미 표시되었습니다. 이 텍스트는 화면에 나타나지 않아야 합니다."
+  IDS_ERRCREATE, "파일을 열거나 만들 수 없습니다."
+  IDS_MULDISK, "죄송합니다. 이 버전의 ZIP 플러그인에서는 여러 디스크로 된 압축 파일을 지원하지 않습니다."
+  IDS_TOOLONGNAME, "파일 경로 이름이 너무 길어 처리할 수 없습니다."
+  IDS_TOOLONGNAME2, "파일 경로 이름이 너무 길어 패널에 표시되지 않습니다."
+  IDS_PREPAREDATA, "데이터 준비 중..."
+  IDS_EXTRPROGTITLE, "ZIP 압축 파일 압축 풀기 - %s"
+  IDS_ERRTEMPDIR, "대상 디렉터리에 임시 디렉터리를 만들 수 없습니다."
+  IDS_EXTRACTING, "추출 중: "
+  IDS_TOOLONGNAME3, "경로 이름이 너무 길어 파일을 추출할 수 없습니다."
+  IDS_ERRCOMPDATA, "압축된 데이터에 오류가 있습니다."
+  IDS_BADMETHOD, "이 버전의 ZIP 플러그인에서 지원하지 않는 방법으로 압축된 파일입니다."
+  IDS_ERRCRC, "압축된 데이터에 오류가 있습니다. CRC가 일치하지 않습니다."
+  IDS_ERRWRITE, "파일에 쓸 수 없습니다."
+  IDS_TOOLONGMASK, "마스크가 너무 깁니다."
+  IDS_EXTRACTFILES, "추출 중..."
+  IDS_BADPACKLEVEL, "압축 수준이 잘못되었습니다."
+  IDS_BLOCKVANISHED, "압축 중 예기치 않은 오류가 발생했습니다. 블록이 사라졌습니다."
+  IDS_DELPROGTITLE, "ZIP 압축 파일 항목 삭제 - %s"
+  IDS_DELETEFILES, "삭제 중..."
+  IDS_DELETING, "삭제 중: "
+  IDS_CANCELING, "작업을 취소하는 중입니다. 잠시 기다려 주십시오..."
+  IDS_ERRTEMP, "임시 백업 파일을 만들 수 없습니다."
+  IDS_READONLY, "압축 파일이 읽기 전용입니다. 먼저 읽기 전용 특성을 해제하십시오."
+  IDS_USERBREAK, "사용자가 중단했습니다. 이 텍스트는 화면에 나타나지 않아야 합니다."
+  IDS_REMOVEFILES, "압축 파일에서 불필요한 파일 제거 중..."
+  IDS_ADDFILES, "추가 중..."
+  IDS_ADDING, "추가 중: "
+  IDS_BACKUPING, "압축 파일 백업 중..."
+  IDS_SKIP, "파일을 건너뜁니다. 이 텍스트는 화면에 나타나지 않아야 합니다."
+  IDS_ERRACCESDIR, "디렉터리에 액세스할 수 없습니다."
+  IDS_REMOVING, "제거 중: "
+  IDS_ERRRESTORE, "원래 압축 파일을 임시 작업 파일로 바꿀 수 없습니다. 압축 파일은 변경되지 않았습니다."
+  IDS_AUTO, "자동"
+  IDS_BADLEVEL, "압축 수준은 0에서 9 사이여야 합니다."
+  IDS_ERROR, "오류"
+  IDS_BADVOLSIZE, "볼륨 크기 값이 잘못되었습니다. 숫자와 소수 구분 기호 하나만 사용할 수 있습니다.\n\n볼륨 크기는 1KB 이상 4GB 미만이어야 합니다."
+  IDS_PWDDONTMATCH, "입력한 암호가 일치하지 않습니다."
+  IDS_PWDTOOSHORT, "암호는 한 글자 이상이어야 합니다."
+  IDS_BADPWD, "암호가 잘못되었습니다. 암호를 다시 입력하십시오. 암호는 대소문자를 구분합니다. Caps Lock이 켜져 있지 않은지 확인하십시오."
+  IDS_BADPWDTITLE, "잘못된 암호"
+  IDS_ADDPROGTITLE, "ZIP 압축 파일 압축 - %s"
+  IDS_ERRRECOVER, "ZIP 압축 파일 복구에 실패했습니다. 파일 데이터가 손상되었을 수 있습니다."
+  IDS_ECRYPTSTORED, "저장 방식(압축 수준 0)으로는 암호화할 수 없습니다."
+  IDS_ECRYPTSFX, "자동 압축 풀림 파일에서는 AES 암호화를 지원하지 않습니다."
+  IDS_ERRCREATEDIR, "디렉터리를 만들 수 없습니다."
+  IDS_CANTMULTIVOL, "같은 파일 이름의 압축 파일이 이미 있습니다.\n다중 볼륨 압축 파일은 새 압축 파일로만 만들 수 있습니다."
+  IDS_FILEEXIST, "지정한 파일이 이미 있습니다. 덮어쓰시겠습니까?"
+  IDS_CHDISKTEXT, "%d번 볼륨의 압축이 끝났습니다.\n다른 디스크를 드라이브에 넣으십시오. 이 디스크는 %d번 압축 파일 볼륨에 사용됩니다."
+  IDS_BYTES, "바이트"
+  IDS_TOOLOWSPACE, "디스크 공간이 부족합니다. 이 디스크는 압축에 사용할 수 없습니다."
+  IDS_LOWSPACE, "경고: 디스크 여유 공간이 지정한 볼륨 크기보다 작습니다."
+  IDS_LOWSPACE2, "경고: 디스크 공간이 부족합니다."
+  IDS_MULTISTORED, "저장 방식(압축 수준 0)으로는 다중 볼륨 압축 파일을 만들 수 없습니다."
+  IDS_CHDISKTEXT2, "%d번 볼륨이 들어 있는 디스크를 넣거나 디스크에서 파일을 찾으십시오."
+  IDS_ZIPARCHIVES, "ZIP 압축 파일 (*.zip; *.z*; *.pk3; *.jar)"
+  IDS_BROWSEARCHIVETITLE, "압축 파일 선택"
+  IDS_ZIPARCHIVESEXTS, "*.zip;*.z*;*.pk3;*.jar"
+  IDS_ERRMULTIVOL, "다중 볼륨 압축 파일에서는 지원되지 않는 작업입니다. 다중 볼륨 압축 파일은 목록 보기와 압축 풀기만 가능합니다.\n\n참고: 다중 볼륨 압축 파일이 아니라면 파일 데이터의 형식을 알 수 없거나 데이터가 손상된 것입니다."
+  IDS_MISSLHSIG, "데이터 형식이 잘못되었습니다. 로컬 파일 헤더 서명이 없습니다."
+  IDS_ERRGETDISKFREESP, "디스크 여유 공간을 확인할 수 없습니다."
+  IDS_MISSCHSIG, "데이터 형식이 잘못되었습니다. 중앙 파일 헤더 서명이 없습니다."
+  IDS_WRITINGEXE, "자동 압축 풀림 실행 파일 쓰는 중..."
+  IDS_TOOLONGZIPNAME, "계속할 수 없습니다. ZIP 압축 파일의 경로 이름이 너무 깁니다."
+  IDS_ERRGETMODULENAME, "모듈 이름을 가져올 수 없습니다."
+  IDS_DEFAULTTEXT, "ZIP 압축 파일의 압축을 풉니다."
+  IDS_CREAETARCH, "새 압축 파일 만들기"
+  IDS_ADDTOARCHIVE, "압축 파일에 파일 추가"
+  IDS_DEFSFXTITLE, "자동 압축 풀림 ZIP 파일"
+  IDS_ERRBADTITLE, "기본 대화 상자 제목은 비워 둘 수 없습니다. 한 글자 이상 입력하십시오."
+  IDS_ERRBADMBOXTITLE, "메시지 상자 제목은 비워 둘 수 없습니다. 한 글자 이상 입력하십시오."
+  IDS_ERRLAODSHELLDLL, "shell32.dll을 로드할 수 없습니다. "
+  IDS_ERRGETPROCADDRESS, "DLL 모듈에서 프로시저 주소를 가져올 수 없습니다. "
+  IDS_ERRADDICON, "자동 압축 풀림 실행 파일에 아이콘을 추가할 수 없습니다."
+  IDS_ERRLOADICON, "파일에서 아이콘을 로드할 수 없습니다. "
+  IDS_ERRLOADLIB, "아이콘 데이터가 들어 있는 모듈을 로드할 수 없습니다. 이 모듈은 올바른 Win32 응용 프로그램이 아닙니다. "
+  IDS_ERRLOADLIB2, "아이콘 데이터가 들어 있는 모듈을 로드할 수 없습니다. "
+  IDS_ERRLOADSFXICON, "자동 압축 풀림 아이콘을 로드할 수 없습니다."
+  IDS_EXPIRE, "죄송합니다. 플러그인 사용 기간이 만료되었습니다. 웹 사이트에서 최신 버전을 확인하십시오."
+  IDS_UNDERCOSTRUCT, "작업 중입니다."
+  IDS_NOSFXINSTALLED, "자동 압축 풀림 모듈을 찾을 수 없습니다.\n\n자동 압축 풀림 파일을 만들려면 ZIP 플러그인을 다시 설치하십시오."
+  IDS_UNABLEREADSFXDIR, "자동 압축 풀림 모듈 디렉터리를 읽을 수 없습니다: "
+  IDS_UNABLEREADALLSFX, "자동 압축 풀림 모듈을 하나도 로드할 수 없습니다."
+  IDS_UNABLEREADSFX, "자동 압축 풀림 모듈을 로드할 수 없습니다: %s\n\n계속하려면 확인을, 중단하려면 취소를 누르십시오."
+  IDS_UNABLEREADSFX2, "기본 자동 압축 풀림 모듈을 로드할 수 없습니다: %s"
+  IDS_CORRUPTSFX, "자동 압축 풀림 모듈이 손상되었습니다."
+  IDS_CORRUPTSFX2, "자동 압축 풀림 모듈 '%s'이(가) 손상되었습니다.\n\n계속하려면 확인을, 중단하려면 취소를 누르십시오."
+  IDS_ERRLOADMENU, "메뉴를 로드할 수 없습니다."
+  IDS_ERRLOADACCELS, "단축키 테이블을 로드할 수 없습니다."
+  IDS_NODEFSFX, "기본 자동 압축 풀림 모듈이 로드되지 않았습니다."
+  IDS_ERRLOADCONFIG, "설정을 로드할 수 없습니다. 메모리가 부족합니다."
+  IDS_EMPTY, "비어 있음"
+  IDS_RENAMEFAVSET, "즐겨찾기 설정 이름 바꾸기."
+  IDS_USEDNAME, "이미 사용 중인 이름입니다."
+  IDS_NOLANGFILE, "즐겨찾기 설정을 로드할 수 없습니다. 필요한 자동 압축 풀림 언어가 설치되어 있지 않습니다(%s)."
+  IDS_SETTINGSFILE, "설정 파일 (*.set)"
+  IDS_DEFEXTRBUTTON, "추출(&E)"
+  IDS_EXPORTOVEWRITE, "파일이 이미 있습니다. 덮어쓰시겠습니까?"
+  IDS_ERRGETTEMP, "임시 파일을 만들 수 없습니다."
+  IDS_SFXABOUTBTN1, "정보(&A) >>"
+  IDS_SFXABOUTBTN2, "<< 정보(&A)"
+  IDS_MENUCREATESFX, "자동 압축 풀림 파일 만들기(.exe)(&S)..."
+  IDS_MENUTEST, "압축 파일 테스트(&T)"
+  IDS_MENUREPAIR, "손상된 압축 파일 복구(&R)"
+  IDS_CONTINUE, "마지막 작업이 완료되지 않았습니다. 다음 파일에서 계속하시겠습니까?"
+  IDS_NOARCHIVETYPED, "압축 파일 이름이 없습니다."
+  IDS_NOEXETYPED, "만들 자동 압축 풀림 파일의 파일 이름이 없습니다."
+  IDS_SFXPROGTITLE, "자동 압축 풀림 ZIP 파일 만드는 중 - %s"
+  IDS_COPYDATA, "압축 파일 데이터 복사 중..."
+  IDS_EMPTYARCHIVE, "압축 파일이 비어 있습니다."
+  IDS_BADMETHODSFX, "압축 파일에 자동 압축 풀림 프로그램이 지원하지 않는 방법으로 압축된 파일이 있습니다.\n\nZIP 플러그인으로 압축 파일을 다시 압축하십시오."
+  IDS_TESTPROGTITLE, "ZIP 압축 파일 테스트 중 - %s"
+  IDS_TESTFILES, "파일 테스트 중..."
+  IDS_TESTING, "테스트 중: "
+  IDS_TESTOK, "압축 파일 '%s'에 문제가 없습니다."
+  IDS_TESTKO, "압축 파일 '%s'의 일부 파일이 손상되었거나 알 수 없는 암호로 암호화되어 있습니다."
+  IDS_MENUCOMMENT, "압축 파일 주석(&C)..."
+  IDS_COMMENTMODIFIED, "파일 주석이 변경되었습니다.\n\n변경 내용을 저장하시겠습니까?"
+  IDS_COMMENTDLGTITLE, "ZIP 압축 파일 주석 - %s"
+  IDS_ERRREADCOMMENT, "ZIP 압축 파일 주석을 읽는 중 오류가 발생했습니다. 파일이 손상되었거나 형식을 알 수 없습니다.\n\n압축 파일 주석을 건너뛰고 압축 파일을 계속 읽으려면 확인을 누르십시오."
+  IDS_COMMENTMV, "다중 볼륨 압축 파일의 주석은 볼 수 있지만 저장할 수는 없습니다."
+  IDS_RECOVERARCHIVETITLE, "ZIP 압축 파일 복구"
+  IDS_SOURCEHEADING, "복구할 압축 파일(&R):"
+  IDS_TARGETHEADING, "복구한 압축 파일을 다른 이름으로 저장(&S):"
+  IDS_REPAIRPROGTITLE, "ZIP 압축 파일 복구 중 - %s"
+  IDS_SAVING, "저장 중: "
+  IDS_REPAIRING, "압축 파일 복구 중..."
+  IDS_ERROPENICO, "아이콘 데이터가 들어 있는 파일을 열 수 없습니다."
+  IDS_BADBUTTONTEXT, "기본 대화 상자 머리글은 비워 둘 수 없습니다. 한 글자 이상 입력하십시오."
+  IDS_BADTEMP, "$(Temp) 뒤에는 어떤 문자도 올 수 없습니다. 임시 디렉터리에 추출하려면 $(Temp)만 입력하십시오."
+  IDS_MISBAR, "$() 시퀀스의 닫는 괄호가 없습니다."
+  IDS_BADVAR, "알 수 없는 $() 변수입니다."
+  IDS_MBOK, "확인"
+  IDS_MBOKCANCEL, "확인 + 취소"
+  IDS_MBYESNO, "예 + 아니요"
+  IDS_MBAGREEDISAGREE, "동의함 + 동의하지 않음"
+  IDS_MBNOICON, "단순"
+  IDS_MBEXCLAMATION, "느낌표"
+  IDS_MBINFORMATION, "정보"
+  IDS_MBQUESTION, "질문"
+  IDS_LONGMESSAGE, "긴 메시지"
+  IDS_BADKEY, "잘못된 키 이름입니다."
+  IDS_MANAGE, "관리(&M)..."
+  IDS_REMOVEWARNTITLE, "즐겨찾기 설정 제거"
+  IDS_REMOVEWARN, "'%s' 설정을 제거하시겠습니까?\n\n이 작업은 취소할 수 없습니다."
+  IDS_REMOVEALLWARN, "저장된 설정을 모두 제거하시겠습니까?\n\n이 작업은 취소할 수 없습니다."
+  IDS_MISSINGVERSION, "설정 파일을 로드할 수 없습니다. 버전 번호가 없습니다."
+  IDS_BADVERSION, "설정 파일을 로드할 수 없습니다. 지원되지 않는 버전입니다."
+  IDS_BADTEMP2, "설정 파일을 로드할 수 없습니다. 'target_dir' 값이 잘못되었습니다. $(Temp) 뒤에는 어떤 문자도 올 수 없습니다."
+  IDS_MISBAR2, "설정 파일을 로드할 수 없습니다. 'target_dir' 값이 잘못되었습니다. $() 시퀀스의 닫는 괄호가 없습니다."
+  IDS_BADVAR2, "설정 파일을 로드할 수 없습니다. 'target_dir' 값이 잘못되었습니다. 알 수 없는 $() 변수입니다."
+  IDS_BADKEY2, "설정 파일을 로드할 수 없습니다. 'target_dir' 값이 잘못되었습니다. 잘못된 키 이름입니다."
+  IDS_CHDISKTEXT3, "%d번 볼륨이 들어 있는 디스크를 넣으십시오."
+  IDS_NONTEXT, "한 글자 이상 입력하십시오."
+  IDS_BADSFXVER, "지원되지 않는 SFX 패키지 버전입니다(%s). 적합한 SFX 버전이 포함된 최신 ZIP 플러그인을 다운로드하십시오."
+  IDS_BADSFXVER2, "지원되지 않는 SFX 패키지 버전입니다. 적합한 SFX 버전이 포함된 최신 ZIP 플러그인을 다운로드하십시오."
+  IDS_TOOBIG2, "ZIP 파일 크기 제한(4GB) 때문에 작업을 완료할 수 없습니다.\n\n4GB가 넘는 데이터를 ZIP 압축 파일로 압축하려면 다중 볼륨 압축 파일 기능을 사용하십시오. 각각 4GB 크기의 볼륨을 65536개까지 만들 수 있습니다. 단, 압축 파일에 압축되는 각 파일의 크기 제한은 4GB입니다."
+  IDS_FILENOTFOUND, "파일을 찾을 수 없습니다."
+  IDS_ALLFILES, "모든 파일 (*.*)"
+  IDS_NOTFOUND, "파일을 찾을 수 없습니다."
+  IDS_BADMSGBOXTYPE, """동의함 + 동의하지 않음"" 단추는 ""긴 메시지"" 메시지 상자 종류와 함께만 사용할 수 있습니다."
+  IDS_LOTFILES, "항목이 65535개를 넘는 ZIP 압축 파일을 만들려고 합니다. 이러한 압축 파일은 원래 ZIP 형식과 호환되지 않으며 일부 압축 프로그램에서는 압축을 풀지 못할 수 있습니다.\n\n계속하시겠습니까?"
+  IDS_LOTFILESSFX, "항목이 65535개를 넘는 자동 압축 풀림 ZIP 파일은 만들 수 없습니다."
+  IDS_BADAES, "알 수 없는 AES 버전으로 암호화된 파일입니다."
+  IDS_PWDTOOLONG, "암호가 너무 깁니다.\nAES 암호화의 최대 암호 길이는 128자입니다."
+  IDS_AESERROR, "AES 오류입니다."
+  IDS_MACERROR, "인증 코드가 일치하지 않습니다. 파일이 손상되었거나 암호가 잘못되었습니다."
+  IDS_ERRZIP64, "zip64 압축 파일에서는 지원되지 않는 작업입니다. zip64 압축 파일은 목록 보기와 압축 풀기만 가능합니다."
+  IDS_ONLYFULLVERSION, " (정식 버전에서만 사용 가능)"
+  IDS_ERRBZIP2 "BZIP2 스트림에서 오류가 발생했습니다. 압축 파일이 손상되었을 수 있습니다."
+  IDS_UNSUP_CD_ENCRYPTION "파일 목록이 들어 있는 이 압축 파일의 중앙 디렉터리가 암호화되었거나 압축되어 있습니다.\n이 형식은 지원되지 않습니다."
+  IDS_LISTINFO_PAKEDSIZE      "압축 크기"
+  IDS_LISTINFO_PAKEDSIZE_DESC "파일의 압축 크기"
+  IDS_SIZE_KB, "KB"
+  IDS_SIZE_MB, "MB"
+  IDS_MODIFICATION_NOT_SUPPORTED, "이 ZIP 파일은 현재 버전의 ZIP 플러그인에서 수정을 지원하지 않는 데이터 형식을 사용합니다."
+  IDS_WAITFOR_INFO, "설치 프로그램이 다른 실행 파일을 실행하고, 원래 설치 프로그램이 끝난 뒤에도 그 실행 파일이 설치를 계속하는 경우에만 필요합니다.\n예를 들어 일부 버전의 Install Shield가 이렇게 동작합니다."
+}
+
+STRINGTABLE
+{
+  IDS_SFX_COMMENT_HEAD1, ";자동 압축 풀림 설정\r\n\r\n;자동 압축 풀림 프로그램의 설정 파일입니다.\r\n;\r\n;파일 형식 구문:\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD2, ";';' 문자로 시작하는 줄은 주석으로 처리되며\r\n;설정 파일을 처리할 때 무시됩니다.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD3, ";version을 제외한 모든 변수는 선택 사항입니다. 설정 파일에\r\n;변수가 없으면 기본값이 사용됩니다.\r\n;언어에 따라 달라지는 변수(dlg_text, dlg_title,\r\n;button_text)의 기본값은 sfx 패키지에서 가져옵니다.\r\n;\r\n"
+  IDS_SFX_COMMENT_HEAD4, ";빈 문자열을 포함한 모든 문자열 값은 큰따옴표로\r\n;묶어야 합니다. 문자열에 큰따옴표를 넣으려면 큰따옴표를\r\n;두 번 연속으로 입력하십시오.\r\n;\r\n;숫자는 큰따옴표로 묶을 수 없습니다.\r\n\r\n"
+  IDS_SFX_COMMENT_VERSION, "\r\n;설정 파일의 버전, 현재 버전은 2입니다\r\n;유일한 필수 변수입니다\r\n\r\n"
+  IDS_SFX_COMMENT_TARGDIR1, "\r\n;대상 디렉터리 지정, 절대 경로 또는 상대 경로를\r\n;사용할 수 있습니다. 상대 경로는 sfx 실행 파일을 실행할 때의\r\n;현재 디렉터리를 기준으로 합니다\r\n"
+  IDS_SFX_COMMENT_TARGDIR2, ";'target_dir' 문자열의 시작 부분(!)에 미리 정의된\r\n;변수를 사용할 수도 있습니다:\r\n;\r\n"
+  IDS_SFX_COMMENT_TARGDIR3, ";  $(Temp)      임시 디렉터리, target_dir 필드에 단독으로만\r\n;               사용해야 하며 뒤에 경로를 붙일 수\r\n;               없습니다\r\n"
+  IDS_SFX_COMMENT_TARGDIR4, ";  $(ProgFiles) 사용자의 'Program Files' 폴더\r\n;  $(WinDir)    Windows 디렉터리\r\n;  $(SysDir)    시스템 디렉터리\r\n"
+  IDS_SFX_COMMENT_TARGDIR5, ";  $[variable]  'variable'로 지정한 환경 변수의\r\n;               값\r\n;  $<regkey>    'regkey'로 지정한 레지스트리 키 값\r\n;  예: SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\ProgramFilesDir\r\n\r\n"
+  IDS_SFX_COMMENT_ALLOWCHANGE, "\r\n;압축을 풀 때 사용자가 대상 디렉터리를 변경할 수 있는지\r\n;지정합니다\r\n;허용하려면 값을 1로 설정하십시오\r\n\r\n"
+  IDS_SFX_COMMENT_REMOVE1, "\r\n;'command' 변수로 지정한 프로그램이 끝나면\r\n;임시 폴더에 추출한 파일을 제거할지 지정합니다\r\n"
+  IDS_SFX_COMMENT_REMOVE2, ";임시 파일을 제거하려면 값을 1로 설정하십시오\r\n;이 변수는 'target_dir'이 ""$(Temp)""로 설정된 경우에만\r\n;의미가 있으며, 그렇지 않으면 값이 무시됩니다\r\n\r\n"
+  IDS_SFX_COMMENT_AUTO, "\r\n;사용자가 자동 압축 풀림 파일을 실행할 때 추출을\r\n;자동으로 시작할지 지정합니다\r\n;추출을 자동으로 시작하려면 값을 1로 설정하십시오\r\n\r\n"
+  IDS_SFX_COMMENT_SUMMARY, "\r\n;파일 추출이 끝난 후 작업 성공을 알리는 메시지 상자를\r\n;표시할지 지정합니다\r\n;작업 요약을 표시하려면 값을 1로 설정하십시오\r\n\r\n"
+  IDS_SFX_COMMENT_HIDE, "\r\n;자동 압축 풀림 프로그램의 기본 대화 상자를 표시할지 지정합니다\r\n;기본 sfx 대화 상자를 표시하지 않으려면 값을 1로 설정하십시오\r\n;이 변수는 'autostart'가 1로 설정된 경우에만 의미가 있으며,\r\n;그렇지 않으면 값이 무시됩니다\r\n\r\n"
+  IDS_SFX_COMMENT_OVERWRITE, "\r\n;대상 디렉터리의 모든 파일을 자동으로 덮어쓸지\r\n;지정합니다\r\n;파일을 자동으로 덮어쓰려면 값을 1로\r\n;설정하십시오\r\n\r\n"
+  IDS_SFX_COMMENT_AUTODIR, "\r\n;사용자에게 묻지 않고 대상 디렉터리를 자동으로 만들지\r\n;지정합니다\r\n;대상 디렉터리를 자동으로 만들려면 값을 1로\r\n;설정하십시오\r\n\r\n"
+  IDS_SFX_COMMENT_COMMAND, "\r\n;파일 추출이 성공적으로 끝나면 실행하거나 열 프로그램,\r\n;http 링크 또는 문서, 경로는 추출 대상 디렉터리를\r\n;기준으로 하며, 프로그램을 지정하는 경우\r\n;인수도 입력할 수 있습니다\r\n\r\n"
+  IDS_SFX_COMMENT_PACKAGE, "\r\n;자동 압축 풀림 파일을 만들 때 사용할 sfx 패키지\r\n;상대 경로는 zip2sfx.exe가 있는 디렉터리를 기준으로 합니다\r\n\r\n"
+  IDS_SFX_COMMENT_MBUT, "\r\n;선택적 메시지 상자의 단추\r\n;다음 중 하나를 사용할 수 있습니다: ""ok"", ""ok_cancel"", ""yes_no"",\r\n;""agree_disagree""\r\n\r\n"
+  IDS_SFX_COMMENT_MICO, "\r\n;선택적 메시지 상자의 종류\r\n;다음 중 하나를 사용할 수 있습니다: ""simple"", ""exclamation"", ""information"",\r\n;""question"", ""long_message""\r\n\r\n"
+  IDS_SFX_COMMENT_MBOX, "\r\n;추출을 시작하기 전에 표시되는 선택적 메시지 상자의\r\n;텍스트와 제목\r\n;메시지 상자를 표시하지 않으려면 두 필드를 모두\r\n;비워 두십시오("""")\r\n\r\n"
+  IDS_SFX_COMMENT_TEXT, "\r\n;자동 압축 풀림 프로그램의 기본 대화 상자에 표시할 텍스트\r\n\r\n"
+  IDS_SFX_COMMENT_TITLE, "\r\n;자동 압축 풀림 프로그램의 기본 대화 상자 제목\r\n\r\n"
+  IDS_SFX_COMMENT_BUTTON, "\r\n;기본 sfx 대화 상자의 추출 단추에 표시할 텍스트\r\n\r\n"
+  IDS_SFX_COMMENT_VENDOR, "\r\n;기본 sfx 대화 상자 왼쪽 아래에 표시할 공급업체 이름\r\n\r\n"
+  IDS_SFX_COMMENT_WWW, "\r\n;기본 sfx 대화 상자 오른쪽 아래에 표시할 www 링크\r\n\r\n"
+  IDS_SFX_COMMENT_ICOFILE, "\r\n;아이콘 데이터가 들어 있는 파일, ICO 파일 또는 아이콘이 들어 있는\r\n;PE 실행 파일(win32 EXE 또는 DLL 등)일 수 있습니다\r\n;상대 경로는 zip2sfx.exe가 있는 디렉터리를 기준으로 합니다\r\n\r\n"
+  IDS_SFX_COMMENT_ICOINDEX, "\r\n;양수 값은 'icon_file' 변수로 지정한 실행 파일에서\r\n;아이콘의 인덱스를 의미합니다\r\n;음수 값은 아이콘의 리소스 ID를 의미합니다\r\n;ICO 파일에서는 인덱스가 항상 0이며 값이 무시됩니다\r\n\r\n"
+  IDS_SFX_COMMENT_WAITFOR1, "\r\n;이 옵션을 사용하면 '명령' 필드에 지정한 프로세스가 아닌\r\n;다른 프로세스를 기다릴 수 있습니다. 이 프로세스가 끝나면\r\n;자동 압축 풀림 프로그램이 임시 파일을 제거한 후 종료합니다.\r\n"
+  IDS_SFX_COMMENT_WAITFOR2, ";설치 프로그램이 다른 실행 파일을 실행하고, 원래 설치 프로그램이\r\n;끝난 뒤에도 그 실행 파일이 설치를 계속하는 경우에만\r\n;필요합니다.\r\n"
+  IDS_SFX_COMMENT_WAITFOR3, ";예를 들어 일부 버전의 Install Shield가 이렇게 동작합니다.\r\n;'remove_temp'가 1로 설정되지 않으면 이 옵션은 무시됩니다.\r\n\r\n"
+  IDS_SFX_COMMENT_REQUIRESADMIN, "\r\n;Windows Vista 이상에서 실행하려면 관리자 권한이 필요합니다\r\n\r\n"
+}

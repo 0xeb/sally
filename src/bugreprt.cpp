@@ -7,6 +7,7 @@
 #include <tlhelp32.h>
 #include "common/AccessViolationText.h"
 #include "common/DiagnosticTextEncoding.h"
+#include "common/PluginLoadDiagnostic.h"
 #include "common/IEnvironment.h"
 #include "common/IRegistry.h"
 #include "shiconov_diag.h"
@@ -906,6 +907,13 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                         }
                     }
                     PrintLine(param, buf, TRUE);
+
+                    const sally::diagnostic::PluginLoadDiagnostic* loading = stack->GetLoadingPlugin();
+                    if (loading != nullptr)
+                    {
+                        for (size_t field = 0; field < loading->ReportLines.size(); ++field)
+                            PrintLine(param, loading->ReportLines[field].c_str(), TRUE);
+                    }
 
                     stack->Reset();
                     const char* s;
