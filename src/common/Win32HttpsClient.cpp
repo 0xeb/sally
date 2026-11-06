@@ -68,7 +68,7 @@ std::wstring ResponseHeader(HINTERNET request, const wchar_t* name)
         wcscpy_s(buffer.data(), buffer.size(), name);
         DWORD bytes = static_cast<DWORD>(buffer.size() * sizeof(wchar_t));
         if (HttpQueryInfoW(request, HTTP_QUERY_CUSTOM, buffer.data(), &bytes, NULL))
-            return std::wstring(buffer.data(), wcsnlen(buffer.data(), (std::min)(buffer.size(), bytes / sizeof(wchar_t) + 1)));
+            return std::wstring(buffer.data(), wcsnlen(buffer.data(), (std::min)(buffer.size(), static_cast<size_t>(bytes) / sizeof(wchar_t) + 1)));
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || bytes / sizeof(wchar_t) + 1 <= buffer.size())
             return std::wstring();
         buffer.resize(bytes / sizeof(wchar_t) + 1);
