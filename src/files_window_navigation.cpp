@@ -3203,7 +3203,7 @@ void CFilesWindow::SetQuickSearchCaretPos()
     {
         ss = formattedFileName.c_str() + preLen;
         qsLen -= preLen;
-        offset = Columns[0].Width + 4 - (3 + IconSizes[ICONSIZE_16]);
+        offset = Columns[0].Width + 4 - (3 + GetIconSizePx(ICONSIZE_16));
         ext = TRUE;
     }
     else
@@ -3230,7 +3230,7 @@ void CFilesWindow::SetQuickSearchCaretPos()
         case vmBrief:
         case vmDetailed:
         {
-            x = r.left + 3 + IconSizes[ICONSIZE_16] + s.cx + offset;
+            x = r.left + 3 + GetIconSizePx(ICONSIZE_16) + s.cx + offset;
             y = r.top + 2;
             // if the column width is manually limited, we ensure that
             // the caret doesn't go beyond the limit; otherwise, it would spill into other columns
@@ -3276,7 +3276,7 @@ void CFilesWindow::SetQuickSearchCaretPos()
         {
             // ATTENTION: keep in sync with CFilesBox::GetIndex, see call to GetTileTexts
             //        int itemWidth = rect.right - rect.left; // item width
-            int maxTextWidth = ListBox->ItemWidth - TILE_LEFT_MARGIN - IconSizes[ICONSIZE_48] - TILE_LEFT_MARGIN - 4;
+            int maxTextWidth = ListBox->ItemWidth - TILE_LEFT_MARGIN - GetIconSizePx(ICONSIZE_48) - TILE_LEFT_MARGIN - 4;
             int widthNeeded = 0;
 
             HDC hDC2 = ItemBitmap.HMemDC;
@@ -3293,8 +3293,8 @@ void CFilesWindow::SetQuickSearchCaretPos()
                 visibleLines++;
             int textH = visibleLines * FontCharHeight + 4;
 
-            int iconW = IconSizes[ICONSIZE_48];
-            int iconH = IconSizes[ICONSIZE_48];
+            int iconW = GetIconSizePx(ICONSIZE_48);
+            int iconH = GetIconSizePx(ICONSIZE_48);
 
             if (s.cx > maxTextWidth)
                 s.cx = maxTextWidth;

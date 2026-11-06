@@ -86,7 +86,7 @@ void CToolBar::SetFont()
 
     if (Style & TLB_STYLE_TEXT)
     {
-        HFont = (UseBoldFont && EnvFontBold != NULL) ? EnvFontBold : EnvFont; // #96
+        HFont = (UseBoldFont && EnvFontBold != NULL) ? EnvFontBold : EnvFont; // bold bottom-bar shortcut labels
 
         HDC hDC = HANDLES(GetDC(NULL));
         TEXTMETRIC tm;

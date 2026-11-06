@@ -5,6 +5,7 @@
 
 #include "precomp.h"
 #include "windows_terminal_ui.h"
+#include "tabwnd.h"
 #include "SallyUrls.h"
 #include "sal_colors.h"
 #include <time.h>
@@ -35,6 +36,7 @@
 #include "editwnd.h"
 #include "find.h"
 #include "zip.h"
+#include "common/DpiScale.h"
 #include "pack.h"
 #include "cache.h"
 #include "dialogs.h"
@@ -55,7 +57,7 @@
 #include "configuration_profiles.h"
 #include "common/IFileSystem.h"
 
-// Issue #82: shell-extension DLLs from OLD Sally/Salamander installs stay loaded/locked by
+// Shell-extension DLLs from OLD Sally/Salamander installs stay loaded/locked by
 // Explorer after an upgrade, keeping their install folders undeletable. The CLSID-family sweep
 // lives in salext_cleanup.cpp so it can run headlessly against fake interfaces; this wrapper
 // supplies the OS-abstraction interfaces and traces the outcome.
@@ -152,7 +154,7 @@ static bool ApplyConfigurationProfile()
     return true;
 }
 
-// #128: a file the updater renamed aside because it was still in use (the shell extension,
+// A file the updater renamed aside because it was still in use (the shell extension,
 // loaded by Explorer) is deleted on a later start, once nothing holds it any more.
 static void CleanupUpdateLeftovers()
 {
@@ -440,8 +442,9 @@ HBITMAP HZoomBitmap = NULL;
 
 HCURSOR HHelpCursor = NULL;
 
-int SystemDPI = 0; // Global DPI across all monitors. Salamander does not support Per-Monitor DPI, see https://msdn.microsoft.com/library/windows/desktop/dn469266.aspx
-int IconSizes[] = {16, 32, 48};
+// Private; everything else reads them through GetSystemDPI() and GetIconSizePx().
+static int SystemDPI = 0; // Global DPI across all monitors. Salamander does not support Per-Monitor DPI, see https://msdn.microsoft.com/library/windows/desktop/dn469266.aspx
+static int IconSizes[] = {16, 32, 48};
 int IconLRFlags = 0;
 HICON HSharedOverlays[] = {0};
 HICON HShortcutOverlays[] = {0};
@@ -2016,26 +2019,17 @@ int GetSystemDPI()
 
 int GetScaleForSystemDPI()
 {
-    int dpi = GetSystemDPI();
-    int scale;
-    if (dpi <= 96)
-        scale = 100;
-    else if (dpi <= 120)
-        scale = 125;
-    else if (dpi <= 144)
-        scale = 150;
-    else if (dpi <= 192)
-        scale = 200;
-    else if (dpi <= 240)
-        scale = 250;
-    else if (dpi <= 288)
-        scale = 300;
-    else if (dpi <= 384)
-        scale = 400;
-    else
-        scale = 500;
+    return sally::dpi::ScalePercentForDpi(GetSystemDPI());
+}
 
-    return scale;
+int GetIconSizePx(int sizeIndex)
+{
+    if (sizeIndex < ICONSIZE_16 || sizeIndex >= ICONSIZE_COUNT)
+    {
+        TRACE_E("GetIconSizePx() unknown size index " << sizeIndex);
+        return IconSizes[ICONSIZE_16];
+    }
+    return IconSizes[sizeIndex];
 }
 
 int GetIconSizeForSystemDPI(CIconSizeEnum iconSize)
@@ -2063,11 +2057,7 @@ int GetIconSizeForSystemDPI(CIconSizeEnum iconSize)
     // Custom        384   4.00 (400%)
     // Custom        480   5.00 (500%)
 
-    int scale = GetScaleForSystemDPI();
-
-    int baseIconSize[ICONSIZE_COUNT] = {16, 32, 48}; // must match CIconSizeEnum
-
-    return (baseIconSize[iconSize] * scale) / 100;
+    return sally::dpi::IconSizeForDpi(iconSize, GetSystemDPI());
 }
 
 void GetSystemDPI(HDC hDC)
@@ -2104,13 +2094,13 @@ static HICON GetDirectoryIconSEH(const wchar_t* path, CIconSizeEnum sizeIndex)
     return hIcon;
 }
 
-// #96: the F-key indicators used to be a fixed 17x13 bitmap (bottomtb.bmp) with no DPI
+// The F-key indicators used to be a fixed 17x13 bitmap (bottomtb.bmp) with no DPI
 // scaling, so at high DPI the labels grew with the font and the keys stayed tiny. Generate
 // them from the environment font instead. Enabled caps are "inverted" (light cap, dark text
 // in dark mode; dark cap, light text in light mode) exactly as the reference build draws
 // them; the grayed list is dimmer, since CToolBar::DrawItem uses HImageList for grayed items
 // and HHotImageList for enabled ones.
-// #96: the cap label is drawn in a SMALLER font than the bar label, as the reference build
+// The cap label is drawn in a SMALLER font than the bar label, as the reference build
 // does. That keeps the cap compact, so the row height is driven by the label text and the cap
 // sits inside it with margin instead of filling the whole row.
 static HFONT CreateBottomTBCapFont()
@@ -2395,7 +2385,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             return FALSE;
         }
 
-        int capCX, capCY; // #96: sized from the environment font, not a fixed 17x13 bitmap
+        int capCX, capCY; // sized from the environment font, not a fixed 17x13 bitmap
         GetBottomTBKeyCapSize(&capCX, &capCY);
         HBottomTBImageList = ImageList_Create(capCX, capCY, ILC_MASK | ILC_COLORDDB, 12, 0);
         HHotBottomTBImageList = ImageList_Create(capCX, capCY, ILC_MASK | ILC_COLORDDB, 12, 0);
@@ -2561,7 +2551,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         return FALSE;
     }
 
-    // #96: draw the F-key caps at the image list's CURRENT size (queried, so a colours-only
+    // Draw the F-key caps at the image list's CURRENT size (queried, so a colours-only
     // rebuild - which does not recreate the lists - still fills them correctly).
     int capW = BOTTOMBAR_CX, capH = BOTTOMBAR_CY;
     ImageList_GetIconSize(HBottomTBImageList, &capW, &capH);
@@ -4203,7 +4193,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         const std::wstring& cleanupPathW = Windows64Bit ? shellExtX64PathW : shellExtX86PathW;
 #endif
 
-        // #82: drop previous installs' shell-extension registrations, so nothing loads their DLLs
+        // Drop previous installs' shell-extension registrations, so nothing loads their DLLs
         // again and their folders become deletable once Explorer lets go (best-effort).
         CleanupStaleShellExtensions(cleanupPathW.c_str());
     }
@@ -4462,6 +4452,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
                             if ((wnd == NULL || !wnd->Is(otDialog) ||
                                  !IsDialogMessage(wnd->HWindow, &msg)) &&
                                 !TranslateCommandShellShortcut(MainWindow, msg) &&
+                                !TranslateTabKeyProfile(MainWindow, msg) &&
                                 (MainWindow == NULL || !MainWindow->CaptionIsActive || // added "!MainWindow->CaptionIsActive" so accelerators are not translated in modeless plugin windows (F7 in "FTP Logs" is not great)
                                  MainWindow->QuickRenameWindowActive() ||
                                  !TranslateAccelerator(MainWindow->HWindow, AccelTable1, &msg) &&

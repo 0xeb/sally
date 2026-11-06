@@ -1543,6 +1543,33 @@ void CPathHistory::AddPath(int type, const wchar_t* pathOrArchiveOrFSName, const
     }
 }
 
+void CPathHistory::CopyFrom(CPathHistory& other)
+{
+    ClearHistory();
+    for (int i = 0; i < other.Paths.Count; i++)
+    {
+        CPathHistoryItem* source = other.Paths[i];
+        // Icons stay with the original history; the copy shows the generic folder icon.
+        CPathHistoryItem* item = new CPathHistoryItem(source->Type, source->PathOrArchiveOrFSName.c_str(),
+                                                      source->ArchivePathOrFSUserPart.c_str(), NULL,
+                                                      source->PluginFS);
+        if (item == NULL)
+        {
+            TRACE_E(LOW_MEMORY);
+            break;
+        }
+        item->ChangeData(source->TopIndex, source->FocusedName.empty() ? NULL : source->FocusedName.c_str());
+        Paths.Add(item);
+        if (!Paths.IsGood())
+        {
+            delete item;
+            Paths.ResetState();
+            break;
+        }
+    }
+    ForwardIndex = other.ForwardIndex < Paths.Count ? other.ForwardIndex : -1;
+}
+
 void CPathHistory::AddPathUnique(int type, const wchar_t* pathOrArchiveOrFSName, const wchar_t* archivePathOrFSUserPart,
                                  HICON hIcon, CPluginFSInterfaceAbstract* pluginFS,
                                  CPluginFSInterfaceEncapsulation* curPluginFS)
@@ -2226,7 +2253,7 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
     }
 
     // extract default icon from shell32.dll
-    UMIcon = SalLoadImage(2, 1, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags);
+    UMIcon = SalLoadImage(2, 1, GetIconSizePx(ICONSIZE_16), GetIconSizePx(ICONSIZE_16), IconLRFlags);
     return TRUE;
 }
 

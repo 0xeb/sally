@@ -175,7 +175,7 @@ void CEditListBox::UpdateFonts(HFONT font)
     GetTextMetricsW(dc, &metrics);
     SelectObject(dc, previous);
     HANDLES(ReleaseDC(HWindow, dc));
-    SendMessageW(HWindow, LB_SETITEMHEIGHT, 0, (std::max)(metrics.tmHeight + 4, (LONG)IconSizes[ICONSIZE_16]));
+    SendMessageW(HWindow, LB_SETITEMHEIGHT, 0, (std::max)(metrics.tmHeight + 4, (LONG)GetIconSizePx(ICONSIZE_16)));
     if (EditLine != NULL)
         SendMessageW(EditLine->HWindow, WM_SETFONT, (WPARAM)font, TRUE);
 }
@@ -495,7 +495,7 @@ void CEditListBox::OnBeginEdit(int start, int end)
 
     int iconWidth = 0;
     if (Flags & ELB_SHOWICON)
-        iconWidth = IconSizes[ICONSIZE_16] + 2;
+        iconWidth = GetIconSizePx(ICONSIZE_16) + 2;
 
     EditLine->Create(L"edit",
                      L"",
@@ -540,7 +540,7 @@ void CEditListBox::LayoutEditLine()
         return;
 
     const int buttonWidth = (Flags & ELB_RIGHTARROW) ? row.bottom - row.top : 0;
-    const int iconWidth = (Flags & ELB_SHOWICON) ? IconSizes[ICONSIZE_16] + 2 : 0;
+    const int iconWidth = (Flags & ELB_SHOWICON) ? GetIconSizePx(ICONSIZE_16) + 2 : 0;
     if (Flags & ELB_RIGHTARROW)
     {
         ButtonRect = row;
@@ -679,7 +679,7 @@ void CEditListBox::OnDrawItem(LPARAM lParam)
             RECT itemRect = lpdis->rcItem;
             FillRectWithColor(lpdis->hDC, &itemRect, bkColor);
             if (Flags & ELB_SHOWICON)
-                itemRect.left += IconSizes[ICONSIZE_16];
+                itemRect.left += GetIconSizePx(ICONSIZE_16);
 
             INT_PTR itemID = (INT_PTR)SendMessage(HWindow, LB_GETITEMDATA, lpdis->itemID, 0);
             if (itemID == -1)
@@ -720,7 +720,7 @@ void CEditListBox::OnDrawItem(LPARAM lParam)
                         // under NT 4.0 US with 256 colors a black spot appears in the background;
                         // this patch fixes the problem.
                         HBRUSH hBrush = HANDLES(CreateSolidBrush(bkColor));
-                        int iconSize = IconSizes[ICONSIZE_16];
+                        int iconSize = GetIconSizePx(ICONSIZE_16);
                         DrawIconEx(lpdis->hDC, lpdis->rcItem.left + 1, lpdis->rcItem.top + 1,
                                    DispInfo.HIcon, iconSize, iconSize, 0, hBrush /*(HBRUSH)(COLOR_WINDOW + 1)*/, DI_NORMAL);
                         HANDLES(DeleteObject(hBrush));
@@ -729,7 +729,7 @@ void CEditListBox::OnDrawItem(LPARAM lParam)
                     {
                         // must clear the background
                         RECT r = lpdis->rcItem;
-                        r.right = r.left + IconSizes[ICONSIZE_16] + 2;
+                        r.right = r.left + GetIconSizePx(ICONSIZE_16) + 2;
                         FillRectWithColor(lpdis->hDC, &r, bkColor);
                     }
                 }
@@ -1079,7 +1079,7 @@ CEditListBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 CommandParent(LBN_SELCHANGE);
             }
 
-            if ((Flags & ELB_SHOWICON) && (pt.x < IconSizes[ICONSIZE_16] + 2))
+            if ((Flags & ELB_SHOWICON) && (pt.x < GetIconSizePx(ICONSIZE_16) + 2))
             {
                 DispInfo.ItemID = (INT_PTR)SendMessage(HWindow, LB_GETITEMDATA, index, 0);
                 DispInfo.Index = index;
@@ -1192,7 +1192,7 @@ CEditListBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
         {
             ReleaseCapture();
-            if ((Flags & ELB_SHOWICON) && (LOWORD(lParam) < IconSizes[ICONSIZE_16] + 2))
+            if ((Flags & ELB_SHOWICON) && (LOWORD(lParam) < GetIconSizePx(ICONSIZE_16) + 2))
             {
             }
             else if (!SelChanged && index != -1)

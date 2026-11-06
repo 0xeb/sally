@@ -1121,7 +1121,7 @@ BEGIN
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 430
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 442
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Aspecto"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1138,37 +1138,39 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,158,12
     CONTROL         "Ver botón &maximizar/restaurar en línea de directorio",IDC_PANELZOOM,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,187,12
-    GROUPBOX        " Fuentes ",IDC_STATIC_2,1,81,295,54
-    PUSHBUTTON      "Fuente del pan&el…",IDB_PANELFONT,7,93,110,14,WS_GROUP
-    EDITTEXT        IDE_PANELFONT,122,93,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    PUSHBUTTON      "Fuente de con&figuración…",IDB_CONFIGURATIONFONT,7,113,110,14
-    EDITTEXT        IDE_CONFIGURATIONFONT,122,113,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    GROUPBOX        " C&ontenido de la línea de información ",IDC_STATIC_3,1,140,295,30,WS_GROUP
-    EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
-    GROUPBOX        " Mi&niaturas ",IDC_STATIC_4,1,176,295,30
-    LTEXT           "Tamaño:",IDC_STATIC_5,8,190,29,8
-    EDITTEXT        IDC_THUMBNAILSIZE,39,188,33,12,ES_AUTOHSCROLL
-    LTEXT           "pixels",IDC_STATIC_6,76,190,22,8,NOT WS_GROUP
-    GROUPBOX        " Apariencia de la aplicación ",IDC_STATIC_7,1,214,295,74
-    LTEXT           "&Tema:",IDC_STATIC_8,8,228,62,8
-    COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Icono de la apli&cación:",IDC_STATIC_9,8,247,84,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,245,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Para cambiar el color del icono del atajo en su escritorio o en el menú inicio,\nhaga click derecho en el atajo > Propiedades > Cambiar icono.",IDC_STATIC_10,8,266,278,16
-    GROUPBOX " Pantalla de inicio y Acerca de ",IDC_IDENTITY_GROUP,1,294,295,128
-    LTEXT "Gama de colores:",IDC_IDENTITY_PALETTE_LABEL,8,308,90,8
-    COMBOBOX IDC_IDENTITY_PALETTE,100,305,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Tono (0–100):",IDC_IDENTITY_SHADE_LABEL,8,331,90,8
-    EDITTEXT IDC_IDENTITY_SHADE,100,328,30,14,ES_NUMBER | ES_AUTOHSCROLL
-    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,328,138,14
-    LTEXT "Rótulo Sally:",IDC_IDENTITY_LETTERING_LABEL,8,354,90,8
-    COMBOBOX IDC_IDENTITY_LETTERING,100,351,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Fuente del texto:",IDC_IDENTITY_FONT_LABEL,8,377,90,8
-    COMBOBOX IDC_IDENTITY_FONT,100,374,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Color del texto:",IDC_IDENTITY_TONE_LABEL,8,400,90,8
-    COMBOBOX IDC_IDENTITY_TONE,100,397,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
-    PUSHBUTTON "Vista previa…",IDC_IDENTITY_PREVIEW,206,397,68,14,WS_TABSTOP
+    CONTROL         "Mostrar siempre la &barra de pestañas sobre cada panel",IDC_SHOWTABBAR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,75,290,12
+    GROUPBOX        " Fuentes ",IDC_STATIC_2,1,93,295,54
+    PUSHBUTTON      "Fuente del pan&el…",IDB_PANELFONT,7,105,110,14,WS_GROUP
+    EDITTEXT        IDE_PANELFONT,122,105,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "Fuente de con&figuración…",IDB_CONFIGURATIONFONT,7,125,110,14
+    EDITTEXT        IDE_CONFIGURATIONFONT,122,125,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    GROUPBOX        " C&ontenido de la línea de información ",IDC_STATIC_3,1,152,295,30,WS_GROUP
+    EDITTEXT        IDC_INFOLINECONTENT,7,164,268,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,164,12,12
+    GROUPBOX        " Mi&niaturas ",IDC_STATIC_4,1,188,295,30
+    LTEXT           "Tamaño:",IDC_STATIC_5,8,202,29,8
+    EDITTEXT        IDC_THUMBNAILSIZE,39,200,33,12,ES_AUTOHSCROLL
+    LTEXT           "pixels",IDC_STATIC_6,76,202,22,8,NOT WS_GROUP
+    GROUPBOX        " Apariencia de la aplicación ",IDC_STATIC_7,1,226,295,74
+    LTEXT           "&Tema:",IDC_STATIC_8,8,240,62,8
+    COMBOBOX        IDC_THEME_MODE,78,237,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Icono de la apli&cación:",IDC_STATIC_9,8,259,84,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,257,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Para cambiar el color del icono del atajo en su escritorio o en el menú inicio,\nhaga click derecho en el atajo > Propiedades > Cambiar icono.",IDC_STATIC_10,8,278,278,16
+    GROUPBOX " Pantalla de inicio y Acerca de ",IDC_IDENTITY_GROUP,1,306,295,128
+    LTEXT "Gama de colores:",IDC_IDENTITY_PALETTE_LABEL,8,320,90,8
+    COMBOBOX IDC_IDENTITY_PALETTE,100,317,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Tono (0–100):",IDC_IDENTITY_SHADE_LABEL,8,343,90,8
+    EDITTEXT IDC_IDENTITY_SHADE,100,340,30,14,ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,340,138,14
+    LTEXT "Rótulo Sally:",IDC_IDENTITY_LETTERING_LABEL,8,366,90,8
+    COMBOBOX IDC_IDENTITY_LETTERING,100,363,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Fuente del texto:",IDC_IDENTITY_FONT_LABEL,8,389,90,8
+    COMBOBOX IDC_IDENTITY_FONT,100,386,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Color del texto:",IDC_IDENTITY_TONE_LABEL,8,412,90,8
+    COMBOBOX IDC_IDENTITY_TONE,100,409,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    PUSHBUTTON "Vista previa…",IDC_IDENTITY_PREVIEW,206,409,68,14,WS_TABSTOP
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -1870,7 +1872,7 @@ BEGIN
     LTEXT           "elementos.",IDC_STATIC_8,175,181,37,8
 END
 
-IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 231
+IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 270
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Paneles"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1911,6 +1913,12 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,190,12
     CONTROL         "Tr&atar directorios como si tuvieran extensiones (verlas también en columna Ext)",IDC_SORTDIRSBYEXT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,275,12
+    LTEXT           "Pestañas",IDC_STATIC_10,1,232,32,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,35,236,262,1
+    CONTROL         "A&brir las pestañas nuevas al final de la barra de pestañas",IDC_TABSATEND,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
+    CONTROL         "Usar &las teclas de Total Commander para pestañas (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,285,12
 END
 
 IDD_CANNOTSETATTRSINFO DIALOGEX 15, 33, 353, 89
@@ -2276,6 +2284,8 @@ STRINGTABLE
  IDS_MENU_EDIT,              "&Editar"
  IDS_MENU_EDIT_UNDO, "&Deshacer\tCtrl+Z"
  IDS_UNDO_FAILED, "Windows no pudo deshacer la última operación del shell."
+ IDS_UNDO_CONFIRM, "Windows puede deshacer la última operación de archivos. Puede haberse realizado en otro programa, como el Explorador de archivos.\n\n%s\n\n¿Desea deshacerla?"
+ IDS_UNDO_NOTHING, "Windows no tiene ninguna operación de archivos que deshacer."
  IDS_MENU_EDIT_CUT,          "Cort&ar\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "&Copiar\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "C&opiar ruta + nombre como texto\tAlt+Insertar"
@@ -4238,6 +4248,25 @@ BEGIN
  IDS_PROFILE_MANAGER, "Perfiles de configuración"
  IDS_PROFILE_NAME_RULE, "Use de 1 a 64 letras (A-Z, a-z), dígitos, puntos, guiones bajos o guiones; no . ni .. ."
  IDS_PROFILE_DELETE_CONFIRM, "¿Eliminar permanentemente este perfil y su configuración guardada?"
+ IDS_MENU_CMD_TABS, "&Pestañas"
+ IDS_MENU_TAB_NEW, "&Nueva pestaña\tCtrl+Mays+T"
+ IDS_MENU_TAB_DUPLICATE, "&Duplicar pestaña"
+ IDS_MENU_TAB_OPENFOCUSED, "&Abrir directorio enfocado en nueva pestaña"
+ IDS_MENU_TAB_CLOSE, "&Cerrar pestaña\tCtrl+Mays+W"
+ IDS_MENU_TAB_CLOSEOTHERS, "Cerrar las &otras pestañas"
+ IDS_MENU_TAB_REOPEN, "&Reabrir pestaña cerrada"
+ IDS_MENU_TAB_NEXT, "Pestaña &siguiente\tAlt+Mays+Flecha dcha"
+ IDS_MENU_TAB_PREV, "Pestaña an&terior\tAlt+Mays+Flecha izda"
+ IDS_MENU_TAB_ALWAYSSHOW, "&Mostrar siempre la barra de pestañas"
+ IDS_TAB_COPYPATH, "Co&piar ruta"
+ IDS_TAB_LIMIT, "Un panel puede tener como máximo %d pestañas."
+ IDS_MENU_TAB_RENAME, "Cam&biar nombre de pestaña..."
+ IDS_MENU_TAB_LOCK, "B&loquear pestaña"
+ IDS_MENU_TAB_MOVELEFT, "Mover pestaña a la &izquierda"
+ IDS_MENU_TAB_MOVERIGHT, "Mover pestaña a la d&erecha"
+ IDS_TAB_RENAME_TITLE, "Cambiar nombre de pestaña"
+ IDS_TAB_RENAME_PROMPT, "Nombre de la pestaña (déjelo vacío para mostrar el nombre del directorio):"
+ IDS_TAB_DRIVEMARK, " (pestaña)"
 END
 
 STRINGTABLE

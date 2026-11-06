@@ -688,7 +688,7 @@ bool __fastcall CPluginFSInterface::UnixPaths()
     assert(FTerminal);
     assert(FTerminal->Active);
 
-    // IsEmpty() condition added because of suspect bug #340
+    // IsEmpty() condition added because of a suspected bug with an empty current directory
     return !FTerminal->CurrentDirectory.IsEmpty() &&
            (FTerminal->CurrentDirectory[1] == '/');
 }

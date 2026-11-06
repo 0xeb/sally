@@ -53,7 +53,7 @@ HWND CSalamanderGuiTextBox::CreateHwnd(HWND hWndParent)
     if (hWnd != NULL)
     {
         // There seems to be some problem with long strings in
-        // Win7 as reported by Honza (#26). For now we limit
+        // Win7 as reported by Honza. For now we limit
         // the text to 2K characters that should be enough for
         // scripts.
         SendMessage(hWnd, EM_LIMITTEXT, 2048, 0);

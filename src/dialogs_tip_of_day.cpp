@@ -415,7 +415,7 @@ CSharesDialog::CreateImageList()
     HIMAGELIST himl = ImageList_Create(16, 16, GetImageListColorFlags() | ILC_MASK, 2, 0);
     //  ImageList_SetBkColor(himl, GetSysColor(COLOR_WINDOW)); // make transparent icons work under XP
 
-    HICON hIcon = SalLoadImage(4, 4, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags); // symbolsDirectory
+    HICON hIcon = SalLoadImage(4, 4, GetIconSizePx(ICONSIZE_16), GetIconSizePx(ICONSIZE_16), IconLRFlags); // symbolsDirectory
     if (hIcon != NULL)
     {
         ImageList_ReplaceIcon(himl, -1, hIcon);
@@ -912,7 +912,7 @@ CDisconnectDialog::CreateImageList()
     //  ImageList_SetBkColor(himl, GetSysColor(COLOR_WINDOW)); // make transparent icons work under XP
 
     // CONNECTION_ICON_NETWORK
-    HICON hIcon = SalLoadImage(33, 10, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags); // accessible network drive
+    HICON hIcon = SalLoadImage(33, 10, GetIconSizePx(ICONSIZE_16), GetIconSizePx(ICONSIZE_16), IconLRFlags); // accessible network drive
     if (hIcon != NULL)
     {
         ImageList_ReplaceIcon(himl, -1, hIcon);
@@ -922,12 +922,12 @@ CDisconnectDialog::CreateImageList()
         TRACE_E("Icon was not found!");
 
     // CONNECTION_ICON_PLUGIN
-    hIcon = SalLoadIcon(HInstance, IDI_PLUGINFS, IconSizes[ICONSIZE_16]);
+    hIcon = SalLoadIcon(HInstance, IDI_PLUGINFS, GetIconSizePx(ICONSIZE_16));
     ImageList_ReplaceIcon(himl, -1, hIcon);
     HANDLES(DestroyIcon(hIcon));
 
     // CONNECTION_ICON_ACCESSIBLE
-    hIcon = SalLoadImage(33, 10, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags); // accessible network drive
+    hIcon = SalLoadImage(33, 10, GetIconSizePx(ICONSIZE_16), GetIconSizePx(ICONSIZE_16), IconLRFlags); // accessible network drive
     if (hIcon != NULL)
     {
         ImageList_ReplaceIcon(himl, -1, hIcon);
@@ -937,7 +937,7 @@ CDisconnectDialog::CreateImageList()
         TRACE_E("Icon was not found!");
 
     // CONNECTION_ICON_INACCESSIBLE
-    hIcon = SalLoadImage(31, 11, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags); // non-accessible network drive
+    hIcon = SalLoadImage(31, 11, GetIconSizePx(ICONSIZE_16), GetIconSizePx(ICONSIZE_16), IconLRFlags); // non-accessible network drive
     if (hIcon != NULL)
     {
         ImageList_ReplaceIcon(himl, -1, hIcon);

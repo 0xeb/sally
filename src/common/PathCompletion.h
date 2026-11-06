@@ -5,10 +5,12 @@
 
 #include <cstddef>
 #include <functional>
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
-class IFileEnumerator;
+#include "IFileEnumerator.h"
 
 // Path suggestions while a path is typed (F5/F6 targets, Shift+F7, F7): the part typed up to the
 // last '\' or '/' names a folder; its entries are offered as completions of what follows.
@@ -26,7 +28,8 @@ struct Target
 // 'typedHead' is what Windows' autocomplete passes as the part to expand: the typed text up to and
 // including its last separator ("" when none was typed). 'baseDirectory' is the source panel's
 // folder ("" when the panel is not a disk folder).
-// Nothing is offered for plugin or archive paths ("ftp://", "C:\a.zip\..." simply lists nothing),
+// Nothing is offered for plugin paths ("ftp://"); an archive path ("C:\a.zip\...") lists through an
+// ArchiveFolderEnumerator when the archive is open in a panel, otherwise nothing;
 // a server root ("\\server\"), a drive-relative form ("C:dir\") or an invalid character.
 Target Resolve(const std::wstring& typedHead, const std::wstring& baseDirectory);
 
@@ -63,5 +66,39 @@ std::vector<std::wstring> ListCandidates(IFileEnumerator& enumerator, const Targ
 CandidateKinds SuggestionKindsFor(size_t operationItemCount, bool singleItemIsFile, bool sourceIsDisk);
 
 constexpr size_t MaxSuggestions = 1000;
+
+// The folders inside an archive that is open in a panel, copied from the panel's
+// listing on the UI thread when a target dialog opens (the autocomplete lists on its own thread,
+// and the panel's listing is replaced when it refreshes).
+struct ArchiveFolderTree
+{
+    std::wstring Archive; // the archive file, "C:\x\pack.zip"
+    // Folder inside the archive, folded (see FoldArchiveKey; "" is the root) -> its subfolders.
+    std::map<std::wstring, std::vector<std::wstring>> Children;
+};
+
+// Lowercase, '/' as '\', no leading or trailing separators: how archive paths are matched.
+std::wstring FoldArchiveKey(const std::wstring& path);
+
+// Most folders copied from one panel's archive (a huge archive costs one bounded copy).
+constexpr size_t MaxArchiveFolders = 50000;
+
+// Lists the folders of archive trees as an IFileEnumerator does a disk folder, for the directories
+// it claims: an archive file itself or a folder inside it. Files are never listed.
+class ArchiveFolderEnumerator : public IFileEnumerator
+{
+public:
+    explicit ArchiveFolderEnumerator(std::vector<ArchiveFolderTree> archives);
+    bool Claims(const std::wstring& directory) const;
+    bool Empty() const { return Archives.empty(); }
+
+    HENUM StartEnum(const wchar_t* path, const wchar_t* pattern = nullptr) override;
+    EnumResult NextFile(HENUM handle, FileEnumEntry& entry) override;
+    void EndEnum(HENUM handle) override;
+
+private:
+    const std::vector<std::wstring>* Find(const std::wstring& directory) const;
+    std::vector<ArchiveFolderTree> Archives;
+};
 
 } // namespace Sally::PathCompletion

@@ -5,7 +5,7 @@
 //
 // Every file of the release is copied over the installed one. An installed file is not
 // overwritten: it is renamed aside to "<name>.sally-old" first, which Windows allows even
-// while the file is loaded (the shell extension stays loaded in Explorer, issue #128), and
+// while the file is loaded (the shell extension stays loaded in Explorer), and
 // the new file takes its name. Files that the release does not contain (configuration,
 // user files) are left alone.
 //

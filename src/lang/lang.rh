@@ -307,6 +307,9 @@
 #define IDC_PANELCAPTION                614
 #define IDC_SHIFTFORHOTPATHS            615
 #define IDC_PANELZOOM                   616
+#define IDC_SHOWTABBAR                  6232
+#define IDC_TABSATEND                   6233
+#define IDC_TABKEYSTC                   6234
 #define IDC_CHD_SHOWNET                 619
 #define IDC_THUMBNAILSIZE               620
 #define IDC_THUMBNAILSIZE_UPDOWN        621
@@ -742,7 +745,7 @@
 #define IDS_SHELL_SHORTCUT_CONFLICT 8522
 #define IDS_SHELL_PROFILE_UNAVAILABLE 8523
 
-// #50 User Menu: "Show only when" rules for top-level commands and submenus.
+// User Menu: "Show only when" rules for top-level commands and submenus.
 #define IDC_UM_SHOWWHEN 8600
 #define IDC_UM_SHOWWHEN_GROUP 8601
 #define IDC_UM_SHOWWHEN_FILE_LABEL 8602

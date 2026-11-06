@@ -337,6 +337,7 @@
 #define IDC_EDITWINDOW      955
 #define IDC_EDITLINE        956
 #define IDC_DIRTEXT         957
+#define IDC_TABSTRIP        958 // a panel's tab strip
 
 // icons
 #define IDI_SALAMANDER       960
@@ -458,6 +459,21 @@
 #define CM_RIGHTHISTORYPATH_MIN    2850    // historie adresaru pro menu Go To
 #define CM_RIGHTHISTORYPATH_MAX    2859
 
+// Panel tabs: they act on the active panel
+#define CM_TAB_NEW                 2860  // Ctrl+Shift+T: new tab at the current folder
+#define CM_TAB_DUPLICATE           2861  // new tab with the current tab's history and selection
+#define CM_TAB_CLOSE               2862  // Ctrl+Shift+W
+#define CM_TAB_CLOSEOTHERS         2863
+#define CM_TAB_REOPEN              2864  // reopen the most recently closed tab
+#define CM_TAB_NEXT                2865  // Alt+Shift+Right, Ctrl+Shift+Tab
+#define CM_TAB_PREV                2866  // Alt+Shift+Left
+#define CM_TAB_OPENFOCUSED         2867  // open the focused folder in a new tab
+#define CM_TAB_TOGGLEBAR           2868  // Configuration.ShowTabBar (also on the Appearance page)
+#define CM_TAB_RENAME              2869  // give the active tab its own name
+#define CM_TAB_LOCK                2870  // a locked tab cannot be closed
+#define CM_TAB_MOVELEFT            2871
+#define CM_TAB_MOVERIGHT           2872
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FREESPACE
 
 // vyhrazene intervaly pro SortBy a FixedWidth po 20 polozkach; vic proste nezobrazime
@@ -551,6 +567,7 @@
 #define CML_COMMANDS            5520
 #define CML_COMMANDS_USERMENU   5521
 #define CML_COMMANDS_FOLDERS    5523
+#define CML_COMMANDS_TABS       5524
 
 #define CML_PLUGINS             5530
 #define CML_PLUGINS_SUBMENU     5531

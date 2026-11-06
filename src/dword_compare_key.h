@@ -37,7 +37,7 @@ inline int CompareDWORDS(const void* p1, const void* p2, int lengthBytes)
     return 0;
 }
 
-// #115: a lookup key for CIconCache::GetIndex or CAssociations::GetIndex. std::wstring
+// A lookup key for CIconCache::GetIndex or CAssociations::GetIndex. std::wstring
 // guarantees only one wide NUL, so an even-length name left CompareDWORDS reading an
 // uninitialized wchar_t past it: the lookup then failed at random and the panel painted the
 // generic icon instead of the file's own, changing from one repaint to the next. Two wide NULs

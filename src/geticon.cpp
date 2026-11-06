@@ -264,9 +264,9 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const wchar_t* path, LPCITEMIDLIST pi
             // Note: if iconFile == '*', Extract sometimes returns valid icons but in some implementations it doesn't,
             // leaving users with default icons; see below
             if (isIExtractIconW)
-                hres = extractIconW->Extract(iconFileW.data(), iconIndex, &hIconLarge, &hIconSmall, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]));
+                hres = extractIconW->Extract(iconFileW.data(), iconIndex, &hIconLarge, &hIconSmall, MAKELONG(GetIconSizePx(largeIconSize), GetIconSizePx(ICONSIZE_16)));
             else
-                hres = extractIconA->Extract(iconFileA.data(), iconIndex, &hIconLarge, &hIconSmall, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]));
+                hres = extractIconA->Extract(iconFileA.data(), iconIndex, &hIconLarge, &hIconSmall, MAKELONG(GetIconSizePx(largeIconSize), GetIconSizePx(ICONSIZE_16)));
             //TRACE_I("  SalGetIconFromPIDL() pxi->Extract() hIconLarge="<<hIconLarge<<" hIconSmall="<<hIconSmall<<" isIExtractIconW="<<isIExtractIconW);
             // WARNING: for *.ai files iconFile==0 and iconIndex==0 yet Extract() still returns an icon (Adobe Illustrator shell extension)
             // WARNING: D:\Store\Salamand\ICO_SONY\SonyF707_Day_Flash.icc returns hIconLarge==hIconSmall, both 32x32
@@ -280,8 +280,8 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const wchar_t* path, LPCITEMIDLIST pi
             // CP_ACP-narrowed mirror that can resolve to the wrong file or nothing at all.
             HICON hIcons[2] = {0, 0};
             UINT u = isIExtractIconW
-                        ? ExtractIconsW(iconFileW.data(), iconIndex, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), hIcons, NULL, 2, IconLRFlags)
-                        : ExtractIconsA(iconFileA.data(), iconIndex, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), hIcons, 2);
+                        ? ExtractIconsW(iconFileW.data(), iconIndex, MAKELONG(GetIconSizePx(largeIconSize), GetIconSizePx(ICONSIZE_16)), MAKELONG(GetIconSizePx(largeIconSize), GetIconSizePx(ICONSIZE_16)), hIcons, NULL, 2, IconLRFlags)
+                        : ExtractIconsA(iconFileA.data(), iconIndex, MAKELONG(GetIconSizePx(largeIconSize), GetIconSizePx(ICONSIZE_16)), MAKELONG(GetIconSizePx(largeIconSize), GetIconSizePx(ICONSIZE_16)), hIcons, 2);
             if (u != -1)
             {
                 hIconLarge = hIcons[0];
@@ -315,7 +315,7 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const wchar_t* path, LPCITEMIDLIST pi
             resID = defIconIsDir ? 4 : (fileIsExecutable ? 3 : 1); // symbolsDirectory : symbolsExecutable : symbolsNonAssociated
         HICON hIcons[2] = {0, 0};
         UINT u = ExtractIconsW(WindowsVistaAndLater ? L"imageres.dll" : L"shell32.dll", -resID,
-                               MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]),
+                               MAKELONG(GetIconSizePx(largeIconSize), GetIconSizePx(ICONSIZE_16)), MAKELONG(GetIconSizePx(largeIconSize), GetIconSizePx(ICONSIZE_16)),
                                hIcons, NULL, 2, IconLRFlags);
         if (u != -1)
         {
@@ -334,7 +334,7 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const wchar_t* path, LPCITEMIDLIST pi
             // if the small icon is missing or we were given the handle of the large one, create it
             if (hIconSmall == NULL || hIconSmall == hIconLarge)
             {
-                hIconSmall = (HICON)CopyImage(hIconLarge, IMAGE_ICON, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], LR_COPYFROMRESOURCE);
+                hIconSmall = (HICON)CopyImage(hIconLarge, IMAGE_ICON, GetIconSizePx(ICONSIZE_16), GetIconSizePx(ICONSIZE_16), LR_COPYFROMRESOURCE);
                 //TRACE_I("  SalGetIconFromPIDL() CopyImage 1 hIconSmall="<<hIconSmall<<" hIconLarge="<<hIconLarge);
             }
             *hIcon = hIconSmall;
@@ -349,7 +349,7 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const wchar_t* path, LPCITEMIDLIST pi
             // if the large icon is missing or we were given the handle of the small one, create it
             if (hIconLarge == NULL || hIconSmall == hIconLarge)
             {
-                hIconLarge = (HICON)CopyImage(hIconSmall, IMAGE_ICON, IconSizes[largeIconSize], IconSizes[largeIconSize], LR_COPYFROMRESOURCE);
+                hIconLarge = (HICON)CopyImage(hIconSmall, IMAGE_ICON, GetIconSizePx(largeIconSize), GetIconSizePx(largeIconSize), LR_COPYFROMRESOURCE);
                 //TRACE_I("  SalGetIconFromPIDL() CopyImage 2 hIconSmall="<<hIconSmall<<" hIconLarge="<<hIconLarge);
             }
             *hIcon = hIconLarge;

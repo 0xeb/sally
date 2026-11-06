@@ -4,6 +4,7 @@
 #include "PathCompletion.h"
 
 #include "IFileEnumerator.h"
+#include "unicode/helpers.h"
 
 #include <algorithm>
 #include <cwctype>
@@ -195,6 +196,106 @@ std::vector<std::wstring> ListCandidates(IFileEnumerator& enumerator, const Targ
                       std::make_move_iterator(fileCandidates.end()));
     }
     return result;
+}
+
+std::wstring FoldArchiveKey(const std::wstring& path)
+{
+    // Whole-UTF-16 case fold (FoldCharW, not towlower, which folds ASCII only here), '/' as '\\',
+    // and the path's own '.', '..' and doubled separators resolved, so "pack.zip\\..\\" is the
+    // folder holding the archive (left to the disk), not the archive's root.
+    std::vector<std::wstring> parts;
+    std::wstring part;
+    const auto endPart = [&]() {
+        if (part == L"..")
+        {
+            if (!parts.empty() && parts.back() != L"..")
+                parts.pop_back();
+            else
+                parts.push_back(part);
+        }
+        else if (!part.empty() && part != L".")
+            parts.push_back(part);
+        part.clear();
+    };
+    for (wchar_t ch : path)
+    {
+        if (ch == L'\\' || ch == L'/')
+            endPart();
+        else
+            part.push_back(sally::unicode::FoldCharW(ch));
+    }
+    endPart();
+    std::wstring key;
+    for (const std::wstring& name : parts)
+    {
+        if (!key.empty())
+            key.push_back(L'\\');
+        key += name;
+    }
+    return key;
+}
+
+ArchiveFolderEnumerator::ArchiveFolderEnumerator(std::vector<ArchiveFolderTree> archives)
+    : Archives(std::move(archives))
+{
+}
+
+const std::vector<std::wstring>* ArchiveFolderEnumerator::Find(const std::wstring& directory) const
+{
+    const std::wstring folded = FoldArchiveKey(directory);
+    for (const ArchiveFolderTree& archive : Archives)
+    {
+        const std::wstring root = FoldArchiveKey(archive.Archive);
+        if (root.empty() || folded.compare(0, root.size(), root) != 0)
+            continue;
+        if (folded.size() != root.size() && folded[root.size()] != L'\\')
+            continue; // "pack.zip2" is not inside "pack.zip"
+        const std::wstring inner = folded.size() == root.size() ? std::wstring() : folded.substr(root.size() + 1);
+        const auto found = archive.Children.find(inner);
+        static const std::vector<std::wstring> none;
+        return found != archive.Children.end() ? &found->second : &none;
+    }
+    return nullptr;
+}
+
+bool ArchiveFolderEnumerator::Claims(const std::wstring& directory) const
+{
+    return Find(directory) != nullptr;
+}
+
+namespace
+{
+struct ArchiveListing
+{
+    const std::vector<std::wstring>* Names;
+    size_t Next = 0;
+};
+} // namespace
+
+HENUM ArchiveFolderEnumerator::StartEnum(const wchar_t* path, const wchar_t*)
+{
+    const std::vector<std::wstring>* names = path != nullptr ? Find(path) : nullptr;
+    if (names == nullptr)
+        return INVALID_HENUM;
+    return new ArchiveListing{names};
+}
+
+EnumResult ArchiveFolderEnumerator::NextFile(HENUM handle, FileEnumEntry& entry)
+{
+    auto* listing = static_cast<ArchiveListing*>(handle);
+    if (listing == nullptr)
+        return EnumResult::Error(ERROR_INVALID_HANDLE);
+    if (listing->Next >= listing->Names->size())
+        return EnumResult::Done();
+    entry = FileEnumEntry{};
+    entry.name = (*listing->Names)[listing->Next++];
+    entry.attributes = FILE_ATTRIBUTE_DIRECTORY;
+    return EnumResult::Ok();
+}
+
+void ArchiveFolderEnumerator::EndEnum(HENUM handle)
+{
+    delete static_cast<ArchiveListing*>(handle);
 }
 
 CandidateKinds SuggestionKindsFor(size_t operationItemCount, bool singleItemIsFile, bool sourceIsDisk)

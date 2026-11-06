@@ -9,7 +9,7 @@
 
 // Refills a history combo box (New name, Search for, Replace with) and leaves 'text' in its
 // edit field. CB_RESETCONTENT also clears the edit text, so the text must be written back
-// after the list is rebuilt - never read from the control at this point (#117: reading it
+// after the list is rebuilt - never read from the control at this point (reading it
 // returned "" and Batch Rename computed an empty name for every file).
 inline void RefillRenamerHistoryCombo(HWND combo, const std::vector<std::wstring>& items, const std::wstring& text)
 {

@@ -4,7 +4,7 @@
 
 #include <string>
 
-// #94: A Copy/Move (F5/F6) target that names an existing, packable archive written
+// A Copy/Move (F5/F6) target that names an existing, packable archive written
 // WITHOUT a trailing backslash used to be classified as a plain file to overwrite —
 // so the copy silently replaced (destroyed) the whole archive after a generic
 // "Confirm File Overwrite". Drag & drop onto the same archive correctly packs into it.
@@ -41,7 +41,7 @@ bool ShouldRerouteCopyTargetToArchive(bool isCopyOrMove,
 // multi-part associations and stores each one reversed with a trailing dot - "tar.gz" becomes
 // "g.rat." - so matching it requires the literal ".tar" ahead of the ".gz". Probing only the final
 // extension can never match "tar.gz": it matches a plain "gz" association instead, or nothing,
-// and nothing sends F5/F6 back to the destructive overwrite path #94 exists to prevent.
+// and nothing sends F5/F6 back to the destructive overwrite path this policy exists to prevent.
 //
 // Requiring only a SUFFIX to convert - rather than the whole path - is what keeps a genuinely
 // non-ANSI archive name such as L"Ā.tar.gz" detectable. Truncation can only cost a match,

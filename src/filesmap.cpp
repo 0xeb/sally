@@ -123,7 +123,7 @@ BOOL CFilesMap::CreateMap()
                     if (*s == '.' && *(s + 1) == '.' && *(s + 2) == 0)
                         s = NULL;
 
-                    width = IconSizes[ICONSIZE_16] + 2;
+                    width = GetIconSizePx(ICONSIZE_16) + 2;
 
                     int len;
                     if (s != NULL)
@@ -454,8 +454,8 @@ void CFilesMap::SetPoint(int x, int y)
                 }
                 else
                 {
-                    int mw = IconSizes[ICONSIZE_48];
-                    int mh = IconSizes[ICONSIZE_48];
+                    int mw = GetIconSizePx(ICONSIZE_48);
+                    int mh = GetIconSizePx(ICONSIZE_48);
                     int mx = col * Panel->ListBox->ItemWidth + 4;
                     int my = row * Panel->ListBox->ItemHeight + 4;
                     if (oldRectRight < mx || oldRectLeft > mx + mw ||
@@ -496,8 +496,8 @@ void CFilesMap::SetPoint(int x, int y)
                 }
                 else
                 {
-                    int mw = IconSizes[ICONSIZE_48];
-                    int mh = IconSizes[ICONSIZE_48];
+                    int mw = GetIconSizePx(ICONSIZE_48);
+                    int mh = GetIconSizePx(ICONSIZE_48);
                     int mx = col * Panel->ListBox->ItemWidth + 4;
                     int my = row * Panel->ListBox->ItemHeight + 4;
                     if (newRectRight < mx || newRectLeft > mx + mw ||

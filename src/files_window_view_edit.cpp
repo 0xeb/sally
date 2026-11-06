@@ -1436,7 +1436,7 @@ void CFilesWindow::EditNewFile()
     }
     else
     {
-        // Try to derive name from the focused item (issue #12)
+        // Try to derive name from the focused item
         BOOL usedFocused = FALSE;
         int totalCount = Dirs->Count + Files->Count;
         if (FocusedIndex >= 0 && FocusedIndex < totalCount)

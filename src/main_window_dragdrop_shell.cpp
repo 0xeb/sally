@@ -1232,9 +1232,15 @@ void CMainWindow::ChangePanel(BOOL force)
 
         // ensure the active panel header is redrawn
         if (p1->DirectoryLine != NULL)
+        {
             p1->DirectoryLine->InvalidateAndUpdate(FALSE);
+            p1->RepaintTabStrip(); // the strip shows which panel is active
+        }
         if (p2->DirectoryLine != NULL)
+        {
             p2->DirectoryLine->InvalidateAndUpdate(FALSE);
+            p2->RepaintTabStrip(); // the strip shows which panel is active
+        }
 
         UpdateDriveBars(); // press the correct drive in the drive bar
 
@@ -1296,9 +1302,15 @@ void CMainWindow::FocusPanel(CFilesWindow* focus, BOOL testIfMainWndActive)
 
         // repaint the directory line of both panels
         if (old->DirectoryLine != NULL)
+        {
             old->DirectoryLine->InvalidateAndUpdate(FALSE);
+            old->RepaintTabStrip(); // the strip shows which panel is active
+        }
         if (focus->DirectoryLine != NULL)
+        {
             focus->DirectoryLine->InvalidateAndUpdate(FALSE);
+            focus->RepaintTabStrip(); // the strip shows which panel is active
+        }
         //    ReleaseMenuNew();
         EditWindowSetDirectory();
         IdleRefreshStates = TRUE; // on the next Idle, force checking of state variables

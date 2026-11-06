@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "common/unicode/LegacyByteCellMap.h"
+#include "common/DpiScale.h"
 
 #include <cstdint>
 
@@ -37,7 +38,7 @@ void GetDefaultViewerLogFont(LOGFONT* lf)
 {
     const int VIEWER_FONT_PTS = 10;
     memset(lf, 0, sizeof(*lf));
-    lf->lfHeight = -(VIEWER_FONT_PTS * SystemDPI) / 72;
+    lf->lfHeight = sally::dpi::FontHeightForDpi(VIEWER_FONT_PTS, GetSystemDPI());
     lf->lfWeight = FW_NORMAL;
     lf->lfCharSet = UserCharset;
     lf->lfOutPrecision = OUT_DEFAULT_PRECIS;

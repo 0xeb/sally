@@ -184,6 +184,9 @@ public:
     // clears all history entries
     void ClearHistory();
 
+    // replaces this history with a copy of 'other' (Duplicate Tab)
+    void CopyFrom(CPathHistory& other);
+
     // adds a path to the history. The wide-twin arguments that used to
     // ride alongside these are gone: the item holds one wide value, and Execute() replays
     // it through ChangePathToDisk / ChangePathToArchive unconditionally.

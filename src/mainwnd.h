@@ -559,6 +559,8 @@ public:
     BOOL HandleCtrlLetter(wchar_t c); // Ctrl+letter hotkeys
     HWND UndoMenuTarget = nullptr;
     BOOL UndoInProgress = FALSE;
+    // Edit > Undo and Ctrl+Z: text undo in an edit control, otherwise the shell's undo after a
+    // confirmation that names the operation (or a note that there is nothing to undo).
     void ExecuteUndo(HWND target);
     void UpdateUndoMenu(CMenuPopup* popup);
 
@@ -591,17 +593,17 @@ public:
     void RemoveTrayIcon();
     void SetTrayIconTextW(const wchar_t* text);
 
-    // fills the menu with UserMenuItems items as the active panel shows them (#50)
+    // fills the menu with UserMenuItems items as the active panel shows them
     // customize specifies whether the configuration option should be added
     void FillUserMenu(CMenuPopup* menu, BOOL customize = TRUE);
-    // #50: only commands whose "Show only when" rule matches 'context'; an Unknown context
+    // only commands whose "Show only when" rule matches 'context'; an Unknown context
     // (Find's User Menu) shows every command
     void FillUserMenu(CMenuPopup* menu, BOOL customize, const Sally::UserMenuConditions::Context& context);
     // internal recursive function used for filling; 'shown' (indexed like UserMenuItems)
     // leaves out entries hidden by their rules, NULL shows all
     void FillUserMenu2(CMenuPopup* menu, int* iterator, int max, BOOL submenu = FALSE,
                        const std::vector<bool>* shown = NULL);
-    // #50: what the "Show only when" rules see: the active panel and its focused item
+    // what the "Show only when" rules see: the active panel and its focused item
     Sally::UserMenuConditions::Context GetUserMenuContext();
 
     // fills the View menu with modes

@@ -703,7 +703,7 @@ public:
         if (iconList != NULL)
         {
             iconList->SetBkColor(GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]));
-            if (!iconList->CreateFromImageList(il, IconSizes[iconSize]))
+            if (!iconList->CreateFromImageList(il, GetIconSizePx(iconSize)))
             {
                 delete iconList;
                 iconList = NULL;

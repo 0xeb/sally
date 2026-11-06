@@ -223,7 +223,7 @@ HRESULT CScriptSite::OnScriptError(
 
     // Never ever try to return anything else than S_OK here.
     // If JScript.dll returns CTL_E_OUTOFMEMORY because of infinite
-    // recursion (see Redmine #782 bug) it keeps calling OnScriptError
+    // recursion it keeps calling OnScriptError
     // again and again if we return anything else than S_OK.
 
     return S_OK;

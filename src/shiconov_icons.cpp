@@ -31,7 +31,7 @@ int LoadShellOverlayIcons(const char* iconFile, int iconIndex, const int* sizes,
         //
         // nIconSize is MAKELONG(largeSize, smallSize); passing a bare size asks for that
         // one size only. The previous code packed two sizes into this argument and read
-        // both icons back, which is where issue #90 came from - see the header.
+        // both icons back, which dropped .ico-based overlay handlers - see the header.
         //
         // Note SHDefExtractIcon can return S_FALSE when it cannot produce the exact size
         // requested, so success must be tested with == S_OK rather than SUCCEEDED().

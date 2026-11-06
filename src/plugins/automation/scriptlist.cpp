@@ -133,7 +133,7 @@ bool CScriptInfo::CreateEngine(EXECUTION_INFO* info)
 
         m_hAbortEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
 
-        // BUG 103: ActiveRuby calls OnEnterScript very early
+        // ActiveRuby calls OnEnterScript very early
         // during parsing.
         m_pSite->SetExecutionInfo(info);
 

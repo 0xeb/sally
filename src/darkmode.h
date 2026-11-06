@@ -46,7 +46,7 @@ void DarkMode_SetThemeMode(int themeMode);
 BOOL DarkMode_ShouldUseDark();
 BOOL DarkMode_GetColors(DarkModeColors* colors);
 BOOL DarkMode_GetMainFramePalette(DarkModeMainFramePalette* palette);
-HBRUSH DarkMode_GetMainFrameBrush(); // #95: dark background brush for the main window class
+HBRUSH DarkMode_GetMainFrameBrush(); // dark background brush for the main window class
 HBRUSH DarkMode_GetDialogCtlColorBrush(UINT msg, HDC hdc, HWND hCtrl);
 void DarkMode_SetLightSurface(HWND hwnd, BOOL enable);
 BOOL DarkMode_IsLightSurface(HWND hwnd);

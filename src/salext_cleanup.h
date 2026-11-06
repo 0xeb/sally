@@ -6,7 +6,7 @@
 #include "common/IRegistry.h"
 #include "common/IFileSystem.h"
 
-// Pure decision helper for the issue #82 stale shell-extension cleanup.
+// Pure decision helper for the stale shell-extension cleanup.
 //
 // Every past Sally/Salamander version registered its shell extension under a sibling CLSID in
 // the family {c78b61XX-f3ea-11d2-94a1-00e0292a01e3}, each pointing at its own per-install

@@ -1121,7 +1121,7 @@ BEGIN
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 430
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 442
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Aparenta"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1138,37 +1138,39 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,137,12
     CONTROL         "Arata butonul de &maximizeaza/refacere in linia Director",IDC_PANELZOOM,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,197,12
-    GROUPBOX        " Fonturi ",IDC_STATIC_2,1,81,295,54
-    PUSHBUTTON      "&Font panou…",IDB_PANELFONT,7,93,110,14,WS_GROUP
-    EDITTEXT        IDE_PANELFONT,122,93,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    PUSHBUTTON      "Font config&urare…",IDB_CONFIGURATIONFONT,7,113,110,14
-    EDITTEXT        IDE_CONFIGURATIONFONT,122,113,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    GROUPBOX        " C&ontinut al Liniei Informatie ",IDC_STATIC_3,1,140,295,30,WS_GROUP
-    EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
-    GROUPBOX        " &Thumbnails ",IDC_STATIC_4,1,176,295,30
-    LTEXT           "Marime:",IDC_STATIC_5,8,190,28,8
-    EDITTEXT        IDC_THUMBNAILSIZE,38,188,33,12,ES_AUTOHSCROLL
-    LTEXT           "pixels",IDC_STATIC_6,75,190,22,8,NOT WS_GROUP
-    GROUPBOX        " Aspectul aplicației ",IDC_STATIC_7,1,214,295,74
-    LTEXT           "Temă (&V):",IDC_STATIC_8,8,228,62,8
-    COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "P&ictograma aplicației:",IDC_STATIC_9,8,247,84,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,245,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Pentru a schimba culoarea icoanei scurtaturei de pe Desktop sau din Start menu, \nClick dreapta scurtatura>Properties>Change Icon.",IDC_STATIC_10,8,266,278,16
-    GROUPBOX " Ecran de pornire și Despre ",IDC_IDENTITY_GROUP,1,294,295,128
-    LTEXT "Familie de culori:",IDC_IDENTITY_PALETTE_LABEL,8,308,90,8
-    COMBOBOX IDC_IDENTITY_PALETTE,100,305,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Nuanță (0–100):",IDC_IDENTITY_SHADE_LABEL,8,331,90,8
-    EDITTEXT IDC_IDENTITY_SHADE,100,328,30,14,ES_NUMBER | ES_AUTOHSCROLL
-    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,328,138,14
-    LTEXT "Inscripția Sally:",IDC_IDENTITY_LETTERING_LABEL,8,354,90,8
-    COMBOBOX IDC_IDENTITY_LETTERING,100,351,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Fontul textului:",IDC_IDENTITY_FONT_LABEL,8,377,90,8
-    COMBOBOX IDC_IDENTITY_FONT,100,374,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Culoarea textului:",IDC_IDENTITY_TONE_LABEL,8,400,90,8
-    COMBOBOX IDC_IDENTITY_TONE,100,397,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
-    PUSHBUTTON "Previzualizare…",IDC_IDENTITY_PREVIEW,206,397,68,14,WS_TABSTOP
+    CONTROL         "Afișează întotdeauna &bara de file deasupra fiecărui panou",IDC_SHOWTABBAR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,75,290,12
+    GROUPBOX        " Fonturi ",IDC_STATIC_2,1,93,295,54
+    PUSHBUTTON      "&Font panou…",IDB_PANELFONT,7,105,110,14,WS_GROUP
+    EDITTEXT        IDE_PANELFONT,122,105,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "Font config&urare…",IDB_CONFIGURATIONFONT,7,125,110,14
+    EDITTEXT        IDE_CONFIGURATIONFONT,122,125,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    GROUPBOX        " C&ontinut al Liniei Informatie ",IDC_STATIC_3,1,152,295,30,WS_GROUP
+    EDITTEXT        IDC_INFOLINECONTENT,7,164,268,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,164,12,12
+    GROUPBOX        " &Thumbnails ",IDC_STATIC_4,1,188,295,30
+    LTEXT           "Marime:",IDC_STATIC_5,8,202,28,8
+    EDITTEXT        IDC_THUMBNAILSIZE,38,200,33,12,ES_AUTOHSCROLL
+    LTEXT           "pixels",IDC_STATIC_6,75,202,22,8,NOT WS_GROUP
+    GROUPBOX        " Aspectul aplicației ",IDC_STATIC_7,1,226,295,74
+    LTEXT           "Temă (&V):",IDC_STATIC_8,8,240,62,8
+    COMBOBOX        IDC_THEME_MODE,78,237,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "P&ictograma aplicației:",IDC_STATIC_9,8,259,84,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,257,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Pentru a schimba culoarea icoanei scurtaturei de pe Desktop sau din Start menu, \nClick dreapta scurtatura>Properties>Change Icon.",IDC_STATIC_10,8,278,278,16
+    GROUPBOX " Ecran de pornire și Despre ",IDC_IDENTITY_GROUP,1,306,295,128
+    LTEXT "Familie de culori:",IDC_IDENTITY_PALETTE_LABEL,8,320,90,8
+    COMBOBOX IDC_IDENTITY_PALETTE,100,317,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Nuanță (0–100):",IDC_IDENTITY_SHADE_LABEL,8,343,90,8
+    EDITTEXT IDC_IDENTITY_SHADE,100,340,30,14,ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,340,138,14
+    LTEXT "Inscripția Sally:",IDC_IDENTITY_LETTERING_LABEL,8,366,90,8
+    COMBOBOX IDC_IDENTITY_LETTERING,100,363,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Fontul textului:",IDC_IDENTITY_FONT_LABEL,8,389,90,8
+    COMBOBOX IDC_IDENTITY_FONT,100,386,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Culoarea textului:",IDC_IDENTITY_TONE_LABEL,8,412,90,8
+    COMBOBOX IDC_IDENTITY_TONE,100,409,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    PUSHBUTTON "Previzualizare…",IDC_IDENTITY_PREVIEW,206,409,68,14,WS_TABSTOP
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -1870,7 +1872,7 @@ BEGIN
     LTEXT           "obiecte.",IDC_STATIC_8,175,181,27,8
 END
 
-IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 231
+IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 270
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Panouri"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1911,6 +1913,12 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,188,12
     CONTROL         "Tratea&ză directoarele ca având extensii (arată extensiile și în coloana Ext)",IDC_SORTDIRSBYEXT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,285,12
+    LTEXT           "File",IDC_STATIC_10,1,232,18,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,21,236,276,1
+    CONTROL         "Deschide filele noi la sfârșitul &barei de file",IDC_TABSATEND,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
+    CONTROL         "Fo&losește tastele din Total Commander pentru file (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,285,12
 END
 
 IDD_CANNOTSETATTRSINFO DIALOGEX 15, 33, 353, 89
@@ -2276,6 +2284,8 @@ STRINGTABLE
  IDS_MENU_EDIT,              "&Editeaza"
  IDS_MENU_EDIT_UNDO, "&Anulare\tCtrl+Z"
  IDS_UNDO_FAILED, "Windows nu a putut anula ultima operație shell."
+ IDS_UNDO_CONFIRM, "Windows poate anula ultima operație cu fișiere. Este posibil să fi fost efectuată în alt program, cum ar fi Explorer.\n\n%s\n\nDoriți să o anulați?"
+ IDS_UNDO_NOTHING, "Windows nu are nicio operație cu fișiere de anulat."
  IDS_MENU_EDIT_CUT,          "C&ut\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "&Copie\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "C&opie Cale + Nume ca Text\tAlt+Insert"
@@ -4238,6 +4248,25 @@ BEGIN
  IDS_PROFILE_MANAGER, "Profiluri de configurare"
  IDS_PROFILE_NAME_RULE, "Folosiți 1–64 de litere (A-Z, a-z), cifre, puncte, liniuțe de subliniere sau cratime; nu . sau .. ."
  IDS_PROFILE_DELETE_CONFIRM, "Ștergeți definitiv acest profil și setările sale salvate?"
+ IDS_MENU_CMD_TABS, "Lu&cru cu file"
+ IDS_MENU_TAB_NEW, "Filă &nouă\tCtrl+Shift+T"
+ IDS_MENU_TAB_DUPLICATE, "D&uplică fila"
+ IDS_MENU_TAB_OPENFOCUSED, "&Deschide directorul cu focus într-o filă nouă"
+ IDS_MENU_TAB_CLOSE, "Închide &fila\tCtrl+Shift+W"
+ IDS_MENU_TAB_CLOSEOTHERS, "Închide &celelalte file"
+ IDS_MENU_TAB_REOPEN, "&Redeschide fila închisă"
+ IDS_MENU_TAB_NEXT, "Fila urmă&toare\tAlt+Shift+Right Arrow"
+ IDS_MENU_TAB_PREV, "Fila &precedentă\tAlt+Shift+Left Arrow"
+ IDS_MENU_TAB_ALWAYSSHOW, "&Afișează mereu bara de file"
+ IDS_TAB_COPYPATH, "Copiază ca&lea"
+ IDS_TAB_LIMIT, "Un panou poate avea cel mult %d de file."
+ IDS_MENU_TAB_RENAME, "Redenu&mește fila..."
+ IDS_MENU_TAB_LOCK, "&Blochează fila"
+ IDS_MENU_TAB_MOVELEFT, "Mută fila spre stân&ga"
+ IDS_MENU_TAB_MOVERIGHT, "Mută fila spre dr&eapta"
+ IDS_TAB_RENAME_TITLE, "Redenumește fila"
+ IDS_TAB_RENAME_PROMPT, "Numele filei (lăsați gol pentru a afișa numele directorului):"
+ IDS_TAB_DRIVEMARK, " (filă)"
 END
 
 STRINGTABLE

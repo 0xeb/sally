@@ -49,6 +49,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&No"
  IDS_UPDATER_OK, "OK"
  IDS_UPDATER_NOTES_LABEL, "What's new:"
+ IDS_UPDATER_RATE_LIMITED, "GitHub is limiting requests from your network for now. Please try again later."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub is limiting requests from your network for now. Please try again after %s."
 }
 
 LANGUAGE LANG_CZECH, SUBLANG_DEFAULT
@@ -96,6 +98,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&Ne"
  IDS_UPDATER_OK, "OK"
  IDS_UPDATER_NOTES_LABEL, "Novinky:"
+ IDS_UPDATER_RATE_LIMITED, "GitHub dočasně omezuje požadavky z vaší sítě. Zkuste to prosím později."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub dočasně omezuje požadavky z vaší sítě. Zkuste to prosím znovu po %s."
 }
 
 LANGUAGE LANG_SLOVAK, SUBLANG_DEFAULT
@@ -143,6 +147,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&Nie"
  IDS_UPDATER_OK, "OK"
  IDS_UPDATER_NOTES_LABEL, "Novinky:"
+ IDS_UPDATER_RATE_LIMITED, "GitHub dočasne obmedzuje požiadavky z vašej siete. Skúste to prosím neskôr."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub dočasne obmedzuje požiadavky z vašej siete. Skúste to prosím znova po %s."
 }
 
 LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
@@ -190,6 +196,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&Nein"
  IDS_UPDATER_OK, "OK"
  IDS_UPDATER_NOTES_LABEL, "Neuigkeiten:"
+ IDS_UPDATER_RATE_LIMITED, "GitHub begrenzt vorübergehend die Anfragen aus Ihrem Netzwerk. Bitte versuchen Sie es später erneut."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub begrenzt vorübergehend die Anfragen aus Ihrem Netzwerk. Bitte versuchen Sie es nach %s erneut."
 }
 
 LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
@@ -237,6 +245,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&Non"
  IDS_UPDATER_OK, "OK"
  IDS_UPDATER_NOTES_LABEL, "Nouveautés :"
+ IDS_UPDATER_RATE_LIMITED, "GitHub limite pour le moment les requêtes provenant de votre réseau. Veuillez réessayer plus tard."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub limite pour le moment les requêtes provenant de votre réseau. Veuillez réessayer après %s."
 }
 
 LANGUAGE LANG_SPANISH, SUBLANG_SPANISH_MODERN
@@ -284,6 +294,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&No"
  IDS_UPDATER_OK, "Aceptar"
  IDS_UPDATER_NOTES_LABEL, "Novedades:"
+ IDS_UPDATER_RATE_LIMITED, "GitHub está limitando por ahora las solicitudes desde su red. Inténtelo de nuevo más tarde."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub está limitando por ahora las solicitudes desde su red. Inténtelo de nuevo después de las %s."
 }
 
 LANGUAGE LANG_DUTCH, SUBLANG_DUTCH
@@ -331,6 +343,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&Nee"
  IDS_UPDATER_OK, "OK"
  IDS_UPDATER_NOTES_LABEL, "Nieuw:"
+ IDS_UPDATER_RATE_LIMITED, "GitHub beperkt tijdelijk de verzoeken vanaf uw netwerk. Probeer het later opnieuw."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub beperkt tijdelijk de verzoeken vanaf uw netwerk. Probeer het na %s opnieuw."
 }
 
 LANGUAGE LANG_HUNGARIAN, SUBLANG_DEFAULT
@@ -378,6 +392,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&Nem"
  IDS_UPDATER_OK, "OK"
  IDS_UPDATER_NOTES_LABEL, "Újdonságok:"
+ IDS_UPDATER_RATE_LIMITED, "A GitHub egyelőre korlátozza az Ön hálózatáról érkező kéréseket. Próbálja újra később."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "A GitHub egyelőre korlátozza az Ön hálózatáról érkező kéréseket. Próbálja újra %s után."
 }
 
 LANGUAGE LANG_ROMANIAN, SUBLANG_DEFAULT
@@ -425,6 +441,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&Nu"
  IDS_UPDATER_OK, "OK"
  IDS_UPDATER_NOTES_LABEL, "Noutăți:"
+ IDS_UPDATER_RATE_LIMITED, "GitHub limitează deocamdată cererile din rețeaua dumneavoastră. Încercați din nou mai târziu."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub limitează deocamdată cererile din rețeaua dumneavoastră. Încercați din nou după ora %s."
 }
 
 LANGUAGE LANG_RUSSIAN, SUBLANG_DEFAULT
@@ -472,6 +490,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "&Нет"
  IDS_UPDATER_OK, "ОК"
  IDS_UPDATER_NOTES_LABEL, "Что нового:"
+ IDS_UPDATER_RATE_LIMITED, "GitHub временно ограничивает запросы из вашей сети. Повторите попытку позже."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub временно ограничивает запросы из вашей сети. Повторите попытку после %s."
 }
 
 LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
@@ -519,6 +539,8 @@ STRINGTABLE
  IDS_UPDATER_NO, "否(&N)"
  IDS_UPDATER_OK, "确定"
  IDS_UPDATER_NOTES_LABEL, "新功能："
+ IDS_UPDATER_RATE_LIMITED, "GitHub 暂时限制了来自您网络的请求。请稍后重试。"
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub 暂时限制了来自您网络的请求。请在 %s 之后重试。"
 }
 
 LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
@@ -566,4 +588,6 @@ STRINGTABLE
  IDS_UPDATER_NO, "아니요(&N)"
  IDS_UPDATER_OK, "확인"
  IDS_UPDATER_NOTES_LABEL, "새로운 기능:"
+ IDS_UPDATER_RATE_LIMITED, "GitHub에서 사용자 네트워크의 요청을 일시적으로 제한하고 있습니다. 나중에 다시 시도하십시오."
+ IDS_UPDATER_RATE_LIMITED_UNTIL, "GitHub에서 사용자 네트워크의 요청을 일시적으로 제한하고 있습니다. %s 이후에 다시 시도하십시오."
 }

@@ -125,7 +125,7 @@ struct CUserMenuItem
 
     CUserMenuItemType Type;
 
-    // #50 "Show only when": top-level commands and submenus only. Unticked keeps the masks and
+    // "Show only when": top-level commands and submenus only. Unticked keeps the masks and
     // always shows the command. Persisted as "Show When Enabled/File/Folder"; absent means off.
     int ShowWhenEnabled = FALSE;
     std::wstring ShowWhenFile;
@@ -203,11 +203,11 @@ public:
     int MoveItem(int index, int direction);
 };
 
-// #50: the "Show When Enabled/File/Folder" values of one User Menu item key. Saving writes nothing
+// The "Show When Enabled/File/Folder" values of one User Menu item key. Saving writes nothing
 // for an item without a rule; loading treats absent values as off and empty.
 void SaveUserMenuShowWhen(HKEY itemKey, const CUserMenuItem& item);
 void LoadUserMenuShowWhen(HKEY itemKey, CUserMenuItem& item);
 
-// #50: the first 'count' entries of 'items' as the "Show only when" rules see them in 'context'.
+// The first 'count' entries of 'items' as the "Show only when" rules see them in 'context'.
 std::vector<Sally::UserMenuConditions::Entry> UserMenuConditionEntries(CUserMenuItems& items, int count,
                                                                       const Sally::UserMenuConditions::Context& context);

@@ -19,7 +19,7 @@
 #include "common/IFileSystem.h"
 #include "common/IPathService.h"
 
-// #97: defined in main_window_config_persistence.cpp - clamps a normal window rect to a
+// Defined in main_window_config_persistence.cpp - clamps a normal window rect to a
 // visible, sane size on a real monitor.
 RECT SanitizeMainWindowNormalRect(RECT rect);
 #include "common/fsutil.h"
@@ -136,20 +136,12 @@ sally::undo::Focus GetUndoFocus(CMainWindow* main, HWND target)
 
 void CMainWindow::UpdateUndoMenu(CMenuPopup* popup)
 {
+    // Opening the menu never asks the shell (see UndoItemEnabled); ExecuteUndo does, on demand.
     const auto focus = GetUndoFocus(this, UndoMenuTarget);
-    ShellUndoState state;
     const bool busy = HasLockedUI() || UndoInProgress || OperationsQueue.GetNumOfOperations() != 0 ||
                       ProgressDlgArray.RemoveFinishedDlgs() != 0;
-    if (focus == sally::undo::Focus::Panel && !busy)
-        gShell->GetShellUndoState(HWindow, state);
     const bool textCanUndo = focus == sally::undo::Focus::Text && SendMessageW(UndoMenuTarget, EM_CANUNDO, 0, 0) != 0;
-    const auto action = sally::undo::ChooseTarget(focus, textCanUndo, state.available, busy);
-    std::wstring caption = sally::undo::MenuCaption(state.caption, LoadStrW(IDS_MENU_EDIT_UNDO));
-    MENU_ITEM_INFO item = {};
-    item.Mask = MENU_MASK_STRING;
-    item.String = caption.data();
-    popup->SetItemInfo(CM_UNDO, FALSE, &item);
-    popup->EnableItem(CM_UNDO, FALSE, action != sally::undo::Target::None);
+    popup->EnableItem(CM_UNDO, FALSE, sally::undo::UndoItemEnabled(focus, textCanUndo, busy));
 }
 
 void CMainWindow::ExecuteUndo(HWND target)
@@ -165,11 +157,44 @@ void CMainWindow::ExecuteUndo(HWND target)
                       ProgressDlgArray.RemoveFinishedDlgs() != 0;
     if (focus != sally::undo::Focus::Panel || busy)
         return;
+    // Never a blind undo: the history is shared with File Explorer and other programs, so the
+    // operation is named and confirmed first, or the user is told there is nothing to undo. The
+    // shell undoes its newest entry when the command runs; the dialog names the entry it found.
     UndoInProgress = TRUE; // Shell dialogs can pump messages; block reentrant file undo.
-    const ShellResult result = gShell->UndoLastShellOperation(HWindow);
+    bool undone = false;
+    HCURSOR oldCursor = SetCursor(LoadCursorW(NULL, (LPCWSTR)IDC_WAIT)); // building the menu can take a moment
+    const ShellResult result = gShell->UndoLastShellOperation(
+        HWindow, [&](const ShellUndoState& state)
+        {
+            SetCursor(oldCursor);
+            // Keys typed while the menu was being built must not answer a dialog not yet seen.
+            MSG typed;
+            while (PeekMessageW(&typed, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                ;
+            const std::wstring undoText = LoadStrW(IDS_MENU_EDIT_UNDO);
+            const std::wstring title = sally::undo::PlainMenuText(undoText);
+            if (!state.available)
+            {
+                gPrompter->ShowInfo(HWindow, title.c_str(), LoadStrW(IDS_UNDO_NOTHING));
+                return false;
+            }
+            const std::wstring question = sally::undo::UndoConfirmation(LoadStrW(IDS_UNDO_CONFIRM), state.caption, undoText);
+            if (gPrompter->AskYesNo(HWindow, title.c_str(), question.c_str()).type != PromptResult::kYes)
+                return false;
+            // The dialog was modal for the main window only: an operation may have started meanwhile.
+            undone = IsWindow(HWindow) && OperationsQueue.GetNumOfOperations() == 0 &&
+                     ProgressDlgArray.RemoveFinishedDlgs() == 0;
+            return undone;
+        });
+    SetCursor(oldCursor);
     UndoInProgress = FALSE;
-    LeftPanel->RefreshForConfig();
-    RightPanel->RefreshForConfig();
+    if (!IsWindow(HWindow))
+        return; // destroyed while the dialog was open
+    if (undone)
+    {
+        LeftPanel->RefreshForConfig();
+        RightPanel->RefreshForConfig();
+    }
     if (!result.success && result.errorCode != ERROR_CANCELLED &&
         result.errorCode != static_cast<DWORD>(HRESULT_FROM_WIN32(ERROR_CANCELLED)))
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNDO_FAILED));
@@ -1488,7 +1513,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
     case WM_DISPLAYCHANGE:
     {
-        // #97: a resolution/monitor change (e.g. resume-from-sleep at high DPI, where the
+        // A resolution/monitor change (e.g. resume-from-sleep at high DPI, where the
         // monitor reattaches) could leave the main window tiny or off-screen. Re-clamp a
         // normal (non-minimized, non-maximized) window to a visible, sane size; a window
         // that is already fine is left untouched.
@@ -2008,9 +2033,15 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     case WM_USER_REPAINTSTATUSBARS:
     {
         if (LeftPanel != NULL && LeftPanel->DirectoryLine != NULL)
+        {
             LeftPanel->DirectoryLine->InvalidateAndUpdate(FALSE);
+            LeftPanel->RepaintTabStrip(); // the strip shows which panel is active
+        }
         if (RightPanel != NULL && RightPanel->DirectoryLine != NULL)
+        {
             RightPanel->DirectoryLine->InvalidateAndUpdate(FALSE);
+            RightPanel->RepaintTabStrip(); // the strip shows which panel is active
+        }
         return 0;
     }
 
@@ -2131,6 +2162,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         BOOL oldStatusArea = Configuration.StatusArea;
         BOOL oldPanelCaption = Configuration.ShowPanelCaption;
         BOOL oldPanelZoom = Configuration.ShowPanelZoom;
+        BOOL oldShowTabBar = Configuration.ShowTabBar;
         int oldThemeMode = Configuration.ThemeMode;
 
         UserMenuIconBkgndReader.ResetSysColorsChanged(); // now, we start watching system color changes (icon reload required)
@@ -2199,6 +2231,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 if (RightPanel->DirectoryLine != NULL && RightPanel->DirectoryLine->HWindow != NULL)
                     RightPanel->DirectoryLine->Repaint();
             }
+            if (oldShowTabBar != Configuration.ShowTabBar) // show or hide the tab strips
+            {
+                LeftPanel->UpdateTabStrip();
+                RightPanel->UpdateTabStrip();
+            }
 
             if (oldThemeMode != Configuration.ThemeMode)
             {
@@ -2228,6 +2265,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             oldStatusArea = Configuration.StatusArea;
             oldPanelCaption = Configuration.ShowPanelCaption;
             oldPanelZoom = Configuration.ShowPanelZoom;
+            oldShowTabBar = Configuration.ShowTabBar;
             oldThemeMode = Configuration.ThemeMode;
             oldUseCustomPanelFont = UseCustomPanelFont;
             oldLogFont = LogFont;
@@ -4528,6 +4566,24 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             return 0;
         }
 
+        case CM_TAB_NEW: // panel tabs: the active panel's
+        case CM_TAB_DUPLICATE:
+        case CM_TAB_CLOSE:
+        case CM_TAB_CLOSEOTHERS:
+        case CM_TAB_REOPEN:
+        case CM_TAB_NEXT:
+        case CM_TAB_PREV:
+        case CM_TAB_OPENFOCUSED:
+        case CM_TAB_TOGGLEBAR:
+        case CM_TAB_RENAME:
+        case CM_TAB_LOCK:
+        case CM_TAB_MOVELEFT:
+        case CM_TAB_MOVERIGHT:
+        {
+            GetActivePanel()->TabCommand(LOWORD(wParam));
+            return 0;
+        }
+
         case CM_SWAPPANELS:
         {
             // swap panels
@@ -5079,6 +5135,26 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             popup->EnableItem(CM_RIGHTHEADER, FALSE, RightPanel->GetViewMode() == vmDetailed);
             popup->CheckItem(CM_RIGHTHEADER, FALSE, RightPanel->GetViewMode() == vmDetailed && RightPanel->HeaderLineVisible);
             popup->CheckItem(CM_RIGHTSTATUS, FALSE, RightPanel->StatusLine->HWindow != NULL);
+            break;
+        }
+
+        case CML_COMMANDS_TABS: // enable/check the Tabs menu items for the active panel
+        {
+            CFilesWindow* panel = GetActivePanel();
+            const BOOL several = panel->Tabs.Count() > 1;
+            const BOOL locked = panel->Tabs.ActiveTab().Locked;
+            popup->EnableItem(CM_TAB_CLOSE, FALSE, several && !locked);
+            BOOL closableOthers = FALSE; // Close Other Tabs has an unlocked tab to close
+            for (std::size_t i = 0; i < panel->Tabs.Count(); i++)
+                closableOthers = closableOthers || (i != panel->Tabs.Active() && !panel->Tabs.At(i).Locked);
+            popup->EnableItem(CM_TAB_CLOSEOTHERS, FALSE, closableOthers);
+            popup->EnableItem(CM_TAB_REOPEN, FALSE, panel->Tabs.CanReopen());
+            popup->EnableItem(CM_TAB_NEXT, FALSE, several);
+            popup->EnableItem(CM_TAB_PREV, FALSE, several);
+            popup->EnableItem(CM_TAB_MOVELEFT, FALSE, panel->Tabs.Active() > 0);
+            popup->EnableItem(CM_TAB_MOVERIGHT, FALSE, panel->Tabs.Active() + 1 < panel->Tabs.Count());
+            popup->CheckItem(CM_TAB_LOCK, FALSE, locked);
+            popup->CheckItem(CM_TAB_TOGGLEBAR, FALSE, Configuration.ShowTabBar);
             break;
         }
 
@@ -5754,6 +5830,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     offset1 = LeftPanel->DirectoryLine->GetNeededHeight();
                 if (RightPanel->DirectoryLine != NULL && RightPanel->DirectoryLine->HWindow != NULL)
                     offset2 = RightPanel->DirectoryLine->GetNeededHeight();
+                offset1 += LeftPanel->GetTabStripHeight(); // the tab strip sits above the directory line
+                offset2 += RightPanel->GetTabStripHeight();
                 int offset = max(offset1, offset2);
                 hdwp = HANDLES(DeferWindowPos(hdwp, MiddleToolBar->HWindow, NULL,
                                               SplitPositionPix + SPLIT_LINE_WIDTH, TopRebarHeight + offset,
@@ -7158,7 +7236,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     }
 
     case WM_DESTROY:
-        gShell->ReleaseShellUndoState();
+        if (!UndoInProgress) // an undo dialog still holds the shell view; it is released at exit
+            gShell->ReleaseShellUndoState();
     {
         if (!CanDestroyMainWindow)
         {

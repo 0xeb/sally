@@ -3550,22 +3550,22 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
         max.cy = act.cy;
         CaretHeight = (short)act.cy;
 
-        max.cx += 2 * IconSizes[ICONSIZE_16];
+        max.cx += 2 * GetIconSizePx(ICONSIZE_16);
         // minimal width (e.g., for an empty panel) so the user can hit UpDir
-        if (max.cx < 4 * IconSizes[ICONSIZE_16])
-            max.cx = 4 * IconSizes[ICONSIZE_16];
+        if (max.cx < 4 * GetIconSizePx(ICONSIZE_16))
+            max.cx = 4 * GetIconSizePx(ICONSIZE_16);
         Columns[0].Width = max.cx; // width of the 'Name' column
         max.cy += 4;
-        if (max.cy < IconSizes[ICONSIZE_16] + 1)
-            max.cy = IconSizes[ICONSIZE_16] + 1;
+        if (max.cy < GetIconSizePx(ICONSIZE_16) + 1)
+            max.cy = GetIconSizePx(ICONSIZE_16) + 1;
         ListBox->SetItemWidthHeight(max.cx, max.cy);
         break;
     }
 
     case vmIcons:
     {
-        int w = IconSizes[ICONSIZE_32];
-        int h = IconSizes[ICONSIZE_32];
+        int w = GetIconSizePx(ICONSIZE_32);
+        int h = GetIconSizePx(ICONSIZE_32);
         w += Configuration.IconSpacingHorz;
         h += Configuration.IconSpacingVert;
         ListBox->SetItemWidthHeight(w, h);
@@ -3584,8 +3584,8 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
 
     case vmTiles:
     {
-        int w = IconSizes[ICONSIZE_48];
-        int h = IconSizes[ICONSIZE_48];
+        int w = GetIconSizePx(ICONSIZE_48);
+        int h = GetIconSizePx(ICONSIZE_48);
         if (w < 48)
             w = 48; // for 32x32 the width was insufficient
         w += (int)(2.5 * (double)w);
@@ -3731,7 +3731,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                 {
                     nameLen = widthPlan.NameLength;
                     GetTextExtentPoint32W(dc, formatedFileName.c_str(), nameLen, &act);
-                    act.cx += 1 + IconSizes[ICONSIZE_16] + 1 + 2 + SPACE_WIDTH;
+                    act.cx += 1 + GetIconSizePx(ICONSIZE_16) + 1 + 2 + SPACE_WIDTH;
                     if (columnWidthName < act.cx)
                         columnWidthName = act.cx;
                     if (nameColWidths != NULL)
@@ -4087,8 +4087,8 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
         CaretHeight = (short)FontCharHeight;
 
         int cy = FontCharHeight + 4;
-        if (cy < IconSizes[ICONSIZE_16] + 1)
-            cy = IconSizes[ICONSIZE_16] + 1;
+        if (cy < GetIconSizePx(ICONSIZE_16) + 1)
+            cy = GetIconSizePx(ICONSIZE_16) + 1;
         ListBox->SetItemWidthHeight(totalWidth, cy);
         break;
     }

@@ -237,7 +237,6 @@ CScriptEngineShim* CPythonScriptEngineShim::Create(CScriptInfo* pScript)
 
 void CPythonScriptEngineShim::Site_OnEnterScript()
 {
-    // BUG 816:
     // Python engine calls OnEnterScript/OnLeaveScript in strange order:
     //   1. OnEnterScript (compilation phase)
     //   2. OnLeaveScript (compilation phase)
@@ -285,7 +284,7 @@ void CGlobalRubyScriptEngineShim::AdjustSourcePosition(LONG& linePos, LONG& colu
 
 void CGlobalRubyScriptEngineShim::Site_OnEnterScript()
 {
-    // BUG 103: Ruby calls OnEnterScript during parsing before BeginExecution.
+    // Ruby calls OnEnterScript during parsing before BeginExecution.
     if (m_cNestedEnterScript++ == 0)
     {
         ScriptEnter();
@@ -303,7 +302,6 @@ void CGlobalRubyScriptEngineShim::Site_OnLeaveScript()
 
 HRESULT CGlobalRubyScriptEngineShim::InterruptScript(IActiveScript* pScript)
 {
-    // Redmine #817:
     // Calling InterruptScriptThread on Ruby engine is a suicidal mission.
     // What is going on?
     // 1. Ruby suspends the thread executing the script (i.e. Salamander's

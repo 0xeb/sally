@@ -1028,10 +1028,15 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             suggestions.Kinds = Sally::PathCompletion::CandidateKinds::FoldersAndFiles;
             suggestions.AcceptOnlyWhileVisible = true;
             suggestions.BaseDirectory = SuggestionBaseDirectory;
+            suggestions.ArchiveFolders = true; // a disk source can be copied into an archive open in a panel
             AttachPathSuggestions(HWindow, IDE_PATH, suggestions);
         }
         else
-            AttachPathSuggestions(HWindow, IDE_PATH); // before the key forwarder subclasses the edit
+        {
+            PathSuggestionOptions suggestions;
+            suggestions.ArchiveFolders = true;
+            AttachPathSuggestions(HWindow, IDE_PATH, suggestions); // before the key forwarder subclasses the edit
+        }
         CreateKeyForwarder(HWindow, IDE_PATH);                  // so that we receive WM_USER_KEYDOWN
         ChangeToIconButton(HWindow, IDB_BROWSE, IDI_DIRECTORY); // the button will have a folder icon and an arrow to the right
 
@@ -1333,7 +1338,11 @@ CChangeDirDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (SendDirectlyToPlugin == NULL)
             EnableWindow(GetDlgItem(HWindow, IDC_SENDDIRECTTOPLG), FALSE);
         InstallWordBreakProc(GetDlgItem(HWindow, IDE_PATH));    // install WordBreakProc into the combobox
-        AttachPathSuggestions(HWindow, IDE_PATH); // before the key forwarder subclasses the edit
+        {
+            PathSuggestionOptions suggestions;
+            suggestions.ArchiveFolders = true; // Shift+F7 can change into an archive open in a panel
+            AttachPathSuggestions(HWindow, IDE_PATH, suggestions); // before the key forwarder subclasses the edit
+        }
         CreateKeyForwarder(HWindow, IDE_PATH);                  // so that we receive WM_USER_KEYDOWN
         ChangeToIconButton(HWindow, IDB_BROWSE, IDI_DIRECTORY); // the button will have a folder icon and an arrow to the right
 
@@ -2008,6 +2017,7 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         InstallWordBreakProc(GetDlgItem(HWindow, IDE_PATH)); // install WordBreakProc into the editline
+        AttachPathSuggestions(HWindow, IDE_PATH, PackTargetSuggestions()); // folder suggestions for the target path
 
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
@@ -2193,6 +2203,7 @@ CUnpackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         InstallWordBreakProc(GetDlgItem(HWindow, IDE_PATH)); // install WordBreakProc into the editline
         InstallWordBreakProc(GetDlgItem(HWindow, IDE_MASK)); // install WordBreakProc into the editline
+        AttachPathSuggestions(HWindow, IDE_PATH, PackTargetSuggestions()); // folder suggestions for the target path
 
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))

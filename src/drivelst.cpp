@@ -1966,8 +1966,18 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 BOOL destroyIcon = FALSE;
                 if (fs->GetChangeDriveOrDisconnectItem(fs->GetPluginFSName(), txt, icon, destroyIcon))
                 {
-                    drv.DriveText = DupStr(txt);
+                    std::wstring itemText = txt;
                     free(txt);
+                    // A connection a background tab keeps open says so ("(tab)")
+                    if (MainWindow->LeftPanel->IsFSParkedByTab(fs->GetInterface()) ||
+                        MainWindow->RightPanel->IsFSParkedByTab(fs->GetInterface()))
+                    {
+                        // columns: drive letter or hotkey, name, free space; the mark ends the name
+                        const std::size_t first = itemText.find(L'\t');
+                        const std::size_t second = first == std::wstring::npos ? std::wstring::npos : itemText.find(L'\t', first + 1);
+                        itemText.insert(second == std::wstring::npos ? itemText.size() : second, LoadStrOwned(IDS_TAB_DRIVEMARK));
+                    }
+                    drv.DriveText = DupStr(itemText.c_str());
                     drv.HIcon = icon;
                     drv.HGrayIcon = NULL;
                     drv.DestroyIcon = destroyIcon;

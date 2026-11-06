@@ -1121,7 +1121,7 @@ BEGIN
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 430
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 442
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Apparence"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1138,37 +1138,39 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,221,12
     CONTROL         "Afficher le bouton &Déployer/Restaurer dans le bandeau de répertoire",IDC_PANELZOOM,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,242,12
-    GROUPBOX        " Polices ",IDC_STATIC_2,1,81,295,54
-    PUSHBUTTON      "Police des panneau&x…",IDB_PANELFONT,7,93,110,14,WS_GROUP
-    EDITTEXT        IDE_PANELFONT,122,93,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    PUSHBUTTON      "Police de confi&guration…",IDB_CONFIGURATIONFONT,7,113,110,14
-    EDITTEXT        IDE_CONFIGURATIONFONT,122,113,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    GROUPBOX        " C&ontenu du bandeau d'information ",IDC_STATIC_3,1,140,295,30,WS_GROUP
-    EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
-    GROUPBOX        " &Vignettes ",IDC_STATIC_4,1,176,295,30
-    LTEXT           "Taille:",IDC_STATIC_5,8,190,19,8
-    EDITTEXT        IDC_THUMBNAILSIZE,29,188,33,12,ES_AUTOHSCROLL
-    LTEXT           "éléments d'images (pixels)",IDC_STATIC_6,66,190,88,8,NOT WS_GROUP
-    GROUPBOX        " Apparence de l’application ",IDC_STATIC_7,1,214,295,74
-    LTEXT           "&Thème :",IDC_STATIC_8,8,228,62,8
-    COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "&Icône de l’application :",IDC_STATIC_9,8,247,84,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,245,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Changer la couleur d'un raccourci (bureau ou Démarrer):\nClic droit > Propriétés > Changer l'icône.",IDC_STATIC_10,8,266,278,16
-    GROUPBOX " Écran de démarrage et À propos ",IDC_IDENTITY_GROUP,1,294,295,128
-    LTEXT "Famille de couleurs :",IDC_IDENTITY_PALETTE_LABEL,8,308,90,8
-    COMBOBOX IDC_IDENTITY_PALETTE,100,305,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Nuance (0–100) :",IDC_IDENTITY_SHADE_LABEL,8,331,90,8
-    EDITTEXT IDC_IDENTITY_SHADE,100,328,30,14,ES_NUMBER | ES_AUTOHSCROLL
-    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,328,138,14
-    LTEXT "Lettrage Sally :",IDC_IDENTITY_LETTERING_LABEL,8,354,90,8
-    COMBOBOX IDC_IDENTITY_LETTERING,100,351,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Police du texte :",IDC_IDENTITY_FONT_LABEL,8,377,90,8
-    COMBOBOX IDC_IDENTITY_FONT,100,374,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Couleur du texte :",IDC_IDENTITY_TONE_LABEL,8,400,90,8
-    COMBOBOX IDC_IDENTITY_TONE,100,397,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
-    PUSHBUTTON "Aperçu…",IDC_IDENTITY_PREVIEW,206,397,68,14,WS_TABSTOP
+    CONTROL         "Toujours afficher la &barre d’onglets au-dessus des panneaux",IDC_SHOWTABBAR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,75,290,12
+    GROUPBOX        " Polices ",IDC_STATIC_2,1,93,295,54
+    PUSHBUTTON      "Police des panneau&x…",IDB_PANELFONT,7,105,110,14,WS_GROUP
+    EDITTEXT        IDE_PANELFONT,122,105,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "Police de confi&guration…",IDB_CONFIGURATIONFONT,7,125,110,14
+    EDITTEXT        IDE_CONFIGURATIONFONT,122,125,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    GROUPBOX        " C&ontenu du bandeau d'information ",IDC_STATIC_3,1,152,295,30,WS_GROUP
+    EDITTEXT        IDC_INFOLINECONTENT,7,164,268,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,164,12,12
+    GROUPBOX        " &Vignettes ",IDC_STATIC_4,1,188,295,30
+    LTEXT           "Taille:",IDC_STATIC_5,8,202,19,8
+    EDITTEXT        IDC_THUMBNAILSIZE,29,200,33,12,ES_AUTOHSCROLL
+    LTEXT           "éléments d'images (pixels)",IDC_STATIC_6,66,202,88,8,NOT WS_GROUP
+    GROUPBOX        " Apparence de l’application ",IDC_STATIC_7,1,226,295,74
+    LTEXT           "&Thème :",IDC_STATIC_8,8,240,62,8
+    COMBOBOX        IDC_THEME_MODE,78,237,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Icône de l’application :",IDC_STATIC_9,8,259,84,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,257,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Changer la couleur d'un raccourci (bureau ou Démarrer):\nClic droit > Propriétés > Changer l'icône.",IDC_STATIC_10,8,278,278,16
+    GROUPBOX " Écran de démarrage et À propos ",IDC_IDENTITY_GROUP,1,306,295,128
+    LTEXT "Famille de couleurs :",IDC_IDENTITY_PALETTE_LABEL,8,320,90,8
+    COMBOBOX IDC_IDENTITY_PALETTE,100,317,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Nuance (0–100) :",IDC_IDENTITY_SHADE_LABEL,8,343,90,8
+    EDITTEXT IDC_IDENTITY_SHADE,100,340,30,14,ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,340,138,14
+    LTEXT "Lettrage Sally :",IDC_IDENTITY_LETTERING_LABEL,8,366,90,8
+    COMBOBOX IDC_IDENTITY_LETTERING,100,363,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Police du texte :",IDC_IDENTITY_FONT_LABEL,8,389,90,8
+    COMBOBOX IDC_IDENTITY_FONT,100,386,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Couleur du texte :",IDC_IDENTITY_TONE_LABEL,8,412,90,8
+    COMBOBOX IDC_IDENTITY_TONE,100,409,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    PUSHBUTTON "Aperçu…",IDC_IDENTITY_PREVIEW,206,409,68,14,WS_TABSTOP
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -1870,7 +1872,7 @@ BEGIN
     LTEXT           ".",IDC_STATIC_8,175,181,22,8
 END
 
-IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 231
+IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 270
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Panneaux"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1911,6 +1913,12 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,215,12
     CONTROL         "Considérer que les réper&toires ont des extensions les afficher dans la colonne Ext.)",IDC_SORTDIRSBYEXT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,285,12
+    LTEXT           "Onglets",IDC_STATIC_10,1,232,28,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,31,236,266,1
+    CONTROL         "Ouvrir les nouveaux onglets à la fin de la &barre d’onglets",IDC_TABSATEND,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
+    CONTROL         "Utiliser &les raccourcis d’onglets de Total Commander (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,285,12
 END
 
 IDD_CANNOTSETATTRSINFO DIALOGEX 15, 33, 353, 89
@@ -2276,6 +2284,8 @@ STRINGTABLE
  IDS_MENU_EDIT,              "&Éditer"
  IDS_MENU_EDIT_UNDO, "&Annuler\tCtrl+Z"
  IDS_UNDO_FAILED, "Windows n’a pas pu annuler la dernière opération du shell."
+ IDS_UNDO_CONFIRM, "Windows peut annuler la dernière opération sur les fichiers. Elle a pu être effectuée dans un autre programme, comme l’Explorateur de fichiers.\n\n%s\n\nVoulez-vous l’annuler ?"
+ IDS_UNDO_NOTHING, "Windows n’a aucune opération sur les fichiers à annuler."
  IDS_MENU_EDIT_CUT,          "Co&uper\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "Co&pier\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "Copier le texte du c&hemin d'accès et du nom\tAlt+Inser"
@@ -4238,6 +4248,25 @@ BEGIN
  IDS_PROFILE_MANAGER, "Profils de configuration"
  IDS_PROFILE_NAME_RULE, "Utilisez 1 à 64 lettres (A-Z, a-z), chiffres, points, tirets bas ou traits d’union ; pas . ni .. ."
  IDS_PROFILE_DELETE_CONFIRM, "Supprimer définitivement ce profil et ses réglages enregistrés ?"
+ IDS_MENU_CMD_TABS, "Gest&ion des onglets"
+ IDS_MENU_TAB_NEW, "&Nouvel onglet\tCtrl+Maj+T"
+ IDS_MENU_TAB_DUPLICATE, "&Dupliquer l’onglet"
+ IDS_MENU_TAB_OPENFOCUSED, "&Ouvrir le répertoire focalisé dans un nouvel onglet"
+ IDS_MENU_TAB_CLOSE, "&Fermer l’onglet\tCtrl+Maj+W"
+ IDS_MENU_TAB_CLOSEOTHERS, "Fermer les &autres onglets"
+ IDS_MENU_TAB_REOPEN, "&Rouvrir l’onglet fermé"
+ IDS_MENU_TAB_NEXT, "Onglet &suivant\tAlt+Maj+Flèche droite"
+ IDS_MENU_TAB_PREV, "Onglet &précédent\tAlt+Maj+Flèche gauche"
+ IDS_MENU_TAB_ALWAYSSHOW, "&Toujours afficher la barre d’onglets"
+ IDS_TAB_COPYPATH, "Copier le &chemin d’accès"
+ IDS_TAB_LIMIT, "Un panneau peut contenir au maximum %d onglets."
+ IDS_MENU_TAB_RENAME, "Reno&mmer l’onglet..."
+ IDS_MENU_TAB_LOCK, "&Verrouiller l’onglet"
+ IDS_MENU_TAB_MOVELEFT, "Déplacer l’onglet vers la &gauche"
+ IDS_MENU_TAB_MOVERIGHT, "Déplacer l’onglet vers la dro&ite"
+ IDS_TAB_RENAME_TITLE, "Renommer l’onglet"
+ IDS_TAB_RENAME_PROMPT, "Nom de l’onglet (laisser vide pour afficher le nom du répertoire):"
+ IDS_TAB_DRIVEMARK, " (onglet)"
 END
 
 STRINGTABLE

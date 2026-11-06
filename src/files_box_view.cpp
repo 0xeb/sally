@@ -1878,8 +1878,8 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
 
         labelR.top = itemY * ItemHeight;
         labelR.bottom = labelR.top + ItemHeight;
-        labelR.left = (x / ItemWidth) * ItemWidth + IconSizes[ICONSIZE_16] + 2 - XOffset;
-        labelR.right = labelR.left + ItemWidth - 10 - IconSizes[ICONSIZE_16] - 2;
+        labelR.left = (x / ItemWidth) * ItemWidth + GetIconSizePx(ICONSIZE_16) + 2 - XOffset;
+        labelR.right = labelR.left + ItemWidth - 10 - GetIconSizePx(ICONSIZE_16) - 2;
         break;
     }
 
@@ -1891,8 +1891,8 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
 
         labelR.top = itemY * ItemHeight;
         labelR.bottom = labelR.top + ItemHeight;
-        labelR.left = IconSizes[ICONSIZE_16] + 2 - XOffset;
-        labelR.right = labelR.left + ItemWidth - IconSizes[ICONSIZE_16] - 2;
+        labelR.left = GetIconSizePx(ICONSIZE_16) + 2 - XOffset;
+        labelR.right = labelR.left + ItemWidth - GetIconSizePx(ICONSIZE_16) - 2;
         break;
     }
 
@@ -1930,7 +1930,7 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             else
                 f = &Parent->Files->At(itemIndex - Parent->Dirs->Count);
 
-            int width = IconSizes[ICONSIZE_16] + 2;
+            int width = GetIconSizePx(ICONSIZE_16) + 2;
 
             SIZE sz;
             // Declared before the 'goto SKIP_MES' below, as the buffer it replaced was:
@@ -1979,7 +1979,7 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             HANDLES(ReleaseDC(HWindow, dc));
         SKIP_MES:
 
-            labelR.right = labelR.left + width - IconSizes[ICONSIZE_16] - 2;
+            labelR.right = labelR.left + width - GetIconSizePx(ICONSIZE_16) - 2;
 
             int xPos = x;
             if (ViewMode == vmBrief)
@@ -2080,8 +2080,8 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             pt.x = x % ItemWidth;
             pt.y = (y + TopIndex) % ItemHeight;
 
-            int iconW = IconSizes[ICONSIZE_48];
-            int iconH = IconSizes[ICONSIZE_48];
+            int iconW = GetIconSizePx(ICONSIZE_48);
+            int iconH = GetIconSizePx(ICONSIZE_48);
 
             // detect a click on the icon
             rect.top = (ItemHeight - iconH) / 2;
@@ -2101,7 +2101,7 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
                 f = &Parent->Files->At(itemIndex - Parent->Dirs->Count);
 
             int itemWidth = rect.right - rect.left; // item width
-            int maxTextWidth = ItemWidth - TILE_LEFT_MARGIN - IconSizes[ICONSIZE_48] - TILE_LEFT_MARGIN - 4;
+            int maxTextWidth = ItemWidth - TILE_LEFT_MARGIN - GetIconSizePx(ICONSIZE_48) - TILE_LEFT_MARGIN - 4;
             int widthNeeded = 0;
 
             HDC hDC = ItemBitmap.HMemDC;
@@ -2229,8 +2229,8 @@ BOOL CFilesBox::ShowHideChilds()
             //
             // v1.0.24 shipped with visible arrows here even in the dark theme. That theming code
             // was already present then, so it was never reaching this control - the theme walk
-            // simply ran at a moment when this lazily-created scrollbar did not exist yet. #95
-            // moved the startup theme walk earlier (before SetWindowPlacement, so the first
+            // simply ran at a moment when this lazily-created scrollbar did not exist yet. A later
+            // change moved the startup theme walk earlier (before SetWindowPlacement, so the first
             // painted frame is dark) and the panel scrollbar started being caught by it.
             //
             // Opting this one control out restores the 1.0.24 appearance without touching how

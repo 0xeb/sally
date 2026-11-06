@@ -20,6 +20,8 @@ struct HttpsFailure
     unsigned Status = 0;   // the HTTP status when the server answered with an error
     bool TooLarge = false; // the body is longer than allowed
     bool Cancelled = false;
+    bool RateLimited = false;                 // the server limits requests from this network for now
+    unsigned long long RetryAfterSeconds = 0; // with RateLimited: when it accepts them again, 0 unknown
     std::wstring Text; // the system's description of Code, or an English explanation
 };
 

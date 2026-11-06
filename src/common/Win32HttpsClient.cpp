@@ -5,7 +5,11 @@
 
 #include <wininet.h>
 
+#include <algorithm>
+#include <ctime>
 #include <vector>
+
+#include "update/RateLimit.h"
 
 namespace Sally::Update
 {
@@ -51,6 +55,25 @@ std::wstring FinalUrl(HINTERNET request)
     if (!InternetQueryOptionW(request, INTERNET_OPTION_URL, buffer.data(), &bytes))
         return std::wstring();
     return std::wstring(buffer.data());
+}
+
+// A response header's value, or empty when it is absent. HTTP_QUERY_CUSTOM takes the header's
+// name in the buffer and returns its value there, asking for more room when it is longer.
+std::wstring ResponseHeader(HINTERNET request, const wchar_t* name)
+{
+    std::vector<wchar_t> buffer(wcslen(name) + 32, L'\0');
+    for (int attempt = 0; attempt < 3; ++attempt)
+    {
+        std::fill(buffer.begin(), buffer.end(), L'\0');
+        wcscpy_s(buffer.data(), buffer.size(), name);
+        DWORD bytes = static_cast<DWORD>(buffer.size() * sizeof(wchar_t));
+        if (HttpQueryInfoW(request, HTTP_QUERY_CUSTOM, buffer.data(), &bytes, NULL))
+            return std::wstring(buffer.data(), wcsnlen(buffer.data(), (std::min)(buffer.size(), bytes / sizeof(wchar_t) + 1)));
+        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || bytes / sizeof(wchar_t) + 1 <= buffer.size())
+            return std::wstring();
+        buffer.resize(bytes / sizeof(wchar_t) + 1);
+    }
+    return std::wstring();
 }
 
 } // namespace
@@ -110,6 +133,16 @@ bool Win32HttpsClient::Get(const std::wstring& url, const wchar_t* headers, unsi
     {
         failure.Status = status;
         failure.Text = L"HTTP " + std::to_wstring(status);
+        if (status == 403 || status == 429)
+        {
+            const RateLimitAnswer limit =
+                ReadRateLimit(status, ResponseHeader(request.Get(), L"X-RateLimit-Remaining"),
+                              ResponseHeader(request.Get(), L"X-RateLimit-Reset"),
+                              ResponseHeader(request.Get(), L"Retry-After"),
+                              static_cast<unsigned long long>(_time64(nullptr)));
+            failure.RateLimited = limit.Limited;
+            failure.RetryAfterSeconds = limit.RetryAfterSeconds;
+        }
         return false;
     }
 

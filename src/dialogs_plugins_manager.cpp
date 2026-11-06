@@ -1613,7 +1613,7 @@ void CCfgPageConfirmations::InitTree()
 HIMAGELIST
 CCfgPageConfirmations::CreateImageList()
 {
-    int iconSize = IconSizes[ICONSIZE_16];
+    int iconSize = GetIconSizePx(ICONSIZE_16);
     HIMAGELIST hIL = CreateCheckboxImagelist(iconSize);
 
     HICON hIcon;
@@ -2918,6 +2918,7 @@ void CCfgPageAppearance::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_ICONTINCTURE, Configuration.UseIconTincture);
     ti.CheckBox(IDC_PANELCAPTION, Configuration.ShowPanelCaption);
     ti.CheckBox(IDC_PANELZOOM, Configuration.ShowPanelZoom);
+    ti.CheckBox(IDC_SHOWTABBAR, Configuration.ShowTabBar);
     ti.CheckBox(IDC_SINGLECLICK, Configuration.SingleClick);
 
     ti.EditLineW(IDC_INFOLINECONTENT, Configuration.InfoLineContent);
@@ -3488,6 +3489,8 @@ void CCfgPagePanels::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_SORTNEWERONTOP, Configuration.SortNewerOnTop);
     ti.CheckBox(IDC_SORTDIRSBYEXT, Configuration.SortDirsByExt);
     ti.CheckBox(IDC_SORTDIRSBYNAME, Configuration.SortDirsByName);
+    ti.CheckBox(IDC_TABSATEND, Configuration.TabsOpenAtEnd);
+    ti.CheckBox(IDC_TABKEYSTC, Configuration.TabKeysTotalCommander);
 
     if (ti.Type == ttDataToWindow)
         EnableControls();

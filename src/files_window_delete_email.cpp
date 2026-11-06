@@ -478,7 +478,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                                (type == atCopy) ? IDD_COPYDIALOG : IDD_MOVEDIALOG,
                                                Configuration.CopyHistory, COPY_HISTORY_SIZE,
                                                &criteria, havePermissions, supportsADS);
-                // #51: one file copied or moved may take an existing file's name; otherwise the
+                // One file copied or moved may take an existing file's name; otherwise the
                 // target is a folder. The text typed is parsed below exactly as before.
                 if (Sally::PathCompletion::SuggestionKindsFor(count == 0 ? 1 : (size_t)count, singleItemIsFile != FALSE,
                                                               Is(ptDisk) != FALSE) ==
@@ -512,7 +512,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 nextFocusW.clear();
                 operationMaskW.clear();
 
-                // #94: A Copy/Move target that names an existing, packable archive without a
+                // A Copy/Move target that names an existing, packable archive without a
                 // trailing backslash was silently overwritten (the whole archive destroyed) via
                 // the plain file-overwrite path. Detect that and append a backslash so ParsePath
                 // below routes it to the archive/pack flow ("Add to existing archive?"), matching

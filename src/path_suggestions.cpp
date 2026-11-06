@@ -10,6 +10,7 @@
 #include "plugins.h"
 #include "fileswnd.h"
 #include "pack.h"
+#include "zip.h" // CSalamanderDirectory: the archive panel listing copied for archive folder suggestions
 #include "common/IFileEnumerator.h"
 #include "common/PathCompletion.h"
 
@@ -90,14 +91,65 @@ std::function<bool(const std::wstring&)> ArchiveFilterSnapshot()
     return [formats](const std::wstring& name) { return formats->PackIsArchive(name.c_str()) != 0; };
 }
 
+// The folders of the archives open in the panels, copied here on the UI thread (the
+// autocomplete lists on its own thread, and a panel replaces its listing when it refreshes). Read-only
+// walk of the panel's tree, bounded by MaxArchiveFolders; the same archive in both panels is copied once.
+std::shared_ptr<Sally::PathCompletion::ArchiveFolderEnumerator> ArchiveFoldersSnapshot()
+{
+    using namespace Sally::PathCompletion;
+    std::vector<ArchiveFolderTree> archives;
+    if (MainWindow == NULL)
+        return {};
+    for (CFilesWindow* panel : {MainWindow->LeftPanel, MainWindow->RightPanel})
+    {
+        if (panel == NULL || !panel->Is(ptZIPArchive) || panel->GetArchiveDir() == NULL)
+            continue;
+        const std::wstring archive = panel->GetZIPArchive();
+        bool known = false;
+        for (const ArchiveFolderTree& tree : archives)
+            known = known || FoldArchiveKey(tree.Archive) == FoldArchiveKey(archive);
+        if (known || archive.empty())
+            continue;
+        ArchiveFolderTree tree;
+        tree.Archive = archive;
+        size_t copied = 0;
+        std::vector<std::pair<std::wstring, const CSalamanderDirectoryAbstract*>> pending;
+        pending.emplace_back(std::wstring(), panel->GetArchiveDir());
+        while (!pending.empty() && copied < MaxArchiveFolders)
+        {
+            const auto [inner, dir] = pending.back();
+            pending.pop_back();
+            std::vector<std::wstring>& names = tree.Children[FoldArchiveKey(inner)];
+            const int count = dir->GetDirsCount();
+            for (int i = 0; i < count && copied < MaxArchiveFolders; i++)
+            {
+                const CFileData* folder = dir->GetDir(i);
+                const CSalamanderDirectoryAbstract* sub = dir->GetSalDir(i);
+                if (folder == NULL || folder->Name == NULL)
+                    continue;
+                const std::wstring name(folder->Name, folder->NameLen);
+                names.push_back(name);
+                copied++;
+                if (sub != NULL)
+                    pending.emplace_back(inner.empty() ? name : inner + L"\\" + name, sub);
+            }
+        }
+        archives.push_back(std::move(tree));
+    }
+    if (archives.empty())
+        return {};
+    return std::make_shared<ArchiveFolderEnumerator>(std::move(archives));
+}
+
 // The strings Windows' autocomplete offers. It calls this object on a worker thread of its own:
 // IACList::Expand when the typed text reaches a separator, then Reset and Next. The folder is
 // listed there, never on the dialog's thread, so a slow network folder cannot stall typing.
 class CPathSuggestionSource final : public IEnumString, public IACList
 {
 public:
-    CPathSuggestionSource(std::wstring baseDirectory, Sally::PathCompletion::CandidateOptions options)
-        : BaseDirectory(std::move(baseDirectory)), Options(std::move(options))
+    CPathSuggestionSource(std::wstring baseDirectory, Sally::PathCompletion::CandidateOptions options,
+                          std::shared_ptr<Sally::PathCompletion::ArchiveFolderEnumerator> archives = {})
+        : BaseDirectory(std::move(baseDirectory)), Options(std::move(options)), Archives(std::move(archives))
     {
     }
 
@@ -181,9 +233,12 @@ private:
     void FillLocked()
     {
         using namespace Sally::PathCompletion;
-        Items = gFileEnumerator != nullptr
-                    ? ListCandidates(*gFileEnumerator, Resolve(Head, BaseDirectory), MaxSuggestions, Options)
-                    : std::vector<std::wstring>();
+        const Target target = Resolve(Head, BaseDirectory);
+        if (Archives != nullptr && Archives->Claims(target.Directory))
+            Items = ListCandidates(*Archives, target, MaxSuggestions, Options); // inside an open archive
+        else
+            Items = gFileEnumerator != nullptr ? ListCandidates(*gFileEnumerator, target, MaxSuggestions, Options)
+                                               : std::vector<std::wstring>();
         Position = 0;
         Filled = true;
     }
@@ -192,6 +247,7 @@ private:
     std::mutex Lock;
     const std::wstring BaseDirectory;
     const Sally::PathCompletion::CandidateOptions Options;
+    const std::shared_ptr<Sally::PathCompletion::ArchiveFolderEnumerator> Archives; // immutable snapshot
     std::wstring Head;
     std::vector<std::wstring> Items;
     size_t Position = 0;
@@ -242,7 +298,8 @@ void AttachPathSuggestions(HWND dialog, int controlId, const PathSuggestionOptio
     IAutoComplete2* autoComplete = NULL;
     if (FAILED(CoCreateInstance(CLSID_AutoComplete, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&autoComplete))))
         return;
-    CPathSuggestionSource* source = new CPathSuggestionSource(baseDirectory, std::move(candidates));
+    CPathSuggestionSource* source = new CPathSuggestionSource(
+        baseDirectory, std::move(candidates), options.ArchiveFolders ? ArchiveFoldersSnapshot() : nullptr);
     // The drop-down only: completed text is never typed for the user (no inline append).
     if (SUCCEEDED(autoComplete->Init(edit, static_cast<IEnumString*>(source), NULL, NULL)))
     {

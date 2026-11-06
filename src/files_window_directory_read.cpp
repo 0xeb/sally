@@ -2797,7 +2797,7 @@ void CFilesWindow::UpdateDriveIcon(BOOL check)
         {
             if (DirectoryLine->HWindow != NULL)
             {
-                HICON hIcon = LoadArchiveIcon(IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags);
+                HICON hIcon = LoadArchiveIcon(GetIconSizePx(ICONSIZE_16), GetIconSizePx(ICONSIZE_16), IconLRFlags);
                 DirectoryLine->SetDriveIcon(hIcon);
                 HANDLES(DestroyIcon(hIcon));
             }
@@ -2818,7 +2818,7 @@ void CFilesWindow::UpdateDriveIcon(BOOL check)
                     }
                     else // standard
                     {
-                        icon = SalLoadIcon(HInstance, IDI_PLUGINFS, IconSizes[ICONSIZE_16]);
+                        icon = SalLoadIcon(HInstance, IDI_PLUGINFS, GetIconSizePx(ICONSIZE_16));
                         DirectoryLine->SetDriveIcon(icon);
                         HANDLES(DestroyIcon(icon));
                     }

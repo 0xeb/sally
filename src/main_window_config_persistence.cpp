@@ -220,7 +220,7 @@ const wchar_t* FINDDIALOG_NAMEWIDTH_REG = L"Name Width";
 const wchar_t* SALAMANDER_LEFTP_REG = L"Left Panel";
 const wchar_t* SALAMANDER_RIGHTP_REG = L"Right Panel";
 
-// #97: collect monitor work areas and clamp a normal-window rect to a sane, visible size
+// Collect monitor work areas and clamp a normal-window rect to a sane, visible size
 // before it is applied - so a stale/off-screen saved rect (e.g. after resume-from-sleep
 // monitor reattach at high DPI) cannot collapse the window to a sliver.
 static BOOL CALLBACK CollectMonitorWorkAreaProc(HMONITOR hMon, HDC, LPRECT, LPARAM lParam)
@@ -336,6 +336,9 @@ const wchar_t* CONFIG_SHIFTFORHOTPATHS_REG_W = L"Use Shift For GoTo HotPath";
 const wchar_t* CONFIG_SHOWGREPERRORS_REG_W = L"Show Errors In Find Files";
 const wchar_t* CONFIG_SHOWPANELCAPTION_REG_W = L"Show Panel Caption";
 const wchar_t* CONFIG_SHOWPANELZOOM_REG_W = L"Show Panel Zoom";
+const wchar_t* CONFIG_SHOWTABBAR_REG_W = L"Show Tab Bar";
+const wchar_t* CONFIG_TABSATEND_REG_W = L"Open Tabs At End";
+const wchar_t* CONFIG_TABKEYSTC_REG_W = L"Total Commander Tab Keys";
 const wchar_t* CONFIG_SHOWSPLASHSCREEN_REG_W = L"Show Splash Screen";
 const wchar_t* CONFIG_SINGLECLICK_REG_W = L"Single Click";
 const wchar_t* CONFIG_SIZEFORMAT_REG_W = L"Size Format";
@@ -1483,6 +1486,84 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
 // CMainWindow
 //
 
+// Panel tabs: "<panel>\Tabs" holds the active tab's index and one numbered subkey per tab
+// ("1", "2", ...). The panel's own values above stay the active tab's, so builds without tabs
+// read the same panel as before; a profile without the key starts with one tab.
+static const wchar_t* PANEL_TABS_REG_W = L"Tabs";
+static const wchar_t* PANEL_TABS_ACTIVE_REG_W = L"Active";
+
+static void SavePanelTabs(CFilesWindow* panel, HKEY panelKey)
+{
+    std::size_t active = 0;
+    const std::vector<sally::tabs::TabRecord> records = panel->GetTabsForConfig(active);
+    HKEY tabsKey;
+    if (!CreateKeyW(panelKey, PANEL_TABS_REG_W, tabsKey))
+        return;
+    ClearKey(tabsKey); // tabs closed since the last save
+    DWORD value = (DWORD)active;
+    SetValueW(tabsKey, PANEL_TABS_ACTIVE_REG_W, REG_DWORD, &value, sizeof(DWORD));
+    for (std::size_t i = 0; i < records.size(); i++)
+    {
+        HKEY tabKey;
+        if (!CreateKeyW(tabsKey, std::to_wstring(i + 1).c_str(), tabKey))
+            break;
+        const sally::tabs::TabValues values = sally::tabs::Encode(records[i]);
+        for (const auto& number : values.Numbers)
+        {
+            DWORD data = number.second;
+            SetValueW(tabKey, number.first.c_str(), REG_DWORD, &data, sizeof(DWORD));
+        }
+        for (const auto& text : values.Strings)
+            SetValueW(tabKey, text.first.c_str(), REG_SZ, text.second.c_str(), (DWORD)-1);
+        CloseKey(tabKey);
+    }
+    CloseKey(tabsKey);
+}
+
+static void LoadPanelTabs(CFilesWindow* panel, HKEY panelKey)
+{
+    using namespace sally::tabs;
+    panel->StartupTabs.clear();
+    panel->StartupActiveTab = 0;
+    HKEY tabsKey;
+    if (!OpenKeyW(panelKey, PANEL_TABS_REG_W, tabsKey))
+        return;
+    DWORD active = 0;
+    GetValueW(tabsKey, PANEL_TABS_ACTIVE_REG_W, REG_DWORD, &active, sizeof(DWORD));
+    // An active record that does not decode leaves activeIndex past the end: the panel's own
+    // location then gets a tab of its own instead of overwriting another tab's saved one.
+    std::size_t activeIndex = PanelTabSet::npos;
+    for (std::size_t i = 0; i < PanelTabSet::kMaxTabs; i++)
+    {
+        HKEY tabKey;
+        if (!OpenKeyW(tabsKey, std::to_wstring(i + 1).c_str(), tabKey))
+            break; // the list ends at the first gap
+        TabValues values;
+        for (const wchar_t* name : kTabNumberValues)
+        {
+            DWORD data;
+            if (GetValueW(tabKey, name, REG_DWORD, &data, sizeof(DWORD)))
+                values.Numbers[name] = data;
+        }
+        for (const wchar_t* name : kTabStringValues)
+        {
+            std::wstring data;
+            if (GetStringValueW(tabKey, name, data))
+                values.Strings[name] = data;
+        }
+        CloseKey(tabKey);
+        TabRecord record;
+        if (Decode(values, VIEW_TEMPLATES_COUNT, stAttr, record))
+        {
+            if (i == active)
+                activeIndex = panel->StartupTabs.size();
+            panel->StartupTabs.push_back(std::move(record));
+        }
+    }
+    panel->StartupActiveTab = activeIndex != PanelTabSet::npos ? activeIndex : panel->StartupTabs.size();
+    CloseKey(tabsKey);
+}
+
 void CMainWindow::SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const wchar_t* reg)
 {
     // FIRST REGION ON THE WIDE FACADES. Every registry call here goes
@@ -1527,6 +1608,8 @@ void CMainWindow::SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const w
         // CMaskGroup::GetMasksString() has returned the wide storage directly since
         // - no ANSI rendering left to bridge.
         SetValueW(actKey, PANEL_FILTER_W, REG_SZ, panel->Filter.GetMasksString(), -1);
+
+        SavePanelTabs(panel, actKey); // the panel's tabs
 
         CloseKey(actKey);
     }
@@ -2012,6 +2095,12 @@ BOOL CMainWindow::SaveConfig(HWND parent, LONG* error)
                          &Configuration.ShowPanelCaption, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_SHOWPANELZOOM_REG_W, REG_DWORD,
                          &Configuration.ShowPanelZoom, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_SHOWTABBAR_REG_W, REG_DWORD,
+                         &Configuration.ShowTabBar, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_TABSATEND_REG_W, REG_DWORD,
+                         &Configuration.TabsOpenAtEnd, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_TABKEYSTC_REG_W, REG_DWORD,
+                         &Configuration.TabKeysTotalCommander, sizeof(DWORD));
                 SetValueW(actKey, CONFIG_SINGLECLICK_REG_W, REG_DWORD,
                          &Configuration.SingleClick, sizeof(DWORD));
                 //      SetValue(actKey, CONFIG_SHOWTIPOFTHEDAY_REG, REG_DWORD,
@@ -2743,6 +2832,8 @@ void CMainWindow::LoadPanelConfig(std::wstring& panelPath, CFilesWindow* panel, 
                 panel->Filter.SetMasksString(L"*.*");
                 panel->Filter.PrepareMasks(errPos);
             }
+
+            LoadPanelTabs(panel, actKey); // the panel's tabs, applied once the startup path is set
         }
 
         CloseKey(actKey);
@@ -2803,7 +2894,7 @@ void LoadIconOvrlsInfo(const wchar_t* root)
     }
 }
 
-// #95: The main window becomes VISIBLE inside LoadConfig(): SetWindowPlacement() below
+// The main window becomes VISIBLE inside LoadConfig(): SetWindowPlacement() below
 // applies the persisted showCmd. That happened ~100 lines BEFORE the theme was finalized,
 // so the first painted frame was the default LIGHT theme and flipped to dark a few hundred
 // milliseconds later (measured: ~250ms of a fully light-themed window). Finalize the theme -
@@ -2881,7 +2972,7 @@ BOOL CMainWindow::LoadConfig(
     if (SALAMANDER_ROOT_REG == NULL)
         return FALSE;
 
-    BOOL themeFinalized = FALSE; // #95: theme applied before the window can become visible
+    BOOL themeFinalized = FALSE; // theme applied before the window can become visible
 
     LoadSaveToRegistryMutex.Enter();
 
@@ -3641,6 +3732,12 @@ BOOL CMainWindow::LoadConfig(
                      &Configuration.ShowPanelCaption, sizeof(DWORD));
             GetValueW(actKey, CONFIG_SHOWPANELZOOM_REG_W, REG_DWORD,
                      &Configuration.ShowPanelZoom, sizeof(DWORD));
+            GetValueW(actKey, CONFIG_SHOWTABBAR_REG_W, REG_DWORD,
+                     &Configuration.ShowTabBar, sizeof(DWORD)); // absent: stays TRUE
+            GetValueW(actKey, CONFIG_TABSATEND_REG_W, REG_DWORD,
+                     &Configuration.TabsOpenAtEnd, sizeof(DWORD));
+            GetValueW(actKey, CONFIG_TABKEYSTC_REG_W, REG_DWORD,
+                     &Configuration.TabKeysTotalCommander, sizeof(DWORD));
             GetValueW(actKey, CONFIG_SINGLECLICK_REG_W, REG_DWORD,
                      &Configuration.SingleClick, sizeof(DWORD));
             //      GetValue(actKey, CONFIG_SHOWTIPOFTHEDAY_REG, REG_DWORD,
@@ -4020,7 +4117,7 @@ BOOL CMainWindow::LoadConfig(
                 SetFont();
             }
 
-            // #165: preserve an existing profile's Configuration appearance once,
+            // Preserve an existing profile's Configuration appearance once,
             // then keep the two choices independent. Fresh profiles use Windows.
             if (!GetValueW(actKey, CONFIG_USECUSTOMCONFIGURATIONFONT_REG, REG_DWORD, &UseCustomConfigurationFont, sizeof(DWORD)))
             {
@@ -4360,9 +4457,9 @@ BOOL CMainWindow::LoadConfig(
                 }
                 }
             }
-            // #97: clamp the restored normal rect to a visible, sane size on a real monitor.
+            // Clamp the restored normal rect to a visible, sane size on a real monitor.
             place.rcNormalPosition = SanitizeMainWindowNormalRect(place.rcNormalPosition);
-            // #95: SetWindowPlacement() makes the window visible - finalize the theme first so the
+            // SetWindowPlacement() makes the window visible - finalize the theme first so the
             // very first painted frame is already dark.
             ApplyStartupThemeToMainWindow(HWindow);
             themeFinalized = TRUE;
@@ -4454,13 +4551,19 @@ BOOL CMainWindow::LoadConfig(
         }
         UpdateWindow(RightPanel->HWindow); // ensures dir/info line is drawn immediately after the panel content
 
+        // The saved tabs; each panel's active tab is where the panel is now
+        LeftPanel->SetTabsFromConfig(std::move(LeftPanel->StartupTabs), LeftPanel->StartupActiveTab, !leftPanelPathSet);
+        RightPanel->SetTabsFromConfig(std::move(RightPanel->StartupTabs), RightPanel->StartupActiveTab, !rightPanelPathSet);
+        LeftPanel->StartupTabs.clear();
+        RightPanel->StartupTabs.clear();
+
         // restore default-dir on the system drive (damaged - system root was in both panels)
         if (!sysDefDir.empty() && systemDrive >= L'a' && systemDrive <= L'z')
             DefaultDir[systemDrive - L'a'] = sysDefDir;
         // restore DefaultDir
         MainWindow->UpdateDefaultDir(TRUE);
 
-        // #95: normally already done above, before SetWindowPlacement() could show the
+        // Normally already done above, before SetWindowPlacement() could show the
         // window. This covers the path where no persisted window placement existed.
         if (!themeFinalized)
             ApplyStartupThemeToMainWindow(HWindow);

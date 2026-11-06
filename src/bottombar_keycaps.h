@@ -4,7 +4,7 @@
 
 #include <windows.h>
 
-// #96: The bottom bar's F-key indicators came from bottomtb.bmp through a fixed
+// The bottom bar's F-key indicators came from bottomtb.bmp through a fixed
 // ImageList_Create(BOTTOMBAR_CX /*17*/, BOTTOMBAR_CY /*13*/, ...) - a hard-coded 17x13 image
 // list with no DPI scaling, unlike the main toolbar right above it which uses the DPI-scaled
 // iconSize. So at high DPI the labels grew with the environment font while the key glyphs

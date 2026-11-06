@@ -13,7 +13,7 @@
 // cx/cy arguments with MAKELONG and passing nIcons = 2. That form requests two
 // consecutive icon *resources* starting at iconIndex and only works for a DLL or EXE
 // holding several of them. A standalone .ico file contains exactly one icon, so the
-// second size came back NULL and the handler was discarded - which is issue #90:
+// second size came back NULL and the handler was discarded. The common case:
 // TortoiseOverlays hands us ...\icons\<set>\NormalIcon.ico, every size is present in
 // that file, and Sally threw it away anyway.
 //

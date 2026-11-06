@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -154,12 +155,14 @@ public:
                                          HWND parentWnd = NULL)
     { (void)paths; (void)parentWnd; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
 
-    // UI STA only: the Windows adapter retains a windowed view until ReleaseShellUndoState.
-    virtual ShellResult GetShellUndoState(HWND owner, ShellUndoState& state)
-    { (void)owner; state = {}; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
-
-    virtual ShellResult UndoLastShellOperation(HWND owner)
-    { (void)owner; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+    // Undoes the last operation of the shell's undo history (the Desktop background menu's
+    // "undo" command) if 'decide' approves. The menu is built once: 'decide' receives what it
+    // offers (available, and Windows' own caption such as "Undo Delete"), also when there is
+    // nothing to undo, and returns whether to run it. The shell undoes its newest entry when the
+    // command runs, which another program may have changed while 'decide' waited. UI STA only: the Windows adapter retains a
+    // windowed view until ReleaseShellUndoState.
+    virtual ShellResult UndoLastShellOperation(HWND owner, const std::function<bool(const ShellUndoState&)>& decide)
+    { (void)owner; (void)decide; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
 
     // Release windowed COM resources before the UI thread calls OleUninitialize.
     virtual void ReleaseShellUndoState() {}

@@ -18,7 +18,7 @@
 
 // Debug builds only.
 //
-// This existed to find why Alt+drag reported DROPEFFECT_NONE (#101). That is fixed and
+// This existed to find why Alt+drag reported DROPEFFECT_NONE. That is fixed and
 // confirmed, so the diagnostic is a development aid now, not a product feature - a shipped
 // build should carry neither the code nor its strings. Release gets the no-op stubs below,
 // so call sites need no #ifdef of their own.
@@ -82,7 +82,7 @@ const wchar_t* DiagPath()
         }
         // Opt-in in every configuration.
         //
-        // This defaulted ON in Debug while #101 was being investigated, because the log
+        // This defaulted ON in Debug while Alt+drag was being investigated, because the log
         // silently never appeared when Sally is started from Visual Studio (no environment
         // variable), and that cost a round trip. The investigation is finished, so it goes back
         // to opt-in rather than writing a file on every drag of every debug session.

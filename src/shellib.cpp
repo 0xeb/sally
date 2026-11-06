@@ -54,7 +54,7 @@ BOOL DragFromPluginFSEffectIsFromPlugin = FALSE;
 
 static DWORD GetOwnFolderDropEffect(DWORD allowedEffects, DWORD keyState)
 {
-    // #101: the modifier->effect mapping (incl. Alt / Ctrl+Shift -> shortcut) lives in the
+    // The modifier->effect mapping (incl. Alt / Ctrl+Shift -> shortcut) lives in the
     // testable drop_effect_policy unit.
     //
     // This is the OWN-FOLDER branch, which is entered only when CurDirDropTarget is NULL - i.e.
@@ -615,7 +615,7 @@ STDMETHODIMP CImpDropTarget::DragOver(DWORD grfKeyState, POINTL pt,
         int tgtType;
         const wchar_t* tgtPathWide = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
                                                grfKeyState, tgtType, OldDataObjectSrcType);
-        // [merge:main->unicode] main's #101 drag-drop diagnostic, re-inserted onto the wide
+        // [merge:main->unicode] main's drag-drop diagnostic, re-inserted onto the wide
         // GetCurDir/SetDirectory call shape this branch uses.
         diagTgtFile = tgtFile;
         SetDirectory(tgtPathWide, grfKeyState, pt, pdwEffect, OldDataObject, tgtFile, tgtType);
@@ -1842,7 +1842,7 @@ IContextMenu2* CreateNetworkRootContextMenu(HWND hOwnerWindow, const wchar_t* di
 
 //*****************************************************************************
 //
-// CreateIContextMenu2W - wide, partial-failure-tolerant selection menu (issue #79)
+// CreateIContextMenu2W - wide, partial-failure-tolerant selection menu
 //
 
 // Binds the IShellFolder for a wide path.
@@ -1978,7 +1978,7 @@ IDataObject* CreateIDataObjectW(HWND hOwnerWindow, const wchar_t* rootDirW, int 
 }
 
 //
-// CreateIContextMenu2W - wide, partial-failure-tolerant selection menu (issue #79)
+// CreateIContextMenu2W - wide, partial-failure-tolerant selection menu
 //
 IContextMenu2* CreateIContextMenu2WAux(HWND hOwnerWindow, const wchar_t* rootDirW,
                                        const std::vector<std::wstring>& names,

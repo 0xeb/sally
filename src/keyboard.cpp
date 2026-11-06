@@ -52,6 +52,7 @@ BOOL IsSalHotKey(WORD hotKey)
         {
         case NONE:    // switch panels
         case CONTROL: // go to/from command line
+        case CONTROL_SHIFT: // next tab
             found = TRUE;
         }
         break;
@@ -140,6 +141,7 @@ BOOL IsSalHotKey(WORD hotKey)
         case ALT:           // history: back
         case SHIFT:         // select + left
         case CONTROL_SHIFT: // focus in second panel
+        case ALT_SHIFT:     // previous tab
             found = TRUE;
         }
         break;
@@ -167,6 +169,7 @@ BOOL IsSalHotKey(WORD hotKey)
         case ALT:           // history: forward
         case SHIFT:         // select + right
         case CONTROL_SHIFT: // focus in second panel
+        case ALT_SHIFT:     // next tab
             found = TRUE;
         }
         break;
@@ -609,6 +612,7 @@ BOOL IsSalHotKey(WORD hotKey)
         case CONTROL: // focus shortcut or link target
         case ALT:     // enter menu
         case SHIFT:   // change drive
+        case CONTROL_SHIFT: // new tab
             found = TRUE;
         }
         break;
@@ -648,6 +652,7 @@ BOOL IsSalHotKey(WORD hotKey)
         case CONTROL: // reselect
         case ALT:     // enter menu
         case SHIFT:   // change drive
+        case CONTROL_SHIFT: // close tab
             found = TRUE;
         }
         break;

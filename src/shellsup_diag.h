@@ -10,7 +10,7 @@
 //
 // Why this exists rather than TRACE_I: TRACE_ENABLE lives only in SAL_DEBUG_DEFINES
 // (cmake/sal_common.cmake), so in the Release build a reporter runs, every TRACE_* in
-// shellsup.cpp expands to __TraceEmptyFunction(). Issues #13/#15/#20 reproduce only on
+// shellsup.cpp expands to __TraceEmptyFunction(). The reported menu failures reproduce only on
 // machines with particular shell extensions installed, so the facts we need have never
 // been observable where they actually happen.
 //
@@ -28,7 +28,7 @@
 // Release and already produces a file the user can attach to a GitHub issue.
 
 // Which interface Sally decided owned the chosen command. Misattribution here is a live
-// suspect for #13: an extension that allocates ids at or above SHELLMENU_NEW_ID_FIRST is
+// suspect for dropped extension commands: an extension that allocates ids at or above SHELLMENU_NEW_ID_FIRST is
 // routed to ContextSubmenuNew, which in the selection case is not assigned, so the command
 // is silently dropped.
 enum class ShellMenuOwner

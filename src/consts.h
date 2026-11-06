@@ -1415,13 +1415,13 @@ extern LOGFONT LogFont;         // structure describing panel font
 
 BOOL CreatePanelFont(); // fills Font, FontUL and FontCharHeight based on LogFont
 
-// #96: bold labels in the bottom key bar. OFF by default: it made the words heavier without
-// touching the F-key glyphs, which are what the issue actually calls too small (they are a
+// Bold labels in the bottom key bar. OFF by default: it made the words heavier without
+// touching the F-key glyphs, which are the part that is actually too small (they are a
 // fixed 17x13 bitmap that never scales - see the ledger). Flip to 1 to bring the bold back.
 #define SALLY_BOTTOMBAR_BOLD_LABELS 0
 
 extern HFONT EnvFont;         // environment font (edit, toolbar, header, status)
-extern HFONT EnvFontBold;     // bold variant of EnvFont (bottom toolbar shortcut labels, #96)
+extern HFONT EnvFontBold;     // bold variant of EnvFont (bottom toolbar shortcut labels)
 extern HFONT EnvFontUL;       // underlined listbox font
 extern int EnvFontCharHeight; // font height
 extern HFONT TooltipFont;     // font for tooltips (and statusbars, but we don't use it there)
@@ -1449,7 +1449,6 @@ extern HBRUSH HMenuGrayTextBrush;
 extern HACCEL AccelTable1; // accelerators in panels and cmdline
 extern HACCEL AccelTable2; // accelerators in cmdline
 
-extern int SystemDPI;
 
 enum CIconSizeEnum
 {
@@ -1459,7 +1458,9 @@ enum CIconSizeEnum
     ICONSIZE_COUNT // items count
 };
 
-extern int IconSizes[ICONSIZE_COUNT]; // icon sizes: 16, 32, 48
+// The pixel size of icon size ICONSIZE_16/32/48 at the system DPI (the sizes are
+// private to sally_entry_lifecycle.cpp; this is the only way to read them).
+int GetIconSizePx(int sizeIndex);
 extern int IconLRFlags;               // controls color depth of loaded icons
 
 // WARNING: on Vista for 48x48 icons ICONSIZE_32 overlay is used and for thumbnails ICONSIZE_48 overlay is used
@@ -2432,7 +2433,7 @@ const wchar_t* EnumFileNames(int index, void* param);
 
 // Both return the HRESULT from the wrapped shell call, or E_UNEXPECTED if it raised an
 // exception. Callers may ignore it, but it is the only evidence we get when a shell
-// extension refuses a command (see shellsup_diag.h and issues #13/#15/#20).
+// extension refuses a command (see shellsup_diag.h).
 HRESULT ShellActionAux5(UINT flags, CFilesWindow* panel, HMENU h);
 HRESULT AuxInvokeCommand(CFilesWindow* panel, CMINVOKECOMMANDINFO* ici);
 void ShellActionAux6(CFilesWindow* panel);

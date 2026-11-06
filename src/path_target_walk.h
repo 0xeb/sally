@@ -9,7 +9,7 @@
 // path component at a time until a prefix exists, then decide what the target is. The path is
 // never modified; every result is an offset into it.
 //
-// #116: an existing archive file followed by a backslash is a path INTO that archive and must
+// An existing archive file followed by a backslash is a path INTO that archive and must
 // be returned as such. The walk used to record that and then fall through to the generic
 // Windows-path result, so F5/F6 into an open archive reported "Target path for this operation
 // cannot contain path to a file".

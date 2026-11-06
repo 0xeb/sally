@@ -12,8 +12,8 @@
 // Why this exists: the overlay subsystem drops handlers at roughly twenty distinct
 // points, and in a Release build not one of them is observable. Most use TRACE_I/TRACE_E,
 // which compile to nothing without TRACE_ENABLE (a Debug-only define); several - including
-// the disabled-list gate at shiconov.cpp, which is the single most likely cause of issue
-// #90 - log nothing in any build at all.
+// the disabled-list gate at shiconov.cpp, which is the single most likely cause of
+// missing overlays - log nothing in any build at all.
 //
 // The Configuration > Icon Overlays page cannot substitute for this. It renders
 // ListOfShellIconOverlays, which is populated for every registry key *before and
@@ -76,7 +76,7 @@ struct ShellOverlayDiagRecord
 #define SHICONOV_DIAG_CAPACITY 48
 
 // Process-level context, captured once at startup. Answers "which configuration is Sally
-// actually reading?" - the question behind the imported-root theory for #90, where a
+// actually reading?" - the question behind the imported-root theory for missing overlays, where a
 // config imported from an older Altap Salamander install can carry a disabled-handler list
 // or force EnableCustomIconOverlays off outright.
 struct ShellOverlayDiagHeader

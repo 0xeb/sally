@@ -12,6 +12,7 @@
 #include "fileswnd.h"
 #include "filesbox.h"
 #include "stswnd.h"
+#include "tabwnd.h"
 #include "snooper.h"
 #include "shellib.h"
 #include "drivelst.h"
@@ -81,9 +82,17 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             int width = LOWORD(lParam);
             int height = HIWORD(lParam);
 
+            // The tab strip, when shown, sits on top and everything else moves down
+            int tsHeight = 0;
             int dlHeight = 3;
             int stHeight = 0;
             int windowsCount = 1;
+            if (TabStrip != NULL && TabStrip->HWindow != NULL)
+            {
+                tsHeight = TabStrip->GetNeededHeight();
+                InvalidateRect(TabStrip->HWindow, NULL, FALSE);
+                windowsCount++;
+            }
             if (DirectoryLine->HWindow != NULL)
             {
                 dlHeight = DirectoryLine->GetNeededHeight();
@@ -103,13 +112,18 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HDWP hdwp = HANDLES(BeginDeferWindowPos(windowsCount));
             if (hdwp != NULL)
             {
+                if (tsHeight > 0)
+                    hdwp = HANDLES(DeferWindowPos(hdwp, TabStrip->HWindow, NULL,
+                                                  0, 0, width, tsHeight,
+                                                  SWP_NOACTIVATE | SWP_NOZORDER));
+
                 if (DirectoryLine->HWindow != NULL)
                     hdwp = HANDLES(DeferWindowPos(hdwp, DirectoryLine->HWindow, NULL,
-                                                  0, 0, width, dlHeight,
+                                                  0, tsHeight, width, dlHeight,
                                                   SWP_NOACTIVATE | SWP_NOZORDER));
 
                 hdwp = HANDLES(DeferWindowPos(hdwp, ListBox->HWindow, NULL,
-                                              0, dlHeight, width, height - stHeight - dlHeight,
+                                              0, tsHeight + dlHeight, width, height - stHeight - dlHeight - tsHeight,
                                               SWP_NOACTIVATE | SWP_NOZORDER));
 
                 if (StatusLine->HWindow != NULL)
@@ -132,7 +146,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 RECT r;
                 GetClientRect(HWindow, &r);
-                r.bottom = 3;
+                r.top = GetTabStripHeight(); // the gap is below the tab strip
+                r.bottom = r.top + 3;
                 FillRect((HDC)wParam, &r, HDialogBrush);
             }
         }
@@ -1063,6 +1078,13 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         DirectoryLine->SetLeftPanel(MainWindow->LeftPanel == this);
         ToggleDirectoryLine();
+        //---  the tab strip above the directory line (its window exists while it is shown)
+        TabStrip = new CTabWindow(this);
+        if (TabStrip == NULL)
+        {
+            TRACE_E(LOW_MEMORY);
+            return -1;
+        }
         //---  set the view type + read directory contents
         SetThumbnailSize(Configuration.ThumbnailSize); // ListBox must exist
         if (!ListBox->CreateEx(WS_EX_WINDOWEDGE,
@@ -1100,6 +1122,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // synchronize AutomaticRefresh variable and directory-line settings
         SetAutomaticRefresh(AutomaticRefresh, TRUE);
 
+        UpdateTabStrip(); // shown by default; the loaded configuration may hide it again
+
         return 0;
     }
 
@@ -1125,6 +1149,13 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         DirectoryLine->DestroyWindow();
         delete DirectoryLine;
         DirectoryLine = NULL; // crash fix
+
+        if (TabStrip != NULL)
+        {
+            TabStrip->DestroyWindow();
+            delete TabStrip;
+            TabStrip = NULL;
+        }
                               //---
         return 0;
     }
@@ -1615,4 +1646,6 @@ void CFilesWindow::LockUI(BOOL lock)
         EnableWindow(StatusLine->HWindow, !lock);
     if (ListBox->HeaderLine.HWindow != NULL)
         EnableWindow(ListBox->HeaderLine.HWindow, !lock);
+    if (TabStrip != NULL && TabStrip->HWindow != NULL)
+        EnableWindow(TabStrip->HWindow, !lock);
 }

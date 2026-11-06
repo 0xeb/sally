@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
-// #114: external archivers print each member's date as three numeric groups whose order the
+// External archivers print each member's date as three numeric groups whose order the
 // archiver table fixes (RAR 4 printed DD-MM-YY). Current RAR prints ISO YYYY-MM-DD, which the
 // day-first table read as day 2026, so every member failed validation, triggered "The file
 // date and/or time reported by archiver is invalid" and fell back to 1.1.1980.

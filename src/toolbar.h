@@ -76,7 +76,7 @@ protected:
     int Height;
     HFONT HFont;
     int FontHeight;
-    BOOL UseBoldFont; // #96: draw text in the bold env font (bottom toolbar shortcut labels)
+    BOOL UseBoldFont; // draw text in the bold env font (bottom toolbar shortcut labels)
     HWND HNotifyWindow; // where notifications are delivered
     HIMAGELIST HImageList;
     HIMAGELIST HHotImageList;
@@ -357,9 +357,9 @@ public:
 
     // pulls items from UserMenu and loads buttons into the toolbar, as the active panel shows them
     BOOL CreateButtons();
-    // #50: the buttons of the commands whose "Show only when" rule matches 'context'
+    // the buttons of the commands whose "Show only when" rule matches 'context'
     BOOL CreateButtons(const Sally::UserMenuConditions::Context& context);
-    // #50: rebuilds the bar only when 'context' changes which commands it shows
+    // rebuilds the bar only when 'context' changes which commands it shows
     void RefreshForContext(const Sally::UserMenuConditions::Context& context);
     // User Menu index of each current button or separator, in bar order
     const std::vector<size_t>& GetShownEntries() const { return ShownEntries; }

@@ -865,8 +865,8 @@ unsigned IconThreadThreadFBody(void* parameter)
                                             {
                                                 // load the icon from the file (ExtractIcons retrieves it by index);
                                                 // the icon reader may go to sleep mode while loading
-                                                CALL_STACK_MESSAGE4("IconThreadThreadFBody::ExtractIcons(%ls, %d, %d, ...)", iconPathW.c_str(), index, IconSizes[iconSize]);
-                                                if (ExtractIconsW(iconPathW.c_str(), index, IconSizes[iconSize], IconSizes[iconSize], &shi.hIcon, NULL, 1, IconLRFlags) != 1)
+                                                CALL_STACK_MESSAGE4("IconThreadThreadFBody::ExtractIcons(%ls, %d, %d, ...)", iconPathW.c_str(), index, GetIconSizePx(iconSize));
+                                                if (ExtractIconsW(iconPathW.c_str(), index, GetIconSizePx(iconSize), GetIconSizePx(iconSize), &shi.hIcon, NULL, 1, IconLRFlags) != 1)
                                                 {
                                                     TRACE_IW(L"Unable to get icon from: " << iconPathW << L", " << index);
                                                     shi.hIcon = NULL;
@@ -880,15 +880,15 @@ unsigned IconThreadThreadFBody(void* parameter)
                                                 {
                                                     // load the icon from a file (likely .ico); the icon reader can switch to sleep mode during loading
                                                     CALL_STACK_MESSAGE2("IconThreadThreadFBody::LoadImage(%ls)", iconPathW.c_str());
-                                                    shi.hIcon = (HICON)NOHANDLES(LoadImageW(NULL, iconPathW.c_str(), IMAGE_ICON, IconSizes[iconSize], IconSizes[iconSize],
+                                                    shi.hIcon = (HICON)NOHANDLES(LoadImageW(NULL, iconPathW.c_str(), IMAGE_ICON, GetIconSizePx(iconSize), GetIconSizePx(iconSize),
                                                                                            LR_LOADFROMFILE | IconLRFlags));
                                                     //                            TRACE_I("LoadImage " << (shi.hIcon == NULL ? "has failed, now trying ExtractIcons..." : "is done."));
                                                 }
                                                 if (shi.hIcon == NULL) // LoadImage failed; trying ExtractIcons as well (e.g., an icon without index from zipfldr.dll on XP: a .zip archive packed in a .7z archive)
                                                 {
                                                     // let the first icon load from the file; the icon reader may enter sleep mode while loading
-                                                    CALL_STACK_MESSAGE3("IconThreadThreadFBody::ExtractIcons(%ls, (0), %d, ...)", iconPathW.c_str(), IconSizes[iconSize]);
-                                                    if (ExtractIconsW(iconPathW.c_str(), 0, IconSizes[iconSize], IconSizes[iconSize], &shi.hIcon, NULL, 1, IconLRFlags) != 1)
+                                                    CALL_STACK_MESSAGE3("IconThreadThreadFBody::ExtractIcons(%ls, (0), %d, ...)", iconPathW.c_str(), GetIconSizePx(iconSize));
+                                                    if (ExtractIconsW(iconPathW.c_str(), 0, GetIconSizePx(iconSize), GetIconSizePx(iconSize), &shi.hIcon, NULL, 1, IconLRFlags) != 1)
                                                     {
                                                         TRACE_IW(L"Unable to get first icon from: " << iconPathW);
                                                         shi.hIcon = NULL;
@@ -1411,6 +1411,8 @@ CFilesWindow::CFilesWindow(CMainWindow* parent)
     ListBox = NULL;
     StatusLine = NULL;
     DirectoryLine = NULL;
+    TabStrip = NULL;
+    SwitchingTab = FALSE;
     StatusLineVisible = TRUE;
     DirectoryLineVisible = TRUE;
     HeaderLineVisible = TRUE;
@@ -1519,6 +1521,7 @@ CFilesWindow::~CFilesWindow()
 
     ClearHistory();
 
+    FreeTabRuntime(FALSE); // background tabs' histories (parked file systems are closed with the plugins)
     if (PathHistory != NULL)
         delete PathHistory;
 
@@ -1752,6 +1755,13 @@ void CFilesWindow::DirectoryLineSetText()
 
     if (path == NULL)
         return;
+
+    // The active tab follows the panel; during a tab switch the panel is between tabs
+    if (!SwitchingTab)
+    {
+        CaptureActiveTab();
+        RepaintTabStrip();
+    }
 
     if (FilterEnabled)
     {

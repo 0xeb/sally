@@ -3856,7 +3856,7 @@ HIMAGELIST CreateCheckboxImagelist(int itemSize)
 
 HICON SalLoadIcon(HINSTANCE hInst, LPCWSTR iconName, CIconSizeEnum iconSize)
 {
-    int width = IconSizes[iconSize];
+    int width = GetIconSizePx(iconSize);
     HICON hIcon = NULL;
     HRESULT hres = LoadIconWithScaleDown(hInst, (PCWSTR)iconName, width, width, &hIcon);
     if (hres != S_OK)

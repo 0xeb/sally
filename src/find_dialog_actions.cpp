@@ -423,7 +423,7 @@ BOOL CFindTBHeader::CreateLogToolbar(BOOL errors, BOOL infos)
             LogToolBar->RemoveItem(0, TRUE);
         if (HWarningIcon == NULL)
         {
-            int iconSize = IconSizes[ICONSIZE_16];
+            int iconSize = GetIconSizePx(ICONSIZE_16);
             LoadIconWithScaleDown(NULL, (PCWSTR)IDI_EXCLAMATION, iconSize, iconSize, &HWarningIcon);
         }
         tii.HIcon = HWarningIcon;
@@ -436,7 +436,7 @@ BOOL CFindTBHeader::CreateLogToolbar(BOOL errors, BOOL infos)
     {
         if (HInfoIcon == NULL)
         {
-            int iconSize = IconSizes[ICONSIZE_16];
+            int iconSize = GetIconSizePx(ICONSIZE_16);
             LoadIconWithScaleDown(NULL, (PCWSTR)IDI_INFORMATION, iconSize, iconSize, &HInfoIcon);
         }
         tii.HIcon = HInfoIcon;
@@ -613,7 +613,7 @@ CFindTBHeader::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (HEmptyIcon == NULL)
                 {
-                    int iconSize = IconSizes[ICONSIZE_16];
+                    int iconSize = GetIconSizePx(ICONSIZE_16);
                     LoadIconWithScaleDown(HInstance, (PCWSTR)IDI_EMPTY, iconSize, iconSize, &HEmptyIcon);
                 }
                 TLBI_ITEM_INFO2 tii;
@@ -1072,7 +1072,7 @@ CFindIgnoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             TRACE_E(LOW_MEMORY);
         EditLB->MakeHeader(IDC_FFI_NAMESLABEL);
         EditLB->EnableDrag(HWindow);
-        int iconSize = IconSizes[ICONSIZE_16];
+        int iconSize = GetIconSizePx(ICONSIZE_16);
         HIMAGELIST hIL = CreateCheckboxImagelist(iconSize);
         HUnchecked = ImageList_GetIcon(hIL, 0, ILD_NORMAL);
         HChecked = ImageList_GetIcon(hIL, 1, ILD_NORMAL);
@@ -1872,7 +1872,7 @@ void CFindLogDialog::Transfer(CTransferInfo& ti)
     {
         HListView = GetDlgItem(HWindow, IDC_FINDLOG_LIST);
 
-        int iconSize = IconSizes[ICONSIZE_16];
+        int iconSize = GetIconSizePx(ICONSIZE_16);
         HIMAGELIST hIcons = ImageList_Create(iconSize, iconSize, ILC_MASK | GetImageListColorFlags(), 2, 0); // the listview will destroy this image list
 
         HICON hWarning;

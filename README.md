@@ -11,7 +11,7 @@
 [![Stars](https://img.shields.io/github/stars/0xeb/sally?style=social)](https://github.com/0xeb/sally)
 [![License: GPL v2](https://img.shields.io/badge/License-GPLv2-blue.svg)](LICENSE)
 
-Sally is a fast, keyboard-first dual-panel file manager for Windows power users. It keeps the classic [Open Salamander](https://github.com/OpenSalamander/salamander) workflow alive and moves it forward for current machines: Unicode and long paths, dark mode, Windows Terminal integration, native ARM64, modern viewing, active plugin packaging, Wine compatibility, built-in languages, and a real release pipeline.
+Sally is a fast, keyboard-first dual-panel file manager for Windows power users. It keeps the classic [Open Salamander](https://github.com/OpenSalamander/salamander) workflow alive and moves it forward for current machines: tabs in both panels, Unicode and long paths, dark mode, Windows Terminal integration, native ARM64, modern viewing, active plugin packaging, Wine compatibility, built-in languages, and a real release pipeline.
 
 <p align="center">
   <a href="https://github.com/0xeb/sally/releases/latest"><img alt="Download Sally" src="https://img.shields.io/badge/Download-Sally_for_Windows-1e6fd9?style=for-the-badge"></a>
@@ -29,9 +29,9 @@ Sally is a fast, keyboard-first dual-panel file manager for Windows power users.
 </p>
 
 <p align="center">
-  <img src="doc/images/sally-dark-panels.png" alt="Sally in dark mode with two panels and Greek and Cyrillic folder names" width="900">
+  <img src="doc/images/sally-dark-panels.png" alt="Sally in dark mode with two panels, three tabs in the left panel, and Greek and Cyrillic folder names" width="900">
   <br>
-  <em>Sally in dark mode on Windows, with two file panels.</em>
+  <em>Sally in dark mode on Windows: two file panels, with three tabs in the left one.</em>
 </p>
 
 See the [screenshot gallery](https://get-sally.app/screenshots/) for light mode,
@@ -41,6 +41,7 @@ archive browsing, viewers, Find and plugin dialogs.
 
 Open Salamander became loved because it made serious file work feel direct: two panels, fast keyboard commands, rich viewers, archive handling, plugins, and a compact Win32 UI that stays out of the way. Sally preserves that muscle memory while removing the places where the original codebase was showing its age.
 
+- **Tabs in both panels**: keep several folders, archives and FTP sites open per panel, each with its own view, sort, filter, selection and history, and get them back at the next start.
 - **Built for real file names**: Unicode and Windows long paths work through copy, move, delete, rename, drag/drop, panel state, directory history, Find, viewers, editors, startup paths, and network/UNC navigation.
 - **Classic workflow, current polish**: the dense dual-panel interface remains, now with `Light`, `Dark`, and `System` theme modes across the core UI and first-party plugins.
 - **Small project, fast movement**: user reports have turned into fixes for ARM64 FTP, Unicode context menus, viewer edge cases, Windows 11 automation changes, network long paths, release packaging, and translations.
@@ -48,6 +49,17 @@ Open Salamander became loved because it made serious file work feel direct: two 
 - **AI-assisted development velocity**: AI helps grind through modernization work, tests, translations, and release plumbing while the project stays open source and user-driven.
 
 ## Feature Highlights
+
+### Tabs In Both Panels
+
+Each panel holds as many tabs as you need, so a dual-panel workflow no longer means juggling two folders at a time.
+
+- A tab shows a folder on disk, a place inside an archive, or a plugin file system such as FTP or the Registry. Each tab keeps its own view, sort order, filter, focused item, selection and Back/Forward history.
+- `Ctrl+Shift+T` opens a tab at the current folder, `Ctrl+Shift+W` closes it, and `Alt+Shift+Left`/`Right` (or `Ctrl+Shift+Tab`) switch tabs. A double-click on the tab bar opens a tab, a middle-click closes one, and the mouse wheel over the bar switches.
+- Right-click a tab to duplicate, rename, lock, move or close it, close the others, or reopen the tabs you closed. Locked tabs stay open; renamed tabs keep their name.
+- Drag tabs into order, and drop folders from a panel or from Explorer on the tab bar to open each in a new tab.
+- Tabs are saved with the configuration and come back at the next start. Background tabs read their folders only when you switch to them, so many tabs do not slow startup.
+- Coming from Total Commander? Turn on its tab keys (`Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`) in Configuration, and choose whether new tabs open at the end of the bar.
 
 ### File Operations That Respect Modern Paths
 

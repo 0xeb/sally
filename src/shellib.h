@@ -47,14 +47,14 @@ IContextMenu2* CreateIContextMenu2W(HWND hOwnerWindow, const wchar_t* dirW);
 
 // How many of the requested selection names actually resolved to a shell PIDL.
 // Reported so the caller can tell "nothing to show" from "some names were skipped" and
-// say so, instead of failing silently the way issue #79 does.
+// say so, instead of failing silently the way the ANSI version does.
 struct CShellPidlResolveStats
 {
     int Requested = 0;
     int Resolved = 0;
 };
 
-// Wide version of the selection context menu (issue #79).
+// Wide version of the selection context menu.
 //
 // The ANSI version above resolves each name by widening the panel's CP_ACP name back to
 // UTF-16 and handing that to ParseDisplayName. For a filename outside the ANSI code page

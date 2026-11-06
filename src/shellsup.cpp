@@ -1052,7 +1052,7 @@ HRESULT ShellActionAux5(UINT flags, CFilesWindow* panel, HMENU h)
 
     // On success HRESULT_CODE(ret) is the number of ids the extension claimed. Recording it
     // is what makes the 0..4999 / 5000..6000 range split verifiable instead of assumed - an
-    // extension that claims ids past the split is silently dropped today (issue #13).
+    // extension that claims ids past the split is silently dropped today.
     ShellMenuDiagRecord* diag = ShellMenuDiag.Current();
     if (diag != NULL)
     {
@@ -1858,7 +1858,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 data.Panel = panel;
                 const int selCount = (count == 0) ? 1 : count;
 
-                // The same defect as the right-click menu in issue #79, reached by a
+                // The same defect as the right-click selection menu, reached by a
                 // different command: the ANSI builder rebuilds every PIDL from
                 // CFileData::Name, the lossy CP_ACP mirror, and CreateItemIdList() is
                 // all-or-nothing. So one unrepresentable name suppressed the property
@@ -2140,8 +2140,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 BOOL hasWideName = FALSE;
                 if (CollectSelectedPathsW(panel, idxs, idxCount, selectedPathsW, hasWideName))
                 {
-                    // #101: prefer the Shell's own data object, exactly as saCopyToClipboard does
-                    // above for Paste Shortcut (#87).
+                    // Prefer the Shell's own data object, exactly as saCopyToClipboard does
+                    // above for Paste Shortcut.
                     //
                     // A CF_HDROP-only object cannot produce a shortcut: the shell folder drop
                     // target builds a link from the shell ID list (a PIDL array), not from file
@@ -2270,7 +2270,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 
                 // Open a diagnostic record for this right-click. GetPathW() is the wide
                 // source of truth; the removed ANSI mirror is the lossy CP_ACP mirror and would hide
-                // exactly the case issues #79/#90 turn on.
+                // exactly the non-ANSI path case the record exists to capture.
                 ShellMenuDiag.Begin(panel->GetPathW(), useSelection ? (count == 0 ? 1 : count) : 0,
                                     onlyPanelMenu);
 
@@ -2366,7 +2366,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                             data.Panel = panel;
                             const int selCount = (count == 0) ? 1 : count;
 
-                            // Build the menu from the wide names first (issue #79). The
+                            // Build the menu from the wide names first. The
                             // legacy path resolves each PIDL from CFileData::Name, the
                             // lossy CP_ACP mirror, and abandons the entire menu if any one
                             // name fails - which is why right-clicking a file with
@@ -2790,7 +2790,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                         // ici.hwnd is a stack CShellExecuteWnd that dies when
                                         // this scope exits. A verb that keeps working after
                                         // InvokeCommand returns (the Compressed-folder handler
-                                        // is the suspect for #20) is left with a dead parent.
+                                        // is one suspect) is left with a dead parent.
                                         diag->ParentWasTransient = ici.hwnd != MainWindow->HWindow;
                                         diag->ParentAliveAfter = IsWindow(ici.hwnd) != FALSE;
                                     }
@@ -2815,7 +2815,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 {
                                     if (panel->ContextSubmenuNew->MenuIsAssigned()) // exception could have occurred
                                     {
-                                        // The same provider owns the full background menu (#166).
+                                        // The same provider owns the full background menu.
                                         // Only a command inside its genuine New child requests rename.
                                         const BOOL newCommand = panel->ContextSubmenuNew->IsNewCommand(cmd);
                                         panel->RenameFirstNewItem = newCommand;
@@ -2836,7 +2836,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                     }
                                     else if (diag != NULL)
                                     {
-                                        // The silent discard behind issue #13: an extension that
+                                        // The silent discard of extension commands: an extension that
                                         // claimed ids at or past 5000 lands here, and in the
                                         // selection case ContextSubmenuNew is never assigned, so
                                         // the command is dropped with no invoke and no error.

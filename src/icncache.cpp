@@ -357,7 +357,7 @@ int CIconCache::AllocIcon(CIconList** iconList, int* iconListIndex)
         if (IconSize == ICONSIZE_COUNT)
             TRACE_E("CIconCache::AllocIcon() IconSize == ICONSIZE_COUNT, you must call SetIconSize() first!");
         else
-            iconWidth = IconSizes[IconSize];
+            iconWidth = GetIconSizePx(IconSize);
 
         CIconList* il = new CIconList();
         if (il == NULL)
@@ -977,7 +977,7 @@ int CAssociations::AllocIcon(CIconList** iconList, int* iconListIndex, CIconSize
             return -1;
         }
 
-        int iconWidth = IconSizes[iconSize];
+        int iconWidth = GetIconSizePx(iconSize);
 
         CIconList* il = new CIconList();
         if (il == NULL)
@@ -1406,7 +1406,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                     vistaResID = 2;
                     break;
                 }
-                int iconWidth = IconSizes[iconSize];
+                int iconWidth = GetIconSizePx(iconSize);
                 HICON smallIcon = SalLoadImage(vistaResID, resID, iconWidth, iconWidth, IconLRFlags);
                 if (smallIcon != NULL)
                 {

@@ -10,7 +10,7 @@
 #include "lang/lang.rh" // IDC_FIND_* control ids
 #include "find_dialog_theme_ids.h"
 
-// #99: all four Find comboboxes, including the "Type:" combo IDC_FIND_FILETYPE that was
+// All four Find comboboxes, including the "Type:" combo IDC_FIND_FILETYPE that was
 // previously missing and rendered white in dark mode.
 static const int g_findThemedComboIds[] = {
     IDC_FIND_NAMED,

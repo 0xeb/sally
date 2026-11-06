@@ -421,6 +421,9 @@ CConfiguration::CConfiguration()
     UseIconTincture = TRUE;
     ShowPanelCaption = TRUE;
     ShowPanelZoom = TRUE;
+    ShowTabBar = TRUE; // a profile without the value (new, or from before tabs) shows the strip
+    TabsOpenAtEnd = FALSE;
+    TabKeysTotalCommander = FALSE; // Sally's own Ctrl+T, Ctrl+W and Ctrl+Tab stay
     InfoLineContent = L"$(FileName): $(FileSize), $(FileDate), $(FileTime), $(FileAttributes), $(FileDOSName)";
 
     HotPathAutoConfig = TRUE;
@@ -3022,7 +3025,7 @@ void CCfgPageUserMenu::Validate(CTransferInfo& ti)
                 return;
             }
         }
-        // #50: a ticked rule must prepare; an unticked one keeps its text unchecked. Rules
+        // A ticked rule must prepare; an unticked one keeps its text unchecked. Rules
         // of nested entries cannot be edited and are ignored, so they are not checked either.
         if (CanHaveShowWhen(i))
         {
@@ -3199,7 +3202,7 @@ void CCfgPageUserMenu::EnableButtons()
 
     EnableWindow(GetDlgItem(HWindow, IDC_UM_TOOLBAR), validItem);
 
-    // #50: the rule's text stays in its fields while they are disabled.
+    // The rule's text stays in its fields while they are disabled.
     int index = -1;
     EditLB->GetCurSel(index);
     const BOOL canRule = validItem && !separator && CanHaveShowWhen(index);
@@ -4487,7 +4490,7 @@ void CCfgPageColors::LoadColors()
         {
             // Mirror the panel's render-time dark resolution so the base-color swatches match
             // what the panel actually shows in dark mode (these indices are stored flag-0 and
-            // are no longer dark-mutated in UpdateDefaultColors). Read-only. #81 follow-up.
+            // are no longer dark-mutated in UpdateDefaultColors). Read-only.
             BOOL swatchDark = DarkMode_ShouldUseDark();
             COLORREF sfg = ResolvePanelColor(subData->ColorFg, tmpColors[subData->ColorFg], swatchDark, tmpColors == TmpColors);
             COLORREF sbk = ResolvePanelColor(subData->ColorBk, tmpColors[subData->ColorBk], swatchDark, tmpColors == TmpColors);

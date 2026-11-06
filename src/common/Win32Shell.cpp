@@ -220,25 +220,16 @@ class Win32Shell : public IShell
     }
 
 public:
-    ShellResult GetShellUndoState(HWND owner, ShellUndoState& state) override
-    {
-        IContextMenu* context = nullptr;
-        HMENU menu = nullptr;
-        UINT command = 0;
-        const HRESULT hr = QueryUndo(owner, &context, menu, command, state);
-        if (menu != nullptr) DestroyMenu(menu);
-        if (context != nullptr) context->Release();
-        return ResultFromHResult(hr);
-    }
-
-    ShellResult UndoLastShellOperation(HWND owner) override
+    ShellResult UndoLastShellOperation(HWND owner, const std::function<bool(const ShellUndoState&)>& decide) override
     {
         IContextMenu* context = nullptr;
         HMENU menu = nullptr;
         UINT command = 0;
         ShellUndoState state;
         HRESULT hr = QueryUndo(owner, &context, menu, command, state);
-        if (SUCCEEDED(hr) && state.available)
+        // The menu is kept while the user decides and its command runs only after approval; the
+        // shell then undoes its newest entry (normally the one shown).
+        if (SUCCEEDED(hr) && decide(state) && state.available)
         {
             CMINVOKECOMMANDINFOEX info = {};
             info.cbSize = sizeof(info);

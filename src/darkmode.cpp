@@ -1020,14 +1020,14 @@ void ApplyWindowTheme(HWND hwnd, BOOL useDark, LPCWSTR lightTheme = NULL)
     SetWindowTheme(hwnd, useDark ? UXTHEME_DARKMODE_EXPLORER : lightTheme, NULL);
 }
 
-// #98: The white hairline around edits and comboboxes in dark mode is the control's
+// The white hairline around edits and comboboxes in dark mode is the control's
 // NON-CLIENT frame, which Windows paints with system (light) colours. No theme class governs
 // it - DarkMode_Explorer and DarkMode_CFD were both tried and neither touches it - and it is
 // not the 3D client edge either, so stripping WS_EX_CLIENTEDGE does nothing. The only way to
 // darken it is to paint it ourselves, which is exactly what the Find dialog has always done
 // for its combos (FindComboSkinSubclassProc) and why Find was the one dialog that looked
 // right. This generalises that mechanism to every edit-like control.
-// #98 (third attempt). The first two were reverted; the third drew a 1px outline over the
+// Earlier attempts: the first two were reverted; the third drew a 1px outline over the
 // control AFTER letting it paint itself, which measured as a dark hairline with the control's
 // own WHITE 2px frame still inside it, and an untouched WHITE drop-down button. An outline is
 // not a fix - the control has to stop painting light in the first place.
@@ -1182,7 +1182,7 @@ LRESULT CALLBACK EditFrameSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
     {
         // A combobox must be owner-drawn outright. Letting it paint and then outlining the edge
         // leaves its own white frame and white drop-down button underneath - that was the third
-        // failed attempt at #98.
+        // failed attempt at a dark frame.
         if (DarkMode_ShouldUseDark() && HasClassName(hwnd, COMBOBOX_CLASS_NAME))
         {
             PAINTSTRUCT ps;
@@ -1378,13 +1378,13 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
     if (_wcsicmp(className, EDIT_CLASS_NAME) == 0 ||
         _wcsicmp(className, UPDOWN_CLASSW) == 0)
     {
-        ApplyEditLikeTheme(hwnd, useDark); // #98: paints its own frame in dark mode
+        ApplyEditLikeTheme(hwnd, useDark); // paints its own frame in dark mode
         return;
     }
 
     if (_wcsicmp(className, COMBOBOX_CLASS_NAME) == 0)
     {
-        ApplyEditLikeTheme(hwnd, useDark); // #98
+        ApplyEditLikeTheme(hwnd, useDark); // owner-drawn in dark mode
         ApplyComboBoxChildThemes(hwnd, useDark);
         return;
     }
@@ -1438,7 +1438,7 @@ BOOL DarkMode_IsSupported()
 
 HBRUSH DarkMode_GetMainFrameBrush()
 {
-    // #95: a solid dark brush for the main window CLASS background. Without it the class is
+    // A solid dark brush for the main window CLASS background. Without it the class is
     // registered with COLOR_WINDOW (white), so the first WM_ERASEBKGND when the window is
     // shown paints the whole frame white for a moment before the dark children paint over it
     // - the startup flash. Process-lifetime brush.

@@ -308,6 +308,9 @@ struct CConfiguration
     int UseIconTincture;  // for hidden/system/selected/focused items
     int ShowPanelCaption; // should the panel caption be shown in color in the directory line?
     int ShowPanelZoom;    // should the Zoom button be shown in the directory line?
+    int ShowTabBar;       // always show each panel's tab strip (otherwise only with two or more tabs)
+    int TabsOpenAtEnd;    // new tabs go after the last tab (otherwise right after the active one)
+    int TabKeysTotalCommander; // Ctrl+T, Ctrl+W, Ctrl+Tab and Ctrl+Shift+Tab work on tabs
 
     std::wstring InfoLineContent;
 
@@ -689,7 +692,7 @@ class CSmallIconWindow : public CWindow
 };
 */
 
-// #50: sizes the "Show only when" group-title checkbox of a User Menu page to its caption in the
+// Sizes the "Show only when" group-title checkbox of a User Menu page to its caption in the
 // page's own font (the Configuration font may differ from the template's), within its group.
 void FitUserMenuShowWhenTitle(HWND page);
 
@@ -718,7 +721,7 @@ protected:
 
     void RefreshGroupIconInUMItems(); // after changing colors, HGroupIcon changes; we must update it in UserMenuItems as well
 
-    // #50: only top-level commands and submenus can have a "Show only when" rule.
+    // Only top-level commands and submenus can have a "Show only when" rule.
     BOOL CanHaveShowWhen(int index);
     std::wstring ShowWhenSummary(int index); // the list row's note, "" without an active rule
 

@@ -4,7 +4,7 @@
 
 #include <windows.h> // RECT
 
-// #97: After resume-from-sleep on a 4K/150% display (monitor reattach), the main window
+// After resume-from-sleep on a 4K/150% display (monitor reattach), the main window
 // could collapse to a tiny size - a saved/normal rect was applied blind, with no check that
 // it was still a sane size on an actual monitor. This sanitizes a normal-position rect:
 //

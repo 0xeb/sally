@@ -194,7 +194,7 @@ struct CQuadWord
 
 #define QW_MAX CQuadWord(0xFFFFFFFF, 0xFFFFFFFF)
 
-#define ICONOVERLAYINDEX_NOTUSED 31 // value for CFileData::IconOverlayIndex when the icon has no overlay (widened from 15 to allow more than 15 shell icon-overlay handlers, e.g. TortoiseGit/SVN alongside OneDrive/Dropbox — see issue #83)
+#define ICONOVERLAYINDEX_NOTUSED 31 // value for CFileData::IconOverlayIndex when the icon has no overlay (widened from 15 to allow more than 15 shell icon-overlay handlers, e.g. TortoiseGit/SVN alongside OneDrive/Dropbox)
 
 // record of each file and directory in Salamander (basic data about file/directory)
 struct CFileData // destructor must not be added here!
@@ -224,7 +224,7 @@ struct CFileData // destructor must not be added here!
     unsigned Hidden : 1;           // is hidden? (if 1, icon is 50% more transparent - ghosted)
     unsigned IsLink : 1;           // is link? (if 1, icon has link overlay) - standard filling see CSalamanderGeneralAbstract::IsFileLink(CFileData::Ext), takes precedence over IsOffline when displayed, but IconOverlayIndex takes precedence
     unsigned IsOffline : 1;        // is offline? (if 1, icon has offline overlay - black clock), both IsLink and IconOverlayIndex take precedence when displayed
-    unsigned IconOverlayIndex : 5; // icon-overlay index (if icon has no overlay, value is ICONOVERLAYINDEX_NOTUSED), takes precedence over IsLink and IsOffline when displayed. Widened 4->5 bits (0..31) for issue #83 to support more than 15 overlay handlers; CFileData size is unchanged, but the following internal-use flags shift by one bit, so plugins must be rebuilt against this header
+    unsigned IconOverlayIndex : 5; // icon-overlay index (if icon has no overlay, value is ICONOVERLAYINDEX_NOTUSED), takes precedence over IsLink and IsOffline when displayed. Widened 4->5 bits (0..31) to support more than 15 overlay handlers; CFileData size is unchanged, but the following internal-use flags shift by one bit, so plugins must be rebuilt against this header
 
     // flags for internal use in Salamander: cleared when added to CSalamanderDirectoryAbstract
     unsigned Association : 1;     // meaning only for 'simple icons' display - icon of associated file, otherwise 0

@@ -57,7 +57,7 @@ bool BuildArchiveProbeNameFromWidePath(const wchar_t* fullWidePath, std::string&
     // requires the literal ".tar" ahead of the ".gz". Probing only the final extension therefore
     // could never match "tar.gz" - it would match a plain "gz" association instead, or nothing
     // at all, and returning nothing sends F5/F6 back to the destructive ordinary-overwrite path
-    // that #94 exists to prevent.
+    // that this check exists to prevent.
     //
     // Truncation can only ever cost a match, never invent one: a pattern longer than the probe
     // runs off the front and fails the bounds check. So the longest representable suffix is both

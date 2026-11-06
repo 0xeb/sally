@@ -64,7 +64,7 @@ public:
 
     // number of handlers that actually loaded. Note this is NOT the same as the number of
     // rows in ListOfShellIconOverlays, which holds every registered handler whether or not
-    // it loaded - the two being conflated is what made issues #83 and #90 undiagnosable.
+    // it loaded - the two being conflated is what made missing-overlay reports undiagnosable.
     int GetCount() const { return Overlays.Count; }
 
     // releases all icon overlays

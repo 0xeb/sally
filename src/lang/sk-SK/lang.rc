@@ -1121,7 +1121,7 @@ BEGIN
     EDITTEXT        IDC_TITLEBAR_PREFIX_TEXT,164,45,130,12,ES_AUTOHSCROLL
 END
 
-IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 430
+IDD_CFGPAGE_APPEARANCE DIALOGEX 67, 23, 299, 442
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Vzhľad"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1138,37 +1138,39 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,51,149,12
     CONTROL         "Zobra&ziť tlačidlo maximalizovať/obnoviť v paneli adresára",IDC_PANELZOOM,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,63,205,12
-    GROUPBOX        " Písma ",IDC_STATIC_2,1,81,295,54
-    PUSHBUTTON      "Pí&smo panela…",IDB_PANELFONT,7,93,110,14,WS_GROUP
-    EDITTEXT        IDE_PANELFONT,122,93,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    PUSHBUTTON      "Písmo &konfigurácie…",IDB_CONFIGURATIONFONT,7,113,110,14
-    EDITTEXT        IDE_CONFIGURATIONFONT,122,113,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
-    GROUPBOX        " O&bsah panelu informácií ",IDC_STATIC_3,1,140,295,30,WS_GROUP
-    EDITTEXT        IDC_INFOLINECONTENT,7,152,268,12,ES_AUTOHSCROLL
-    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,152,12,12
-    GROUPBOX        " &Miniatúry ",IDC_STATIC_4,1,176,295,30
-    LTEXT           "Veľkosť:",IDC_STATIC_5,8,190,28,8
-    EDITTEXT        IDC_THUMBNAILSIZE,38,188,33,12,ES_AUTOHSCROLL
-    LTEXT           "bodov",IDC_STATIC_6,75,190,22,8,NOT WS_GROUP
-    GROUPBOX        " Vzhľad aplikácie ",IDC_STATIC_7,1,214,295,74
-    LTEXT           "Mo&tív:",IDC_STATIC_8,8,228,62,8
-    COMBOBOX        IDC_THEME_MODE,78,225,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "&Ikona aplikácie:",IDC_STATIC_9,8,247,84,8
-    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,245,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT           "Na zmenu farby ikony zástupcu na ploche alebo v ponuke Štart,\nkliknite pravým tlačidlom na zástupcu > Vlastnosti > Zmeniť ikonu.",IDC_STATIC_10,8,266,278,16
-    GROUPBOX " Úvodné okno a O aplikácii ",IDC_IDENTITY_GROUP,1,294,295,128
-    LTEXT "Farebný rad:",IDC_IDENTITY_PALETTE_LABEL,8,308,90,8
-    COMBOBOX IDC_IDENTITY_PALETTE,100,305,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Odtieň (0–100):",IDC_IDENTITY_SHADE_LABEL,8,331,90,8
-    EDITTEXT IDC_IDENTITY_SHADE,100,328,30,14,ES_NUMBER | ES_AUTOHSCROLL
-    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,328,138,14
-    LTEXT "Nápis Sally:",IDC_IDENTITY_LETTERING_LABEL,8,354,90,8
-    COMBOBOX IDC_IDENTITY_LETTERING,100,351,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Písmo textu:",IDC_IDENTITY_FONT_LABEL,8,377,90,8
-    COMBOBOX IDC_IDENTITY_FONT,100,374,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
-    LTEXT "Farba textu:",IDC_IDENTITY_TONE_LABEL,8,400,90,8
-    COMBOBOX IDC_IDENTITY_TONE,100,397,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
-    PUSHBUTTON "Náhľad…",IDC_IDENTITY_PREVIEW,206,397,68,14,WS_TABSTOP
+    CONTROL         "&Vždy zobraziť lištu kariet nad každým panelom",IDC_SHOWTABBAR,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,75,290,12
+    GROUPBOX        " Písma ",IDC_STATIC_2,1,93,295,54
+    PUSHBUTTON      "Pí&smo panela…",IDB_PANELFONT,7,105,110,14,WS_GROUP
+    EDITTEXT        IDE_PANELFONT,122,105,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "Písmo &konfigurácie…",IDB_CONFIGURATIONFONT,7,125,110,14
+    EDITTEXT        IDE_CONFIGURATIONFONT,122,125,166,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    GROUPBOX        " O&bsah panelu informácií ",IDC_STATIC_3,1,152,295,30,WS_GROUP
+    EDITTEXT        IDC_INFOLINECONTENT,7,164,268,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "",IDC_INFOLINEBROWSE,279,164,12,12
+    GROUPBOX        " &Miniatúry ",IDC_STATIC_4,1,188,295,30
+    LTEXT           "Veľkosť:",IDC_STATIC_5,8,202,28,8
+    EDITTEXT        IDC_THUMBNAILSIZE,38,200,33,12,ES_AUTOHSCROLL
+    LTEXT           "bodov",IDC_STATIC_6,75,202,22,8,NOT WS_GROUP
+    GROUPBOX        " Vzhľad aplikácie ",IDC_STATIC_7,1,226,295,74
+    LTEXT           "Mo&tív:",IDC_STATIC_8,8,240,62,8
+    COMBOBOX        IDC_THEME_MODE,78,237,150,65,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Ikona aplikácie:",IDC_STATIC_9,8,259,84,8
+    COMBOBOX        IDC_TITLEBAR_ICON_INDEX,100,257,174,15,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Na zmenu farby ikony zástupcu na ploche alebo v ponuke Štart,\nkliknite pravým tlačidlom na zástupcu > Vlastnosti > Zmeniť ikonu.",IDC_STATIC_10,8,278,278,16
+    GROUPBOX " Úvodné okno a O aplikácii ",IDC_IDENTITY_GROUP,1,306,295,128
+    LTEXT "Farebný rad:",IDC_IDENTITY_PALETTE_LABEL,8,320,90,8
+    COMBOBOX IDC_IDENTITY_PALETTE,100,317,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Odtieň (0–100):",IDC_IDENTITY_SHADE_LABEL,8,343,90,8
+    EDITTEXT IDC_IDENTITY_SHADE,100,340,30,14,ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL "",IDC_IDENTITY_SLIDER,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,136,340,138,14
+    LTEXT "Nápis Sally:",IDC_IDENTITY_LETTERING_LABEL,8,366,90,8
+    COMBOBOX IDC_IDENTITY_LETTERING,100,363,174,100,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Písmo textu:",IDC_IDENTITY_FONT_LABEL,8,389,90,8
+    COMBOBOX IDC_IDENTITY_FONT,100,386,174,80,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT "Farba textu:",IDC_IDENTITY_TONE_LABEL,8,412,90,8
+    COMBOBOX IDC_IDENTITY_TONE,100,409,100,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    PUSHBUTTON "Náhľad…",IDC_IDENTITY_PREVIEW,206,409,68,14,WS_TABSTOP
 END
 
 IDD_CFGPAGE_KEYBOARD DIALOGEX 67, 23, 299, 231
@@ -1870,7 +1872,7 @@ BEGIN
     LTEXT           ".",IDC_STATIC_8,175,181,22,8
 END
 
-IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 231
+IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 270
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Panely"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1911,6 +1913,12 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,202,171,12
     CONTROL         "Zaobchádzať s adresármi, ako by mali príp&ony (a zobraziť ich v stĺpci Prípona)",IDC_SORTDIRSBYEXT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,214,285,12
+    LTEXT           "Karty",IDC_STATIC_10,1,232,20,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,23,236,274,1
+    CONTROL         "O&tvárať nové karty na konci lišty kariet",IDC_TABSATEND,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
+    CONTROL         "Používať pre karty klávesy pro&gramu Total Commander (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,285,12
 END
 
 IDD_CANNOTSETATTRSINFO DIALOGEX 15, 33, 353, 89
@@ -2276,6 +2284,8 @@ STRINGTABLE
  IDS_MENU_EDIT,              "&Upraviť"
  IDS_MENU_EDIT_UNDO, "&Späť\tCtrl+Z"
  IDS_UNDO_FAILED, "Systém Windows nemohol vrátiť poslednú operáciu prostredia."
+ IDS_UNDO_CONFIRM, "Systém Windows môže vrátiť poslednú operáciu so súbormi. Mohla byť vykonaná v inom programe, napríklad v Prieskumníkovi.\n\n%s\n\nChcete ju vrátiť?"
+ IDS_UNDO_NOTHING, "Systém Windows nemá žiadnu operáciu so súbormi, ktorú by bolo možné vrátiť."
  IDS_MENU_EDIT_CUT,          "&Vystrihnúť\tCtrl+X"
  IDS_MENU_EDIT_COPY,         "&Kopírovať\tCtrl+C"
  IDS_MENU_EDIT_COPYFULLNAME, "Kopírovať &cestu + názov ako text\tAlt+Insert"
@@ -4238,6 +4248,25 @@ BEGIN
  IDS_PROFILE_MANAGER, "Profily nastavení"
  IDS_PROFILE_NAME_RULE, "Použite 1 až 64 písmen (A-Z, a-z), číslic, bodiek, podčiarkovníkov alebo pomlčiek; nie . ani .. ."
  IDS_PROFILE_DELETE_CONFIRM, "Natrvalo odstrániť tento profil a jeho uložené nastavenia?"
+ IDS_MENU_CMD_TABS, "Prá&ca s kartami"
+ IDS_MENU_TAB_NEW, "&Nová karta\tCtrl+Shift+T"
+ IDS_MENU_TAB_DUPLICATE, "D&uplikovať kartu"
+ IDS_MENU_TAB_OPENFOCUSED, "&Otvoriť adresár s fokusom na novej karte"
+ IDS_MENU_TAB_CLOSE, "&Zavrieť kartu\tCtrl+Shift+W"
+ IDS_MENU_TAB_CLOSEOTHERS, "Zavrieť o&statné karty"
+ IDS_MENU_TAB_REOPEN, "Zno&vu otvoriť zatvorenú kartu"
+ IDS_MENU_TAB_NEXT, "Nasle&dujúca karta\tAlt+Shift+Šípka vpravo"
+ IDS_MENU_TAB_PREV, "&Predchádzajúca karta\tAlt+Shift+Šípka vľavo"
+ IDS_MENU_TAB_ALWAYSSHOW, "Vždy zobrazovať &lištu kariet"
+ IDS_TAB_COPYPATH, "Kopírovať &cestu"
+ IDS_TAB_LIMIT, "Panel môže mať najviac %d kariet."
+ IDS_MENU_TAB_RENAME, "Pre&menovať kartu..."
+ IDS_MENU_TAB_LOCK, "Zam&knúť kartu"
+ IDS_MENU_TAB_MOVELEFT, "Presunúť kartu doľ&ava"
+ IDS_MENU_TAB_MOVERIGHT, "Presunúť kartu dop&rava"
+ IDS_TAB_RENAME_TITLE, "Premenovať kartu"
+ IDS_TAB_RENAME_PROMPT, "Názov karty (nechajte prázdne, ak sa má zobraziť názov adresára):"
+ IDS_TAB_DRIVEMARK, " (karta)"
 END
 
 STRINGTABLE

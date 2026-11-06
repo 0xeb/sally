@@ -239,15 +239,14 @@ BOOL IsThemeSettingHint(LPARAM lParam)
            _wcsicmp(valueName, WINDOWS_THEME_ELEMENT_PARAM) == 0;
 }
 
-// #98: same white hairline as in the core - the control's NON-CLIENT frame, painted by
+// Same white hairline as in the core - the control's NON-CLIENT frame, painted by
 // Windows with system (light) colours. No theme class governs it, so paint it ourselves, the
 // way the core's Find dialog has always done for its combos.
-// #98: a combobox has to be OWNER-DRAWN, not outlined.
+// A combobox has to be OWNER-DRAWN, not outlined.
 //
 // Painting the control normally and then drawing a 1px frame over the edge leaves the
 // control's own white 2px frame and its white drop-down button underneath - measured on the
-// FTP Connect dialog. Kept in lockstep with darkmode.cpp's PaintDarkComboClient(); the
-// issue98 test pins core/plugin parity.
+// FTP Connect dialog. Kept in lockstep with darkmode.cpp's PaintDarkComboClient().
 const COLORREF DARK_COMBO_LINE = RGB(55, 55, 58);
 const COLORREF DARK_COMBO_BUTTON = RGB(52, 52, 56);
 
@@ -530,7 +529,7 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
         return;
     }
 
-    // #98: plugin dialogs already got dark BACKGROUNDS (WM_CTLCOLOR* in winliblt), but
+    // Plugin dialogs already got dark BACKGROUNDS (WM_CTLCOLOR* in winliblt), but
     // buttons, edits and comboboxes were never themed, so Windows drew them with their
     // light frames - bright white borders on every control in dark mode. The core does
     // theme these classes (darkmode.cpp ApplyListTreeThemeToControl); this helper did not,
@@ -544,13 +543,13 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
 
     if (_wcsicmp(className.c_str(), EDIT_CLASS_NAME) == 0)
     {
-        ApplyPluginEditLikeTheme(hwnd, useDark); // #98: paints its own frame in dark mode
+        ApplyPluginEditLikeTheme(hwnd, useDark); // paints its own frame in dark mode
         return;
     }
 
     if (_wcsicmp(className.c_str(), COMBOBOX_CLASS_NAME) == 0)
     {
-        ApplyPluginEditLikeTheme(hwnd, useDark); // #98
+        ApplyPluginEditLikeTheme(hwnd, useDark); // owner-drawn in dark mode
         ApplyComboBoxChildThemes(hwnd, useDark);
         return;
     }

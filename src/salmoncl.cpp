@@ -182,7 +182,7 @@ BOOL SalmonStartProcess(const wchar_t* fileMappingName)
     PROCESS_INFORMATION pi;
     HSalmonProcess = NULL;
 
-    // issue #63: wide install paths so non-ASCII directories (Cyrillic, etc.)
+    // Wide install paths so non-ASCII directories (Cyrillic, etc.)
     // don't get mangled by ANSI GetModuleFileName -> CreateProcess.
     std::wstring exePath;
     if (!GetModuleFileNameOwnedW(NULL, exePath))

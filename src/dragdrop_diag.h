@@ -4,7 +4,7 @@
 
 #include <windows.h>
 
-// #101 diagnostic. Alt+drag is reported as still showing the "blocked" cursor even though the
+// Drag-and-drop diagnostic. Alt+drag is reported as still showing the "blocked" cursor even though the
 // drag source advertises DROPEFFECT_LINK (shellsup.cpp, saLeftDragFiles) and the modifier
 // mapping in ComputeOwnFolderDropEffect() is correct. Reading alone cannot say WHICH of the
 // three branches in CImpDropTarget::DragOver() runs, nor whether OLE actually delivers MK_ALT
@@ -29,7 +29,7 @@ void DragDropDiagRecord(const char* branch, DWORD keyState, DWORD effectIn, DWOR
 // Why this matters: the log showed the shell drop target returning DROPEFFECT_NONE for Alt over
 // a FOLDER while returning COPY|LINK for the same key state over a FILE. Same data object, same
 // allowed effects - so the difference is what the folder target needs in order to offer LINK.
-// Issue #87 already taught this codebase that the shell shortcut path wants richer formats than
+// Paste Shortcut already taught this codebase that the shell shortcut path wants richer formats than
 // CF_HDROP (it was fixed there with a PIDL-backed data object); this checks whether the DRAG
 // data object has the same gap.
 void DragDropDiagDataObject(IDataObject* dataObject, const wchar_t* curDir);

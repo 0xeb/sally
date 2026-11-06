@@ -849,7 +849,7 @@ int CArchive::ReadArchiveHeader(SCommonHeader& header, BOOL probe)
             }
             if (!available)
             {
-                // Patera 2005.04.28: Fix of bug #183 (phphomework-alpha2.tar.gz)
+                // Patera 2005.04.28: Fix of a bug with phphomework-alpha2.tar.gz
                 // Not able to read anything: try some heuristics
                 if ((Stream->GetStreamSize() == Stream->GetStreamPos()) && (Stream->GetStreamSize() > CQuadWord(0, 0)))
                 {

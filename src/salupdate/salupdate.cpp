@@ -24,6 +24,7 @@
 #include "ui_style.h"
 #include "ApplicationAppearance.h"
 #include "Win32TextCodec.h"
+#include "update/MessageBoxFit.h"
 #include "update/UpdateProcesses.h"
 #include "update/UpdaterCommand.h"
 
@@ -252,6 +253,67 @@ BOOL CALLBACK StyleMessageControl(HWND control, LPARAM)
     return TRUE;
 }
 
+BOOL CALLBACK CollectMessageControl(HWND control, LPARAM param)
+{
+    reinterpret_cast<std::vector<HWND>*>(param)->push_back(control);
+    return TRUE;
+}
+
+// After the restyling: the text control grows to what its text needs in MessageFont at its
+// width, and the controls below it move down. Returns how much taller the client area must be.
+int FitMessageText(HWND window)
+{
+    HWND message = GetDlgItem(window, 0xFFFF);
+    if (message == NULL || MessageFont == NULL)
+        return 0;
+    const int length = GetWindowTextLengthW(message);
+    if (length <= 0)
+        return 0;
+    std::wstring text(static_cast<size_t>(length) + 1, L'\0');
+    text.resize(static_cast<size_t>(GetWindowTextW(message, &text[0], length + 1)));
+
+    std::vector<HWND> handles;
+    EnumChildWindows(window, CollectMessageControl, reinterpret_cast<LPARAM>(&handles));
+    std::vector<ControlBox> boxes;
+    size_t messageIndex = handles.size();
+    for (size_t i = 0; i < handles.size(); ++i)
+    {
+        RECT rect{};
+        GetWindowRect(handles[i], &rect);
+        MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&rect), 2);
+        boxes.push_back(ControlBox{rect.left, rect.top, rect.right, rect.bottom});
+        if (handles[i] == message)
+            messageIndex = i;
+    }
+    if (messageIndex == handles.size())
+        return 0;
+
+    // The wrapping of the text control's own style: with SS_EDITCONTROL a word wider than the
+    // control (a long path) is broken onto more lines, as the control draws it.
+    const LONG_PTR style = GetWindowLongPtrW(message, GWL_STYLE);
+    UINT flags = DT_CALCRECT | DT_WORDBREAK | DT_EXPANDTABS;
+    if (style & SS_NOPREFIX)
+        flags |= DT_NOPREFIX;
+    if (style & SS_EDITCONTROL)
+        flags |= DT_EDITCONTROL;
+    RECT needed{0, 0, boxes[messageIndex].Right - boxes[messageIndex].Left, 0};
+    HDC dc = GetDC(message);
+    HGDIOBJ previous = SelectObject(dc, MessageFont);
+    DrawTextW(dc, text.c_str(), static_cast<int>(text.size()), &needed, flags);
+    SelectObject(dc, previous);
+    ReleaseDC(message, dc);
+
+    const std::vector<ControlBox> before = boxes;
+    const int extra = FitMessageHeight(boxes, messageIndex, needed.bottom - needed.top);
+    for (size_t i = 0; extra > 0 && i < handles.size(); ++i)
+    {
+        if (boxes[i].Top != before[i].Top || boxes[i].Bottom != before[i].Bottom)
+            SetWindowPos(handles[i], nullptr, boxes[i].Left, boxes[i].Top, boxes[i].Right - boxes[i].Left,
+                         boxes[i].Bottom - boxes[i].Top, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    return extra;
+}
+
 LRESULT CALLBACK StyleMessageBox(int code, WPARAM wParam, LPARAM lParam)
 {
     if (code == HCBT_DESTROYWND)
@@ -286,10 +348,20 @@ LRESULT CALLBACK StyleMessageBox(int code, WPARAM wParam, LPARAM lParam)
             MessageScaleY = (std::max)(1.0, static_cast<double>(newMetrics.tmHeight) / (std::max)(1L, oldMetrics.tmHeight));
             RECT client{}, outer{}; GetClientRect(window, &client); GetWindowRect(window, &outer);
             EnumChildWindows(window, StyleMessageControl, 0);
+            // The scaling follows average character widths; the text itself may still need more room.
+            const int extra = FitMessageText(window);
             const int width = static_cast<int>(client.right * MessageScaleX) + outer.right - outer.left - client.right;
-            const int height = static_cast<int>(client.bottom * MessageScaleY) + outer.bottom - outer.top - client.bottom;
-            SetWindowPos(window, nullptr, outer.left - (width - outer.right + outer.left) / 2,
-                outer.top - (height - outer.bottom + outer.top) / 2, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+            const int height = static_cast<int>(client.bottom * MessageScaleY) + extra + outer.bottom - outer.top - client.bottom;
+            int left = outer.left - (width - outer.right + outer.left) / 2;
+            int top = outer.top - (height - outer.bottom + outer.top) / 2;
+            // Grown text may make the box taller: keep its title bar and buttons on the screen.
+            MONITORINFO monitor{sizeof(monitor)};
+            if (GetMonitorInfoW(MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST), &monitor))
+            {
+                left = (std::max)(static_cast<int>(monitor.rcWork.left), (std::min)(left, static_cast<int>(monitor.rcWork.right) - width));
+                top = (std::max)(static_cast<int>(monitor.rcWork.top), (std::min)(top, static_cast<int>(monitor.rcWork.bottom) - height));
+            }
+            SetWindowPos(window, nullptr, left, top, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
             RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
         }
     }

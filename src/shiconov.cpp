@@ -276,7 +276,7 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const wchar_t* name, ShellOverlay
         int iconIndex;
         DWORD flags;
         // NOTE: strict == S_OK, so a handler returning S_FALSE is dropped exactly like one
-        // that failed. Recording the value is what will let us tell those apart (issue #90).
+        // that failed. Recording the value is what will let us tell those apart.
         HRESULT overlayInfoHr = GetOverlayInfoDynamic(iconOverlayIdentifier, iconFile, &iconIndex, &flags);
         if (diag != NULL)
         {
@@ -306,10 +306,12 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const wchar_t* name, ShellOverlay
 
                 // wide: iconFile is already the genuine wide path from
                 // GetOverlayInfo - use it directly instead of narrowing it first.
-                // Load this overlay's icon at all three sizes (issue #90 - see
+                // Load this overlay's icon at all three sizes (see
                 // shiconov_icons.h for why this must not be a single packed call).
                 HICON iconOverlay[ICONSIZE_COUNT] = {0};
-                LoadShellOverlayIconsW(iconFile.c_str(), iconIndex, IconSizes, ICONSIZE_COUNT,
+                const int sizes[ICONSIZE_COUNT] = {GetIconSizePx(ICONSIZE_16), GetIconSizePx(ICONSIZE_32),
+                                                   GetIconSizePx(ICONSIZE_48)};
+                LoadShellOverlayIconsW(iconFile.c_str(), iconIndex, sizes, ICONSIZE_COUNT,
                                        iconOverlay);
 
                 int x;
@@ -445,15 +447,15 @@ void InitShellIconOverlays()
 
     // Snapshot the configuration this run is actually using. Which registry root Sally
     // resolved, and whether the overlay values were present in it, is the question behind
-    // the imported-configuration theory for issue #90: a config inherited from an older
+    // the imported-configuration theory for missing overlays: a config inherited from an older
     // Altap Salamander install can carry a disabled-handler list, or force overlays off
     // outright when the value pair is missing from a version-41-or-later config.
     ShellOverlayDiag.Reset();
     ShellOverlayDiag.Header.AnsiCodePage = GetACP();
-    ShellOverlayDiag.Header.IconSizes[0] = IconSizes[ICONSIZE_16];
-    ShellOverlayDiag.Header.IconSizes[1] = IconSizes[ICONSIZE_32];
-    ShellOverlayDiag.Header.IconSizes[2] = IconSizes[ICONSIZE_48];
-    ShellOverlayDiag.Header.SystemDpi = (UINT)SystemDPI;
+    ShellOverlayDiag.Header.IconSizes[0] = GetIconSizePx(ICONSIZE_16);
+    ShellOverlayDiag.Header.IconSizes[1] = GetIconSizePx(ICONSIZE_32);
+    ShellOverlayDiag.Header.IconSizes[2] = GetIconSizePx(ICONSIZE_48);
+    ShellOverlayDiag.Header.SystemDpi = (UINT)GetSystemDPI();
     ShellOverlayDiag.Header.EnableCustomIconOverlays = Configuration.EnableCustomIconOverlays != FALSE;
     SetOverlayDiagConfigRoot(ShellOverlayDiag.Header, SALAMANDER_ROOT_REG);
     if (Configuration.DisabledCustomIconOverlays != NULL)
@@ -1052,9 +1054,11 @@ void ColorsChangedAuxAux(CShellIconOverlayItem* item)
             // wide: iconFile is already the genuine wide path from
             // GetOverlayInfo - use it directly instead of narrowing it first.
             // Same loader as at startup. Getting this wrong here would re-drop every
-            // overlay the moment the display colour depth changed (issue #90).
+            // overlay the moment the display colour depth changed.
             HICON iconOverlay[ICONSIZE_COUNT] = {0};
-            LoadShellOverlayIconsW(iconFile.c_str(), iconIndex, IconSizes, ICONSIZE_COUNT,
+            const int sizes[ICONSIZE_COUNT] = {GetIconSizePx(ICONSIZE_16), GetIconSizePx(ICONSIZE_32),
+                                               GetIconSizePx(ICONSIZE_48)};
+            LoadShellOverlayIconsW(iconFile.c_str(), iconIndex, sizes, ICONSIZE_COUNT,
                                    iconOverlay);
 
             int x;

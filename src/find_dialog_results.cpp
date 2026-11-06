@@ -520,7 +520,7 @@ static void ApplyFindComboSkin(HWND hCombo)
 
 static void ApplyFindComboSkins(HWND hDialog)
 {
-    // #99: skin all four Find comboboxes (the "Type:" combo IDC_FIND_FILETYPE was missing
+    // Skin all four Find comboboxes (the "Type:" combo IDC_FIND_FILETYPE was missing
     // here, leaving it white in dark mode). The set lives in find_dialog_theme_ids.cpp.
     int count = 0;
     const int* comboIDs = GetFindThemedComboIds(count);
@@ -3805,7 +3805,7 @@ void CFindDialog::OnUserMenu()
     UserMenuIconBkgndReader.BeginUserMenuIconsInUse();
     CMenuPopup menu;
     // Keep customization disabled. The commands act on found files, not on the active panel,
-    // so the panel's "Show only when" rules (#50) do not apply here: an Unknown context.
+    // so the panel's "Show only when" rules do not apply here: an Unknown context.
     MainWindow->FillUserMenu(&menu, FALSE, Sally::UserMenuConditions::Context());
     POINT p;
     GetListViewContextMenuPos(FoundFilesListView->HWindow, &p);

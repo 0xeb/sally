@@ -1208,7 +1208,7 @@ BOOL CPlugins::AddItemsToChangeDrvMenu(CDrivesList* drvList, int& currentFSIndex
             }
             else
             {
-                drv.HIcon = SalLoadIcon(HInstance, IDI_PLUGINFS, IconSizes[ICONSIZE_16]);
+                drv.HIcon = SalLoadIcon(HInstance, IDI_PLUGINFS, GetIconSizePx(ICONSIZE_16));
                 drv.HGrayIcon = NULL;
                 drv.DestroyIcon = TRUE;
             }

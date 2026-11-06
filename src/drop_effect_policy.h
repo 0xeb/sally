@@ -4,7 +4,7 @@
 
 #include <windows.h> // DWORD, DROPEFFECT_*, MK_*
 
-// #101: For a drag over Sally's own panel folder, map the keyboard modifiers to a drop
+// For a drag over Sally's own panel folder, map the keyboard modifiers to a drop
 // effect. The old code stripped DROPEFFECT_LINK unconditionally (and even returned
 // DROPEFFECT_NONE for the Ctrl+Shift link combo), so Alt+drag / Ctrl+Shift+drag could
 // never create a shortcut - the cursor showed "blocked" and no shortcut was offered.

@@ -7,6 +7,10 @@
 #include "common/widepath.h"
 #include "common/CSelectionSnapshot.h"
 #include "common/SurrogateAssembler.h"
+#include "common/PanelTabs.h"
+
+#include <cstdint>
+#include <map>
 
 #include <string>
 #include <vector>
@@ -210,6 +214,7 @@ class COperations;
 class CFilesBox;
 class CHeaderLine;
 class CStatusWindow;
+class CTabWindow;
 class CFilesArray;
 struct CFileData;
 class CIconCache;
@@ -763,6 +768,26 @@ public:
     CStatusWindow *StatusLine,
         *DirectoryLine;
 
+    // Panel tabs (files_window_tabs.cpp). The panel shows the active tab; the other tabs are
+    // saved states (sally::tabs::TabRecord) plus what the core keeps for them below.
+    CTabWindow* TabStrip; // the strip above the directory line (its HWindow is NULL while hidden)
+    sally::tabs::PanelTabSet Tabs;
+    struct CPanelTabRuntime
+    {
+        CPathHistory* History = NULL; // the tab's Back/Forward history (the active tab's is PathHistory)
+        std::vector<std::wstring> SelectedDirs, SelectedFiles; // selection when the tab was left
+        CPluginFSInterfaceAbstract* ParkedFS = NULL; // the tab's file system while detached in the background
+    };
+    std::map<std::uint32_t, CPanelTabRuntime> TabRuntime; // by TabRecord::Id; the active tab's History is NULL (PathHistory)
+    BOOL SwitchingTab; // a tab switch is in progress (guards re-entry)
+    // A tab command (a key or menu) that arrived while a switch was pumping messages, for example
+    // while an archive tab was being left; it runs when the switch ends instead of being lost.
+    int PendingTabCommand = 0;
+    void RunPendingTabCommand();
+    // Tabs read by LoadPanelConfig, applied once the startup path is set (SetTabsFromConfig).
+    std::vector<sally::tabs::TabRecord> StartupTabs;
+    std::size_t StartupActiveTab = 0;
+
     BOOL StatusLineVisible;
     BOOL DirectoryLineVisible;
     BOOL HeaderLineVisible;
@@ -1256,6 +1281,48 @@ public:
     void ToggleStatusLine();
     void ToggleDirectoryLine();
     void ToggleHeaderLine();
+
+    // Panel tabs (files_window_tabs.cpp)
+    // Saves the panel's location, view, sort, filter, focus and top index into the active tab.
+    void CaptureActiveTab();
+    // Saves the panel into the active tab and loads tab 'index'; FALSE when the panel stays on
+    // the current tab (the old path could not be left, for example a declined repack).
+    BOOL SwitchToTab(std::size_t index);
+    // CM_TAB_NEW, CM_TAB_DUPLICATE, CM_TAB_CLOSE, ... on this panel.
+    void TabCommand(int command);
+    // New tab after the active one at the current location (duplicate also copies history and
+    // selection), and switches to it.
+    void NewTab(BOOL duplicate);
+    // Opens 'path' (a disk folder) in a new tab after the active one and switches to it.
+    void OpenPathInNewTab(const wchar_t* path);
+    // Closes a tab (not a locked one, nor the last); its parked file system is closed first.
+    void CloseTab(std::size_t index);
+    // Asks for a name for the tab (empty: the location's name).
+    void RenameTab(std::size_t index);
+    void ToggleTabLock(std::size_t index);
+    // Moves a tab to index 'to' (the strip's drag uses the gap form).
+    void MoveTab(std::size_t from, std::size_t to);
+    void MoveTabToGap(std::size_t from, std::size_t gap);
+    // A plugin file system parked (detached) by one of this panel's background tabs.
+    BOOL IsFSParkedByTab(CPluginFSInterfaceAbstract* fs);
+    // Shows or hides the strip (Configuration.ShowTabBar, or at least two tabs) and repaints it.
+    void UpdateTabStrip();
+    BOOL WantsTabStrip();
+    // Height of the shown tab strip, 0 while it is hidden.
+    int GetTabStripHeight();
+    // Repaints the strip (titles, the active panel's colours).
+    void RepaintTabStrip();
+    // A closed plugin file system must not stay remembered by a background tab.
+    void ClearPluginFSFromTabs(CPluginFSInterfaceAbstract* fs);
+    // Applies a tab's view, sort and filter to the panel (refresh: re-list the current folder).
+    void ApplyTabSettings(const sally::tabs::TabRecord& record, BOOL refresh);
+    // Loads saved tabs at startup; the panel is at its saved disk path already. navigateActive:
+    // an active tab saved inside an archive goes back there (not when the command line set a path).
+    void SetTabsFromConfig(std::vector<sally::tabs::TabRecord> records, std::size_t active, BOOL navigateActive);
+    // The tabs to save, with the active tab captured from the panel.
+    std::vector<sally::tabs::TabRecord> GetTabsForConfig(std::size_t& active);
+    // Frees the background tabs' histories and closes their parked file systems (panel destruction).
+    void FreeTabRuntime(BOOL closeParkedFS);
 
     void ConnectNet(BOOL readOnlyUNC, const wchar_t* netRootPath = NULL, BOOL changeToNewDrive = TRUE, wchar_t* newlyMappedDrive = NULL);
     void DisconnectNet();

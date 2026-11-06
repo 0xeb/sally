@@ -33,6 +33,7 @@
 #include "update/ReleaseChecksums.h"
 #include "update/ReleaseDownload.h"
 #include "update/ReleaseNotesText.h"
+#include "update/RateLimit.h"
 #include "update/ReleaseNotesChoice.h"
 #include "update/UpdatePackage.h"
 #include "update/UpdateProcesses.h"
@@ -175,11 +176,39 @@ void OpenPage(const std::wstring& url)
     ShellExecuteW(TheSession.Window, L"open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 }
 
+// GitHub limits anonymous checks per network address. Say so, with the local time it
+// accepts them again when it said, instead of a bare "HTTP 403".
+std::wstring RateLimitText(unsigned long long retryAfterSeconds)
+{
+    FILETIME now{};
+    GetSystemTimeAsFileTime(&now);
+    ULARGE_INTEGER at{};
+    at.LowPart = now.dwLowDateTime;
+    at.HighPart = now.dwHighDateTime;
+    at.QuadPart = RetryShownAt(at.QuadPart, retryAfterSeconds);
+    if (at.QuadPart == 0)
+        return Text(IDS_UPDATER_RATE_LIMITED);
+    const FILETIME utc{at.LowPart, at.HighPart};
+    SYSTEMTIME universal{}, local{};
+    if (!FileTimeToSystemTime(&utc, &universal) || !SystemTimeToTzSpecificLocalTime(NULL, &universal, &local))
+        return Text(IDS_UPDATER_RATE_LIMITED);
+    const int length = GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT, TIME_NOSECONDS, &local, NULL, NULL, 0);
+    if (length <= 0)
+        return Text(IDS_UPDATER_RATE_LIMITED);
+    std::wstring time(static_cast<size_t>(length), L'\0');
+    if (GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT, TIME_NOSECONDS, &local, NULL, &time[0], length) <= 0)
+        return Text(IDS_UPDATER_RATE_LIMITED);
+    time.resize(static_cast<size_t>(length - 1));
+    return Text(IDS_UPDATER_RATE_LIMITED_UNTIL, time.c_str());
+}
+
 std::wstring FailureText(const ReleaseFailure& failure)
 {
     switch (failure.What)
     {
     case ReleaseFailure::Kind::Network:
+        if (failure.Network.RateLimited)
+            return RateLimitText(failure.Network.RetryAfterSeconds);
         return failure.Network.Code != 0 ? Win32NetworkErrorText(failure.Network.Code, Language) : failure.Network.Text;
     case ReleaseFailure::Kind::BadFeed:
         return Text(IDS_UPDATER_BAD_FEED, Widen(failure.Detail).c_str());
@@ -467,14 +496,18 @@ void Layout()
     Place(kIdInstalled, release, margin, y, width, line); if (release) y += line + Px(3);
     Place(kIdLatest, release && checked && !s.Offline, margin, y, width, line);
     if (release && checked && !s.Offline) y += line + Px(6);
+    // The notes list is offered only when there is a choice (latest and installed).
+    // With the installed release alone, the line above already names it; a greyed-out list read as
+    // broken.
+    const bool notesChoice = SendMessageW(Control(kIdNotesVersion), CB_GETCOUNT, 0, 0) > 1;
     const int gap = Px(8), labelWidth = ButtonWidth(kIdNotesLabel), checkWidth = ButtonWidth(kIdCheckUpdates);
-    const int notesWidth = (std::max)(Px(180), ButtonWidth(kIdNotesVersion));
+    const int notesWidth = notesChoice ? (std::max)(Px(180), ButtonWidth(kIdNotesVersion)) : 0;
     const bool oneRow = labelWidth + notesWidth + checkWidth + 2 * gap <= width;
     Place(kIdNotesLabel, release, margin, y + Px(5), oneRow ? labelWidth : width, line);
     if (release && !oneRow) y += line + Px(6);
     const int comboWidth = oneRow ? width - labelWidth - checkWidth - 2 * gap : width;
-    Place(kIdNotesVersion, release, oneRow ? margin + labelWidth + gap : margin, y, comboWidth, buttonHeight * 8);
-    if (release && !oneRow) y += buttonHeight + Px(6);
+    Place(kIdNotesVersion, release && notesChoice, oneRow ? margin + labelWidth + gap : margin, y, comboWidth, buttonHeight * 8);
+    if (release && notesChoice && !oneRow) y += buttonHeight + Px(6);
     Place(kIdCheckUpdates, release, oneRow ? margin + width - checkWidth : margin, y, oneRow ? checkWidth : width, buttonHeight);
     EnableWindow(Control(kIdCheckUpdates), s.Current != View::Checking && !s.Installing);
     if (release) y += buttonHeight + Px(8);
@@ -482,7 +515,6 @@ void Layout()
     int statusHeight = status ? TextHeight(s.Font, GetText(Control(kIdStatus)), width) + Px(4) : 0;
     const bool support = (release || (s.Current == View::Report && s.SuccessfulReport)) && s.SupportActions;
     const int invitationHeight = support ? TextHeight(s.Font, T(IDS_SUP_INVITATION), width) + Px(8) : 0;
-    const int supportRows = support ? 1 : 0;
     const bool install = s.Current == View::Newer && !s.Offline;
     const bool page = !(s.Current == View::Report && s.ReportPage.empty());
     std::vector<int> footer;
@@ -493,6 +525,11 @@ void Layout()
     for (int id : footer) footerWidth += ButtonWidth(id);
     const bool footerFits = footerWidth <= width;
     const int footerRows = footerFits ? 1 : static_cast<int>(footer.size());
+    // Support Sally starts the button row, left of the other buttons, when the row has room for it;
+    // only a narrow window gives it a row of its own.
+    const int supportWidth = (std::min)(ButtonWidth(kIdSupport), width);
+    const bool supportInFooter = support && footerFits && supportWidth + Px(16) + footerWidth <= width;
+    const int supportRows = support && !supportInFooter ? 1 : 0;
     int reserved = invitationHeight + statusHeight + (supportRows + footerRows) * (buttonHeight + Px(6)) + margin;
     // State/text changes can add rows without changing the reading-surface kind.
     // Measure those rows before placing the content and footer, also after a resize.
@@ -517,7 +554,7 @@ void Layout()
     Place(kIdStatus, status, margin, y, width, statusHeight); y += statusHeight;
     Place(kIdInvitation, support, margin, y, width, invitationHeight > 0 ? invitationHeight - Px(8) : 0);
     y += invitationHeight;
-    Place(kIdSupport, support, margin, y, (std::min)(ButtonWidth(kIdSupport), width), buttonHeight);
+    Place(kIdSupport, support, margin, y, supportWidth, buttonHeight); // on the button row below when it fits
     ShowWindow(Control(kIdSupporter), SW_HIDE);
     y += supportRows * (buttonHeight + Px(6));
     const int footerIds[] = {kIdInstall, kIdReleasePage, IDCANCEL};
@@ -532,6 +569,8 @@ void Layout()
             footerFits ? y : y + i * (buttonHeight + Px(6)), buttonWidth, buttonHeight);
         footerX += buttonWidth + Px(8);
     }
+    if (supportInFooter) // same row and top as the other buttons, at the left margin
+        Place(kIdSupport, true, margin, y, supportWidth, buttonHeight);
     EnableWindow(Control(kIdInstall), install && s.Release.CanInstall && !s.Installing);
     int defaultId = install && s.Release.CanInstall && !s.Installing ? kIdInstall : IDCANCEL;
     SendMessageW(Control(kIdInstall), BM_SETSTYLE, defaultId == kIdInstall ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON, TRUE);
@@ -750,6 +789,7 @@ void BeginCheck()
     RefreshContent();
     if (!StartWorker(CheckWorker))
     {
+        s.CheckFailure = ReleaseFailure(); // not an earlier check's rate limit
         s.CheckFailure.What = ReleaseFailure::Kind::Network;
         s.CheckFailure.Network.Code = GetLastError();
         ShowCheckFailure();
@@ -1205,7 +1245,8 @@ int CheckForUpdates(const UpdaterCommand& command)
         if (!FetchLatestRelease(client, s.FeedUrl, Narrow(s.InstalledVersion), BuildPlatform(), s.Release,
                                 s.CheckFailure))
         {
-            Log(L"check failed: " + FailureText(s.CheckFailure));
+            Log(L"check failed: " + FailureText(s.CheckFailure) +
+                (s.CheckFailure.Network.Status != 0 ? L" (" + s.CheckFailure.Network.Text + L")" : std::wstring()));
             return 2;
         }
         Log(L"latest release " + Widen(s.Release.LatestVersion));

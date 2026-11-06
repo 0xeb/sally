@@ -163,6 +163,7 @@ void CFilesWindow::ClearPluginFSFromHistory(CPluginFSInterfaceAbstract* fs)
 {
     CALL_STACK_MESSAGE_NONE
     PathHistory->ClearPluginFSFromHistory(fs);
+    ClearPluginFSFromTabs(fs); // background tabs remember file systems too
 }
 
 BOOL SafeInvokeCommand(IContextMenu2* menu, CMINVOKECOMMANDINFO& ici)
@@ -1580,7 +1581,7 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
         }
         if (GetViewMode() == vmBrief || GetViewMode() == vmDetailed)
         {
-            iconWidth = 1 + IconSizes[ICONSIZE_16] + 1 + 2;
+            iconWidth = 1 + GetIconSizePx(ICONSIZE_16) + 1 + 2;
             CFileData* f = (itemIndex < Dirs->Count) ? &Dirs->At(itemIndex) : &Files->At(itemIndex - Dirs->Count);
             std::wstring altered = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, itemIndex < Dirs->Count);
             buff = std::move(altered);

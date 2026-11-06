@@ -1453,7 +1453,7 @@ BOOL CreateEnvFonts()
     }
 
 #if SALLY_BOTTOMBAR_BOLD_LABELS
-    // #96: bold variant for the bottom toolbar's labels (kept behind the switch)
+    // Bold variant for the bottom toolbar's labels (kept behind the switch)
     if (EnvFontBold != NULL)
         HANDLES(DeleteObject(EnvFontBold));
     LOGFONT lfBold = MakeBoldToolbarLogFont(lf);
@@ -1628,7 +1628,7 @@ void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max, BOOL s
     int added = 0;
     for (; *iterator < max; (*iterator)++)
     {
-        // #50: a hidden submenu's whole block, closing marker included, is left out
+        // A hidden submenu's whole block, closing marker included, is left out
         if (shown != NULL && *iterator < (int)shown->size() && !(*shown)[*iterator])
             continue;
         switch (UserMenuItems->At(*iterator)->Type)
@@ -1794,7 +1794,7 @@ void CMainWindow::AddTrayIcon(BOOL updateIcon)
     tnid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     tnid.uCallbackMessage = WM_USER_ICON_NOTIFY;
     int resID = MainWindowIcons[Configuration.GetMainWindowIconIndex()].IconResID;
-    tnid.hIcon = SalLoadIcon(HInstance, resID, IconSizes[ICONSIZE_16]);
+    tnid.hIcon = SalLoadIcon(HInstance, resID, GetIconSizePx(ICONSIZE_16));
     std::wstring tipW = MAINWINDOW_NAME;
     lstrcpynW(tnid.szTip, tipW.c_str(), sizeof(tnid.szTip) / sizeof(tnid.szTip[0]));
     Shell_NotifyIconW(updateIcon ? NIM_MODIFY : NIM_ADD, &tnid);
@@ -3209,7 +3209,7 @@ void CMainWindow::OnEnterIdle()
     if (IdleRefreshStates)
     {
         RefreshCommandStates();
-        // #50: the focus or the path changed, which may change the commands the bar shows
+        // The focus or the path changed, which may change the commands the bar shows
         if (UMToolBar != NULL)
             UMToolBar->RefreshForContext(GetUserMenuContext());
     }

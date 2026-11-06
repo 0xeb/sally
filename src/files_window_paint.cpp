@@ -243,7 +243,7 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                 if (isDir) // it's a directory
                 {
                     int icon;
-                    fileName = MakeDwordCompareKey(f->Name, f->NameLen); // #115: padded lookup key
+                    fileName = MakeDwordCompareKey(f->Name, f->NameLen); // padded lookup key
 
                     if (!IconCache->GetIndex(fileName.c_str(), icon, NULL, NULL) ||                     // the icon-thread isn't loading it
                         IconCache->At(icon).GetFlag() != 1 && IconCache->At(icon).GetFlag() != 2 ||     // neither new nor old icon is loaded
@@ -271,7 +271,7 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                         if (exceptions || Associations[index].GetIndex(iconSize) < 0) // dynamic icon (from the file) or a loaded static icon
                         {                                                             // icon in the file
                             int icon;
-                            fileName = MakeDwordCompareKey(f->Name, f->NameLen); // #115: padded lookup key
+                            fileName = MakeDwordCompareKey(f->Name, f->NameLen); // padded lookup key
                             if (!IconCache->GetIndex(fileName.c_str(), icon, NULL, NULL) ||                 // the icon-thread isn't loading it
                                 IconCache->At(icon).GetFlag() != 1 && IconCache->At(icon).GetFlag() != 2 || // neither new nor old icon is loaded
                                 !IconCache->GetIcon(IconCache->At(icon).GetIndex(),
@@ -575,15 +575,15 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
     //
 
     RECT iconRect = rect;
-    iconRect.right = iconRect.left + 1 + IconSizes[ICONSIZE_16] + 1;
+    iconRect.right = iconRect.left + 1 + GetIconSizePx(ICONSIZE_16) + 1;
 
     if (drawFlags & DRAWFLAG_SKIP_VISTEST || RectVisible(hDC, &iconRect))
     {
         RECT innerRect;
         innerRect.left = iconRect.left + 1;                                                           // iconX
-        innerRect.top = iconRect.top + (iconRect.bottom - iconRect.top - IconSizes[ICONSIZE_16]) / 2; // iconY
-        innerRect.right = innerRect.left + IconSizes[ICONSIZE_16];
-        innerRect.bottom = innerRect.top + IconSizes[ICONSIZE_16];
+        innerRect.top = iconRect.top + (iconRect.bottom - iconRect.top - GetIconSizePx(ICONSIZE_16)) / 2; // iconY
+        innerRect.right = innerRect.left + GetIconSizePx(ICONSIZE_16);
+        innerRect.bottom = innerRect.top + GetIconSizePx(ICONSIZE_16);
 
         // clear the area around the icon
         if ((drawFlags & DRAWFLAG_MASK) == 0) // when drawing the mask (b&w), the background color must not be painted
@@ -602,7 +602,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                  innerRect.left, innerRect.top, ICONSIZE_16, NULL, drawFlags);
 
         if (drawFlags & DRAWFLAG_SELFOC_CHANGE)
-            cacheValidWidth += 1 + IconSizes[ICONSIZE_16] + 1;
+            cacheValidWidth += 1 + GetIconSizePx(ICONSIZE_16) + 1;
     }
 
     BOOL showCaret = FALSE;
@@ -661,7 +661,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
 
         int nameWidth = Columns[0].Width;
 
-        r.left = x + 1 + IconSizes[ICONSIZE_16] + 1;
+        r.left = x + 1 + GetIconSizePx(ICONSIZE_16) + 1;
         r.right = x + nameWidth;
 
         // if the item is framed, draw only its interior
@@ -730,10 +730,10 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 // measure the actual text length
                 if (GetViewMode() == vmDetailed && (column->FixedWidth == 1 || NarrowedNameColumn))
                 {
-                    textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
+                    textWidth = nameWidth - 1 - GetIconSizePx(ICONSIZE_16) - 1 - 2 - SPACE_WIDTH;
                     GetTextExtentExPointW(hDC, alteredNameW.c_str(), nameLen, textWidth,
                                           &fitChars, DrawItemAlpDx, &fnSZ);
-                    int newWidth = 1 + IconSizes[ICONSIZE_16] + 1 + 2 + fnSZ.cx + 3;
+                    int newWidth = 1 + GetIconSizePx(ICONSIZE_16) + 1 + 2 + fnSZ.cx + 3;
                     if (newWidth > nameWidth)
                         newWidth = nameWidth;
                     adjR.right = r.right = rect.left + newWidth;
@@ -741,7 +741,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 else
                 {
                     GetTextExtentPoint32W(hDC, alteredNameW.c_str(), nameLen, &fnSZ);
-                    adjR.right = r.right = rect.left + 1 + IconSizes[ICONSIZE_16] + 1 + 2 + fnSZ.cx + 3;
+                    adjR.right = r.right = rect.left + 1 + GetIconSizePx(ICONSIZE_16) + 1 + 2 + fnSZ.cx + 3;
                 }
 
                 // focus will also be shorter
@@ -754,7 +754,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 {
                     // no width measured yet - let's measure it now
                     // the string may be longer than the available space and must end with "..."
-                    textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
+                    textWidth = nameWidth - 1 - GetIconSizePx(ICONSIZE_16) - 1 - 2 - SPACE_WIDTH;
                     GetTextExtentExPointW(hDC, alteredNameW.c_str(), nameLen, textWidth,
                                           &fitChars, DrawItemAlpDx, &fnSZ);
                 }
@@ -1076,7 +1076,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             (Configuration.FullRowSelect || focusFrameRightValid))
         {
             r = rect;
-            r.left += 1 + IconSizes[ICONSIZE_16] + 1;
+            r.left += 1 + GetIconSizePx(ICONSIZE_16) + 1;
             r.right = x;
             if (focusFrameRightValid)
                 r.right = focusFrameRight;
@@ -1357,8 +1357,8 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
     if (drawFlags & DRAWFLAG_SKIP_VISTEST || RectVisible(hDC, &rect))
     {
         // icon/thumbnail size
-        int iconW = IconSizes[iconSize];
-        int iconH = IconSizes[iconSize];
+        int iconW = GetIconSizePx(iconSize);
+        int iconH = GetIconSizePx(iconSize);
 
         HBITMAP hScaled = NULL; // if not NULL, draw the thumbnail; otherwise draw the icon
         if (GetViewMode() == vmThumbnails)
@@ -1367,7 +1367,7 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             if (Is(ptDisk) && !isDir)
             {
                 int icon;
-                const std::wstring fileName = MakeDwordCompareKey(f->Name, f->NameLen); // #115: padded lookup key
+                const std::wstring fileName = MakeDwordCompareKey(f->Name, f->NameLen); // padded lookup key
 
                 if (IconCache->GetIndex(fileName.c_str(), icon, NULL, NULL))
                 {
@@ -1614,7 +1614,7 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
         }
         else
         {
-            outerRect.top += 2 + IconSizes[ICONSIZE_32];
+            outerRect.top += 2 + GetIconSizePx(ICONSIZE_32);
             y = outerRect.top + 4;
         }
 
@@ -1893,8 +1893,8 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
     if (drawFlags & DRAWFLAG_SKIP_VISTEST || RectVisible(hDC, &rect))
     {
         // icon size
-        int iconW = IconSizes[iconSize];
-        int iconH = IconSizes[iconSize];
+        int iconW = GetIconSizePx(iconSize);
+        int iconH = GetIconSizePx(iconSize);
 
         // icon position
         int iconX = rect.left + TILE_LEFT_MARGIN;
@@ -1959,7 +1959,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
         int itemWidth = rect.right - rect.left; // item width
 
         // texts must not exceed this length in pixels
-        int maxTextWidth = itemWidth - TILE_LEFT_MARGIN - IconSizes[iconSize] - TILE_LEFT_MARGIN - 4;
+        int maxTextWidth = itemWidth - TILE_LEFT_MARGIN - GetIconSizePx(iconSize) - TILE_LEFT_MARGIN - 4;
         int widthNeeded = 0;
 
         const CTileTexts texts = GetTileTexts(f, isDir ? (isItemUpDir ? 2 /* UP-DIR */ : 1) : 0,
@@ -1979,7 +1979,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
 
         // outer rectangle from which I clear towards the inner one
         RECT outerRect = rect;
-        outerRect.left += TILE_LEFT_MARGIN + IconSizes[iconSize];
+        outerRect.left += TILE_LEFT_MARGIN + GetIconSizePx(iconSize);
 
         //int oldRTop = r.top;
 
@@ -2114,8 +2114,8 @@ BOOL StateImageList_Draw(CIconList* iconList, int imageIndex, HDC hDC, int xDst,
         yOverlayDst += 48 - 32;
     }
 
-    int iconW = IconSizes[iconSize];
-    int iconH = IconSizes[iconSize];
+    int iconW = GetIconSizePx(iconSize);
+    int iconH = GetIconSizePx(iconSize);
 
     // for a thumbnail overlayRect != NULL and we move the overlay to its lower left corner
     if (overlayRect != NULL)

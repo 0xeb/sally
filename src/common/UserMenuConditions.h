@@ -10,7 +10,7 @@
 
 class CMaskGroup;
 
-// Issue #50: a top-level User Menu command (or submenu) can be shown only when the active panel
+// A top-level User Menu command (or submenu) can be shown only when the active panel
 // matches its rule. The rule has two optional parts, both Sally masks; when both are given, both
 // must match:
 //   - the focused-file mask, against the name of the focused ordinary file (a folder, ".." or

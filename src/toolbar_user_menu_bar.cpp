@@ -387,7 +387,7 @@ public:
                                                             shell, FALSE, FALSE, TRUE, umitItem, NULL);
 
                     // find the place where the item should be inserted: before the entry of the
-                    // button it was dropped on (#50: buttons of hidden commands do not count),
+                    // button it was dropped on (buttons of hidden commands do not count),
                     // or at the end after the last button
                     const std::vector<size_t>& shown = UserMenuBar->GetShownEntries();
                     int i = 0;
@@ -485,7 +485,7 @@ BOOL CUserMenuBar::CreateButtons(const Sally::UserMenuConditions::Context& conte
 
     // load icons into own toolbar
     // insert only items and submenus from the top level; the rest will expand as submenus.
-    // #50: commands whose "Show only when" rule does not match 'context' are left out; button
+    // Commands whose "Show only when" rule does not match 'context' are left out; button
     // IDs keep the User Menu index, so a click still runs the command it shows.
     CUserMenuItems& items = *MainWindow->UserMenuItems;
     ShownEntries = Sally::UserMenuConditions::ToolbarEntries(UserMenuConditionEntries(items, items.Count, context));

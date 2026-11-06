@@ -10,8 +10,8 @@
 // ICONOVERLAYINDEX_NOTUSED (31) reserved as the "no overlay" sentinel. So the maximum valid
 // index is 30 and at most 31 handlers can be loaded. (Explorer itself only shows ~11-15
 // overlays via its system image list; Sally does its own overlay resolution and is not
-// bound by that image-list limit — see issue #83, where TortoiseGit/SVN handlers were being
-// squeezed out past the previous cap of 15 by OneDrive/Dropbox.)
+// bound by that image-list limit — with the previous cap of 15, TortoiseGit/SVN handlers
+// were being squeezed out by OneDrive/Dropbox.)
 //
 // This value MUST equal ICONOVERLAYINDEX_NOTUSED (plugins/shared/spl_com.h). shiconov.cpp
 // static_asserts the two stay in sync so a valid index (cap-1) can never collide with the

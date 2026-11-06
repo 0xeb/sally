@@ -4503,7 +4503,7 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
     // - under Vista it misbehaved badly; forget Vista, it is almost dead anyway, and
     //   when using the old algorithm against Win7 over the network I saw no speed difference
     //   for uploads, and downloads were only 15% slower (acceptable)
-    // - historically the asynchronous algorithm was used for network copies only; issue #52 also
+    // - historically the asynchronous algorithm was used for network copies only; Sally also
     //   allows large plain copies between fast local volumes to use the same loop for measurement
     // - with the old algorithm, copying on Win7 over the network is easily 2x-3x slower for downloads,
     //   almost 2x slower for uploads, and about 30% slower for network-to-network copies

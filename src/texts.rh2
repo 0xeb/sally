@@ -2765,6 +2765,9 @@
 
 #define IDS_MENU_EDIT_UNDO               14256
 #define IDS_UNDO_FAILED                  14257
+// Edit > Undo and Ctrl+Z confirm the shell's undo (ids after the tab strings: 14292-14293)
+#define IDS_UNDO_CONFIRM                 14292
+#define IDS_UNDO_NOTHING                 14293
 
 
 // Configuration navigation and explicit Apply/Save actions.
@@ -2786,6 +2789,27 @@
 #define IDS_PROFILE_MANAGER                    14270
 #define IDS_PROFILE_NAME_RULE                  14271
 #define IDS_PROFILE_DELETE_CONFIRM             14272
+
+// Panel tabs: the Commands > Tabs menu, the tab strip's menus
+#define IDS_MENU_CMD_TABS                      14273
+#define IDS_MENU_TAB_NEW                       14274
+#define IDS_MENU_TAB_DUPLICATE                 14275
+#define IDS_MENU_TAB_OPENFOCUSED               14276
+#define IDS_MENU_TAB_CLOSE                     14277
+#define IDS_MENU_TAB_CLOSEOTHERS               14278
+#define IDS_MENU_TAB_REOPEN                    14279
+#define IDS_MENU_TAB_NEXT                      14280
+#define IDS_MENU_TAB_PREV                      14281
+#define IDS_MENU_TAB_ALWAYSSHOW                14282
+#define IDS_TAB_COPYPATH                       14283
+#define IDS_TAB_LIMIT                          14284
+#define IDS_MENU_TAB_RENAME                    14285
+#define IDS_MENU_TAB_LOCK                      14286
+#define IDS_MENU_TAB_MOVELEFT                  14287
+#define IDS_MENU_TAB_MOVERIGHT                 14288
+#define IDS_TAB_RENAME_TITLE                   14289
+#define IDS_TAB_RENAME_PROMPT                  14290
+#define IDS_TAB_DRIVEMARK                      14291
 
 //#define CM_TEXTS_MAX                  18000    // maximal texts id
 
