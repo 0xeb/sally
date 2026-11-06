@@ -788,8 +788,8 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             panel->SelectItems = !panel->GetSel(panel->FocusedIndex);
         }
 
-        // Alt+Shift+Down opened the command line from the panel; it also goes back
-        if (wParam == VK_DOWN && altPressed && shiftPressed && !controlPressed &&
+        // Ctrl+Shift+Down opened the command line from the panel; it also goes back
+        if (wParam == VK_DOWN && controlPressed && shiftPressed && !altPressed &&
             !MainWindow->EditWindow->Dropped())
         {
             if (firstPress) // a held key stays here instead of flipping between panel and command line

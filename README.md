@@ -55,7 +55,7 @@ Open Salamander became loved because it made serious file work feel direct: two 
 Each panel holds as many tabs as you need, so a dual-panel workflow no longer means juggling two folders at a time.
 
 - A tab shows a folder on disk, a place inside an archive, or a plugin file system such as FTP or the Registry. Each tab keeps its own view, sort order, filter, focused item, selection and Back/Forward history.
-- `Ctrl+Shift+T` opens a tab at the current folder, `Ctrl+Shift+W` closes it, and `Ctrl+Tab`/`Ctrl+Shift+Tab` (or `Alt+Shift+Right`/`Left`) switch to the next and previous tab. The command line, which `Ctrl+Tab` used to open, is now `Alt+Shift+Down`. A double-click on the tab bar opens a tab, a middle-click closes one, and the mouse wheel over the bar switches.
+- `Ctrl+Shift+T` opens a tab at the current folder, `Ctrl+Shift+W` closes it, and `Ctrl+Tab`/`Ctrl+Shift+Tab` (or `Alt+Shift+Right`/`Left`) switch to the next and previous tab. The command line, which `Ctrl+Tab` used to open, is now `Ctrl+Shift+Down`. A double-click on the tab bar opens a tab, a middle-click closes one, and the mouse wheel over the bar switches.
 - Right-click a tab to duplicate, rename, lock, move or close it, close the others, or reopen the tabs you closed. Locked tabs stay open; renamed tabs keep their name.
 - Drag tabs into order, and drop folders from a panel or from Explorer on the tab bar to open each in a new tab.
 - Tabs are saved with the configuration and come back at the next start. Background tabs read their folders only when you switch to them, so many tabs do not slow startup.

@@ -126,7 +126,7 @@ BEGIN
     VK_DIVIDE,      CM_DOSSHELL,            VIRTKEY 
     VK_DELETE,      CM_DELETEFILES,         VIRTKEY 
     VK_DELETE,      CM_DELETEFILES,         VIRTKEY, SHIFT
-    VK_DOWN,        CM_EDITLINE,            VIRTKEY, SHIFT, ALT
+    VK_DOWN,        CM_EDITLINE,            VIRTKEY, SHIFT, CONTROL
     "T",            CM_TAB_NEW,             VIRTKEY, SHIFT, CONTROL
     "W",            CM_TAB_CLOSE,           VIRTKEY, SHIFT, CONTROL
     VK_TAB,         CM_TAB_NEXT,            VIRTKEY, CONTROL
