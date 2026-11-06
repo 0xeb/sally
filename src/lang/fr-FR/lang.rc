@@ -1917,7 +1917,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,31,236,266,1
     CONTROL         "Ouvrir les nouveaux onglets à la fin de la &barre d’onglets",IDC_TABSATEND,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
-    CONTROL         "Utiliser &les raccourcis d’onglets de Total Commander (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+    CONTROL         "Utiliser &les raccourcis d’onglets de Total Commander (Ctrl+T, Ctrl+W)",IDC_TABKEYSTC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,285,12
 END
 
@@ -4255,8 +4255,8 @@ BEGIN
  IDS_MENU_TAB_CLOSE, "&Fermer l’onglet\tCtrl+Maj+W"
  IDS_MENU_TAB_CLOSEOTHERS, "Fermer les &autres onglets"
  IDS_MENU_TAB_REOPEN, "&Rouvrir l’onglet fermé"
- IDS_MENU_TAB_NEXT, "Onglet &suivant\tAlt+Maj+Flèche droite"
- IDS_MENU_TAB_PREV, "Onglet &précédent\tAlt+Maj+Flèche gauche"
+ IDS_MENU_TAB_NEXT, "Onglet &suivant\tCtrl+Tab"
+ IDS_MENU_TAB_PREV, "Onglet &précédent\tCtrl+Maj+Tab"
  IDS_MENU_TAB_ALWAYSSHOW, "&Toujours afficher la barre d’onglets"
  IDS_TAB_COPYPATH, "Copier le &chemin d’accès"
  IDS_TAB_LIMIT, "Un panneau peut contenir au maximum %d onglets."

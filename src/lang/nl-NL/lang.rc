@@ -1917,7 +1917,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,39,236,258,1
     CONTROL         "Nieuwe tabbladen openen aan het eind van de ta&bbladbalk",IDC_TABSATEND,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
-    CONTROL         "Sn&eltoetsen van Total Commander voor tabbladen (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+    CONTROL         "Sn&eltoetsen van Total Commander voor tabbladen (Ctrl+T, Ctrl+W)",IDC_TABKEYSTC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,282,12
 END
 
@@ -4255,8 +4255,8 @@ BEGIN
  IDS_MENU_TAB_CLOSE, "Tabblad &sluiten\tCtrl+Shift+W"
  IDS_MENU_TAB_CLOSEOTHERS, "&Andere tabbladen sluiten"
  IDS_MENU_TAB_REOPEN, "Gesloten tabblad &heropenen"
- IDS_MENU_TAB_NEXT, "&Volgend tabblad\tAlt+Shift+Rechts"
- IDS_MENU_TAB_PREV, "Vo&rig tabblad\tAlt+Shift+Links"
+ IDS_MENU_TAB_NEXT, "&Volgend tabblad\tCtrl+Tab"
+ IDS_MENU_TAB_PREV, "Vo&rig tabblad\tCtrl+Shift+Tab"
  IDS_MENU_TAB_ALWAYSSHOW, "&Tabbladbalk altijd weergeven"
  IDS_TAB_COPYPATH, "&Pad kopiëren"
  IDS_TAB_LIMIT, "Een paneel kan maximaal %d tabbladen hebben."

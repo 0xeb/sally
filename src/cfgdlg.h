@@ -310,7 +310,7 @@ struct CConfiguration
     int ShowPanelZoom;    // should the Zoom button be shown in the directory line?
     int ShowTabBar;       // always show each panel's tab strip (otherwise only with two or more tabs)
     int TabsOpenAtEnd;    // new tabs go after the last tab (otherwise right after the active one)
-    int TabKeysTotalCommander; // Ctrl+T, Ctrl+W, Ctrl+Tab and Ctrl+Shift+Tab work on tabs
+    int TabKeysTotalCommander; // Ctrl+T and Ctrl+W open and close tabs
 
     std::wstring InfoLineContent;
 

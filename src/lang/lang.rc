@@ -1956,7 +1956,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,23,236,274,1
     CONTROL         "Open new tabs at the end of the ta&b bar",IDC_TABSATEND,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
-    CONTROL         "Use Total Commander &keys for tabs (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+    CONTROL         "Use Total Commander &keys for tabs (Ctrl+T, Ctrl+W)",IDC_TABKEYSTC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,282,12
 END
 

@@ -73,6 +73,7 @@ protected:
     void ShowOverflowMenu();
 };
 
-// The Total Commander key profile (Configuration.TabKeysTotalCommander): Ctrl+T, Ctrl+W, Ctrl+Tab
-// and Ctrl+Shift+Tab work on the active panel's tabs. Returns TRUE when it handled 'msg'.
+// The Total Commander key profile (Configuration.TabKeysTotalCommander): Ctrl+T and Ctrl+W open
+// and close the active panel's tabs (Ctrl+Tab and Ctrl+Shift+Tab switch tabs in every profile).
+// Returns TRUE when it handled 'msg'.
 BOOL TranslateTabKeyProfile(CMainWindow* mainWindow, const MSG& msg);

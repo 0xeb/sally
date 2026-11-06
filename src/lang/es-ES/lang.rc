@@ -1917,7 +1917,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,35,236,262,1
     CONTROL         "A&brir las pestañas nuevas al final de la barra de pestañas",IDC_TABSATEND,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
-    CONTROL         "Usar &las teclas de Total Commander para pestañas (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+    CONTROL         "Usar &las teclas de Total Commander para pestañas (Ctrl+T, Ctrl+W)",IDC_TABKEYSTC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,285,12
 END
 
@@ -4255,8 +4255,8 @@ BEGIN
  IDS_MENU_TAB_CLOSE, "&Cerrar pestaña\tCtrl+Mays+W"
  IDS_MENU_TAB_CLOSEOTHERS, "Cerrar las &otras pestañas"
  IDS_MENU_TAB_REOPEN, "&Reabrir pestaña cerrada"
- IDS_MENU_TAB_NEXT, "Pestaña &siguiente\tAlt+Mays+Flecha dcha"
- IDS_MENU_TAB_PREV, "Pestaña an&terior\tAlt+Mays+Flecha izda"
+ IDS_MENU_TAB_NEXT, "Pestaña &siguiente\tCtrl+Tab"
+ IDS_MENU_TAB_PREV, "Pestaña an&terior\tCtrl+Mays+Tab"
  IDS_MENU_TAB_ALWAYSSHOW, "&Mostrar siempre la barra de pestañas"
  IDS_TAB_COPYPATH, "Co&piar ruta"
  IDS_TAB_LIMIT, "Un panel puede tener como máximo %d pestañas."

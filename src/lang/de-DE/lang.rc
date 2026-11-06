@@ -1917,7 +1917,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,23,236,274,1
     CONTROL         "Neue Tabs am Ende der Ta&b-Leiste öffnen",IDC_TABSATEND,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
-    CONTROL         "Total-Commander-Tasten&kürzel für Tabs verwenden (Strg+T, Strg+W, Strg+Tab)",IDC_TABKEYSTC,
+    CONTROL         "Total-Commander-Tasten&kürzel für Tabs verwenden (Strg+T, Strg+W)",IDC_TABKEYSTC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,282,12
 END
 
@@ -4255,8 +4255,8 @@ BEGIN
  IDS_MENU_TAB_CLOSE, "Tab &schließen\tStrg+Umschalt+W"
  IDS_MENU_TAB_CLOSEOTHERS, "&Andere Tabs schließen"
  IDS_MENU_TAB_REOPEN, "Geschlossenen Tab &wieder öffnen"
- IDS_MENU_TAB_NEXT, "Nä&chster Tab\tAlt+Umschalt+Rechts"
- IDS_MENU_TAB_PREV, "&Vorheriger Tab\tAlt+Umschalt+Links"
+ IDS_MENU_TAB_NEXT, "Nä&chster Tab\tStrg+Tab"
+ IDS_MENU_TAB_PREV, "&Vorheriger Tab\tStrg+Umschalt+Tab"
  IDS_MENU_TAB_ALWAYSSHOW, "Tab-&Leiste immer anzeigen"
  IDS_TAB_COPYPATH, "&Pfad kopieren"
  IDS_TAB_LIMIT, "Ein Dateifenster kann höchstens %d Tabs enthalten."

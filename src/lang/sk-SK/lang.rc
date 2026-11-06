@@ -1917,7 +1917,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,23,236,274,1
     CONTROL         "O&tvárať nové karty na konci lišty kariet",IDC_TABSATEND,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
-    CONTROL         "Používať pre karty klávesy pro&gramu Total Commander (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+    CONTROL         "Používať pre karty klávesy pro&gramu Total Commander (Ctrl+T, Ctrl+W)",IDC_TABKEYSTC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,285,12
 END
 
@@ -4255,8 +4255,8 @@ BEGIN
  IDS_MENU_TAB_CLOSE, "&Zavrieť kartu\tCtrl+Shift+W"
  IDS_MENU_TAB_CLOSEOTHERS, "Zavrieť o&statné karty"
  IDS_MENU_TAB_REOPEN, "Zno&vu otvoriť zatvorenú kartu"
- IDS_MENU_TAB_NEXT, "Nasle&dujúca karta\tAlt+Shift+Šípka vpravo"
- IDS_MENU_TAB_PREV, "&Predchádzajúca karta\tAlt+Shift+Šípka vľavo"
+ IDS_MENU_TAB_NEXT, "Nasle&dujúca karta\tCtrl+Tab"
+ IDS_MENU_TAB_PREV, "&Predchádzajúca karta\tCtrl+Shift+Tab"
  IDS_MENU_TAB_ALWAYSSHOW, "Vždy zobrazovať &lištu kariet"
  IDS_TAB_COPYPATH, "Kopírovať &cestu"
  IDS_TAB_LIMIT, "Panel môže mať najviac %d kariet."

@@ -423,7 +423,7 @@ CConfiguration::CConfiguration()
     ShowPanelZoom = TRUE;
     ShowTabBar = TRUE; // a profile without the value (new, or from before tabs) shows the strip
     TabsOpenAtEnd = FALSE;
-    TabKeysTotalCommander = FALSE; // Sally's own Ctrl+T, Ctrl+W and Ctrl+Tab stay
+    TabKeysTotalCommander = FALSE; // Sally's own Ctrl+T and Ctrl+W stay
     InfoLineContent = L"$(FileName): $(FileSize), $(FileDate), $(FileTime), $(FileAttributes), $(FileDOSName)";
 
     HotPathAutoConfig = TRUE;

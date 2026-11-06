@@ -463,15 +463,9 @@ BOOL TranslateTabKeyProfile(CMainWindow* mainWindow, const MSG& msg)
         command = CM_TAB_NEW;
     else if (msg.wParam == 'W' && !shift)
         command = CM_TAB_CLOSE;
-    else if (msg.wParam == VK_TAB)
-    {
-        if (panel->Tabs.Count() < 2)
-            return FALSE; // one tab: Ctrl+Tab still reaches the command line
-        command = shift ? CM_TAB_PREV : CM_TAB_NEXT;
-    }
     if (command == 0)
         return FALSE;
-    if (!repeat || command == CM_TAB_NEXT || command == CM_TAB_PREV) // holding Ctrl+T/W does not repeat
+    if (!repeat) // holding Ctrl+T/W does not repeat
         SendMessage(mainWindow->HWindow, WM_COMMAND, command, 0);
     return TRUE;
 }

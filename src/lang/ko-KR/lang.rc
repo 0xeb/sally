@@ -1917,7 +1917,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,15,236,282,1
     CONTROL         "새 탭을 탭 표시줄 끝에 열기(&B)",IDC_TABSATEND,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
-    CONTROL         "탭에 Total Commander 바로 가기 키 사용(Ctrl+T, Ctrl+W, Ctrl+Tab)(&K)",IDC_TABKEYSTC,
+    CONTROL         "탭에 Total Commander 바로 가기 키 사용(Ctrl+T, Ctrl+W)(&K)",IDC_TABKEYSTC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,282,12
 END
 
@@ -4255,8 +4255,8 @@ BEGIN
  IDS_MENU_TAB_CLOSE, "탭 닫기(&C)\tCtrl+Shift+W"
  IDS_MENU_TAB_CLOSEOTHERS, "다른 탭 닫기(&H)"
  IDS_MENU_TAB_REOPEN, "닫은 탭 다시 열기(&R)"
- IDS_MENU_TAB_NEXT, "다음 탭(&X)\tAlt+Shift+오른쪽 화살표"
- IDS_MENU_TAB_PREV, "이전 탭(&P)\tAlt+Shift+왼쪽 화살표"
+ IDS_MENU_TAB_NEXT, "다음 탭(&X)\tCtrl+Tab"
+ IDS_MENU_TAB_PREV, "이전 탭(&P)\tCtrl+Shift+Tab"
  IDS_MENU_TAB_ALWAYSSHOW, "탭 표시줄 항상 표시(&A)"
  IDS_TAB_COPYPATH, "경로 복사(&P)"
  IDS_TAB_LIMIT, "패널에는 탭을 최대 %d개까지 열 수 있습니다."

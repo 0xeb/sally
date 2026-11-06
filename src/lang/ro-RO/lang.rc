@@ -1917,7 +1917,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,21,236,276,1
     CONTROL         "Deschide filele noi la sfârșitul &barei de file",IDC_TABSATEND,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
-    CONTROL         "Fo&losește tastele din Total Commander pentru file (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+    CONTROL         "Fo&losește tastele din Total Commander pentru file (Ctrl+T, Ctrl+W)",IDC_TABKEYSTC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,285,12
 END
 
@@ -4255,8 +4255,8 @@ BEGIN
  IDS_MENU_TAB_CLOSE, "Închide &fila\tCtrl+Shift+W"
  IDS_MENU_TAB_CLOSEOTHERS, "Închide &celelalte file"
  IDS_MENU_TAB_REOPEN, "&Redeschide fila închisă"
- IDS_MENU_TAB_NEXT, "Fila urmă&toare\tAlt+Shift+Right Arrow"
- IDS_MENU_TAB_PREV, "Fila &precedentă\tAlt+Shift+Left Arrow"
+ IDS_MENU_TAB_NEXT, "Fila urmă&toare\tCtrl+Tab"
+ IDS_MENU_TAB_PREV, "Fila &precedentă\tCtrl+Shift+Tab"
  IDS_MENU_TAB_ALWAYSSHOW, "&Afișează mereu bara de file"
  IDS_TAB_COPYPATH, "Copiază ca&lea"
  IDS_TAB_LIMIT, "Un panou poate avea cel mult %d de file."

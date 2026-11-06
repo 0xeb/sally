@@ -2,7 +2,7 @@
   "_copyright": "SPDX-FileCopyrightText: 2026 Elias Bachaalany",
   "_license": "SPDX-License-Identifier: GPL-2.0-or-later",
   "announcements": [],
-  "notes_source_sha256": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
+  "notes_source_sha256": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
   "notes_titles": {
     "cs-CZ": "Novinky",
     "de-DE": "Was ist neu?",
@@ -18,17 +18,17 @@
     "zh-CN": "更新内容"
   },
   "notes_translation_source_sha256": {
-    "cs-CZ": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "de-DE": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "es-ES": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "fr-FR": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "hu-HU": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "ko-KR": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "nl-NL": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "ro-RO": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "ru-RU": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "sk-SK": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6",
-    "zh-CN": "07ff6866816852b47ab1b46ee1aaed036ab652f8b927b48d356f714b4207f6a6"
+    "cs-CZ": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "de-DE": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "es-ES": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "fr-FR": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "hu-HU": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "ko-KR": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "nl-NL": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "ro-RO": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "ru-RU": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "sk-SK": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd",
+    "zh-CN": "8e3e0c2a146675e386f2728e0679472d576ab48c4dc7ac1076474f68fc59f4fd"
   },
   "release_version": "1.0.47",
   "schema_version": 1

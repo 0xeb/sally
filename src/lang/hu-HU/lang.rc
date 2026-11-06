@@ -1917,7 +1917,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,25,236,272,1
     CONTROL         "Új lapok megnyitása a lapsáv &végén",IDC_TABSATEND,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,242,282,12
-    CONTROL         "Total Commander-&billentyűk használata a lapokhoz (Ctrl+T, Ctrl+W, Ctrl+Tab)",IDC_TABKEYSTC,
+    CONTROL         "Total Commander-&billentyűk használata a lapokhoz (Ctrl+T, Ctrl+W)",IDC_TABKEYSTC,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,254,285,12
 END
 
@@ -4255,8 +4255,8 @@ BEGIN
  IDS_MENU_TAB_CLOSE, "Lap &bezárása\tCtrl+Shift+W"
  IDS_MENU_TAB_CLOSEOTHERS, "&Többi lap bezárása"
  IDS_MENU_TAB_REOPEN, "Bezárt lap &visszaállítása"
- IDS_MENU_TAB_NEXT, "&Következő lap\tAlt+Shift+Jobbra nyíl"
- IDS_MENU_TAB_PREV, "&Előző lap\tAlt+Shift+Balra nyíl"
+ IDS_MENU_TAB_NEXT, "&Következő lap\tCtrl+Tab"
+ IDS_MENU_TAB_PREV, "&Előző lap\tCtrl+Shift+Tab"
  IDS_MENU_TAB_ALWAYSSHOW, "Lap&sáv mindig látható"
  IDS_TAB_COPYPATH, "&Elérési út másolása"
  IDS_TAB_LIMIT, "Egy panelen legfeljebb %d lap lehet."

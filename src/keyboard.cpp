@@ -50,9 +50,9 @@ BOOL IsSalHotKey(WORD hotKey)
     {
         switch (mods)
         {
-        case NONE:    // switch panels
-        case CONTROL: // go to/from command line
-        case CONTROL_SHIFT: // next tab
+        case NONE:          // switch panels
+        case CONTROL:       // next tab
+        case CONTROL_SHIFT: // previous tab
             found = TRUE;
         }
         break;
@@ -179,10 +179,11 @@ BOOL IsSalHotKey(WORD hotKey)
     {
         switch (mods)
         {
-        case NONE:    // down
-        case CONTROL: // scroll down, keep cursor
-        case ALT:     // down to selected item
-        case SHIFT:   // select + down
+        case NONE:      // down
+        case CONTROL:   // scroll down, keep cursor
+        case ALT:       // down to selected item
+        case SHIFT:     // select + down
+        case ALT_SHIFT: // go to/from command line
             found = TRUE;
         }
         break;
