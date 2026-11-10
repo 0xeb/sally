@@ -40,7 +40,10 @@ TextStatus TextEngine::FindPreviousLine(const PreviousLineQuery& query, Previous
     const EolPolicy& eol = m_config.Eol;
     ChunkedByteSource::Scope scope(m_source);
 
-    std::int64_t seek = Align(std::min(std::max(query.Seek, textStart), std::max(size, textStart)));
+    std::int64_t seek = std::min(std::max(query.Seek, textStart), std::max(size, textStart));
+    // EOF can follow a one-byte UTF-16 tail. Keep that scalar in the forward
+    // wrapping pass while scanning complete code units backward below.
+    if (seek != size) seek = Align(seek);
     const std::int64_t minSeek = std::max(query.MinSeek, textStart);
     bool takeLineBegin = query.TakeLineBegin;
     bool addLineIfSeekIsWrap = query.AddLineIfSeekIsWrap;
@@ -63,7 +66,7 @@ TextStatus TextEngine::FindPreviousLine(const PreviousLineQuery& query, Previous
     constexpr std::uint32_t Nul = 1;
     std::uint32_t kind = 0;
     bool failed = false;
-    std::int64_t pos = seek - unit;
+    std::int64_t pos = Align(seek) - unit;
     const std::uint8_t* chunk = nullptr;
     std::int64_t chunkStart = 0;
     std::int64_t chunkEnd = 0;

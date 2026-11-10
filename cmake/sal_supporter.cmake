@@ -53,6 +53,9 @@ function(sal_add_supporter_variant suffix runtime)
     "${_supporter_root}/src/common/Win32SupporterState.cpp"
     "${_supporter_root}/src/common/Win32ApplicationAppearance.cpp"
     "${_supporter_root}/src/common/Win32SupporterUi.cpp"
+    "${_supporter_root}/src/plugins/shared/plugindarkmode.cpp"
+    "${_supporter_root}/src/combo_dark_paint.cpp"
+    "${_supporter_root}/src/common/update/UpdateAccess.cpp"
     "${_supporter_root}/src/common/update/DisplayContent.cpp" "${_public_keys}")
   target_include_directories(sally_supporter_${suffix} PUBLIC "${_supporter_root}/src/common" PRIVATE "${_supporter_root}/src" "${_supporter_root}/src/common/dep")
   target_link_libraries(sally_supporter_${suffix} PUBLIC sally_sodium_${suffix} sally_cmark_${suffix})

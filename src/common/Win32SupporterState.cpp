@@ -89,5 +89,17 @@ namespace Sally::Supporter
         registry.CloseKey(key);
         return result;
     }
+    std::wstring SupporterUtcDate(uint64_t seconds)
+        {
+            ULARGE_INTEGER value;
+            value.QuadPart = (seconds + 11644473600ULL) * 10000000ULL;
+            FILETIME file = {value.LowPart, value.HighPart};
+            SYSTEMTIME utc{};
+            if (!FileTimeToSystemTime(&file, &utc))
+                return {};
+            wchar_t text[32]{};
+            swprintf_s(text, L"%04u-%02u-%02u %02u:%02u:%02u UTC", utc.wYear, utc.wMonth, utc.wDay, utc.wHour, utc.wMinute, utc.wSecond);
+            return text;
+        }
     uint64_t NowUtc() { return static_cast<uint64_t>(std::time(nullptr)); }
 } // namespace Sally::Supporter

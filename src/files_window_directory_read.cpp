@@ -2595,7 +2595,20 @@ BOOL CFilesWindow::ChangePathToDrvType(HWND parent, int driveType, const wchar_t
     return FALSE;
 }
 
-void CFilesWindow::ChangeDrive(wchar_t drive)
+POINT CFilesWindow::GetDirectoryMenuPosition()
+{
+    RECT rect = {};
+    if (DirectoryLine != NULL && DirectoryLine->HWindow != NULL && IsWindowVisible(DirectoryLine->HWindow))
+    {
+        GetWindowRect(DirectoryLine->HWindow, &rect);
+        return {rect.left, rect.bottom};
+    }
+    // The file list already accounts for visible tabs and the hidden-line border.
+    GetWindowRect(ListBox != NULL && ListBox->HWindow != NULL ? ListBox->HWindow : HWindow, &rect);
+    return {rect.left, rect.top};
+}
+
+void CFilesWindow::ChangeDrive(wchar_t drive, const RECT* menuOpener)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::ChangeDrive(%u)", drive);
     //--- DefaultDire refresh
@@ -2612,7 +2625,7 @@ void CFilesWindow::ChangeDrive(wchar_t drive)
         if (CDrivesList(this, ((Is(ptDisk) || Is(ptZIPArchive)) ? GetPathW() : L""),
                         &driveType, &driveTypeParam, &postCmd, &postCmdParam,
                         &fromContextMenu)
-                    .Track() == FALSE ||
+                    .Track(menuOpener) == FALSE ||
             fromContextMenu && postCmd == 0) // only close-menu executed from context menu
         {
             return;

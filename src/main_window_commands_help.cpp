@@ -1251,6 +1251,22 @@ void CMainWindow::RebuildDriveBarsIfNeeded(BOOL useDrivesMask, DWORD drivesMask,
     }
 }
 
+void CMainWindow::OpenDriveMenu(CFilesWindow* panel, const RECT* menuOpener)
+{
+    if (GetActivePanel() != panel)
+    {
+        ChangePanel();
+        if (GetActivePanel() != panel)
+            return; // the panel cannot be activated
+        UpdateWindow(HWindow); // render the focus before the menu appears
+    }
+    if (panel->DirectoryLine != NULL)
+        panel->DirectoryLine->SetDrivePressed(TRUE);
+    panel->ChangeDrive(0, menuOpener);
+    if (panel->DirectoryLine != NULL)
+        panel->DirectoryLine->SetDrivePressed(FALSE);
+}
+
 LRESULT
 CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -1871,14 +1887,21 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         DWORD id = tii.ID;
 
         RECT r;
-        tlb->GetItemRect(index, r);
+        if (!tlb->GetItemRect(index, r))
+            return 0;
 
         switch (id)
         {
         case CM_LCHANGEDRIVE:
         case CM_RCHANGEDRIVE:
         {
-            SendMessage(HWindow, WM_COMMAND, id, 0);
+            if (HelpMode)
+                SendMessage(HWindow, WM_COMMAND, id, 0);
+            else
+            {
+                CancelPanelsUI(); // preserve the command path's QuickSearch/QuickEdit cancellation
+                OpenDriveMenu(id == CM_LCHANGEDRIVE ? LeftPanel : RightPanel, &r);
+            }
             break;
         }
 
@@ -3451,35 +3474,13 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             // change the current drive in the left panel
         case CM_LCHANGEDRIVE:
         {
-            if (activePanel != LeftPanel)
-            {
-                ChangePanel();
-                if (GetActivePanel() != LeftPanel)
-                    return 0;          // the panel cannot be activated
-                UpdateWindow(HWindow); // render the focus before the menu appears
-            }
-            if (LeftPanel->DirectoryLine != NULL)
-                LeftPanel->DirectoryLine->SetDrivePressed(TRUE);
-            LeftPanel->ChangeDrive();
-            if (LeftPanel->DirectoryLine != NULL)
-                LeftPanel->DirectoryLine->SetDrivePressed(FALSE);
+            OpenDriveMenu(LeftPanel);
             return 0;
         }
             // change of the current drive in the right panel
         case CM_RCHANGEDRIVE:
         {
-            if (activePanel != RightPanel)
-            {
-                ChangePanel();
-                if (GetActivePanel() != RightPanel)
-                    return 0;          // the panel cannot be activated
-                UpdateWindow(HWindow); // render the focus before the menu appears
-            }
-            if (RightPanel->DirectoryLine != NULL)
-                RightPanel->DirectoryLine->SetDrivePressed(TRUE);
-            RightPanel->ChangeDrive();
-            if (RightPanel->DirectoryLine != NULL)
-                RightPanel->DirectoryLine->SetDrivePressed(FALSE);
+            OpenDriveMenu(RightPanel);
             return 0;
         }
             // change the file filter
@@ -4337,13 +4338,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
             MainWindow->CancelPanelsUI(); // cancel QuickSearch and QuickEdit
 
-            RECT r;
-            GetWindowRect(GetActivePanelHWND(), &r);
-            int dirHeight = GetDirectoryLineHeight();
+            const POINT origin = activePanel->GetDirectoryMenuPosition();
 
             CMenuPopup menu;
             HotPaths.FillHotPathsMenu(&menu, CM_ACTIVEHOTPATH_MIN);
-            menu.Track(0, r.left, r.top + dirHeight, HWindow, NULL);
+            menu.Track(0, origin.x, origin.y, HWindow, NULL);
 
             EndStopRefresh();
             return 0;

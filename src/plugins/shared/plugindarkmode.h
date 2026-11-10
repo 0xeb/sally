@@ -24,6 +24,11 @@ struct PluginDarkModeColors
     COLORREF InactiveCaptionText;
 };
 
+// Optional owning-UI-thread override for standalone windows; plugins retain their
+// existing environment/default lookup unless this is explicitly called.
+void PluginDarkMode_SetProfileRoot(const wchar_t* root);
+COLORREF PluginDarkMode_GetLinkColor();
+LRESULT PluginDarkMode_DrawLink(LPARAM notification);
 void PluginDarkMode_Initialize();
 BOOL PluginDarkMode_ShouldUseDark();
 BOOL PluginDarkMode_GetColors(PluginDarkModeColors* colors);

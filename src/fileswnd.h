@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -1001,7 +1001,10 @@ public:
 
     // change drive to DefaultDir[drive], optionally offering a drive menu;
     // when 0, a dialog is shown, the change is applied immediately
-    void ChangeDrive(wchar_t drive = 0);
+    void ChangeDrive(wchar_t drive = 0, const RECT* menuOpener = NULL);
+
+    // Screen origin below the directory line, or at the file list when it is hidden.
+    POINT GetDirectoryMenuPosition();
 
     // it finds the first fixed drive and switches to it;
     // 'parent' is the parent of message boxes;
