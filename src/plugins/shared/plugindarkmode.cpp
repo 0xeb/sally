@@ -61,6 +61,7 @@ const wchar_t* EDIT_CLASS_NAME = L"Edit";
 const wchar_t* COMBOBOX_CLASS_NAME = L"ComboBox";
 const WCHAR* UXTHEME_DARKMODE_EXPLORER = L"DarkMode_Explorer";
 const UINT_PTR PLUGIN_EDIT_FRAME_SUBCLASS_ID = 16;
+const UINT_PTR PLUGIN_HEADER_SUBCLASS_ID = 17;
 
 BOOL Initialized = FALSE;
 PFNSETWINDOWTHEME SetWindowThemePtr = NULL;
@@ -466,6 +467,145 @@ LRESULT CALLBACK PluginEditFrameSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam
     return DefSubclassProc(hwnd, uMsg, wParam, lParam);
 }
 
+// Reads a header item's caption; the control does not report the required length,
+// so grow the buffer while the text fills it. It stops when the text fits or when a
+// larger buffer returns no more text (the control's own limit), so no fixed cap is needed.
+static std::wstring ReadPluginHeaderItemText(HWND hwnd, int index, int* format)
+{
+    std::vector<wchar_t> text(128);
+    size_t previousLength = 0;
+    for (;;)
+    {
+        std::fill(text.begin(), text.end(), L'\0');
+        HDITEMW item = {0};
+        item.mask = HDI_TEXT | HDI_FORMAT;
+        item.pszText = text.data();
+        item.cchTextMax = (int)text.size();
+        if (!SendMessageW(hwnd, HDM_GETITEMW, index, (LPARAM)&item))
+            return std::wstring();
+        *format = item.fmt;
+        size_t length = wcsnlen(text.data(), text.size());
+        if (length + 1 < text.size() || (previousLength != 0 && length == previousLength))
+            return std::wstring(text.data(), length);
+        previousLength = length;
+        text.resize(text.size() * 2);
+    }
+}
+
+// The list view's header is a separate control that the list's window theme does not
+// recolor, so plugin list views kept a light header in dark mode. Same look as the
+// core's dark header: input background, input text, border separators.
+static BOOL PaintPluginDarkHeader(HWND hwnd, HDC paintDC, const PluginDarkModeColors& colors)
+{
+    PAINTSTRUCT ps;
+    HDC hdc = paintDC != NULL ? paintDC : BeginPaint(hwnd, &ps);
+    if (hdc == NULL)
+        return FALSE;
+
+    RECT client;
+    GetClientRect(hwnd, &client);
+    PluginFillRectSolid(hdc, &client, colors.InputBackground);
+
+    HFONT font = (HFONT)SendMessage(hwnd, WM_GETFONT, 0, 0);
+    HFONT oldFont = font != NULL ? (HFONT)SelectObject(hdc, font) : NULL;
+    int oldBkMode = SetBkMode(hdc, TRANSPARENT);
+    COLORREF oldTextColor = SetTextColor(hdc, colors.InputText);
+    HGDIOBJ oldPen = SelectObject(hdc, GetStockObject(DC_PEN));
+    COLORREF oldPenColor = SetDCPenColor(hdc, colors.Border);
+
+    const int padding = MulDiv(6, GetDeviceCaps(hdc, LOGPIXELSX), 96);
+    int count = Header_GetItemCount(hwnd);
+    for (int i = 0; i < count; i++)
+    {
+        RECT itemRect;
+        if (!Header_GetItemRect(hwnd, i, &itemRect))
+            continue;
+        int format = 0;
+        std::wstring text = ReadPluginHeaderItemText(hwnd, i, &format);
+
+        RECT textRect = itemRect;
+        textRect.left += padding;
+        textRect.right -= padding;
+        UINT flags = DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX;
+        if ((format & HDF_CENTER) != 0)
+            flags |= DT_CENTER;
+        else if ((format & HDF_RIGHT) != 0)
+            flags |= DT_RIGHT;
+        else
+            flags |= DT_LEFT;
+        DrawTextW(hdc, text.c_str(), (int)text.size(), &textRect, flags);
+
+        MoveToEx(hdc, itemRect.right - 1, itemRect.top, NULL);
+        LineTo(hdc, itemRect.right - 1, itemRect.bottom);
+    }
+    MoveToEx(hdc, client.left, client.bottom - 1, NULL);
+    LineTo(hdc, client.right, client.bottom - 1);
+
+    SetDCPenColor(hdc, oldPenColor);
+    SelectObject(hdc, oldPen);
+    SetTextColor(hdc, oldTextColor);
+    SetBkMode(hdc, oldBkMode);
+    if (oldFont != NULL)
+        SelectObject(hdc, oldFont);
+    if (paintDC == NULL)
+        EndPaint(hwnd, &ps);
+    return TRUE;
+}
+
+static LRESULT CALLBACK PluginHeaderSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
+                                                 UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
+{
+    UNREFERENCED_PARAMETER(dwRefData);
+
+    switch (uMsg)
+    {
+    case WM_PAINT:
+    case WM_PRINTCLIENT:
+    {
+        // One theme lookup per paint: hot tracking repaints the header often.
+        PluginDarkModeColors colors;
+        HDC dc = uMsg == WM_PRINTCLIENT || wParam != 0 ? (HDC)wParam : NULL;
+        if (PluginDarkMode_GetColors(&colors) && PaintPluginDarkHeader(hwnd, dc, colors))
+            return 0;
+        break;
+    }
+
+    case WM_ERASEBKGND:
+        if (PluginDarkMode_ShouldUseDark())
+            return TRUE;
+        break;
+
+    case WM_THEMECHANGED:
+    case WM_SETTINGCHANGE:
+    case WM_SYSCOLORCHANGE:
+    case WM_SIZE:
+    {
+        LRESULT ret = DefSubclassProc(hwnd, uMsg, wParam, lParam);
+        InvalidateRect(hwnd, NULL, TRUE);
+        return ret;
+    }
+
+    case WM_NCDESTROY:
+        RemoveWindowSubclass(hwnd, PluginHeaderSubclassProc, uIdSubclass);
+        break;
+    }
+
+    return DefSubclassProc(hwnd, uMsg, wParam, lParam);
+}
+
+static void ApplyPluginHeaderTheme(HWND listView, BOOL useDark)
+{
+    HWND header = ListView_GetHeader(listView);
+    if (header == NULL)
+        return;
+    MaybeSetWindowTheme(header, useDark);
+    if (useDark)
+        SetWindowSubclass(header, PluginHeaderSubclassProc, PLUGIN_HEADER_SUBCLASS_ID, 0);
+    else
+        RemoveWindowSubclass(header, PluginHeaderSubclassProc, PLUGIN_HEADER_SUBCLASS_ID);
+    InvalidateRect(header, NULL, TRUE);
+}
+
 void ApplyPluginEditLikeTheme(HWND hwnd, BOOL useDark)
 {
     if (hwnd == NULL || !IsWindow(hwnd))
@@ -514,6 +654,7 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
     if (_wcsicmp(className.c_str(), WC_LISTVIEWW) == 0)
     {
         MaybeSetWindowTheme(hwnd, useDark);
+        ApplyPluginHeaderTheme(hwnd, useDark);
         ListView_SetBkColor(hwnd, colors.InputBackground);
         ListView_SetTextBkColor(hwnd, colors.InputBackground);
         ListView_SetTextColor(hwnd, colors.InputText);

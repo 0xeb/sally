@@ -1403,7 +1403,8 @@ const wchar_t* MyEnumFileNames(int index, void* param)
     return NULL;
 }
 
-void ContextMenuInvoke(IContextMenu2* contextMenu, CMINVOKECOMMANDINFO* ici)
+// Returns the verb's own result; a handler that crashed counts as a failure.
+HRESULT ContextMenuInvoke(IContextMenu2* contextMenu, CMINVOKECOMMANDINFO* ici)
 {
     CALL_STACK_MESSAGE_NONE
 
@@ -1412,9 +1413,10 @@ void ContextMenuInvoke(IContextMenu2* contextMenu, CMINVOKECOMMANDINFO* ici)
     int oldThreadPriority = GetThreadPriority(hThread);
     SetThreadPriority(hThread, THREAD_PRIORITY_NORMAL);
 
+    HRESULT result = E_UNEXPECTED;
     __try
     {
-        contextMenu->InvokeCommand(ici);
+        result = contextMenu->InvokeCommand(ici);
     }
     __except (CCallStack::HandleException(GetExceptionInformation(), 8))
     {
@@ -1422,6 +1424,7 @@ void ContextMenuInvoke(IContextMenu2* contextMenu, CMINVOKECOMMANDINFO* ici)
     }
 
     SetThreadPriority(hThread, oldThreadPriority);
+    return result;
 }
 
 void ContextMenuQuery(IContextMenu2* contextMenu, HMENU h)
@@ -1580,12 +1583,14 @@ void CFindDialog::OnContextMenu(int x, int y)
             ici.ptInvoke.x = x;
             ici.ptInvoke.y = y;
 
+            BOOL invoked = FALSE;
             if (!cmdDelete)
             {
-                ContextMenuInvoke(ContextMenu, (CMINVOKECOMMANDINFO*)&ici); // invoke delete ourselves so it behaves the same via key or context menu
+                invoked = SUCCEEDED(ContextMenuInvoke(ContextMenu, (CMINVOKECOMMANDINFO*)&ici)); // invoke delete ourselves so it behaves the same via key or context menu
             }
 
-            if (cmdCut || cmdCopy)
+            // Mark only a clipboard the verb really filled (see FindShellVerb.h).
+            if ((cmdCut || cmdCopy) && invoked)
             {
                 // also set the preferred drop effect and the origin from Salamander
                 SetClipCutCopyInfo(HWindow, cmdCopy, TRUE);
@@ -1603,13 +1608,13 @@ void CFindDialog::OnContextMenu(int x, int y)
         gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
 }
 
-BOOL CFindDialog::InvokeContextMenu(const wchar_t* lpVerb)
+sally::find::ShellVerbOutcome CFindDialog::InvokeContextMenu(const wchar_t* lpVerb)
 {
-    BOOL ret = FALSE;
+    sally::find::ShellVerbOutcome ret = sally::find::ShellVerbOutcome::NotRun;
     HWND hListView = FoundFilesListView->HWindow;
     DWORD selCount = ListView_GetSelectedCount(hListView);
     if (selCount < 1)
-        return FALSE;
+        return ret;
     HCURSOR hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
     if (InitializeOle())
     {
@@ -1618,39 +1623,37 @@ BOOL CFindDialog::InvokeContextMenu(const wchar_t* lpVerb)
         std::vector<std::wstring> namesW;
         const BOOL havePrefix = GetCommonPrefixPathW(prefixW, namesW);
         IContextMenu2* menu = havePrefix ? CreateIContextMenu2W(HWindow, prefixW.c_str(), namesW) : NULL;
+        const bool haveMenu = menu != NULL;
+        bool invoked = false;
 
         if (menu != NULL || havePrefix)
         {
             if (menu != NULL)
             {
                 CShellExecuteWnd shellExecuteWnd;
-                CMINVOKECOMMANDINFOEX ici;
-                ZeroMemory(&ici, sizeof(CMINVOKECOMMANDINFOEX));
-                ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
-                ici.fMask = CMIC_MASK_PTINVOKE | CMIC_MASK_UNICODE;
-                ici.hwnd = shellExecuteWnd.Create(HWindow, L"SEW: CFindDialog::InvokeContextMenu lpVerb=%s", lpVerb);
-                ici.lpVerbW = lpVerb;
-                ici.nShow = SW_SHOWNORMAL;
-                GetListViewContextMenuPos(FoundFilesListView->HWindow, &ici.ptInvoke);
+                const HWND invokeParent = shellExecuteWnd.Create(HWindow, L"SEW: CFindDialog::InvokeContextMenu lpVerb=%s", lpVerb);
+                POINT invokePoint;
+                GetListViewContextMenuPos(FoundFilesListView->HWindow, &invokePoint);
+                sally::find::ShellVerbInvocation ici(lpVerb, prefixW, invokeParent, invokePoint);
 
-                ContextMenuInvoke(menu, (CMINVOKECOMMANDINFO*)&ici);
+                invoked = SUCCEEDED(ContextMenuInvoke(menu, ici.Get()));
                 menu->Release();
-
-                ret = TRUE;
             }
             else
                 gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FOUNDITEMNOTFOUND));
         }
         else
             gPrompter->ShowError(HWindow, LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_COMMONPREFIXNOTFOUND));
+
+        ret = sally::find::ClassifyShellVerb(havePrefix != FALSE, haveMenu, invoked);
     }
     SetCursor(hOldCursor);
-    return TRUE;
+    return ret;
 }
 
 void CFindDialog::OnCutOrCopy(BOOL cut)
 {
-    if (InvokeContextMenu(cut ? L"cut" : L"copy"))
+    if (sally::find::ShellVerbMayMarkClipboard(InvokeContextMenu(cut ? L"cut" : L"copy")))
     {
         // also set the preferred drop effect and origin from Salamander
         SetClipCutCopyInfo(HWindow, !cut, TRUE);

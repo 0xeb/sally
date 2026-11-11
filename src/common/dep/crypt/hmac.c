@@ -85,9 +85,10 @@ void hmac_sha1_data(const unsigned char data[], unsigned long data_len, hmac_ctx
         /* pad the key if necessary */
         memset(cx->key + cx->klen, 0, IN_BLOCK_LENGTH - cx->klen);
 
-        /* xor ipad into key value  */
-        for(i = 0; i < (IN_BLOCK_LENGTH >> 2); ++i)
-            ((unsigned long*)cx->key)[i] ^= 0x36363636;
+        /* xor ipad into key value; byte-wise so the result does not */
+        /* depend on sizeof(unsigned long) or on the key's alignment */
+        for(i = 0; i < IN_BLOCK_LENGTH; ++i)
+            cx->key[i] ^= 0x36;
 
         /* and start hash operation */
         sha1_begin(cx->ctx);
@@ -114,8 +115,8 @@ void hmac_sha1_end(unsigned char mac[], unsigned long mac_len, hmac_ctx cx[1])
     sha1_end(dig, cx->ctx);         /* complete the inner hash      */
 
     /* set outer key value using opad and removing ipad */
-    for(i = 0; i < (IN_BLOCK_LENGTH >> 2); ++i)
-        ((unsigned long*)cx->key)[i] ^= 0x36363636 ^ 0x5c5c5c5c;
+    for(i = 0; i < IN_BLOCK_LENGTH; ++i)
+        cx->key[i] ^= 0x36 ^ 0x5c;
 
     /* perform the outer hash operation */
     sha1_begin(cx->ctx);

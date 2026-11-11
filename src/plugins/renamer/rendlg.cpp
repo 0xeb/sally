@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 #include "spl_fs.h"
+#include "renamer_date_time.h"
+#include "renamer_dialog_policy.h"
 
 int DialogWidth;
 int DialogHeight;
@@ -537,16 +539,20 @@ BOOL GetCounterParamFormat(HWND parent, char* buffer)
     return CAddCounterDialog(parent, buffer).Execute() == IDOK;
 }
 
+// The menu inserts file-name-safe formats rather than the locale's, whose ':' or '/'
+// would make every generated name invalid (see renamer_date_time.h).
 BOOL GetTimeParamFormat(HWND parent, char* buffer)
 {
     CALL_STACK_MESSAGE_NONE
-    return GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_STIMEFORMAT, buffer, 1024);
+    strcpy(buffer, RenamerMenuTimeFormat);
+    return TRUE;
 }
 
 BOOL GetDateParamFormat(HWND parent, char* buffer)
 {
     CALL_STACK_MESSAGE_NONE
-    return GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_SSHORTDATE, buffer, 1024);
+    strcpy(buffer, RenamerMenuDateFormat);
+    return TRUE;
 }
 
 BOOL GetLowerCaseParam(HWND parent, char* buffer)
@@ -714,7 +720,7 @@ CRenamerDialog::CRenamerDialog(HWND parent)
     Subdirs = FALSE;
     ProcessRenamed = FALSE;
     ProcessNotRenamed = TRUE;
-    RemoveSourcePath = FALSE;
+    RemoveSourcePath = RenamerDefaultRemoveEmptiedDirectories;
     ManualMode = FALSE;
 
     SourceFilesValid = FALSE;
@@ -1514,7 +1520,7 @@ void CRenamerDialog::ResetOptions(BOOL soft)
     if (!soft)
     {
         Subdirs = FALSE;
-        RemoveSourcePath = TRUE;
+        RemoveSourcePath = RenamerDefaultRemoveEmptiedDirectories;
     }
     strcpy(Mask, DefMask);
 
@@ -2221,6 +2227,17 @@ CRenamerDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             KillTimer(HWindow, 666);
             PostMessage(HWindow, WM_CLOSE, 0, 0);
+            return TRUE;
+        }
+        break;
+    }
+
+    case WM_SYSCOMMAND:
+    {
+        // The close box and Alt+F4 ask the same question as Esc and Exit.
+        if (RenamerSysCommandAsksLikeExit(wParam, SG->IsCriticalShutdown() != FALSE))
+        {
+            SendMessage(HWindow, WM_COMMAND, IDCANCEL, 0);
             return TRUE;
         }
         break;
