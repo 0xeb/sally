@@ -124,6 +124,13 @@ public:
     // Stalls on its own once this many bytes (both directions, all connections) went through; 0 = no limit. A limit
     // that was reached stays reached: Stall(false) lets the traffic go again, and the counter keeps counting.
     void StallAfter(uint64_t totalBytes) { limit_ = totalBytes; }
+    // Variant for tests with several connections: only the one connection that itself carried this many bytes freezes,
+    // other (also later) connections keep working. Stall(false) thaws it. IsStalled() tells that one froze.
+    void FreezeConnectionAfter(uint64_t bytes)
+    {
+        perConnection_ = true;
+        limit_ = bytes;
+    }
     uint64_t Forwarded() const { return forwarded_; }
     int Accepted() const { return accepted_; } // connections that reached the target
     bool IsStalled() const { return stalled_; }
@@ -141,6 +148,8 @@ private:
     {
         SOCKET client;
         SOCKET server;
+        uint64_t bytes = 0; // forwarded through this connection
+        bool frozen = false; // FreezeConnectionAfter reached
     };
 
     void Accept()
@@ -159,19 +168,28 @@ private:
             closesocket(c);
             return;
         }
-        pairs_.push_back({c, s});
+        pairs_.push_back({c, s, 0, false});
         ++accepted_;
     }
 
-    bool Forward(SOCKET from, SOCKET to)
+    bool Forward(SOCKET from, SOCKET to, Pair& pair)
     {
         char buf[16384];
         int n = recv(from, buf, sizeof(buf), 0);
         if (n <= 0)
             return false;
         forwarded_ += static_cast<uint64_t>(n);
-        if (limit_ != 0 && forwarded_ >= limit_)
-            stalled_ = true; // this chunk still goes through; the next round stops
+        pair.bytes += static_cast<uint64_t>(n);
+        if (perConnection_)
+        {
+            if (limit_ != 0 && pair.bytes >= limit_)
+            {
+                pair.frozen = true; // this chunk still goes through; the next round stops
+                stalled_ = true;
+            }
+        }
+        else if (limit_ != 0 && forwarded_ >= limit_)
+            stalled_ = true;
         for (int sent = 0; sent < n;)
         {
             int m = send(to, buf + sent, n - sent, 0);
@@ -196,12 +214,17 @@ private:
                 pairs_.clear();
                 drop_ = false;
             }
+            if (!stalled_)
+                for (Pair& p : pairs_)
+                    p.frozen = false;
             fd_set readSet;
             FD_ZERO(&readSet);
             FD_SET(listen_, &readSet);
-            if (!stalled_)
+            if (!stalled_ || perConnection_)
                 for (const Pair& p : pairs_)
                 {
+                    if (p.frozen)
+                        continue;
                     FD_SET(p.client, &readSet);
                     FD_SET(p.server, &readSet);
                 }
@@ -210,16 +233,16 @@ private:
                 continue;
             if (FD_ISSET(listen_, &readSet))
                 Accept();
-            if (stalled_)
+            if (stalled_ && !perConnection_)
                 continue;
             for (size_t i = 0; i < pairs_.size();)
             {
                 const Pair p = pairs_[i];
                 bool alive = true;
-                if (FD_ISSET(p.client, &readSet))
-                    alive = Forward(p.client, p.server);
-                if (alive && FD_ISSET(p.server, &readSet))
-                    alive = Forward(p.server, p.client);
+                if (!p.frozen && FD_ISSET(p.client, &readSet))
+                    alive = Forward(p.client, p.server, pairs_[i]);
+                if (alive && !pairs_[i].frozen && FD_ISSET(p.server, &readSet))
+                    alive = Forward(p.server, p.client, pairs_[i]);
                 if (!alive)
                 {
                     closesocket(p.client);
@@ -238,6 +261,7 @@ private:
     std::atomic<bool> stop_{false};
     std::atomic<bool> stalled_{false};
     std::atomic<bool> drop_{false};
+    std::atomic<bool> perConnection_{false};
     std::atomic<uint64_t> limit_{0};
     std::atomic<uint64_t> forwarded_{0};
     std::atomic<int> accepted_{0};

@@ -12,6 +12,9 @@
 namespace
 {
 constexpr int kIdleWaitMs = 200; // a waiting worker looks again at least this often
+// An idle worker of a running operation gives its slot and connection back after this long (D58); not at once, so short
+// gaps while a directory is explored do not cause reconnects.
+constexpr int kIdleReleaseMs = 3000;
 constexpr uint32_t kModeTypeMask = 0170000;
 constexpr uint32_t kModeRegular = 0100000;
 constexpr uint32_t kModeDirectory = 0040000;
@@ -482,6 +485,7 @@ void CWorker::Run()
         if (queue.TakeNextWaiting(item))
         {
             ProcessItem(item);
+            idle_ = false; // the idle time counts from the end of the item
             continue;
         }
         WaitForNextChance(); // another worker was faster
@@ -527,6 +531,7 @@ void CWorker::WaitForNextChance()
     CQueue& queue = host_.Queue();
     if (queue.GetOperationState() == OperationState::Running)
     {
+        ReleaseWhenIdleForLong();
         queue.WaitForWork(kIdleWaitMs); // other workers are busy and may produce items (explore)
         return;
     }
@@ -535,6 +540,23 @@ void CWorker::WaitForNextChance()
     ReleaseSlot();
     host_.CheckRunOver();
     queue.WaitForWaitingItem(kIdleWaitMs);
+}
+
+// An idle worker of a running operation keeps its slot and connection for a short while (an explore item may produce
+// work any moment), then gives both back so another operation can use them. Run() takes a slot again when work comes.
+void CWorker::ReleaseWhenIdleForLong()
+{
+    const auto now = std::chrono::steady_clock::now();
+    if (!idle_)
+    {
+        idle_ = true;
+        idleSince_ = now;
+        return;
+    }
+    if (now - idleSince_ < std::chrono::milliseconds(kIdleReleaseMs) || !slot_.Held())
+        return;
+    session_.Disconnect(); // the next item reconnects
+    ReleaseSlot();
 }
 
 void CWorker::ProcessItem(const CQueueItem& item)

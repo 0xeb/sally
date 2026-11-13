@@ -13,6 +13,7 @@
 #include <winsock2.h>
 #include <windows.h>
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <thread>
@@ -129,6 +130,7 @@ private:
     void ThreadMain();
     void Run();
     void WaitForNextChance();
+    void ReleaseWhenIdleForLong();
     bool AcquireSlot();
     void ReleaseSlot();
     void ProcessItem(const CQueueItem& item);
@@ -187,9 +189,11 @@ private:
     CKnownHosts hosts_; // this worker's view of the known_hosts files (before session_: it uses it)
     CSessionLogSink logSink_; // before session_: the session writes to it until it is destroyed
     // The worker's connection slot: taken before the worker takes an item (so no item waits in a worker that has no
-    // connection to do it with), kept while it works and while it idles in a running operation, given back when the
-    // operation has nothing to run, is paused, or the worker ends.
+    // connection to do it with), kept while it works and while it idles in a running operation for a few seconds,
+    // given back when it idled longer, the operation has nothing to run, is paused, or the worker ends.
     CSlotLease slot_;
+    bool idle_ = false; // worker thread only: no item since idleSince_
+    std::chrono::steady_clock::time_point idleSince_;
     CSshSession session_;
     CNameCodec codec_;
     bool unreachable_ = false; // the last item ended with "connection lost": no more backoff until a connect works

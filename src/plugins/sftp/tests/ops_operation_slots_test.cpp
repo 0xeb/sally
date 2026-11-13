@@ -156,6 +156,48 @@ TEST_F(OperationSlotsTest, WithOneFreeSlotTwoWorkersRunAsOneAndTheOtherJoinsWhen
     EXPECT_LE(WorkerSlots().Peak(), 2);
 }
 
+// The idle grace period of a worker is 3 seconds (kIdleReleaseMs in op_worker.cpp), so the waits below are long.
+TEST_F(OperationSlotsTest, AnIdleWorkerOfARunningOperationGivesItsSlotBackAndTakesOneForNewWork)
+{
+    SetCap(2);
+    sftptest::CStallProxy proxy(sftptest::kPort);
+    PutRemoteFile(remoteDir_ + "/big.bin", PatternBytes(24 << 20, 21));
+    // Only the connection of the big file freezes: the other worker may connect (even late, on a loaded machine) and
+    // fail its missing file without being caught in the stall, so it is surely the idle one.
+    proxy.FreezeConnectionAfter(4 << 20);
+    port_ = proxy.Port();
+    // worker 1 stalls in the big file; worker 2 gets the missing file, fails at once and has nothing more to do
+    auto op = MakeDownload({RemoteSrc(remoteDir_ + "/big.bin", false, 24 << 20),
+                            RemoteSrc(remoteDir_ + "/missing.bin", false, 10)},
+                           false, 2);
+    CTestObserver observer;
+    op->SetObserver(&observer);
+    ASSERT_TRUE(op->Start());
+    ASSERT_TRUE(WaitUntil([&] { return proxy.IsStalled(); }, 60000));
+    port_ = sftptest::kPort;
+    ASSERT_TRUE(WaitUntil([] { return WorkerSlots().Held() == 2; }, 10000));
+    ASSERT_TRUE(WaitUntil([&] { return op->Summary().counters.failed == 1; }, 15000)); // the idle one is really idle
+
+    // the idle worker gives its slot back while the operation still runs
+    ASSERT_TRUE(WaitUntil([] { return WorkerSlots().Held() == 1; }, 15000));
+    EXPECT_EQ(op->State(), OperationState::Running);
+    {
+        CSlotLease other(WorkerSlots()); // another operation can have the freed slot
+        EXPECT_TRUE(other.TryAcquire());
+        EXPECT_EQ(WorkerSlots().Held(), 2);
+    }
+    EXPECT_EQ(WorkerSlots().Held(), 1);
+
+    // new work: the idle worker takes a slot again
+    proxy.Stall(false); // its new connection goes through the proxy too
+    EXPECT_EQ(op->RetryAllFailed(), 1);
+    ASSERT_TRUE(WaitUntil([] { return WorkerSlots().Held() == 2; }, 15000));
+
+    op->RequestCancel();
+    ASSERT_TRUE(op->WaitFinished(30000));
+    EXPECT_TRUE(WaitUntil([] { return WorkerSlots().Held() == 0; }, 5000));
+}
+
 TEST_F(OperationSlotsTest, CancelAndPauseWhileWaitingForASlot)
 {
     SetCap(1);
