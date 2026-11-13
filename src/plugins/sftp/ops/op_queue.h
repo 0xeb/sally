@@ -150,6 +150,8 @@ public:
     // Hands out the next Waiting item (explore items first, then the others, each in the order they were added),
     // marks it Processing and copies it to 'item'. False when nothing is waiting.
     bool TakeNextWaiting(CQueueItem& item);
+    // True when an item is Waiting (a look only: another worker may take it before the caller does).
+    bool HasWaiting() const;
 
     // Called by a worker for a Processing explore item 'uid' after it listed the directory.
     //  - Without 'after': the children become children of the explore item's parent and the explore item is Done.

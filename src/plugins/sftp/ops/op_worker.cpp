@@ -227,6 +227,19 @@ void MarkViaLink(std::vector<CQueueItem>& items, bool viaLink)
         item.viaLink = viaLink;
 }
 
+// Counts a worker as "waiting for a slot" for exactly as long as it lives, also when something throws.
+class CSlotWaitGuard
+{
+public:
+    explicit CSlotWaitGuard(IWorkerHost& host) : host_(host) { host_.WorkerWaitingForSlot(true); }
+    ~CSlotWaitGuard() { host_.WorkerWaitingForSlot(false); }
+    CSlotWaitGuard(const CSlotWaitGuard&) = delete;
+    CSlotWaitGuard& operator=(const CSlotWaitGuard&) = delete;
+
+private:
+    IWorkerHost& host_;
+};
+
 // A symbolic link or junction: take size, time and "is a directory" from what it points to.
 void FollowReparsePoint(const std::wstring& path, DWORD& attributes, uint64_t& size, FILETIME& writeTime)
 {
@@ -379,7 +392,8 @@ CWorker::CItemResult CWorker::Replaced()
 
 CWorker::CWorker(IWorkerHost& host, int index)
     : host_(host), index_(index),
-      hosts_(host.ConnectParams().knownHostsOwnPath, host.ConnectParams().knownHostsUserPath), session_(this, &hosts_)
+      hosts_(host.ConnectParams().knownHostsOwnPath, host.ConnectParams().knownHostsUserPath), slot_(WorkerSlots()),
+      session_(this, &hosts_)
 {
     session_.SetLogSink(&logSink_);
 }
@@ -427,6 +441,13 @@ void CWorker::ThreadMain()
     }
     try
     {
+        ReleaseSlot(); // also done by the destructor of slot_, but the operation's counters want to hear it
+    }
+    catch (...)
+    {
+    }
+    try
+    {
         host_.WorkerExited();
     }
     catch (...)
@@ -447,16 +468,58 @@ void CWorker::Run()
         if (host_.IsPaused())
         {
             session_.Disconnect(); // a paused worker holds no connection; the next item reconnects
+            ReleaseSlot();
             host_.WaitWhilePaused();
             continue;
         }
+        if (!queue.HasWaiting())
+        {
+            WaitForNextChance();
+            continue;
+        }
+        if (!AcquireSlot())
+            continue; // cancelled or paused while waiting: the loop looks again
         if (queue.TakeNextWaiting(item))
         {
             ProcessItem(item);
             continue;
         }
-        WaitForNextChance();
+        WaitForNextChance(); // another worker was faster
     }
+}
+
+// The slot comes before the item: a worker that takes an item and then waits for a slot would keep the item from the
+// workers that already hold one. False when the operation was cancelled or paused during the wait.
+bool CWorker::AcquireSlot()
+{
+    if (slot_.Held())
+        return true;
+    if (slot_.TryAcquire())
+    {
+        host_.WorkerHoldsSlot(true);
+        return true;
+    }
+    BeginLog(); // so the wait is in the log
+    logSink_.Line(SshLogLevel::Normal, L"Waiting for a free connection slot");
+    OpTrace("worker %d: waiting for a connection slot", index_);
+    bool got = false;
+    {
+        CSlotWaitGuard waiting(host_);
+        got = slot_.Acquire([this] { return host_.IsCancelRequested() || host_.IsPaused(); });
+    }
+    if (!got)
+        return false;
+    host_.WorkerHoldsSlot(true);
+    logSink_.Line(SshLogLevel::Normal, L"Got a connection slot");
+    return true;
+}
+
+void CWorker::ReleaseSlot()
+{
+    if (!slot_.Held())
+        return;
+    slot_.Release();
+    host_.WorkerHoldsSlot(false);
 }
 
 void CWorker::WaitForNextChance()
@@ -469,6 +532,7 @@ void CWorker::WaitForNextChance()
     }
     if (session_.IsConnected() || session_.HasSftp())
         session_.Disconnect(); // nothing to do until the user solves something: do not hold the connection
+    ReleaseSlot();
     host_.CheckRunOver();
     queue.WaitForWaitingItem(kIdleWaitMs);
 }
@@ -712,8 +776,7 @@ bool CWorker::EnsureConnected(CItemResult& failure)
     }
 
     const CPanelConnectParams& params = host_.ConnectParams();
-    logSink_.Begin(WorkerLogTitle(SessionLogTarget(params.site.user, params.site.host, params.site.port),
-                                  host_.OperationNumber(), index_ + 1));
+    BeginLog();
     if (!session_.Connect(ToSshSite(params.site, params.password.Clone(), params.passphrase.Clone())))
     {
         const CSshError error = session_.LastError();
@@ -732,6 +795,14 @@ bool CWorker::EnsureConnected(CItemResult& failure)
         return false;
     }
     return true;
+}
+
+// Opens the worker's log (does nothing when it is open already).
+void CWorker::BeginLog()
+{
+    const CPanelConnectParams& params = host_.ConnectParams();
+    logSink_.Begin(WorkerLogTitle(SessionLogTarget(params.site.user, params.site.host, params.site.port),
+                                  host_.OperationNumber(), index_ + 1));
 }
 
 CWorker::CItemResult CWorker::FromSessionError(Problem fallback)

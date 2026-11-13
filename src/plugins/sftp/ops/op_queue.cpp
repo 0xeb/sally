@@ -195,6 +195,12 @@ bool CQueue::TakeNextWaiting(CQueueItem& item)
     return true;
 }
 
+bool CQueue::HasWaiting() const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return !waitingExplore_.empty() || !waitingOther_.empty();
+}
+
 bool CQueue::ReplaceWithChildren(uint64_t uid, std::vector<CQueueItem> children, const CQueueItem* after)
 {
     std::lock_guard<std::mutex> lock(mutex_);

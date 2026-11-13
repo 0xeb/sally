@@ -25,6 +25,7 @@
 #include "panel_session.h"
 #include "session_log.h"
 #include "ssh_session.h"
+#include "worker_slots.h"
 
 constexpr int kMaxExploreDepth = 64; // deeper than this is taken for a symlink loop
 
@@ -52,6 +53,10 @@ public:
     // A login that will fail the same way for every item (rejected host key, wrong password, bad key file, cancelled
     // prompt): pauses the operation and shows 'text'; Resume tries the login again.
     virtual void PauseForLoginProblem(const std::wstring& text, const CSshError& error) = 0;
+    // Global connection slots (worker_slots.h): the worker starts / stops waiting for a free slot, and takes / gives back
+    // its slot. The operation counts them for its status line ("waiting for a free connection").
+    virtual void WorkerWaitingForSlot(bool waiting) = 0;
+    virtual void WorkerHoldsSlot(bool holds) = 0;
 
     // Logins the worker cannot decide alone (a host key other than the pinned one, a prompt). They block until the
     // user answered, the operation was cancelled or the operation cannot ask (then: reject / false).
@@ -124,6 +129,8 @@ private:
     void ThreadMain();
     void Run();
     void WaitForNextChance();
+    bool AcquireSlot();
+    void ReleaseSlot();
     void ProcessItem(const CQueueItem& item);
     void Report(const CQueueItem& item, const CItemResult& result);
     CItemResult RunItem(const CQueueItem& item);
@@ -170,6 +177,7 @@ private:
     bool MkdirOrExists(const std::string& path);
     bool EnsureRemoteDir(const std::string& path, int depth);
     bool RemoveRemote(const std::string& path, bool isDir);
+    void BeginLog();
     void BeginTransfer(uint64_t uid, uint64_t startOffset);
     void EndTransfer(uint64_t bytesTransferred);
 
@@ -178,6 +186,10 @@ private:
     std::thread thread_;
     CKnownHosts hosts_; // this worker's view of the known_hosts files (before session_: it uses it)
     CSessionLogSink logSink_; // before session_: the session writes to it until it is destroyed
+    // The worker's connection slot: taken before the worker takes an item (so no item waits in a worker that has no
+    // connection to do it with), kept while it works and while it idles in a running operation, given back when the
+    // operation has nothing to run, is paused, or the worker ends.
+    CSlotLease slot_;
     CSshSession session_;
     CNameCodec codec_;
     bool unreachable_ = false; // the last item ended with "connection lost": no more backoff until a connect works

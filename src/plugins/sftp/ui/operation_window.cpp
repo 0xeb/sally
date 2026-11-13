@@ -411,7 +411,7 @@ void COperationWindow::UpdateSummary()
         switch (status)
         {
         case OperationStatus::Running:
-            text = Str(IDS_OP_STATUS_RUNNING);
+            text = Str(op_.IsWaitingForSlot() ? IDS_OP_STATUS_WAITING_SLOT : IDS_OP_STATUS_RUNNING);
             break;
         case OperationStatus::Paused:
         {

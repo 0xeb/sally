@@ -370,5 +370,7 @@
 #define IDS_LOG_SAVE_FILTER_ALL                   441
 #define IDS_LOG_SAVE_FAILED                       442
 #define IDS_LOG_OFF_HINT                          443
+// shown instead of "Running" while every worker of an operation waits for a free connection (global cap)
+#define IDS_OP_STATUS_WAITING_SLOT                444
 
 #endif // __SFTP_RH2

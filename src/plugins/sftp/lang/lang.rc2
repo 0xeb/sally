@@ -484,4 +484,6 @@ STRINGTABLE
  IDS_LOG_SAVE_FAILED, "The log could not be saved (Windows error %d)."
  // shown in the log window next to an empty log when the log level is Off
  IDS_LOG_OFF_HINT, "Logging is switched off. Change the log level in the plugin's Configuration."
+ // the operation is running but every worker waits for a free connection (the total of connections is used up)
+ IDS_OP_STATUS_WAITING_SLOT, "Waiting for a free connection"
 }

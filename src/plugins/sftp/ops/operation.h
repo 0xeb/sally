@@ -123,6 +123,9 @@ public:
     bool WaitFinished(DWORD timeoutMs);
 
     bool IsFinished() const;
+    // Running, but no worker has a connection slot yet and some wait for one (the global cap is used up by other
+    // operations). The window says "waiting for a free connection" then.
+    bool IsWaitingForSlot() const;
     // Finished with nothing left for the user to do: all done, only skips, or cancelled with the workers gone. A parked
     // or failed item can still be retried, so such an operation is not disposable.
     bool IsDisposable() const;
@@ -174,6 +177,8 @@ private:
     void CheckRunOver() override { FinishRun(false); }
     CExploredDirs& ExploredDirs() override { return explored_; }
     void PauseForLoginProblem(const std::wstring& text, const CSshError& error) override;
+    void WorkerWaitingForSlot(bool waiting) override;
+    void WorkerHoldsSlot(bool holds) override;
     HostKeyDecision AskHostKey(int workerIndex, const std::string& host, int port, const std::string& keyType,
                                const std::string& fingerprint, bool changed) override;
     bool AskPrompt(int workerIndex, PromptKind kind, const std::string& name, const std::string& instruction,
@@ -197,6 +202,8 @@ private:
     IOperationObserver* observer_ = nullptr;
     std::atomic<bool> cancelRequested_{false};
     std::atomic<bool> paused_{false};
+    std::atomic<int> workersWaitingForSlot_{0};
+    std::atomic<int> workersHoldingSlot_{0};
 
     mutable std::mutex mutex_; // guards workers_, started_, activeWorkers_, workersGone_, claimedRun_, notifiedRun_
     std::condition_variable finishedCv_;

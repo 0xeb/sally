@@ -128,7 +128,7 @@ std::wstring COperationsDialog::StateOf(const COperationInfo& info) const
     switch (DecideStatus(info.state, info.paused, info.cancelled, info.finished))
     {
     case OperationStatus::Running:
-        return LangStr(IDS_OP_STATUS_RUNNING);
+        return LangStr(info.operation->IsWaitingForSlot() ? IDS_OP_STATUS_WAITING_SLOT : IDS_OP_STATUS_RUNNING);
     case OperationStatus::Paused:
         return LangStr(IDS_OP_STATUS_PAUSED);
     case OperationStatus::Cancelling:

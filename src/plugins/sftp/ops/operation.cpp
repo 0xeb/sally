@@ -300,6 +300,12 @@ bool COperation::IsFinished() const
     return IsFinishedLocked();
 }
 
+bool COperation::IsWaitingForSlot() const
+{
+    return workersWaitingForSlot_.load() > 0 && workersHoldingSlot_.load() == 0 && !cancelRequested_.load() &&
+           !paused_.load();
+}
+
 bool COperation::IsDisposable() const
 {
     if (!IsFinished())
@@ -371,6 +377,18 @@ void COperation::FinishRun(bool workersGone)
 void COperation::WorkerExited()
 {
     ReleaseActive();
+}
+
+void COperation::WorkerWaitingForSlot(bool waiting)
+{
+    workersWaitingForSlot_ += waiting ? 1 : -1;
+    NotifyObserverState();
+}
+
+void COperation::WorkerHoldsSlot(bool holds)
+{
+    workersHoldingSlot_ += holds ? 1 : -1;
+    NotifyObserverState();
 }
 
 void COperation::ItemChanged(uint64_t uid)
