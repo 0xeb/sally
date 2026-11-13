@@ -14,6 +14,7 @@
 #include "operations_registry.h"
 #include "site_config.h"
 #include "../ui/config_dialog.h"
+#include "../ui/session_log_window.h"
 
 #define SFTP_WIDEN_IMPL(value) L##value
 #define SFTP_WIDEN(value) SFTP_WIDEN_IMPL(value)
@@ -305,6 +306,14 @@ CPluginInterface::Release(HWND parent, BOOL force)
     {
         TRACE_E("Release: unexpected exception while closing the sessions.");
     }
+    try
+    {
+        SessionLogWindow().Close(); // joins the window thread
+    }
+    catch (...)
+    {
+        TRACE_E("Release: unexpected exception while closing the session log window.");
+    }
     SetOpTraceSink(nullptr); // every worker thread is gone
     // the F3 copies in Sally's disk cache are of no use without the plugin (the SDK asks for this call)
     SalamanderGeneral->RemoveFilesFromCache((AssignedFSName + L":").c_str());
@@ -359,6 +368,8 @@ CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
         salamander->AddMenuItem(-1, LangStr(IDS_MENU_DISCONNECT).c_str(), 0, SftpCmdDisconnect, FALSE,
                                 MENU_EVENT_THIS_PLUGIN_FS, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
         salamander->AddMenuItem(-1, LangStr(IDS_MENU_OPERATIONS).c_str(), 0, SftpCmdOperations, FALSE,
+                                MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
+        salamander->AddMenuItem(-1, LangStr(IDS_MENU_SESSION_LOG).c_str(), 0, SftpCmdSessionLog, FALSE,
                                 MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
         salamander->AddMenuItem(-1, LangStr(IDS_MENU_CONFIGURATION).c_str(), 0, SftpCmdConfiguration, FALSE,
                                 MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);

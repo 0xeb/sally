@@ -463,4 +463,25 @@ STRINGTABLE
  IDS_CONFIG_ERR_RANGE, "Enter a whole number from %d to %d."
  // arguments (printf style, in this order): %d lowest interval in seconds, %d highest interval in seconds
  IDS_CONFIG_ERR_KEEPALIVE, "Enter 0 (no keepalive) or a whole number of seconds from %d to %d."
+ // Plugin menu item that opens the session log window
+ IDS_MENU_SESSION_LOG, "Session &log..."
+ // Context menu item of a connection: opens the session log window on that connection's log
+ IDS_CTX_SHOW_LOG, "Show session log"
+ // Names of the logs in the session log window (printf style). %ls: "user@host:port"
+ IDS_LOG_TITLE_PANEL, "%ls - panel"
+ // arguments (printf style, in this order): %ls "user@host:port", %d operation number, %d worker number
+ IDS_LOG_TITLE_WORKER, "%ls - operation %d, worker %d"
+ // arguments (printf style, in this order): %ls "user@host:port", %d worker number
+ IDS_LOG_TITLE_WORKER_NO_OPERATION, "%ls - worker %d"
+ // a log of a connection that has ended; %ls: the name of the log
+ IDS_LOG_CLOSED_SUFFIX, "%ls (closed)"
+ // shown in the log window when no connection has been logged yet
+ IDS_LOG_NO_LOGS, "No connection has been logged yet."
+ // file type texts of the Save as dialog of the log window
+ IDS_LOG_SAVE_FILTER_TEXT, "Text files (*.txt)"
+ IDS_LOG_SAVE_FILTER_ALL, "All files (*.*)"
+ // argument (printf style): %d Windows error number
+ IDS_LOG_SAVE_FAILED, "The log could not be saved (Windows error %d)."
+ // shown in the log window next to an empty log when the log level is Off
+ IDS_LOG_OFF_HINT, "Logging is switched off. Change the log level in the plugin's Configuration."
 }

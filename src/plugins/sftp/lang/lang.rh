@@ -161,3 +161,12 @@
 #define IDC_CFG_LOGLEVEL          1527
 #define IDE_CFG_LOGKIB            1528
 #define IDE_CFG_LOGKEEP           1529
+
+// Session log window (IDD_SESSION_LOG): modeless and resizable; a combo box of the connection logs, the read-only text of
+// the selected one, Copy, Save as..., Clear and Close (IDCANCEL)
+#define IDD_SESSION_LOG           1019
+#define IDC_LOG_COMBO             1500
+#define IDE_LOG_TEXT              1501
+#define IDB_LOG_COPY              1502
+#define IDB_LOG_SAVE              1503
+#define IDB_LOG_CLEAR             1504

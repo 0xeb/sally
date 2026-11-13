@@ -16,6 +16,7 @@
 #include "fs_interface.h"
 #include "hot_path.h"
 #include "listing_format.h"
+#include "../ui/session_log_window.h"
 #include "sftp_url.h"
 #include "wait_for_request.h"
 
@@ -31,7 +32,8 @@ enum
     CtxAttributes,
     CtxRefresh,
     CtxDisconnect,
-    CtxServerInfo
+    CtxServerInfo,
+    CtxShowLog
 };
 const int SalamanderCommandBase = 5000;
 
@@ -171,10 +173,12 @@ void CPluginFSInterface::BuildContextMenu(CGUIMenuPopupAbstract* menu, int type,
         AppendSeparator(menu);
         AppendText(menu, CtxRefresh, IDS_CTX_REFRESH);
         AppendText(menu, CtxServerInfo, IDS_CTX_SERVER_INFO);
+        AppendText(menu, CtxShowLog, IDS_CTX_SHOW_LOG);
     }
     else // the current path and the panel get the same menu
     {
         AppendText(menu, CtxServerInfo, IDS_CTX_SERVER_INFO);
+        AppendText(menu, CtxShowLog, IDS_CTX_SHOW_LOG);
         AppendSeparator(menu);
         AppendText(menu, CtxCopyPath, IDS_CTX_COPY_CUR_PATH);
         AppendText(menu, CtxCopyUrl, IDS_CTX_COPY_CUR_URL);
@@ -218,6 +222,10 @@ void CPluginFSInterface::RunContextCommand(const wchar_t* fsName, HWND parent, i
 
     case CtxServerInfo:
         ShowInfoDialog(fsName, parent); // the same dialog as Ctrl+F1
+        break;
+
+    case CtxShowLog:
+        SessionLogWindow().Show(LogId()); // returns at once: the window has its own thread
         break;
 
     case CtxDisconnect:

@@ -358,5 +358,17 @@
 #define IDS_MENU_CONFIGURATION                    430
 #define IDS_CONFIG_ERR_RANGE                      431
 #define IDS_CONFIG_ERR_KEEPALIVE                  432
+// Session log window, menu item and context menu item
+#define IDS_MENU_SESSION_LOG                      433
+#define IDS_CTX_SHOW_LOG                          434
+#define IDS_LOG_TITLE_PANEL                       435
+#define IDS_LOG_TITLE_WORKER                      436
+#define IDS_LOG_TITLE_WORKER_NO_OPERATION         437
+#define IDS_LOG_CLOSED_SUFFIX                     438
+#define IDS_LOG_NO_LOGS                           439
+#define IDS_LOG_SAVE_FILTER_TEXT                  440
+#define IDS_LOG_SAVE_FILTER_ALL                   441
+#define IDS_LOG_SAVE_FAILED                       442
+#define IDS_LOG_OFF_HINT                          443
 
 #endif // __SFTP_RH2

@@ -9,6 +9,7 @@
 #include "fs_object.h"
 #include "operations_registry.h"
 #include "site_config.h"
+#include "../ui/session_log_window.h"
 #include "../ui/site_list_dialog.h"
 
 CPluginFSInterfaceAbstract* WINAPI
@@ -319,6 +320,15 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
         case SftpCmdConfiguration:
             ShowPluginConfiguration(parent);
             break;
+
+        case SftpCmdSessionLog:
+        {
+            // the log of the connection in the active panel when it is ours, otherwise the window picks the newest one
+            CPluginFSInterfaceAbstract* fs = SalamanderGeneral->GetPanelPluginFS(PANEL_SOURCE);
+            const unsigned logId = fs != nullptr ? static_cast<CPluginFSInterface*>(fs)->LogId() : 0;
+            SessionLogWindow().Show(logId);
+            break;
+        }
 
         default:
             TRACE_E("Unknown menu command, ID=" << id);

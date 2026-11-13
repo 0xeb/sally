@@ -26,6 +26,7 @@
 #include <thread>
 #include <vector>
 
+#include "session_log.h"
 #include "site.h"
 #include "ssh_session.h"
 
@@ -256,6 +257,10 @@ public:
     // request runs or an interaction waits. Pending requests finish as Cancelled.
     void Close();
 
+    // Any thread. Id of this connection's log in SessionLogStore(); 0 while there is none (before the first connect and
+    // after Disconnect). The log is opened by the first connect and closed by Disconnect or Close.
+    unsigned LogId() const { return logSink_.LogId(); }
+
     // The session thread's id (valid from the constructor on).
     std::thread::id SessionThreadId() const { return threadId_; }
 
@@ -285,6 +290,7 @@ private:
     bool AbortRequested() const;                            // mutex_ held
 
     CKnownHosts* hosts_;
+    CSessionLogSink logSink_; // before session_: the session writes to it until it is destroyed
     std::thread thread_;
     std::thread::id threadId_; // same as thread_.get_id(), readable while thread_ is being joined
 

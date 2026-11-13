@@ -128,6 +128,9 @@ public:
     bool IsBusy() const { return busy_ > 0; }
     bool CloseRequested() const { return closeRequested_; }
 
+    // Id of this connection's session log (see CPanelSession::LogId); 0 when there is none.
+    unsigned LogId() const { return session_ != nullptr ? session_->LogId() : 0; }
+
     // The user asked to disconnect (Disconnect dialog or menu): TryCloseOrDetach must not ask anything.
     void SetDisconnectRequested(bool requested) { disconnectRequested_ = requested; }
 

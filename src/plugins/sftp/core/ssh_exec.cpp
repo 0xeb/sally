@@ -79,6 +79,8 @@ bool CSshSession::Exec(const std::string& command, const CExecOptions& options, 
     if (session_ == nullptr || !authenticated_)
         return Fail(SshErrorKind::Other, SshMsg::SessionNotOpen, {}, "The SSH session is not open");
 
+    // the command text itself is not logged: it may contain a secret
+    Log(SshLogLevel::Verbose, "SSH exec (" + std::to_string(command.size()) + " bytes of command)");
     int code = 0;
     LIBSSH2_CHANNEL* channel =
         RunPtr([&] { return libssh2_channel_open_session(session_); }, timeoutMs_, code);

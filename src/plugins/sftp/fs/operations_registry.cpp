@@ -29,6 +29,7 @@ bool COperationsRegistry::Launch(COperationSettings settings, CPanelConnectParam
     CWindowedOperation made = COperationWindowHost::Create(std::move(settings), std::move(params), std::move(roots),
                                                            std::move(options));
     const uint64_t uid = list_.Add(made.operation);
+    made.operation->SetNumber(uid); // names the logs of its workers
     // shown before the workers start: a question of a worker never finds a window that is not coming
     made.window->Show();
     if (!made.operation->Start())

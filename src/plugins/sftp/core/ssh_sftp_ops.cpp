@@ -122,7 +122,7 @@ std::string CSshSession::Display(const std::string& raw) const
 }
 
 // Common start of every operation: a cancel that arrived before the call, and a missing SFTP session.
-bool CSshSession::BeginSftp()
+bool CSshSession::BeginSftp(const char* call, const std::string& rawPath, const std::string& rawPath2)
 {
     if (IsCancelled())
         return Fail(SshErrorKind::Cancelled, std::string());
@@ -130,6 +130,7 @@ bool CSshSession::BeginSftp()
         return FailBroken();
     if (sftp_ == nullptr || session_ == nullptr)
         return Fail(SshErrorKind::Other, SshMsg::SftpNotOpen, {}, "The SFTP session is not open");
+    LogVerbose(call, rawPath, rawPath2);
     return true;
 }
 
@@ -208,7 +209,7 @@ void CSshSession::CloseSftpHandle(LIBSSH2_SFTP_HANDLE* h)
 bool CSshSession::ListDir(const std::string& path, std::vector<CSftpEntry>& out)
 {
     out.clear();
-    if (!BeginSftp())
+    if (!BeginSftp("list", path))
         return false;
 
     int code = 0;
@@ -303,7 +304,7 @@ bool CSshSession::ListDir(const std::string& path, std::vector<CSftpEntry>& out)
 bool CSshSession::StatCommon(const std::string& path, int statType, const char* what, CSftpEntry& out)
 {
     out = CSftpEntry();
-    if (!BeginSftp())
+    if (!BeginSftp(statType == LIBSSH2_SFTP_LSTAT ? "lstat" : "stat", path))
         return false;
     LIBSSH2_SFTP_ATTRIBUTES attrs = {};
     int rc = StatRaw(path, statType, attrs);
@@ -332,7 +333,7 @@ bool CSshSession::LStat(const std::string& path, CSftpEntry& out)
 bool CSshSession::RealPath(const std::string& path, std::string& out)
 {
     out.clear();
-    if (!BeginSftp())
+    if (!BeginSftp("realpath", path))
         return false;
     std::vector<char> buf(kMaxNameBytes);
     int rc = Run(
@@ -351,7 +352,7 @@ bool CSshSession::RealPath(const std::string& path, std::string& out)
 bool CSshSession::ReadLink(const std::string& path, std::string& target)
 {
     target.clear();
-    if (!BeginSftp())
+    if (!BeginSftp("readlink", path))
         return false;
     std::vector<char> buf(kMaxNameBytes);
     int rc = Run(
@@ -369,7 +370,7 @@ bool CSshSession::ReadLink(const std::string& path, std::string& target)
 
 bool CSshSession::Mkdir(const std::string& path, int mode)
 {
-    if (!BeginSftp())
+    if (!BeginSftp("mkdir", path))
         return false;
     int rc = Run(
         [&]
@@ -422,7 +423,7 @@ int CSshSession::DirEntryState(const std::string& path)
 
 bool CSshSession::Rmdir(const std::string& path)
 {
-    if (!BeginSftp())
+    if (!BeginSftp("rmdir", path))
         return false;
     int rc = Run(
         [&] { return libssh2_sftp_rmdir_ex(sftp_, path.data(), static_cast<unsigned int>(path.size())); },
@@ -441,7 +442,7 @@ bool CSshSession::Rmdir(const std::string& path)
 
 bool CSshSession::Remove(const std::string& path)
 {
-    if (!BeginSftp())
+    if (!BeginSftp("remove", path))
         return false;
     int rc = Run(
         [&] { return libssh2_sftp_unlink_ex(sftp_, path.data(), static_cast<unsigned int>(path.size())); },
@@ -581,7 +582,7 @@ bool CSshSession::RenameAside(const std::string& from, const std::string& to)
 // rename that failed with FAILURE / ALREADY_EXISTS / UNSUPPORTED goes to RenameAside.
 bool CSshSession::Rename(const std::string& from, const std::string& to, bool overwrite)
 {
-    if (!BeginSftp())
+    if (!BeginSftp("rename", from, to))
         return false;
     if (from == to)
         return true;
@@ -600,7 +601,7 @@ bool CSshSession::Rename(const std::string& from, const std::string& to, bool ov
 // libssh2 takes "what the link points to" first and the new link's path second (the order OpenSSH's server expects).
 bool CSshSession::Symlink(const std::string& target, const std::string& linkPath)
 {
-    if (!BeginSftp())
+    if (!BeginSftp("symlink", linkPath, target))
         return false;
     int rc = Run(
         [&]
@@ -618,7 +619,7 @@ bool CSshSession::Symlink(const std::string& target, const std::string& linkPath
 
 bool CSshSession::Chmod(const std::string& path, uint32_t mode)
 {
-    if (!BeginSftp())
+    if (!BeginSftp("chmod", path))
         return false;
     LIBSSH2_SFTP_ATTRIBUTES attrs = {};
     attrs.flags = LIBSSH2_SFTP_ATTR_PERMISSIONS;
@@ -630,7 +631,7 @@ bool CSshSession::Chmod(const std::string& path, uint32_t mode)
 bool CSshSession::Statvfs(const std::string& path, CSftpVfs& out)
 {
     out = CSftpVfs();
-    if (!BeginSftp())
+    if (!BeginSftp("statvfs", path))
         return false;
     LIBSSH2_SFTP_STATVFS st = {};
     const int rc = Run([&] { return libssh2_sftp_statvfs(sftp_, path.data(), path.size(), &st); }, timeoutMs_);
@@ -647,7 +648,7 @@ bool CSshSession::Statvfs(const std::string& path, CSftpVfs& out)
 
 bool CSshSession::SetTimes(const std::string& path, int64_t atime, int64_t mtime)
 {
-    if (!BeginSftp())
+    if (!BeginSftp("settimes", path))
         return false;
     const auto fits = [](int64_t t) { return t >= 0 && static_cast<uint64_t>(t) <= ULONG_MAX; };
     if (!fits(atime) || !fits(mtime))
@@ -659,4 +660,25 @@ bool CSshSession::SetTimes(const std::string& path, int64_t atime, int64_t mtime
     attrs.mtime = static_cast<unsigned long>(mtime);
     int rc = StatRaw(path, LIBSSH2_SFTP_SETSTAT, attrs);
     return rc == 0 || FailSftp(SshMsg::SftpChangeAttrs, "Cannot set the time of", path, rc);
+}
+
+// ---- log lines --------------------------------------------------------------------------------------------------
+
+void CSshSession::Log(SshLogLevel level, const std::string& line) const
+{
+    if (logSink_ != nullptr)
+        logSink_->Log(level, line);
+}
+
+// One line per SFTP call, only built when somebody listens. Paths are shown decoded (like in error messages).
+void CSshSession::LogVerbose(const char* call, const std::string& rawPath, const std::string& rawPath2) const
+{
+    if (logSink_ == nullptr)
+        return;
+    std::string line = std::string("SFTP ") + call;
+    if (!rawPath.empty())
+        line += " '" + Display(rawPath) + "'";
+    if (!rawPath2.empty())
+        line += " -> '" + Display(rawPath2) + "'";
+    logSink_->Log(SshLogLevel::Verbose, line);
 }

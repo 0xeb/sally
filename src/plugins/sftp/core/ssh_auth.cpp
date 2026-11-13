@@ -325,6 +325,11 @@ bool CSshSession::FailAuth(const CSshSite& site, const std::string& offered, con
                     (tried.empty() ? std::string("nothing (no matching credentials in the site settings)") : tried));
 }
 
+void CSshSession::LogAuthResult(const char* method, bool ok) const
+{
+    Log(SshLogLevel::Normal, std::string(method) + (ok ? ": accepted" : ": not accepted"));
+}
+
 bool CSshSession::Authenticate(const CSshSite& site)
 {
     error_ = CSshError();
@@ -345,6 +350,7 @@ bool CSshSession::Authenticate(const CSshSite& site)
         if (code == kNullNoError && libssh2_userauth_authenticated(session_)) // the server accepted "none"
         {
             authenticated_ = true;
+            Log(SshLogLevel::Normal, "Logged in without credentials (the server accepted 'none')");
             return true;
         }
         return FailFromSession("Cannot query the authentication methods", code == kNullNoError ? 0 : code,
@@ -352,6 +358,7 @@ bool CSshSession::Authenticate(const CSshSite& site)
     }
     const std::string offered = list;
     const std::vector<std::string> methods = SplitMethods(list);
+    Log(SshLogLevel::Normal, "Logging in as '" + site.user + "'; the server offers: " + offered);
 
     CAuthState state;
     const bool publicKeyOffered = Contains(methods, "publickey");
@@ -359,17 +366,34 @@ bool CSshSession::Authenticate(const CSshSite& site)
     auto next = [&] { return !done() && !state.Stop() && !IsCancelled(); };
 
     if (site.useAgent && publicKeyOffered)
+    {
+        Log(SshLogLevel::Normal, "Trying the SSH agent");
         AuthAgent(site, state);
+        LogAuthResult("SSH agent", done());
+    }
     if (next() && !site.keyFile.empty() && publicKeyOffered)
+    {
+        Log(SshLogLevel::Normal, "Trying the key file '" + site.keyFile + "'");
         AuthKeyFile(site, state);
+        LogAuthResult("Key file", done());
+    }
     if (next() && !site.password.empty() && Contains(methods, "password"))
+    {
+        Log(SshLogLevel::Normal, "Trying a password");
         AuthPassword(site, state);
+        LogAuthResult("Password", done());
+    }
     if (next() && Contains(methods, "keyboard-interactive") && (!site.password.empty() || cb_ != nullptr))
+    {
+        Log(SshLogLevel::Normal, "Trying keyboard-interactive");
         AuthKeyboardInteractive(site, state);
+        LogAuthResult("Keyboard-interactive", done());
+    }
 
     if (done())
     {
         authenticated_ = true;
+        Log(SshLogLevel::Normal, "Logged in");
         return true;
     }
     return FailAuth(site, offered, state);

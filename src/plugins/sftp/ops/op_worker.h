@@ -23,6 +23,7 @@
 #include "op_queue.h"
 #include "op_settings.h"
 #include "panel_session.h"
+#include "session_log.h"
 #include "ssh_session.h"
 
 constexpr int kMaxExploreDepth = 64; // deeper than this is taken for a symlink loop
@@ -36,6 +37,7 @@ public:
     virtual const COperationSettings& Settings() const = 0;
     virtual const CPanelConnectParams& ConnectParams() const = 0;
     virtual bool IsCancelRequested() const = 0;
+    virtual uint64_t OperationNumber() const = 0;   // the number in the operations list (0 = not listed); names the worker logs
     virtual void ItemChanged(uint64_t uid) = 0;      // an item changed state
     virtual void AddTransferred(uint64_t bytes) = 0; // statistics, throttled notification of the observer
     virtual void WorkerExited() = 0;                 // last call of a worker thread
@@ -175,6 +177,7 @@ private:
     const int index_;
     std::thread thread_;
     CKnownHosts hosts_; // this worker's view of the known_hosts files (before session_: it uses it)
+    CSessionLogSink logSink_; // before session_: the session writes to it until it is destroyed
     CSshSession session_;
     CNameCodec codec_;
     bool unreachable_ = false; // the last item ended with "connection lost": no more backoff until a connect works

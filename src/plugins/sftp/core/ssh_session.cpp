@@ -41,6 +41,18 @@ std::wstring Widen(const std::string& utf8)
     return out;
 }
 
+// "address:port" of a resolved address for the log (IPv6 gets brackets).
+std::string AddressText(const ADDRINFOEXW* ai)
+{
+    char host[NI_MAXHOST] = {};
+    char port[NI_MAXSERV] = {};
+    if (getnameinfo(ai->ai_addr, static_cast<socklen_t>(ai->ai_addrlen), host, sizeof(host), port, sizeof(port),
+                    NI_NUMERICHOST | NI_NUMERICSERV) != 0)
+        return "(unknown address)";
+    const std::string h = host;
+    return (h.find(':') != std::string::npos ? "[" + h + "]" : h) + ":" + port;
+}
+
 std::string Msec(int ms)
 {
     return std::to_string(ms / 1000) + " s";
@@ -121,6 +133,11 @@ bool CSshSession::Fail(SshErrorKind kind, const std::string& message, int libssh
     error_.message = IsCancelled() ? "The operation was cancelled" : message;
     error_.msgId = SshMsg::None;
     error_.args.clear();
+    // every failure of the session passes here: the log gets each one with its English text
+    if (error_.kind == SshErrorKind::Cancelled)
+        Log(SshLogLevel::Normal, "Cancelled");
+    else
+        Log(SshLogLevel::Error, "Error: " + error_.message + (libssh2Code != 0 ? " (libssh2 code " + std::to_string(libssh2Code) + ")" : ""));
     return false;
 }
 
@@ -162,6 +179,7 @@ void CSshSession::MarkBroken(const char* reason)
         return;
     broken_ = true;
     brokenReason_ = reason;
+    Log(SshLogLevel::Error, std::string("The connection is broken (") + reason + ")");
     ShutdownSocket(); // nothing else can reach the server on this socket, whatever libssh2 still has queued
 }
 
@@ -255,6 +273,8 @@ void CSshSession::CloseAll()
     // marks the session broken) or is skipped, the socket is shut down so that libssh2 cannot answer EAGAIN to the
     // final free and leak the session.
     bool graceful = !broken_ && !IsCancelled();
+    if (session_ != nullptr || socket_ != INVALID_SOCKET)
+        Log(SshLogLevel::Normal, "Disconnecting");
     if (sftp_ != nullptr)
     {
         if (graceful)
@@ -425,6 +445,7 @@ bool CSshSession::ConnectSocket(const CSshSite& site)
 {
     const int timeoutMs = TimeoutMsOf(site);
     ADDRINFOEXW* list = nullptr;
+    Log(SshLogLevel::Normal, "Resolving " + site.host);
     if (!ResolveHost(site, timeoutMs, list))
         return false;
 
@@ -434,8 +455,13 @@ bool CSshSession::ConnectSocket(const CSshSite& site)
     for (const ADDRINFOEXW* ai = list; ai != nullptr && !ok && !IsCancelled(); ai = ai->ai_next)
     {
         why.clear();
+        Log(SshLogLevel::Normal, "Connecting to " + AddressText(ai));
         ok = ConnectAddress(ai, timeoutMs, why) != INVALID_SOCKET;
         timedOut = !ok && why == "timeout";
+        if (ok)
+            Log(SshLogLevel::Normal, "TCP connection established");
+        else if (!IsCancelled())
+            Log(SshLogLevel::Normal, "Connecting failed: " + (timedOut ? "no answer within " + Msec(timeoutMs) : WsaMessage(why)));
     }
     FreeAddrInfoExW(list);
     if (ok)
@@ -495,7 +521,28 @@ bool CSshSession::Handshake()
     int rc = Run([this] { return libssh2_session_handshake(session_, socket_); }, timeoutMs_);
     if (rc != 0)
         return FailFromSession("SSH handshake failed", rc, SshMsg::HandshakeFailed);
+    LogNegotiated();
     return true;
+}
+
+// Banner and negotiated algorithms, right after the handshake.
+void CSshSession::LogNegotiated() const
+{
+    if (logSink_ == nullptr)
+        return;
+    const char* banner = libssh2_session_banner_get(session_);
+    if (banner != nullptr)
+        Log(SshLogLevel::Normal, std::string("Server: ") + banner);
+    // not NegotiatedMethods(): that one answers only after the host key was accepted
+    const auto method = [this](int type)
+    {
+        const char* m = libssh2_session_methods(session_, type);
+        return std::string(m != nullptr ? m : "-");
+    };
+    Log(SshLogLevel::Normal, "Key exchange: " + method(LIBSSH2_METHOD_KEX) + ", host key: " + method(LIBSSH2_METHOD_HOSTKEY));
+    Log(SshLogLevel::Normal, "Cipher: " + method(LIBSSH2_METHOD_CRYPT_CS) + " / " + method(LIBSSH2_METHOD_CRYPT_SC) +
+                                 ", MAC: " + method(LIBSSH2_METHOD_MAC_CS) + " / " + method(LIBSSH2_METHOD_MAC_SC) +
+                                 ", compression: " + method(LIBSSH2_METHOD_COMP_CS) + " / " + method(LIBSSH2_METHOD_COMP_SC));
 }
 
 // Called right after the handshake, before any credential is sent.
@@ -513,16 +560,24 @@ bool CSshSession::VerifyHostKey(const CSshSite& site)
     const std::string host = LowerHost(site.host); // host names are case insensitive
     HostKeyCheck check =
         hosts_ != nullptr ? hosts_->Check(session_, host, site.port, key, len, type) : HostKeyCheck::NotFound;
+    Log(SshLogLevel::Normal, "Host key " + hostKeyType_ + " " + fingerprint_);
     if (check == HostKeyCheck::Match)
+    {
+        Log(SshLogLevel::Normal, "Host key matches a known host");
         return true;
+    }
     if (check == HostKeyCheck::Failure)
         return Fail(SshErrorKind::Other, SshMsg::KnownHostsUnchecked, {host},
                     "The known_hosts data could not be checked; the host key of " + host + " was not verified");
 
     const bool changed = check == HostKeyCheck::Mismatch;
+    Log(SshLogLevel::Normal, changed ? "Host key differs from the known one; asking" : "Host key is not known yet; asking");
     HostKeyDecision decision = HostKeyDecision::Reject;
     if (cb_ != nullptr)
         decision = cb_->VerifyHostKey(host, site.port, hostKeyType_, fingerprint_, changed);
+    Log(SshLogLevel::Normal, decision == HostKeyDecision::Reject            ? "Host key decision: rejected"
+                             : decision == HostKeyDecision::AcceptAndSave ? "Host key decision: accepted and saved"
+                                                                          : "Host key decision: accepted for this session");
 
     if (IsCancelled())
         return Fail(SshErrorKind::Cancelled, std::string());
@@ -585,7 +640,10 @@ bool CSshSession::OpenSftp()
     int code = 0;
     sftp_ = RunPtr([this] { return libssh2_sftp_init(session_); }, timeoutMs_, code);
     if (sftp_ != nullptr)
+    {
+        Log(SshLogLevel::Normal, "SFTP subsystem opened");
         return true;
+    }
 
     switch (code)
     {

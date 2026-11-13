@@ -50,7 +50,7 @@ private:
 // dialog while the connect fails, so the user keeps what was typed; ends on success or Close.
 void ConnectFromSiteList(HWND parent, int panel);
 
-// The plugin menu: Connect..., Disconnect, Operations...
+// The plugin menu: Connect..., Disconnect, Operations..., Session log..., Configuration...
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -66,6 +66,7 @@ const int SftpCmdConnect = 1;
 const int SftpCmdDisconnect = 2;
 const int SftpCmdOperations = 3;
 const int SftpCmdConfiguration = 4;
+const int SftpCmdSessionLog = 5;
 
 // The Configuration dialog (defined in sftp.cpp, also reached from the plugin manager)
 void ShowPluginConfiguration(HWND parent);

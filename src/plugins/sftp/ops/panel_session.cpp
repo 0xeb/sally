@@ -288,6 +288,7 @@ void CPanelSession::ThreadMain()
     try
     {
         session_.reset(new CSshSession(this, hosts_));
+        session_->SetLogSink(&logSink_);
     }
     catch (...)
     {
@@ -374,6 +375,7 @@ void CPanelSession::ThreadMain()
     catch (...)
     {
     }
+    logSink_.End();
     ForgetSite();
 }
 
@@ -407,6 +409,7 @@ bool CPanelSession::DoConnect(CPanelRequest& req)
         hostKeyAsked_ = false;
     }
     vfsUnsupported_ = false;
+    logSink_.Begin(PanelLogTitle(SessionLogTarget(site_.user, site_.host, site_.port)));
     if (session_->Connect(site))
     {
         // A successful connect means the host key was trusted (known_hosts match, AcceptOnce or AcceptAndSave), so the
@@ -478,6 +481,7 @@ void CPanelSession::Execute(CPanelRequest& req)
     }
     case CPanelRequest::Kind::Disconnect:
         session_->Disconnect();
+        logSink_.End();
         ForgetSite();
         break;
     case CPanelRequest::Kind::RealPath:

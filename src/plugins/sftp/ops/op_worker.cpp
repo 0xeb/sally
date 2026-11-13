@@ -381,6 +381,7 @@ CWorker::CWorker(IWorkerHost& host, int index)
     : host_(host), index_(index),
       hosts_(host.ConnectParams().knownHostsOwnPath, host.ConnectParams().knownHostsUserPath), session_(this, &hosts_)
 {
+    session_.SetLogSink(&logSink_);
 }
 
 CWorker::~CWorker()
@@ -419,6 +420,7 @@ void CWorker::ThreadMain()
             // after an out-of-memory in the queue itself)
         }
         session_.Disconnect();
+        logSink_.End(); // the log lives as long as the worker (idle disconnects only add a line)
     }
     catch (...)
     {
@@ -710,6 +712,8 @@ bool CWorker::EnsureConnected(CItemResult& failure)
     }
 
     const CPanelConnectParams& params = host_.ConnectParams();
+    logSink_.Begin(WorkerLogTitle(SessionLogTarget(params.site.user, params.site.host, params.site.port),
+                                  host_.OperationNumber(), index_ + 1));
     if (!session_.Connect(ToSshSite(params.site, params.password.Clone(), params.passphrase.Clone())))
     {
         const CSshError error = session_.LastError();

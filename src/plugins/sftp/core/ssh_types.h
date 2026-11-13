@@ -213,6 +213,14 @@ struct CSshMethods
 // Windows file names.
 bool IsValidRemoteEntryName(const std::string& name);
 
+// How important a log line is. A log shows the lines up to the level the user chose (Error < Normal < Verbose).
+enum class SshLogLevel
+{
+    Error = 1,   // something failed
+    Normal = 2,  // connect, host key, login, SFTP session, disconnect
+    Verbose = 3  // every SFTP call
+};
+
 enum class HostKeyDecision
 {
     Reject,
@@ -243,4 +251,14 @@ public:
 
     // Transfer progress; return false to cancel. total may be 0 when unknown.
     virtual bool Progress(uint64_t done, uint64_t total) = 0;
+};
+
+// Receives the session's log lines (set with CSshSession::SetLogSink). Called on the thread that owns the session, so an
+// implementation that is read from other threads must lock. C#: like an ILogger passed to the class.
+// The text is UTF-8, one line, English. It never contains a password, a passphrase or an answer to a prompt.
+class ISshLogSink
+{
+public:
+    virtual ~ISshLogSink() = default;
+    virtual void Log(SshLogLevel level, const std::string& utf8Line) = 0;
 };

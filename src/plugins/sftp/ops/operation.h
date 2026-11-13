@@ -110,6 +110,9 @@ public:
     void Pause();
     void Resume();
     bool IsPaused() const override { return paused_.load(); }
+    // The number in the operations list; the registry sets it before Start. Names the logs of the workers.
+    void SetNumber(uint64_t number) { number_.store(number); }
+    uint64_t OperationNumber() const override { return number_.load(); }
     // Why the operation paused itself (a login that failed, see IWorkerHost::PauseForLoginProblem); empty for a pause of
     // the user and while running. Cleared by Resume.
     std::wstring PauseReason() const;
@@ -202,6 +205,7 @@ private:
     int activeWorkers_ = 1; // 1 = Start itself, until every worker has been started
     bool workersGone_ = false;
     // OnFinished bookkeeping (queue run ids, see CQueue::RunId): the run whose OnFinished was claimed / completed
+    std::atomic<uint64_t> number_{0};
     uint64_t claimedRun_ = UINT64_MAX;
     uint64_t notifiedRun_ = UINT64_MAX;
 

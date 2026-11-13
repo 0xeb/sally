@@ -132,6 +132,10 @@ public:
     // pipelined requests, so bigger is usually faster. Clamped to 4 KiB .. 8 MiB.
     void SetTransferBufferSize(size_t bytes);
 
+    // Where the session writes its log lines (connect, host key, login, SFTP calls, errors; never secrets). Not owned,
+    // must outlive the session; nullptr = no log. Owner thread, before the first call.
+    void SetLogSink(ISshLogSink* sink) { logSink_ = sink; }
+
     // Closes the SFTP session, the SSH session and the socket (also after a failed or cancelled OpenTransport), clears
     // the cancel request and the broken state.
     void Disconnect();
@@ -165,6 +169,10 @@ private:
     bool FailFromSession(const std::string& what, int code, SshMsg msgId = SshMsg::None,
                          std::vector<std::string> args = std::vector<std::string>());
     bool IsCancelled() const { return cancelled_.load(); }
+    void Log(SshLogLevel level, const std::string& line) const;
+    void LogVerbose(const char* call, const std::string& rawPath, const std::string& rawPath2 = std::string()) const;
+    void LogAuthResult(const char* method, bool ok) const;
+    void LogNegotiated() const;
 
     using Clock = std::chrono::steady_clock;
     bool WaitSocket(const Clock::time_point& deadline);
@@ -235,7 +243,8 @@ private:
     }
 
     // SFTP helpers (ssh_sftp_ops.cpp)
-    bool BeginSftp();
+    // Start of every SFTP call: cancel / broken / not open checks, and the Verbose log line "SFTP <call> '<path>' -> '<path2>'".
+    bool BeginSftp(const char* call, const std::string& rawPath = std::string(), const std::string& rawPath2 = std::string());
     bool FailSftp(SshMsg msgId, const std::string& what, const std::string& path, int code);
     bool FailExistsIfPresent(const std::string& path);
     bool RenameRaw(const std::string& from, const std::string& to, bool overwrite);
@@ -285,6 +294,7 @@ private:
     void CloseAll();
 
     ISshCallbacks* cb_;
+    ISshLogSink* logSink_ = nullptr;
     CKnownHosts* hosts_;
     bool globalInit_ = false;
 

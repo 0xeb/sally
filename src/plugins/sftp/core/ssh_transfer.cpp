@@ -102,7 +102,7 @@ bool CSshSession::Download(const std::string& remotePath, HANDLE localFile, uint
         *bytesTransferred = 0;
     if (totalSize != nullptr)
         *totalSize = 0;
-    if (!BeginSftp())
+    if (!BeginSftp("download", remotePath))
         return false;
 
     int code = 0;
@@ -178,7 +178,7 @@ bool CSshSession::Upload(HANDLE localFile, const std::string& remotePath, uint64
     uint64_t done = 0;
     if (bytesTransferred != nullptr)
         *bytesTransferred = 0;
-    if (!BeginSftp())
+    if (!BeginSftp("upload", remotePath))
         return false;
 
     // The local file is checked before the remote one is opened: opening with TRUNC destroys the remote data.
