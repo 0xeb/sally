@@ -94,8 +94,14 @@ void CPluginFSInterface::CloseSession()
 // The lines go to the connection's session log at the Verbose level (English like the other plugin log lines).
 void CPluginFSInterface::LogCache(const std::wstring& text) const
 {
-    if (session_)
-        session_->LogLine(SshLogLevel::Verbose, text);
+    try
+    {
+        if (session_)
+            session_->LogLine(SshLogLevel::Verbose, text);
+    }
+    catch (...) // logging must never break the cache (the caller may already be building the text with bad_alloc)
+    {
+    }
 }
 
 void CPluginFSInterface::ClearListingCache(const wchar_t* why)
@@ -103,7 +109,13 @@ void CPluginFSInterface::ClearListingCache(const wchar_t* why)
     if (listingCache_.Size() == 0)
         return;
     listingCache_.Clear();
-    LogCache(std::wstring(L"Listing cache cleared: ") + why);
+    try
+    {
+        LogCache(std::wstring(L"Listing cache cleared: ") + why); // building the text may throw too
+    }
+    catch (...)
+    {
+    }
 }
 
 // A reconnect (the connection was lost, a keepalive failed) means the folders may have changed meanwhile.
@@ -140,7 +152,10 @@ CPluginFSInterface::ListingPtr CPluginFSInterface::LookupListing(const std::stri
     SyncListingCacheWithConnection();
     ListingPtr entries = listingCache_.Get(rawPath, config.listingCacheMaxAgeSeconds, CListingCache::Clock::now());
     if (entries != nullptr)
+    {
+        freeKnown_ = false; // no List request: the free space of the previously listed folder must not stay
         LogCache(L"Listing cache hit: " + DisplayPath(rawPath) + L" (no request sent)");
+    }
     return entries;
 }
 
@@ -687,7 +702,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir, CPluginDa
 
 BOOL CPluginFSInterface::DoListCurrentPath(CSalamanderDirectoryAbstract* dir,
                                            CPluginDataInterfaceAbstract*& pluginData, int& iconsType,
-                                           BOOL forceRefresh)
+                                           BOOL /*forceRefresh*/)
 {
     ListingPtr entries;
     if (pendingListing_ != nullptr)
@@ -696,12 +711,6 @@ BOOL CPluginFSInterface::DoListCurrentPath(CSalamanderDirectoryAbstract* dir,
         // after ESC: use that, once
         entries = std::move(pendingListing_);
         pendingListing_.reset();
-    }
-    else if ((entries = LookupListing(curRaw_, forceRefresh)) != nullptr)
-    {
-        // a fresh cached listing of this folder and no hard refresh: no request
-        cacheEntries_ = entries;
-        cacheRaw_ = curRaw_;
     }
     else
     {
@@ -722,6 +731,7 @@ BOOL CPluginFSInterface::DoListCurrentPath(CSalamanderDirectoryAbstract* dir,
                 errorState_ = FsErrorState::InaccessiblePath; // no cache: it goes to the parent
             return FALSE;
         case ListOutcome::PathError:
+            listingCache_.Invalidate(curRaw_); // any cached copy is outdated
             ShowError(SPLFormatStringOwned(LangStr(IDS_ERR_LIST).c_str(), DisplayPath(curRaw_).c_str(),
                                            DescribeError(listing.error).c_str()));
             errorState_ = FsErrorState::InaccessiblePath;
@@ -921,44 +931,51 @@ void WINAPI
 CPluginFSInterface::Event(int event, DWORD param)
 {
     CALL_STACK_MESSAGE2("CPluginFSInterface::Event(%d,)", event);
-    switch (event)
+    try
     {
-    case FSE_PATHCHANGED:
-        UpdateSecurityIcon(static_cast<int>(param));
-        break;
-    case FSE_DETACHED:
-        ClearListingCache(L"detached"); // simple rule: a detached or re-attached FS starts with an empty cache
-        detached_ = true;
-        lastUsed_ = IdleClock::now();
-        try
+        switch (event)
         {
-            RegisterDetached(this);
+        case FSE_PATHCHANGED:
+            UpdateSecurityIcon(static_cast<int>(param));
+            break;
+        case FSE_DETACHED:
+            ClearListingCache(L"detached"); // simple rule: a detached or re-attached FS starts with an empty cache
+            detached_ = true;
+            lastUsed_ = IdleClock::now();
+            try
+            {
+                RegisterDetached(this);
+            }
+            catch (...) // out of memory: the FS then simply stays detached until the user closes it
+            {
+            }
+            ArmIdleTimer();
+            break;
+        case FSE_ATTACHED:
+        case FSE_OPENED:
+            ClearListingCache(L"attached"); // the folders may have changed while it was detached
+            detached_ = false;
+            UnregisterDetached(this);
+            SalamanderGeneral->KillPluginFSTimer(this, FALSE, IdleTimerParam);
+            break;
+        case FSE_TIMER:
+            if (param == IdleTimerParam)
+                OnIdleTimer();
+            break;
+        default: // FSE_CLOSEORDETACHCANCELED: nothing to do
+            break;
         }
-        catch (...) // out of memory: the FS then simply stays detached until the user closes it
+        // The panel is shown (again) or may be refreshed: a listing read earlier must not be used for a later,
+        // non-forced ListCurrentPath. (ChangePath and its ListCurrentPath come back to back, before these events.)
+        if (event == FSE_PATHCHANGED || event == FSE_ACTIVATEREFRESH || event == FSE_OPENED || event == FSE_ATTACHED)
         {
+            pendingListing_.reset();
+            reestablish_ = false;
         }
-        ArmIdleTimer();
-        break;
-    case FSE_ATTACHED:
-    case FSE_OPENED:
-        ClearListingCache(L"attached"); // the folders may have changed while it was detached
-        detached_ = false;
-        UnregisterDetached(this);
-        SalamanderGeneral->KillPluginFSTimer(this, FALSE, IdleTimerParam);
-        break;
-    case FSE_TIMER:
-        if (param == IdleTimerParam)
-            OnIdleTimer();
-        break;
-    default: // FSE_CLOSEORDETACHCANCELED: nothing to do
-        break;
     }
-    // The panel is shown (again) or may be refreshed: a listing read earlier must not be used for a later,
-    // non-forced ListCurrentPath. (ChangePath and its ListCurrentPath come back to back, before these events.)
-    if (event == FSE_PATHCHANGED || event == FSE_ACTIVATEREFRESH || event == FSE_OPENED || event == FSE_ATTACHED)
+    catch (...)
     {
-        pendingListing_.reset();
-        reestablish_ = false;
+        TRACE_E("Event: unexpected exception.");
     }
 }
 

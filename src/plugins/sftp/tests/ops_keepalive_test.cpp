@@ -161,6 +161,32 @@ TEST_F(KeepaliveTest, ActivityTimeMovesWithRequests)
     EXPECT_GT(s.LastActivity(), before);
 }
 
+// ESC on a request queued behind the keepalive (D23, D24). The core sends the keepalive without waiting for a reply, so
+// a proxy cannot hold it; this test covers the cancel of a request in that situation and the reconnect that follows.
+TEST_F(KeepaliveTest, CancelledRequestAfterKeepaliveReturnsPromptlyAndNextOneReconnects)
+{
+    sftptest::CStallProxy proxy(sftptest::kPort);
+    CPanelSession s(nullptr);
+    s.SetKeepaliveSeconds(1);
+    ASSERT_TRUE(Connect(s, proxy.Port()));
+    Sleep(2500); // a keepalive is due or running now
+    proxy.Stall(true);
+
+    const auto start = Clock::now();
+    auto list = s.List("fixtures/small");
+    Sleep(300);
+    s.Cancel();
+    ASSERT_TRUE(Pump(s, *list, 5000));
+    EXPECT_EQ(list->Error().kind, SshErrorKind::Cancelled);
+    EXPECT_LT(Clock::now() - start, std::chrono::seconds(4));
+
+    proxy.Stall(false);
+    auto again = s.List("fixtures/small");
+    ASSERT_TRUE(Pump(s, *again, 15000));
+    EXPECT_TRUE(again->Ok()) << again->Error().message;
+    EXPECT_FALSE(again->Entries().empty());
+}
+
 // ---- silent retry (D59) --------------------------------------------------------------------------------------------
 
 TEST_F(KeepaliveTest, ListIsRetriedOnceAfterTheConnectionWasClosed)

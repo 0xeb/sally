@@ -325,7 +325,8 @@ private:
     std::deque<std::shared_ptr<CPanelRequest>> queue_;
     std::shared_ptr<CPanelRequest> running_;
     bool closing_ = false;
-    bool keepaliveRunning_ = false; // the session thread is inside SendKeepalive (Close cancels it)
+    bool keepaliveRunning_ = false; // the session thread is inside SendKeepalive (Close and Cancel interrupt it)
+    bool keepaliveCancelled_ = false; // Cancel interrupted that keepalive: the session thread disconnects afterwards
     CInteraction interaction_; // kind None = nothing waiting
     bool interactionDelivered_ = false;
     bool answered_ = false;

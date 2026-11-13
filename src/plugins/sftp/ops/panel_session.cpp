@@ -238,6 +238,13 @@ void CPanelSession::Cancel()
     target->cancelled_ = true;
     if (target == running_ && target->executed_)
         session_->Cancel(); // session_ exists: executed_ is set only by the session thread after creating it
+    else if (target != running_ && keepaliveRunning_)
+    {
+        // The request waits behind a keepalive: interrupt it, so the request is not delayed. The session thread
+        // disconnects afterwards (KeepaliveTick), the next request reconnects.
+        keepaliveCancelled_ = true;
+        session_->Cancel();
+    }
     answerCv_.notify_all(); // wakes an interaction wait (AbortRequested sees the flag)
 }
 
@@ -450,6 +457,7 @@ void CPanelSession::KeepaliveTick()
         if (closing_ || !queue_.empty())
             return;
         keepaliveRunning_ = true;
+        keepaliveCancelled_ = false;
     }
     bool ok = false;
     try
@@ -459,11 +467,28 @@ void CPanelSession::KeepaliveTick()
     catch (...)
     {
     }
+    bool cancelled;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         keepaliveRunning_ = false;
+        cancelled = keepaliveCancelled_;
+        keepaliveCancelled_ = false;
     }
     lastTraffic_ = IdleClock::now();
+    if (cancelled)
+    {
+        // A cancelled session is broken until Disconnect (which also clears the cancel flag); then the request that
+        // waited for us finds a clean session and reconnects through EnsureConnected.
+        try
+        {
+            session_->Disconnect();
+        }
+        catch (...)
+        {
+        }
+        logSink_.Line(SshLogLevel::Normal, L"Keepalive cancelled: the connection is reopened by the next request");
+        return;
+    }
     if (!ok)
         logSink_.Line(SshLogLevel::Normal, L"Keepalive failed: the connection is reopened by the next request");
 }

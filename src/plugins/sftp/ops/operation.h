@@ -211,8 +211,8 @@ private:
     bool started_ = false;
     int activeWorkers_ = 1; // 1 = Start itself, until every worker has been started
     bool workersGone_ = false;
-    // OnFinished bookkeeping (queue run ids, see CQueue::RunId): the run whose OnFinished was claimed / completed
     std::atomic<uint64_t> number_{0};
+    // OnFinished bookkeeping (queue run ids, see CQueue::RunId): the run whose OnFinished was claimed / completed
     uint64_t claimedRun_ = UINT64_MAX;
     uint64_t notifiedRun_ = UINT64_MAX;
 
