@@ -4,7 +4,7 @@
 
 CHostKeyDialog::CHostKeyDialog(HWND parent, const std::wstring& host, const std::wstring& keyType,
                                const std::wstring& fingerprint, bool changed)
-    : CCenteredDialog(HLanguage, IDD_HOSTKEY, parent), host_(host), keyType_(keyType), fingerprint_(fingerprint),
+    : CCenteredDialog(HLanguage, IDD_HOSTKEY, IDH_HOST_KEY, parent), host_(host), keyType_(keyType), fingerprint_(fingerprint),
       changed_(changed)
 {
 }

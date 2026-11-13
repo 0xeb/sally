@@ -2,6 +2,7 @@
 
 #include "solve_error_dialog.h"
 
+#include "dark_controls.h"
 #include "encoding.h"
 #include "local_name.h"
 #include "operation.h"
@@ -44,7 +45,7 @@ std::wstring LeafName(const CQueueItem& item)
 } // namespace
 
 CSolveErrorDialog::CSolveErrorDialog(HWND parent, const CQueueItem& item)
-    : CCenteredDialog(HLanguage, IDD_SOLVE_ERROR, parent), item_(item), offers_(SolveOffersFor(item)),
+    : CCenteredDialog(HLanguage, IDD_SOLVE_ERROR, IDH_SOLVE_ERROR, parent), item_(item), offers_(SolveOffersFor(item)),
       newName_(LeafName(item))
 {
 }
@@ -77,6 +78,7 @@ std::wstring CSolveErrorDialog::SideInfo(int formatId, uint64_t size, int64_t mt
 
 void CSolveErrorDialog::InitControls()
 {
+    ApplyDarkButtons(HWindow);
     const std::wstring name = !item_.localPath.empty() ? item_.localPath : CNameCodec::Utf8().Decode(item_.remotePath);
     SetDlgItemTextW(HWindow, IDC_SOLVE_NAME, name.c_str());
     SetDlgItemTextW(HWindow, IDC_SOLVE_MESSAGE, ProblemTextWithDetails(item_.problem, ItemDetails(item_)).c_str());

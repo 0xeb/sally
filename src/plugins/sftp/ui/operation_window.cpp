@@ -52,7 +52,7 @@ class COperationWindow : public CCenteredDialog
 {
 public:
     COperationWindow(COperationWindowHost& host, COperation& operation, const COperationWindowOptions& options)
-        : CCenteredDialog(HLanguage, IDD_OPERATION, nullptr), // no owner: an owner on Sally's thread would couple the input queues
+        : CCenteredDialog(HLanguage, IDD_OPERATION, IDH_OPERATION_WINDOW, nullptr), // no owner: an owner on Sally's thread would couple the input queues
           host_(host), op_(operation), options_(options)
     {
         SetObjectOrigin(ooStatic);
@@ -306,6 +306,7 @@ bool COperationWindow::ErrorsOnly()
 
 void COperationWindow::InitControls()
 {
+    ApplyDarkButtons(HWindow);
     CheckDlgButton(HWindow, IDX_OP_ERRORS_ONLY, options_.errorsOnly ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(HWindow, IDX_OP_CLOSE_WHEN_DONE, options_.closeWhenDone ? BST_CHECKED : BST_UNCHECKED);
     SetDlgItemTextW(HWindow, IDC_OP_SOURCE, options_.source.c_str());

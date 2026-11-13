@@ -83,9 +83,10 @@ static void ForwardOpTrace(const char* text)
 }
 #endif
 
-// there is no help yet
+// F1 and Help buttons of the plugin's dialogs (any dialog thread): Sally opens the page of the sftp manual for the id
 static void WINAPI HelpCallback(HWND window, UINT helpID)
 {
+    SalamanderGeneral->OpenHtmlHelp(window, HHCDisplayContext, helpID, FALSE);
 }
 
 std::wstring LangStr(int resID)
@@ -151,6 +152,9 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
             return nullptr;
 
         salamander->SetPluginHomePageURL(Sally::Urls::Website);
+
+        // names the manual ("sftp"); Sally opens its pages on the website
+        SalamanderGeneral->SetHelpFileName(L"sftp.chm");
 
         // remembered passwords go through Sally's password manager: ask for PasswordManagerEvent calls
         SalamanderGeneral->SetPluginUsesPasswordManager();

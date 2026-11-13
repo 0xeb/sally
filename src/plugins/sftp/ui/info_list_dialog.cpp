@@ -16,8 +16,8 @@ std::wstring InfoRowsToText(const std::vector<CInfoRow>& rows)
     return text;
 }
 
-CInfoListDialog::CInfoListDialog(HWND parent, int dialogId, std::wstring title, std::vector<CInfoRow> rows)
-    : CCenteredDialog(HLanguage, dialogId, parent), title_(std::move(title)), rows_(std::move(rows))
+CInfoListDialog::CInfoListDialog(HWND parent, int dialogId, UINT helpID, std::wstring title, std::vector<CInfoRow> rows)
+    : CCenteredDialog(HLanguage, dialogId, helpID, parent), title_(std::move(title)), rows_(std::move(rows))
 {
 }
 

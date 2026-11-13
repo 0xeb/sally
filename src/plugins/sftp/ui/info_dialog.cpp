@@ -79,7 +79,7 @@ void ShowServerInfoDialog(HWND parent, const CInfoDialogInput& input)
         if (input.session.valid)
             AddMethodRows(rows, input.session.methods);
 
-        CInfoListDialog dialog(parent, IDD_FSINFO,
+        CInfoListDialog dialog(parent, IDD_FSINFO, IDH_SERVER_INFO,
                                SPLFormatStringOwned(LangStr(IDS_INFO_TITLE).c_str(), input.connection.c_str()),
                                std::move(rows));
         dialog.Run();
@@ -104,7 +104,7 @@ void ShowSecurityDialog(HWND parent, const std::wstring& connection, const CPane
             Add(rows, IDS_SEC_FINGERPRINT, OrUnknown(session.hostKeyFingerprint));
             AddMethodRows(rows, session.methods);
         }
-        CInfoListDialog dialog(parent, IDD_FSSECURITY,
+        CInfoListDialog dialog(parent, IDD_FSSECURITY, IDH_SECURITY_INFO,
                                SPLFormatStringOwned(LangStr(IDS_SEC_TITLE).c_str(), connection.c_str()),
                                std::move(rows));
         dialog.Run();

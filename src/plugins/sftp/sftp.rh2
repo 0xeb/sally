@@ -373,4 +373,29 @@
 // shown instead of "Running" while every worker of an operation waits for a free connection (global cap)
 #define IDS_OP_STATUS_WAITING_SLOT                444
 
+// Help topic ids (F1 in a dialog, Plugins > SFTP menu help). Sally maps them to the pages of the sftp manual
+// (https://get-sally.app/manual/sftp/<page>.html, see .notes/help/topics.md). Unique, 2000 and up, never reused.
+#define IDH_SFTP_CONTENTS                 2000 // the manual's start
+#define IDH_SITE_LIST                     2001
+#define IDH_SITE_NAME                     2002
+#define IDH_SITE_EDIT                     2003 // the dialog around the tabs
+#define IDH_SITE_EDIT_SESSION             2004 // tab pages
+#define IDH_SITE_EDIT_AUTH                2005
+#define IDH_SITE_EDIT_CONNECTION          2006
+#define IDH_SITE_EDIT_DIRECTORIES         2007
+#define IDH_HOST_KEY                      2008
+#define IDH_PROMPT                        2009
+#define IDH_COPY_MOVE                     2010
+#define IDH_CHMOD                         2011
+#define IDH_OPERATION_WINDOW              2012
+#define IDH_SOLVE_ERROR                   2013
+#define IDH_OPERATIONS_LIST               2014
+#define IDH_SESSION_LOG                   2015
+#define IDH_CONFIGURATION                 2016
+#define IDH_SERVER_INFO                   2017 // Ctrl+F1
+#define IDH_SECURITY_INFO                 2018 // the security icon
+#define IDH_PROPERTIES                    2019 // Alt+Enter
+#define IDH_COMMAND_OUTPUT                2020
+#define IDH_DISCONNECT                    2021 // menu item only (no dialog)
+
 #endif // __SFTP_RH2

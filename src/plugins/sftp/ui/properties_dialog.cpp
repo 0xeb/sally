@@ -104,7 +104,7 @@ void ShowPropertiesDialog(HWND parent, const CPropertiesInput& input)
             AddSeveralItems(rows, input);
             title = SPLFormatStringOwned(LangStr(IDS_PROP_TITLE_MANY).c_str(), input.itemCount);
         }
-        CInfoListDialog dialog(parent, IDD_FSPROPERTIES, title, std::move(rows));
+        CInfoListDialog dialog(parent, IDD_FSPROPERTIES, IDH_PROPERTIES, title, std::move(rows));
         dialog.Run();
     }
     catch (...)

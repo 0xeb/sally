@@ -4,7 +4,7 @@
 
 CPromptDialog::CPromptDialog(HWND parent, const std::wstring& title, const std::wstring& instruction,
                              const std::vector<CPromptItem>& prompts)
-    : CCenteredDialog(HLanguage, IDD_PROMPT, parent), title_(title), instruction_(instruction), prompts_(prompts)
+    : CCenteredDialog(HLanguage, IDD_PROMPT, IDH_PROMPT, parent), title_(title), instruction_(instruction), prompts_(prompts)
 {
 }
 

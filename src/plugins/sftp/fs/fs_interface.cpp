@@ -344,3 +344,32 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
     }
     return FALSE; // do not deselect
 }
+
+// The manual topic of a menu item (0 = none).
+static UINT HelpTopicOfMenuItem(int id)
+{
+    switch (id)
+    {
+    case SftpCmdConnect:
+        return IDH_SITE_LIST;
+    case SftpCmdDisconnect:
+        return IDH_DISCONNECT;
+    case SftpCmdOperations:
+        return IDH_OPERATIONS_LIST;
+    case SftpCmdConfiguration:
+        return IDH_CONFIGURATION;
+    case SftpCmdSessionLog:
+        return IDH_SESSION_LOG;
+    }
+    return 0;
+}
+
+BOOL WINAPI
+CPluginInterfaceForMenuExt::HelpForMenuItem(HWND parent, int id)
+{
+    CALL_STACK_MESSAGE2("CPluginInterfaceForMenuExt::HelpForMenuItem(, %d)", id);
+    const UINT helpID = HelpTopicOfMenuItem(id);
+    if (helpID != 0)
+        SalamanderGeneral->OpenHtmlHelp(parent, HHCDisplayContext, helpID, FALSE);
+    return helpID != 0;
+}

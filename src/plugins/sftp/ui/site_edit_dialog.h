@@ -29,7 +29,7 @@ class CSiteEditDialog;
 class CSiteTabPage : public CDialog
 {
 public:
-    CSiteTabPage(int resID, CSiteEditDialog& owner);
+    CSiteTabPage(int resID, UINT helpID, CSiteEditDialog& owner);
     bool CreatePage(HWND parent);
     HWND Control(int id) const { return HWindow == nullptr ? nullptr : GetDlgItem(HWindow, id); }
 
@@ -41,28 +41,28 @@ protected:
 class CSiteSessionPage : public CSiteTabPage
 {
 public:
-    explicit CSiteSessionPage(CSiteEditDialog& owner) : CSiteTabPage(IDD_SITETAB_SESSION, owner) {}
+    explicit CSiteSessionPage(CSiteEditDialog& owner) : CSiteTabPage(IDD_SITETAB_SESSION, IDH_SITE_EDIT_SESSION, owner) {}
     void Transfer(CTransferInfo& ti) override;
 };
 
 class CSiteAuthPage : public CSiteTabPage
 {
 public:
-    explicit CSiteAuthPage(CSiteEditDialog& owner) : CSiteTabPage(IDD_SITETAB_AUTH, owner) {}
+    explicit CSiteAuthPage(CSiteEditDialog& owner) : CSiteTabPage(IDD_SITETAB_AUTH, IDH_SITE_EDIT_AUTH, owner) {}
     void Transfer(CTransferInfo& ti) override;
 };
 
 class CSiteConnectionPage : public CSiteTabPage
 {
 public:
-    explicit CSiteConnectionPage(CSiteEditDialog& owner) : CSiteTabPage(IDD_SITETAB_CONNECTION, owner) {}
+    explicit CSiteConnectionPage(CSiteEditDialog& owner) : CSiteTabPage(IDD_SITETAB_CONNECTION, IDH_SITE_EDIT_CONNECTION, owner) {}
     void Transfer(CTransferInfo& ti) override;
 };
 
 class CSiteDirectoriesPage : public CSiteTabPage
 {
 public:
-    explicit CSiteDirectoriesPage(CSiteEditDialog& owner) : CSiteTabPage(IDD_SITETAB_DIRECTORIES, owner) {}
+    explicit CSiteDirectoriesPage(CSiteEditDialog& owner) : CSiteTabPage(IDD_SITETAB_DIRECTORIES, IDH_SITE_EDIT_DIRECTORIES, owner) {}
     void Transfer(CTransferInfo& ti) override;
 };
 

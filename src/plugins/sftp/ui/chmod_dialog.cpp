@@ -21,7 +21,7 @@ bool IsGridControl(int id)
 } // namespace
 
 CChmodDialog::CChmodDialog(HWND parent, const CChmodDialogInput& input)
-    : CCenteredDialog(HLanguage, IDD_CHMOD, parent), input_(input), state_(input.state)
+    : CCenteredDialog(HLanguage, IDD_CHMOD, IDH_CHMOD, parent), input_(input), state_(input.state)
 {
 }
 

@@ -29,7 +29,7 @@ int LevelIndex(SessionLogLevel level)
 } // namespace
 
 CConfigDialog::CConfigDialog(HWND parent, const CGlobalConfig& current)
-    : CCenteredDialog(HLanguage, IDD_CONFIG, parent), config_(current)
+    : CCenteredDialog(HLanguage, IDD_CONFIG, IDH_CONFIGURATION, parent), config_(current)
 {
 }
 

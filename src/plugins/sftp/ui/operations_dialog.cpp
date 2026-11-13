@@ -13,7 +13,7 @@ const UINT_PTR TIMER_REFRESH = 1;
 }
 
 COperationsDialog::COperationsDialog(HWND parent, COperationsList& operations, COperationsDialogCallbacks callbacks)
-    : CCenteredDialog(HLanguage, IDD_OPERATIONS, parent), operations_(operations), callbacks_(std::move(callbacks))
+    : CCenteredDialog(HLanguage, IDD_OPERATIONS, IDH_OPERATIONS_LIST, parent), operations_(operations), callbacks_(std::move(callbacks))
 {
 }
 

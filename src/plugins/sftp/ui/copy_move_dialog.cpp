@@ -35,7 +35,7 @@ int PolicyIndex(ConflictPolicy policy)
 } // namespace
 
 CCopyMoveDialog::CCopyMoveDialog(HWND parent, bool copy, const std::wstring& subject)
-    : CCenteredDialog(HLanguage, IDD_COPYMOVE, parent), copy_(copy), subject_(subject)
+    : CCenteredDialog(HLanguage, IDD_COPYMOVE, IDH_COPY_MOVE, parent), copy_(copy), subject_(subject)
 {
     SalamanderGeneral->GetStdHistoryValues(SALHIST_COPYMOVETGT, &history_, &historyCount_);
 }

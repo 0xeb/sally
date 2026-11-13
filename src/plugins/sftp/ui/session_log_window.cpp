@@ -82,7 +82,7 @@ public:
     }
 
     explicit CSessionLogWindow(CSessionLogWindowHost& host)
-        : CCenteredDialog(HLanguage, IDD_SESSION_LOG, nullptr), host_(host) // no owner: it would couple the input queues
+        : CCenteredDialog(HLanguage, IDD_SESSION_LOG, IDH_SESSION_LOG, nullptr), host_(host) // no owner: it would couple the input queues
     {
         SetObjectOrigin(ooStatic);
     }

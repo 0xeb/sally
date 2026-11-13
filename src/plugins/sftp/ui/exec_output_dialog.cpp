@@ -4,7 +4,7 @@
 #include "exec_output_dialog.h"
 
 CExecOutputDialog::CExecOutputDialog(HWND parent, std::wstring editText, std::wstring statusText)
-    : CCenteredDialog(HLanguage, IDD_EXEC_OUTPUT, parent), text_(std::move(editText)), status_(std::move(statusText))
+    : CCenteredDialog(HLanguage, IDD_EXEC_OUTPUT, IDH_COMMAND_OUTPUT, parent), text_(std::move(editText)), status_(std::move(statusText))
 {
 }
 

@@ -73,8 +73,8 @@ std::wstring SiteErrorText(SiteError error)
 // Tab pages
 //
 
-CSiteTabPage::CSiteTabPage(int resID, CSiteEditDialog& owner)
-    : CDialog(HLanguage, resID, (HWND)nullptr, ooStatic), owner_(owner) // a member of the owner: never deleted by WinLib
+CSiteTabPage::CSiteTabPage(int resID, UINT helpID, CSiteEditDialog& owner)
+    : CDialog(HLanguage, resID, helpID, (HWND)nullptr, ooStatic), owner_(owner) // a member of the owner: never deleted by WinLib
 {
 }
 
@@ -151,7 +151,7 @@ void CSiteDirectoriesPage::Transfer(CTransferInfo& ti)
 
 CSiteEditDialog::CSiteEditDialog(HWND parent, const CSiteList& sites, const CSite* existing, bool hasPassword,
                                  bool hasPassphrase)
-    : CCenteredDialog(HLanguage, IDD_SITEEDIT, parent),
+    : CCenteredDialog(HLanguage, IDD_SITEEDIT, IDH_SITE_EDIT, parent),
       sites_(sites),
       editing_(existing != nullptr),
       originalName_(existing != nullptr ? existing->name : std::wstring()),

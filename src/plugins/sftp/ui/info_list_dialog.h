@@ -17,8 +17,8 @@ struct CInfoRow
 class CInfoListDialog : public CCenteredDialog
 {
 public:
-    // dialogId: the resource template (IDD_FSINFO, ...); title: the window caption.
-    CInfoListDialog(HWND parent, int dialogId, std::wstring title, std::vector<CInfoRow> rows);
+    // dialogId: the resource template (IDD_FSINFO, ...), helpID: its IDH_* topic; title: the window caption.
+    CInfoListDialog(HWND parent, int dialogId, UINT helpID, std::wstring title, std::vector<CInfoRow> rows);
 
     // Shows the dialog; returns when it is closed. Never throws.
     void Run();

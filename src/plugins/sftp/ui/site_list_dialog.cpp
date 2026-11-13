@@ -13,7 +13,7 @@ class CSiteNameDialog : public CCenteredDialog
 {
 public:
     CSiteNameDialog(HWND parent, const CSiteList& sites, const std::wstring& current)
-        : CCenteredDialog(HLanguage, IDD_SITENAME, parent), sites_(sites), current_(current), name_(current), trimmed_(current)
+        : CCenteredDialog(HLanguage, IDD_SITENAME, IDH_SITE_NAME, parent), sites_(sites), current_(current), name_(current), trimmed_(current)
     {
     }
 
@@ -78,7 +78,7 @@ private:
 } // namespace
 
 CSiteListDialog::CSiteListDialog(HWND parent, ISiteStore& store)
-    : CCenteredDialog(HLanguage, IDD_SITELIST, parent), store_(store)
+    : CCenteredDialog(HLanguage, IDD_SITELIST, IDH_SITE_LIST, parent), store_(store)
 {
 }
 

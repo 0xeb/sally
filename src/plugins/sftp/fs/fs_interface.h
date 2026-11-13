@@ -57,7 +57,7 @@ public:
     virtual DWORD WINAPI GetMenuItemState(int id, DWORD eventMask);
     virtual BOOL WINAPI ExecuteMenuItem(CSalamanderForOperationsAbstract* salamander, HWND parent, int id,
                                         DWORD eventMask);
-    virtual BOOL WINAPI HelpForMenuItem(HWND parent, int id) { return FALSE; }
+    virtual BOOL WINAPI HelpForMenuItem(HWND parent, int id);
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
