@@ -76,7 +76,7 @@ private:
     bool fileExists_;
     bool newOk_ = false;
     CQuadWord newSize_ = CQuadWord(0, 0);
-    HANDLE viewerLock_ = NULL;
+    HANDLE viewerLock_ = nullptr;
     BOOL viewerLockOwner_ = FALSE;
     bool removeAsSoonAsPossible_;
 };
@@ -100,15 +100,15 @@ CPluginFSInterface::ViewFile(const wchar_t* fsName, HWND parent, CSalamanderForV
 
 void CPluginFSInterface::DoViewFile(HWND parent, CSalamanderForViewFileOnFSAbstract* salamander, CFileData& file)
 {
-    if (salamander == NULL || closeRequested_ || !connected_ || IsWaiting())
+    if (salamander == nullptr || closeRequested_ || !connected_ || IsWaiting())
         return;
     const CSftpFileData* data = reinterpret_cast<const CSftpFileData*>(file.PluginData);
-    if (data != NULL && (data->mode & ModeTypeMask) == ModeDir)
+    if (data != nullptr && (data->mode & ModeTypeMask) == ModeDir)
         return; // a directory cannot be viewed (Sally does not ask for it)
-    const std::string raw = data != NULL ? data->rawName : codec_.Encode(file.Name);
+    const std::string raw = data != nullptr ? data->rawName : codec_.Encode(file.Name);
     const std::string remotePath = JoinRemotePath(curRaw_, raw);
     const int64_t mtime = FileTimeToUnixTime(file.LastWrite);
-    const bool isLink = data != NULL && (data->mode & ModeTypeMask) == ModeLink;
+    const bool isLink = data != nullptr && (data->mode & ModeTypeMask) == ModeLink;
 
     // Case-sensitive like the server's names. The name is only a key of the cache, never a disk path.
     const std::wstring uniqueName = BuildCacheName(FullFsPath(remotePath), file.Size.Value, mtime);
@@ -117,8 +117,8 @@ void CPluginFSInterface::DoViewFile(HWND parent, CSalamanderForViewFileOnFSAbstr
 
     BOOL fileExists = FALSE;
     const wchar_t* copyPath =
-        salamander->AllocFileNameInCache(parent, uniqueName.c_str(), nameInCache.c_str(), NULL, fileExists);
-    if (copyPath == NULL)
+        salamander->AllocFileNameInCache(parent, uniqueName.c_str(), nameInCache.c_str(), nullptr, fileExists);
+    if (copyPath == nullptr)
         return; // Sally has reported the problem; FreeFileNameInCache is not wanted when Alloc failed
 
     // The pair of AllocFileNameInCache: its destructor runs on every way out, also when an exception is thrown below.
@@ -132,7 +132,7 @@ void CPluginFSInterface::DoViewFile(HWND parent, CSalamanderForViewFileOnFSAbstr
 
     if (fileExists || newOk)
     {
-        HANDLE viewerLock = NULL;
+        HANDLE viewerLock = nullptr;
         BOOL viewerLockOwner = FALSE;
         if (salamander->OpenViewer(parent, copyPath, &viewerLock, &viewerLockOwner))
             guard.SetViewerLock(viewerLock, viewerLockOwner);

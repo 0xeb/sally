@@ -10,13 +10,13 @@ namespace
 {
 // Salamander gives the column callbacks their input and output through its own global variables
 // (CSalamanderViewAbstract::GetTransferVariables): pointers to them are cached here by SetupView.
-const CFileData** TransferFileData = NULL;
-int* TransferIsDir = NULL;
-wchar_t* TransferBuffer = NULL;
-int* TransferLen = NULL;
-DWORD* TransferRowData = NULL;
-CPluginDataInterfaceAbstract** TransferPluginDataIface = NULL;
-DWORD* TransferActCustomData = NULL;
+const CFileData** TransferFileData = nullptr;
+int* TransferIsDir = nullptr;
+wchar_t* TransferBuffer = nullptr;
+int* TransferLen = nullptr;
+DWORD* TransferRowData = nullptr;
+CPluginDataInterfaceAbstract** TransferPluginDataIface = nullptr;
+DWORD* TransferActCustomData = nullptr;
 
 const DWORD ColPermissions = 1; // CColumn::CustomData of our columns
 const DWORD ColOwner = 2;
@@ -32,7 +32,7 @@ int ColumnFixed[2][ColumnCount] = {{0, 0, 0}, {0, 0, 0}};
 // PluginData of the current item; NULL for the up-dir item.
 const CSftpFileData* DataOf(const CFileData* file)
 {
-    return file != NULL ? reinterpret_cast<const CSftpFileData*>(file->PluginData) : NULL;
+    return file != nullptr ? reinterpret_cast<const CSftpFileData*>(file->PluginData) : nullptr;
 }
 
 void SetText(const std::wstring& text)
@@ -48,19 +48,19 @@ void SetText(const std::wstring& text)
 void WINAPI GetPermissionsText()
 {
     const CSftpFileData* data = DataOf(*TransferFileData);
-    SetText(data != NULL ? data->permissions : std::wstring());
+    SetText(data != nullptr ? data->permissions : std::wstring());
 }
 
 void WINAPI GetOwnerText()
 {
     const CSftpFileData* data = DataOf(*TransferFileData);
-    SetText(data != NULL ? data->owner : std::wstring());
+    SetText(data != nullptr ? data->owner : std::wstring());
 }
 
 void WINAPI GetGroupText()
 {
     const CSftpFileData* data = DataOf(*TransferFileData);
-    SetText(data != NULL ? data->group : std::wstring());
+    SetText(data != nullptr ? data->group : std::wstring());
 }
 
 void CopyText(wchar_t* target, size_t capacity, const std::wstring& text)
@@ -100,7 +100,7 @@ CPluginDataInterface::CompareFilesFromFS(const CFileData* file1, const CFileData
 {
     const CSftpFileData* a = DataOf(file1);
     const CSftpFileData* b = DataOf(file2);
-    if (a != NULL && b != NULL)
+    if (a != nullptr && b != nullptr)
     {
         // by the raw bytes; two different items must never compare equal (SDK rule), so identical names fall back
         // to the address (arbitrary but stable while the listing lives)
@@ -109,9 +109,9 @@ CPluginDataInterface::CompareFilesFromFS(const CFileData* file1, const CFileData
             return byName;
         return file1 < file2 ? -1 : 1;
     }
-    if (a == NULL && b == NULL)
+    if (a == nullptr && b == nullptr)
         return 0; // both are the up-dir item
-    return a == NULL ? -1 : 1;
+    return a == nullptr ? -1 : 1;
 }
 
 void WINAPI
@@ -128,7 +128,7 @@ CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, c
     for (int i = view->GetColumnsCount() - 1; i >= 0; i--)
     {
         const CColumn* column = view->GetColumn(i);
-        if (column != NULL && column->ID == COLUMN_ID_ATTRIBUTES)
+        if (column != nullptr && column->ID == COLUMN_ID_ATTRIBUTES)
             view->DeleteColumn(i);
     }
 

@@ -71,7 +71,7 @@ void SetHotItem(HWND header, int item)
     if (item == GetHotItem(header))
         return;
     SetPropW(header, HOT_PROP, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(item + 1)));
-    InvalidateRect(header, NULL, FALSE);
+    InvalidateRect(header, nullptr, FALSE);
 }
 
 // Mouse moved over the header: ask Windows which item is under the cursor and make it the hot one.
@@ -147,9 +147,9 @@ void PaintHeader(HWND header, HDC dc, const PluginDarkModeColors& colors)
         DrawTextW(dc, text, -1, &textRect, flags);
 
         // divider on the right edge and line under the item
-        MoveToEx(dc, rc.right - 1, rc.top + dividerInset, NULL);
+        MoveToEx(dc, rc.right - 1, rc.top + dividerInset, nullptr);
         LineTo(dc, rc.right - 1, rc.bottom - dividerInset);
-        MoveToEx(dc, rc.left, rc.bottom - 1, NULL);
+        MoveToEx(dc, rc.left, rc.bottom - 1, nullptr);
         LineTo(dc, rc.right, rc.bottom - 1);
     }
 }
@@ -206,7 +206,7 @@ void PaintTabs(HWND tabs, HDC dc, const PluginDarkModeColors& colors)
             // the selected tab stands out slightly and is open at the bottom, joined with the page area
             RECT fill = {rc.left, rc.top, rc.right, rc.bottom + 1};
             PluginDarkMode_FillRect(dc, &fill, colors.InputBackground);
-            MoveToEx(dc, rc.left, rc.bottom, NULL);
+            MoveToEx(dc, rc.left, rc.bottom, nullptr);
             LineTo(dc, rc.left, rc.top);
             LineTo(dc, rc.right - 1, rc.top);
             LineTo(dc, rc.right - 1, rc.bottom);
@@ -227,7 +227,7 @@ public:
     CPaintScope(HWND hwnd, UINT msg, WPARAM wParam) : hwnd_(hwnd), ownsPaint_(msg == WM_PAINT)
     {
         dc_ = ownsPaint_ ? BeginPaint(hwnd, &ps_) : reinterpret_cast<HDC>(wParam);
-        saved_ = dc_ != NULL ? SaveDC(dc_) : 0;
+        saved_ = dc_ != nullptr ? SaveDC(dc_) : 0;
     }
     ~CPaintScope()
     {
@@ -244,7 +244,7 @@ private:
     HWND hwnd_;
     bool ownsPaint_;
     PAINTSTRUCT ps_ = {};
-    HDC dc_ = NULL;
+    HDC dc_ = nullptr;
     int saved_ = 0;
 };
 
@@ -277,7 +277,7 @@ LRESULT CALLBACK DarkSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
             if (PluginDarkMode_GetColors(&colors))
             {
                 CPaintScope scope(hwnd, msg, wParam);
-                if (scope.Dc() != NULL)
+                if (scope.Dc() != nullptr)
                 {
                     if (static_cast<Kind>(data) == Kind::Header)
                         PaintHeader(hwnd, scope.Dc(), colors);
@@ -354,7 +354,7 @@ LRESULT CALLBACK GroupBoxSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
             if (PluginDarkMode_GetColors(&colors))
             {
                 CPaintScope scope(hwnd, msg, wParam);
-                if (scope.Dc() != NULL)
+                if (scope.Dc() != nullptr)
                     PaintGroupBox(hwnd, scope.Dc(), colors);
                 return 0;
             }
@@ -400,7 +400,7 @@ void PaintCheckRadio(HWND button, HDC dc, const PluginDarkModeColors& colors)
         state = (check == BST_CHECKED ? CBS_CHECKEDNORMAL : CBS_UNCHECKEDNORMAL) + offset;
 
     HFONT font = reinterpret_cast<HFONT>(SendMessageW(button, WM_GETFONT, 0, 0));
-    if (font != NULL)
+    if (font != nullptr)
         SelectObject(dc, font);
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, enabled ? colors.DialogText : colors.DisabledText);
@@ -408,18 +408,18 @@ void PaintCheckRadio(HWND button, HDC dc, const PluginDarkModeColors& colors)
     // fallback when the theme gives no size: the classic 13 px glyph, scaled (GetSystemMetricsForDpi needs Windows 10)
     SIZE glyph = {Scale(dc, 13), Scale(dc, 13)};
     HTHEME theme = OpenThemeData(button, L"Button");
-    if (theme != NULL)
+    if (theme != nullptr)
     {
         SIZE themed = {};
-        if (SUCCEEDED(GetThemePartSize(theme, dc, part, state, NULL, TS_TRUE, &themed)) && themed.cx > 0 && themed.cy > 0)
+        if (SUCCEEDED(GetThemePartSize(theme, dc, part, state, nullptr, TS_TRUE, &themed)) && themed.cx > 0 && themed.cy > 0)
             glyph = themed;
     }
     RECT glyphRect = {client.left + Scale(dc, 2), client.top + (client.bottom - client.top - glyph.cy) / 2, 0, 0};
     glyphRect.right = glyphRect.left + glyph.cx;
     glyphRect.bottom = glyphRect.top + glyph.cy;
-    if (theme != NULL)
+    if (theme != nullptr)
     {
-        DrawThemeBackground(theme, dc, part, state, &glyphRect, NULL);
+        DrawThemeBackground(theme, dc, part, state, &glyphRect, nullptr);
         CloseThemeData(theme);
     }
 
@@ -455,7 +455,7 @@ LRESULT CALLBACK CheckRadioSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             if (PluginDarkMode_GetColors(&colors))
             {
                 CPaintScope scope(hwnd, msg, wParam);
-                if (scope.Dc() != NULL)
+                if (scope.Dc() != nullptr)
                     PaintCheckRadio(hwnd, scope.Dc(), colors);
                 return 0;
             }
@@ -464,7 +464,7 @@ LRESULT CALLBACK CheckRadioSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                  msg == WM_KILLFOCUS || msg == WM_SETTEXT)
         {
             const LRESULT result = DefSubclassProc(hwnd, msg, wParam, lParam);
-            InvalidateRect(hwnd, NULL, FALSE); // the state changed: repaint with our painter
+            InvalidateRect(hwnd, nullptr, FALSE); // the state changed: repaint with our painter
             return result;
         }
     }
@@ -487,31 +487,31 @@ BOOL CALLBACK SubclassButton(HWND child, LPARAM)
         SetWindowSubclass(child, CheckRadioSubclassProc, SUBCLASS_ID, 0);
     else
         return TRUE;
-    InvalidateRect(child, NULL, TRUE);
+    InvalidateRect(child, nullptr, TRUE);
     return TRUE;
 }
 } // namespace
 
 void ApplyDarkButtons(HWND dialog)
 {
-    if (!PluginDarkMode_ShouldUseDark() || dialog == NULL)
+    if (!PluginDarkMode_ShouldUseDark() || dialog == nullptr)
         return;
     EnumChildWindows(dialog, SubclassButton, 0);
 }
 
 void ApplyDarkListHeader(HWND listView)
 {
-    if (!PluginDarkMode_ShouldUseDark() || listView == NULL)
+    if (!PluginDarkMode_ShouldUseDark() || listView == nullptr)
         return;
     HWND header = ListView_GetHeader(listView);
-    if (header != NULL)
+    if (header != nullptr)
         SetWindowSubclass(header, DarkSubclassProc, SUBCLASS_ID, static_cast<DWORD_PTR>(Kind::Header));
 }
 
 void ApplyDarkTabControl(HWND tabControl)
 {
-    if (!PluginDarkMode_ShouldUseDark() || tabControl == NULL)
+    if (!PluginDarkMode_ShouldUseDark() || tabControl == nullptr)
         return;
     SetWindowSubclass(tabControl, DarkSubclassProc, SUBCLASS_ID, static_cast<DWORD_PTR>(Kind::Tabs));
-    InvalidateRect(tabControl, NULL, TRUE);
+    InvalidateRect(tabControl, nullptr, TRUE);
 }

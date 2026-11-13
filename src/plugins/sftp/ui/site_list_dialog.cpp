@@ -44,7 +44,7 @@ public:
         else
         {
             const CSite* other = sites_.Find(text);
-            if (other != NULL && !SiteNamesEqual(other->name, current_))
+            if (other != nullptr && !SiteNamesEqual(other->name, current_))
                 error = LangStr(IDS_SITE_ERR_NAME_TAKEN);
         }
         if (!error.empty())
@@ -251,7 +251,7 @@ void CSiteListDialog::OnNew()
 {
     if (RefuseIfReadOnly())
         return;
-    CSiteEditDialog dialog(HWindow, store_.Sites(), NULL, false, false);
+    CSiteEditDialog dialog(HWindow, store_.Sites(), nullptr, false, false);
     CSiteEditResult result;
     if (!dialog.Run(result))
         return;
@@ -270,7 +270,7 @@ void CSiteListDialog::OnEdit()
     if (RefuseIfReadOnly())
         return;
     const CSite* found = store_.Sites().Find(SelectedName());
-    if (found == NULL)
+    if (found == nullptr)
         return;
     const CSite original = *found; // the list may change while the dialog runs on the copy
     CSiteEditDialog dialog(HWindow, store_.Sites(), &original, store_.HasPassword(original.name),
@@ -314,7 +314,7 @@ void CSiteListDialog::OnRename()
     if (RefuseIfReadOnly())
         return;
     const CSite* found = store_.Sites().Find(SelectedName());
-    if (found == NULL)
+    if (found == nullptr)
         return;
     CSite renamed = *found;
     const std::wstring oldName = renamed.name;
@@ -394,7 +394,7 @@ INT_PTR CSiteListDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case WM_NOTIFY:
         {
             const NMHDR* header = reinterpret_cast<const NMHDR*>(lParam);
-            if (header == NULL || header->idFrom != IDC_SITELIST_LIST)
+            if (header == nullptr || header->idFrom != IDC_SITELIST_LIST)
                 break;
             if (header->code == LVN_ITEMCHANGED)
                 UpdateButtons();

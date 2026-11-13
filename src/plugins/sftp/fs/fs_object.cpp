@@ -18,7 +18,7 @@ namespace
 {
 bool WriteBuffer(CSalamanderStringBuffer* buffer, const std::wstring& text)
 {
-    return buffer != NULL && sally::plugin_abi::WriteStringBuffer(*buffer, text);
+    return buffer != nullptr && sally::plugin_abi::WriteStringBuffer(*buffer, text);
 }
 
 std::string ToUtf8Path(const std::wstring& path)
@@ -128,7 +128,7 @@ CPluginFSInterface::GetFullName(CFileData& file, int isDir, CSalamanderStringBuf
         if (isDir == 2) // up-dir: the parent
             return WriteBuffer(fullName, UserPartOf(ParentRemotePath(curRaw_)));
         const CSftpFileData* data = reinterpret_cast<const CSftpFileData*>(file.PluginData);
-        const std::string raw = data != NULL ? data->rawName : codec_.Encode(file.Name);
+        const std::string raw = data != nullptr ? data->rawName : codec_.Encode(file.Name);
         return WriteBuffer(fullName, UserPartOf(JoinRemotePath(curRaw_, raw)));
     }
     catch (...)
@@ -147,13 +147,13 @@ CPluginFSInterface::GetFullFSPath(HWND parent, const wchar_t* fsName, CSalamande
         if (!connected_)
             return FALSE;
         std::wstring relative;
-        if (path == NULL || !sally::plugin_abi::ReadStringBuffer(*path, relative))
+        if (path == nullptr || !sally::plugin_abi::ReadStringBuffer(*path, relative))
         {
             success = FALSE;
             return FALSE;
         }
         const std::string absolute = ResolveRemotePath(curRaw_, codec_.Encode(relative));
-        success = WriteBuffer(path, std::wstring(fsName != NULL ? fsName : L"") + L":" + UserPartOf(absolute));
+        success = WriteBuffer(path, std::wstring(fsName != nullptr ? fsName : L"") + L":" + UserPartOf(absolute));
         return TRUE;
     }
     catch (...)
@@ -184,7 +184,7 @@ CPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const
     try
     {
         CSftpPath p;
-        if (!connected_ || userPart == NULL || !ParseSftpPath(userPart, p))
+        if (!connected_ || userPart == nullptr || !ParseSftpPath(userPart, p))
             return FALSE;
         return currentFSNameIndex == fsNameIndex && SameServer(identity_, p) && p.path == DisplayPath(curRaw_);
     }
@@ -201,7 +201,7 @@ CPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex, const wch
     try
     {
         CSftpPath p;
-        if (userPart == NULL || !ParseSftpPath(userPart, p))
+        if (userPart == nullptr || !ParseSftpPath(userPart, p))
             return FALSE;
         // A new object that is not connected yet takes any path (that is how an FS is opened); an open one only
         // paths on its own server.
@@ -225,7 +225,7 @@ bool CPluginFSInterface::ResolveSite(const CSftpPath& wanted, CSite& site, CSecr
     if (wanted.isSite)
     {
         const CSite* saved = SiteConfig.Sites().Find(wanted.siteName);
-        if (saved == NULL)
+        if (saved == nullptr)
         {
             ShowError(SPLFormatStringOwned(LangStr(IDS_ERR_SITE_UNKNOWN).c_str(), wanted.siteName.c_str()));
             return false;
@@ -349,14 +349,14 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, CSalamanderStringBuffer* 
     {
         if (closeRequested_)
             return FALSE;
-        if (fsName == NULL || !sally::plugin_abi::IsValidStringBuffer(*fsName))
+        if (fsName == nullptr || !sally::plugin_abi::IsValidStringBuffer(*fsName))
             return FALSE;
         // the FS name stays as Salamander gave it (this plugin has one name)
-        if (cutFileName != NULL && !WriteBuffer(cutFileName, std::wstring()))
+        if (cutFileName != nullptr && !WriteBuffer(cutFileName, std::wstring()))
             return FALSE;
-        if (pathWasCut != NULL)
+        if (pathWasCut != nullptr)
             *pathWasCut = FALSE;
-        if (mode != 3 && (pathWasCut != NULL || cutFileName != NULL))
+        if (mode != 3 && (pathWasCut != nullptr || cutFileName != nullptr))
         {
             TRACE_E("Incorrect value of 'mode' in CPluginFSInterface::ChangePath().");
             mode = 3;
@@ -398,7 +398,7 @@ BOOL CPluginFSInterface::DoChangePath(const wchar_t* userPart, CSalamanderString
         return TRUE;
     }
 
-    const std::wstring requested = userPart != NULL ? userPart : L"";
+    const std::wstring requested = userPart != nullptr ? userPart : L"";
     const bool opening = !connected_; // the first ChangePath of a new object opens the connection
     const bool hinted = !hintUserPart_.empty() && hintUserPart_ == requested;
     const std::string hintedRaw = hintRawPath_;
@@ -511,9 +511,9 @@ BOOL CPluginFSInterface::DoChangePath(const wchar_t* userPart, CSalamanderString
     pendingListing_ = std::make_shared<const std::vector<CSftpEntry>>(std::move(listing.entries));
     cacheEntries_ = pendingListing_;
     cacheRaw_ = curRaw_;
-    if (pathWasCut != NULL)
+    if (pathWasCut != nullptr)
         *pathWasCut = cut ? TRUE : FALSE;
-    if (cutFileName != NULL && !cutName.empty())
+    if (cutFileName != nullptr && !cutName.empty())
         WriteBuffer(cutFileName, cutName);
     if (!pendingMessage.empty())
         ShowError(pendingMessage);
@@ -622,7 +622,7 @@ bool CPluginFSInterface::AddListing(CSalamanderDirectoryAbstract* dir, CPluginDa
 
     int sortByExtDirsAsFiles = 0;
     SalamanderGeneral->GetConfigParameter(SALCFG_SORTBYEXTDIRSASFILES, &sortByExtDirsAsFiles,
-                                          sizeof(sortByExtDirsAsFiles), NULL);
+                                          sizeof(sortByExtDirsAsFiles), nullptr);
 
     int dirCount = 0;
     for (const CSftpEntry& e : entries)
@@ -637,13 +637,13 @@ bool CPluginFSInterface::AddListing(CSalamanderDirectoryAbstract* dir, CPluginDa
         CFileData up;
         memset(&up, 0, sizeof(up));
         up.Name = SalamanderGeneral->DupStr(L"..");
-        if (up.Name == NULL)
+        if (up.Name == nullptr)
             return false;
         up.NameLen = 2;
         up.Ext = up.Name + up.NameLen;
         up.Attr = FILE_ATTRIBUTE_DIRECTORY;
         up.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED;
-        if (!dir->AddDir(NULL, up, data))
+        if (!dir->AddDir(nullptr, up, data))
         {
             SalamanderGeneral->Free(up.Name);
             return false;
@@ -669,7 +669,7 @@ bool CPluginFSInterface::AddListing(CSalamanderDirectoryAbstract* dir, CPluginDa
         CFileData file;
         memset(&file, 0, sizeof(file));
         file.Name = SalamanderGeneral->DupStr(name.c_str());
-        if (file.Name == NULL)
+        if (file.Name == nullptr)
             return false;
         file.NameLen = static_cast<DWORD>(name.size());
         file.Ext = (isDir && !sortByExtDirsAsFiles) ? file.Name + file.NameLen : file.Name + ExtensionOffset(name);
@@ -683,7 +683,7 @@ bool CPluginFSInterface::AddListing(CSalamanderDirectoryAbstract* dir, CPluginDa
         file.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED;
         file.PluginData = reinterpret_cast<DWORD_PTR>(pluginItem.get());
 
-        const BOOL added = isDir ? dir->AddDir(NULL, file, data) : dir->AddFile(NULL, file, data);
+        const BOOL added = isDir ? dir->AddDir(nullptr, file, data) : dir->AddFile(nullptr, file, data);
         if (!added)
         {
             SalamanderGeneral->Free(file.Name);
@@ -714,7 +714,7 @@ bool CPluginFSInterface::BuildNavigation(const CFileData& file, int isDir, std::
         else
         {
             const CSftpFileData* data = reinterpret_cast<const CSftpFileData*>(file.PluginData);
-            target = JoinRemotePath(curRaw_, data != NULL ? data->rawName : codec_.Encode(file.Name));
+            target = JoinRemotePath(curRaw_, data != nullptr ? data->rawName : codec_.Encode(file.Name));
         }
         userPart = UserPartOf(target);
         hintUserPart_ = userPart; // ChangePath gets exactly this text back and then uses the raw bytes
@@ -841,7 +841,7 @@ CPluginFSInterface::GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_
         if (!connected_)
             return FALSE;
         std::wstring text = L"\t";
-        text += fsName != NULL ? fsName : L"";
+        text += fsName != nullptr ? fsName : L"";
         text += L':';
         text += UserPartOf(curRaw_);
         if (!text.empty() && text.back() == L'/')
@@ -849,7 +849,7 @@ CPluginFSInterface::GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_
         for (size_t at = 0; (at = text.find(L'&', at)) != std::wstring::npos; at += 2)
             text.insert(at, 1, L'&'); // '&' would be taken as a menu hotkey
         title = SalamanderGeneral->DupStr(text.c_str());
-        if (title == NULL)
+        if (title == nullptr)
             return FALSE;
         icon = GetFSIcon(destroyIcon);
         return TRUE;
@@ -866,9 +866,9 @@ namespace
 HICON MakeFadedIcon(HICON icon)
 {
     HIMAGELIST list = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 1, 0);
-    if (list == NULL)
-        return NULL;
-    HICON faded = NULL;
+    if (list == nullptr)
+        return nullptr;
+    HICON faded = nullptr;
     if (ImageList_AddIcon(list, icon) >= 0)
         faded = ImageList_GetIcon(list, 0, ILD_TRANSPARENT | ILD_BLEND50);
     ImageList_Destroy(list);
@@ -883,10 +883,10 @@ CPluginFSInterface::GetFSIcon(BOOL& destroyIcon)
     destroyIcon = TRUE;
     HICON icon = static_cast<HICON>(LoadImageW(DLLInstance, MAKEINTRESOURCEW(IDI_SFTP_FS), IMAGE_ICON, 16, 16,
                                                LR_DEFAULTCOLOR));
-    if (icon != NULL && detached_)
+    if (icon != nullptr && detached_)
     {
         HICON faded = MakeFadedIcon(icon); // a detached connection looks "dimmed"
-        if (faded != NULL)
+        if (faded != nullptr)
         {
             DestroyIcon(icon);
             icon = faded;
@@ -907,7 +907,7 @@ CPluginFSInterface::GetPathForMainWindowTitle(const wchar_t* fsName, int mode, C
         rootPath.path = L"/";
         std::wstring prefix = FormatSftpPath(rootPath);
         prefix.pop_back(); // "user@host" without the root slash
-        prefix = std::wstring(fsName != NULL ? fsName : L"") + L":" + prefix;
+        prefix = std::wstring(fsName != nullptr ? fsName : L"") + L":" + prefix;
         return WriteBuffer(buf, FormatWindowTitlePath(prefix, DisplayPath(curRaw_), mode));
     }
     catch (...)

@@ -22,7 +22,7 @@ namespace
 {
 bool WriteBuffer(CSalamanderStringBuffer* buffer, const std::wstring& text)
 {
-    return buffer != NULL && sally::plugin_abi::WriteStringBuffer(*buffer, text);
+    return buffer != nullptr && sally::plugin_abi::WriteStringBuffer(*buffer, text);
 }
 
 // A Windows path (drive or UNC): the only kind of target Sally lets a download use.
@@ -61,17 +61,17 @@ bool CPluginFSInterface::CollectSelection(int panel, int selectedFiles, int sele
         BOOL isDir = FALSE;
         const CFileData* file = focused ? SalamanderGeneral->GetPanelFocusedItem(panel, &isDir)
                                         : SalamanderGeneral->GetPanelSelectedItem(panel, &index, &isDir);
-        if (file == NULL)
+        if (file == nullptr)
             break;
         const CSftpFileData* data = reinterpret_cast<const CSftpFileData*>(file->PluginData);
-        if (data != NULL || wcscmp(file->Name, L"..") != 0) // the up-dir has no plugin data
+        if (data != nullptr || wcscmp(file->Name, L"..") != 0) // the up-dir has no plugin data
         {
             CSelectedItem item;
-            item.rawName = data != NULL ? data->rawName : codec_.Encode(file->Name);
+            item.rawName = data != nullptr ? data->rawName : codec_.Encode(file->Name);
             item.isDir = isDir != FALSE;
-            item.isLink = data != NULL && (data->mode & 0170000) == 0120000; // S_IFLNK
-            item.mode = data != NULL ? data->mode : 0;
-            item.modeKnown = data != NULL && data->modeKnown;
+            item.isLink = data != nullptr && (data->mode & 0170000) == 0120000; // S_IFLNK
+            item.mode = data != nullptr ? data->mode : 0;
+            item.modeKnown = data != nullptr && data->modeKnown;
             item.size = file->Size.Value;
             item.mtime = FileTimeToUnixTime(file->LastWrite);
             items.push_back(std::move(item));
@@ -133,7 +133,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName,
     try
     {
         std::wstring payload;
-        if (targetPath == NULL || !sally::plugin_abi::ReadStringBuffer(*targetPath, payload) || closeRequested_)
+        if (targetPath == nullptr || !sally::plugin_abi::ReadStringBuffer(*targetPath, payload) || closeRequested_)
         {
             cancelOrHandlePath = TRUE;
             return TRUE; // cancel
@@ -202,14 +202,14 @@ BOOL CPluginFSInterface::AskDownloadTarget(BOOL copy, const wchar_t* fsName, HWN
                                            BOOL& cancelOrHandlePath)
 {
     std::wstring sourceText;
-    SPLGetCommonFSOperSourceDescrOwned(SalamanderGeneral, panel, selectedFiles, selectedDirs, NULL, FALSE, FALSE,
+    SPLGetCommonFSOperSourceDescrOwned(SalamanderGeneral, panel, selectedFiles, selectedDirs, nullptr, FALSE, FALSE,
                                        sourceText);
     const std::wstring subject = SPLFormatStringOwned(
         LangStr(copy ? IDS_COPYMOVE_SUBJECT_COPY : IDS_COPYMOVE_SUBJECT_MOVE).c_str(), sourceText.c_str());
     if (mode == 1 && !path.empty())
         SalamanderGeneral->SetUserWorkedOnPanelPath(PANEL_TARGET); // the default action works with the target panel path
 
-    const std::wstring ownName = fsName != NULL ? fsName : AssignedFSName;
+    const std::wstring ownName = fsName != nullptr ? fsName : AssignedFSName;
     const bool singleFile = IsSingleFile(panel, selectedFiles, selectedDirs);
     CCopyMoveChoice choice;
     choice.target = path;
@@ -310,7 +310,7 @@ bool CPluginFSInterface::IsSingleFile(int panel, int selectedFiles, int selected
         return false;
     BOOL isDir = FALSE;
     const CFileData* file = SalamanderGeneral->GetPanelFocusedItem(panel, &isDir);
-    return file != NULL && !isDir && wcscmp(file->Name, L"..") != 0;
+    return file != nullptr && !isDir && wcscmp(file->Name, L"..") != 0;
 }
 
 // Mode 5: files were dropped on 'path'. A Move to the same server is done on the server; otherwise only an existing
@@ -318,7 +318,7 @@ bool CPluginFSInterface::IsSingleFile(int panel, int selectedFiles, int selected
 BOOL CPluginFSInterface::DropOnTarget(BOOL copy, const wchar_t* fsName, HWND parent, int panel, int selectedFiles,
                                       int selectedDirs, std::wstring& path, BOOL& cancelOrHandlePath)
 {
-    const SftpTargetResult result = TryMoveToSftpTarget(copy, path, fsName != NULL ? fsName : AssignedFSName, parent,
+    const SftpTargetResult result = TryMoveToSftpTarget(copy, path, fsName != nullptr ? fsName : AssignedFSName, parent,
                                                         panel, selectedFiles, selectedDirs);
     if (result == SftpTargetResult::NotSftp)
         return DropToWindowsFolder(copy, parent, panel, selectedFiles, selectedDirs, path, cancelOrHandlePath);
@@ -341,7 +341,7 @@ BOOL CPluginFSInterface::DropToWindowsFolder(BOOL copy, HWND parent, int panel, 
     BOOL isDir = FALSE;
     size_t secondPartOffset = std::wstring::npos;
     if (!SPLSalParsePathOwned(SalamanderGeneral, parent, parsed, type, isDir, secondPartOffset, title.c_str(), FALSE,
-                              NULL, NULL))
+                              nullptr, nullptr))
         return TRUE; // a syntax error: the parser has reported it
     if (type != PATH_TYPE_WINDOWS || secondPartOffset != parsed.size()) // an FS, an archive, or a missing folder
     {
@@ -452,9 +452,9 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* f
     try
     {
         std::wstring payload;
-        if (targetPath == NULL || !sally::plugin_abi::ReadStringBuffer(*targetPath, payload))
+        if (targetPath == nullptr || !sally::plugin_abi::ReadStringBuffer(*targetPath, payload))
         {
-            if (invalidPathOrCancel != NULL)
+            if (invalidPathOrCancel != nullptr)
                 *invalidPathOrCancel = TRUE;
             return FALSE;
         }
@@ -468,7 +468,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* f
         if (mode != 1 && ClassifyTargetMask(mask, ignoredName) == TargetMaskKind::Wildcard)
         {
             ShowMessage(LangStr(IDS_ERR_MASK_UNSUPPORTED));
-            if (invalidPathOrCancel != NULL)
+            if (invalidPathOrCancel != nullptr)
                 *invalidPathOrCancel = TRUE; // like a bad path: the user corrects it
             WriteBuffer(targetPath, path); // the dialog comes back with the path (the mask is dropped)
             return FALSE;
@@ -480,7 +480,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* f
     catch (...)
     {
         TRACE_E("CopyOrMoveFromDiskToFS: unexpected exception.");
-        if (invalidPathOrCancel != NULL)
+        if (invalidPathOrCancel != nullptr)
             *invalidPathOrCancel = TRUE;
         return FALSE;
     }
@@ -490,16 +490,16 @@ BOOL CPluginFSInterface::DoCopyOrMoveFromDiskToFS(BOOL copy, int mode, const wch
                                                   const wchar_t* sourcePath, SalEnumSelection2 next, void* nextParam,
                                                   std::wstring& targetPath, BOOL* invalidPathOrCancel)
 {
-    if (invalidPathOrCancel != NULL)
+    if (invalidPathOrCancel != nullptr)
         *invalidPathOrCancel = TRUE;
     if (mode == 1)
         return TRUE; // Sally passes the current path of this FS: it is the proposed target as it is
-    if (mode != 2 && mode != 3 || sourcePath == NULL || next == NULL)
+    if (mode != 2 && mode != 3 || sourcePath == nullptr || next == nullptr)
         return FALSE;
 
     std::wstring userPart;
     CSftpPath wanted;
-    if (!SplitFsPath(targetPath, fsName != NULL ? fsName : AssignedFSName, userPart) ||
+    if (!SplitFsPath(targetPath, fsName != nullptr ? fsName : AssignedFSName, userPart) ||
         !ParseSftpPath(userPart, wanted))
     {
         ShowMessage(SPLFormatStringOwned(LangStr(IDS_ERR_BAD_PATH).c_str(), targetPath.c_str()));
@@ -507,7 +507,7 @@ BOOL CPluginFSInterface::DoCopyOrMoveFromDiskToFS(BOOL copy, int mode, const wch
     }
     if (connected_ && !SameServer(identity_, wanted))
     {
-        if (invalidPathOrCancel != NULL)
+        if (invalidPathOrCancel != nullptr)
             *invalidPathOrCancel = FALSE;
         return FALSE; // another FS (or a new one) must take this
     }
@@ -516,14 +516,14 @@ BOOL CPluginFSInterface::DoCopyOrMoveFromDiskToFS(BOOL copy, int mode, const wch
     std::vector<CLocalSource> sources;
     std::wstring base = sourcePath;
     SPLSalPathAddBackslashOwned(base);
-    const wchar_t* name = NULL;
-    const wchar_t* dosName = NULL;
+    const wchar_t* name = nullptr;
+    const wchar_t* dosName = nullptr;
     BOOL isDir = FALSE;
     CQuadWord size(0, 0);
     DWORD attributes = 0;
     FILETIME lastWrite = {0, 0};
     int enumError = SALENUM_SUCCESS;
-    while ((name = next(parent, 0, &dosName, &isDir, &size, &attributes, &lastWrite, nextParam, &enumError)) != NULL)
+    while ((name = next(parent, 0, &dosName, &isDir, &size, &attributes, &lastWrite, nextParam, &enumError)) != nullptr)
     {
         CLocalSource source;
         source.path = base + name;
@@ -555,7 +555,7 @@ BOOL CPluginFSInterface::DoCopyOrMoveFromDiskToFS(BOOL copy, int mode, const wch
         launch.changedPaths.push_back(sourcePath); // the moved items are gone from here
     std::vector<CQueueItem> roots = COperation::BuildUploadRoots(sources, settings, codec);
     if (OperationsRegistry.Launch(std::move(settings), std::move(params), std::move(roots), launch) &&
-        invalidPathOrCancel != NULL)
+        invalidPathOrCancel != nullptr)
         *invalidPathOrCancel = FALSE; // started: Sally deselects the source
     return TRUE;
 }
@@ -569,7 +569,7 @@ void WINAPI
 CPluginFSInterface::GetDropEffect(const wchar_t* srcFSPath, const wchar_t* tgtFSPath, DWORD allowedEffects,
                                   DWORD keyState, DWORD* dropEffect)
 {
-    if (dropEffect == NULL)
+    if (dropEffect == nullptr)
         return;
     DWORD effect = DROPEFFECT_NONE;
     try
@@ -588,7 +588,7 @@ CPluginFSInterface::GetDropEffect(const wchar_t* srcFSPath, const wchar_t* tgtFS
 void WINAPI
 CPluginFSInterface::GetAllowedDropEffects(int mode, const wchar_t* tgtFSPath, DWORD* allowedEffects)
 {
-    if (mode != 1 || tgtFSPath == NULL || allowedEffects == NULL)
+    if (mode != 1 || tgtFSPath == nullptr || allowedEffects == nullptr)
         return;
     try
     {
@@ -606,7 +606,7 @@ bool CPluginFSInterface::IsSameServerFsPath(const wchar_t* fsPath) const
 {
     std::wstring userPart;
     CSftpPath parsed;
-    return connected_ && fsPath != NULL && SplitFsPath(fsPath, AssignedFSName, userPart) &&
+    return connected_ && fsPath != nullptr && SplitFsPath(fsPath, AssignedFSName, userPart) &&
            ParseSftpPath(userPart, parsed) && SameServer(identity_, parsed);
 }
 
@@ -620,8 +620,8 @@ CPluginFSInterface::AcceptChangeOnPathNotification(const wchar_t* fsName, const 
     {
         std::wstring userPart;
         CSftpPath changed;
-        if (!connected_ || closeRequested_ || path == NULL ||
-            !SplitFsPath(path, fsName != NULL ? fsName : AssignedFSName, userPart) || !ParseSftpPath(userPart, changed))
+        if (!connected_ || closeRequested_ || path == nullptr ||
+            !SplitFsPath(path, fsName != nullptr ? fsName : AssignedFSName, userPart) || !ParseSftpPath(userPart, changed))
             return;
         if (SameServer(identity_, changed) && IsPathWithin(DisplayPath(curRaw_), changed.path, includingSubdirs != FALSE))
             SalamanderGeneral->PostRefreshPanelFS(this);

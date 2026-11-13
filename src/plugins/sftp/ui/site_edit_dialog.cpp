@@ -19,7 +19,7 @@ void TransferCheck(CTransferInfo& ti, int id, bool& value)
 
 bool IsChecked(HWND control)
 {
-    return control != NULL && SendMessageW(control, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    return control != nullptr && SendMessageW(control, BM_GETCHECK, 0, 0) == BST_CHECKED;
 }
 } // namespace
 
@@ -73,14 +73,14 @@ std::wstring SiteErrorText(SiteError error)
 //
 
 CSiteTabPage::CSiteTabPage(int resID, CSiteEditDialog& owner)
-    : CDialog(HLanguage, resID, (HWND)NULL, ooStatic), owner_(owner) // a member of the owner: never deleted by WinLib
+    : CDialog(HLanguage, resID, (HWND)nullptr, ooStatic), owner_(owner) // a member of the owner: never deleted by WinLib
 {
 }
 
 bool CSiteTabPage::CreatePage(HWND parent)
 {
     SetParent(parent);
-    if (Create() == NULL)
+    if (Create() == nullptr)
         return false;
     // light mode: the page uses the tab body texture (dark mode paints its own background)
     if (!PluginDarkMode_ShouldUseDark())
@@ -152,11 +152,11 @@ CSiteEditDialog::CSiteEditDialog(HWND parent, const CSiteList& sites, const CSit
                                  bool hasPassphrase)
     : CCenteredDialog(HLanguage, IDD_SITEEDIT, parent),
       sites_(sites),
-      editing_(existing != NULL),
-      originalName_(existing != NULL ? existing->name : std::wstring()),
+      editing_(existing != nullptr),
+      originalName_(existing != nullptr ? existing->name : std::wstring()),
       hasPassword_(hasPassword),
       hasPassphrase_(hasPassphrase),
-      form_(FormFromSite(existing != NULL ? *existing : CSite())),
+      form_(FormFromSite(existing != nullptr ? *existing : CSite())),
       session_(*this),
       auth_(*this),
       connection_(*this),
@@ -198,7 +198,7 @@ CSiteTabPage* CSiteEditDialog::Page(int index)
     case SiteTabDirectories:
         return &directories_;
     }
-    return NULL;
+    return nullptr;
 }
 
 void CSiteEditDialog::InitDialog()
@@ -347,7 +347,7 @@ void CSiteEditDialog::ShowError(const std::wstring& text, SiteField field)
     SendMessageW(GetDlgItem(HWindow, IDC_SITEEDIT_TABS), TCM_SETCURSEL, tab, 0);
     ShowTab(tab);
 
-    HWND control = NULL;
+    HWND control = nullptr;
     switch (field)
     {
     case SiteField::Name:
@@ -375,7 +375,7 @@ void CSiteEditDialog::ShowError(const std::wstring& text, SiteField field)
         control = connection_.Control(IDE_SITE_UPLOADMODE);
         break;
     }
-    if (control != NULL)
+    if (control != nullptr)
     {
         SetFocus(control);
         SendMessageW(control, EM_SETSEL, 0, -1);
@@ -397,7 +397,7 @@ bool CSiteEditDialog::TryAccept()
         return false;
     }
     const CSite* other = sites_.Find(site.name);
-    if (other != NULL && !(editing_ && SiteNamesEqual(originalName_, other->name)))
+    if (other != nullptr && !(editing_ && SiteNamesEqual(originalName_, other->name)))
     {
         ShowError(LangStr(IDS_SITE_ERR_NAME_TAKEN), SiteField::Name);
         return false;
@@ -434,7 +434,7 @@ INT_PTR CSiteEditDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_NOTIFY:
     {
         const NMHDR* header = reinterpret_cast<const NMHDR*>(lParam);
-        if (header != NULL && header->idFrom == IDC_SITEEDIT_TABS && header->code == TCN_SELCHANGE)
+        if (header != nullptr && header->idFrom == IDC_SITEEDIT_TABS && header->code == TCN_SELCHANGE)
             ShowTab(static_cast<int>(SendMessageW(header->hwndFrom, TCM_GETCURSEL, 0, 0)));
         break;
     }

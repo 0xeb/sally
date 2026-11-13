@@ -11,7 +11,7 @@ CHostKeyDialog::CHostKeyDialog(HWND parent, const std::wstring& host, const std:
 
 CHostKeyDialog::~CHostKeyDialog()
 {
-    if (boldFont_ != NULL)
+    if (boldFont_ != nullptr)
         DeleteObject(boldFont_);
 }
 
@@ -60,11 +60,11 @@ void CHostKeyDialog::InitControls()
     HWND message = GetDlgItem(HWindow, IDC_HOSTKEY_MESSAGE);
     HFONT font = (HFONT)SendMessageW(message, WM_GETFONT, 0, 0);
     LOGFONTW lf;
-    if (font != NULL && GetObjectW(font, sizeof(lf), &lf) != 0)
+    if (font != nullptr && GetObjectW(font, sizeof(lf), &lf) != 0)
     {
         lf.lfWeight = FW_BOLD;
         boldFont_ = CreateFontIndirectW(&lf);
-        if (boldFont_ != NULL)
+        if (boldFont_ != nullptr)
             SendMessageW(message, WM_SETFONT, (WPARAM)boldFont_, TRUE);
     }
 }

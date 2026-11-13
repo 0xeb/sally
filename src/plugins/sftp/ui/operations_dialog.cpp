@@ -40,7 +40,7 @@ INT_PTR COperationsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             const INT_PTR result = CCenteredDialog::DialogProc(uMsg, wParam, lParam);
             InitList();
             Refresh();
-            SetTimer(HWindow, TIMER_REFRESH, 1000, NULL);
+            SetTimer(HWindow, TIMER_REFRESH, 1000, nullptr);
             return result;
         }
 

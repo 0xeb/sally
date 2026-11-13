@@ -77,7 +77,7 @@ CPluginFSInterface::ExecuteCommandLine(HWND parent, CSalamanderStringBuffer* com
 // TRUE: the command ran (whatever its exit code); the command line is cleared.
 BOOL CPluginFSInterface::DoExecuteCommandLine(HWND parent, CSalamanderStringBuffer* command, int& selFrom, int& selTo)
 {
-    if (closeRequested_ || !connected_ || IsWaiting() || command == NULL)
+    if (closeRequested_ || !connected_ || IsWaiting() || command == nullptr)
         return FALSE;
     std::wstring typed;
     if (!sally::plugin_abi::ReadStringBuffer(*command, typed))

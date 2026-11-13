@@ -36,6 +36,6 @@ private:
     std::wstring subject_;
     CCopyMoveChoice choice_;
     int preserveTime_ = 1; // the checkbox value for CTransferInfo::CheckBox
-    wchar_t** history_ = NULL; // Sally's shared history of target paths
+    wchar_t** history_ = nullptr; // Sally's shared history of target paths
     int historyCount_ = 0;
 };

@@ -162,7 +162,7 @@ int StringIdOfMsg(SshMsg msg)
 // English fallback. LoadStringW with length 0 only returns the length of the read-only resource string (0 = none).
 std::wstring OptionalLangStr(int id)
 {
-    const wchar_t* text = NULL;
+    const wchar_t* text = nullptr;
     const int length = LoadStringW(HLanguage, id, reinterpret_cast<LPWSTR>(&text), 0);
     return length > 0 ? std::wstring(text, length) : std::wstring();
 }

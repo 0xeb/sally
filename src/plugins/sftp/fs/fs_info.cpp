@@ -26,7 +26,7 @@ void CPluginFSInterface::StoreFreeSpace(const CSftpVfs& vfs)
 void WINAPI
 CPluginFSInterface::GetFSFreeSpace(CQuadWord* retValue)
 {
-    if (retValue == NULL)
+    if (retValue == nullptr)
         return;
     if (!freeKnown_)
     {
@@ -93,7 +93,7 @@ void CPluginFSInterface::UpdateSecurityIcon(int panel)
             info = session_->Info();
         if (!info.valid)
         {
-            SalamanderGeneral->ShowSecurityIcon(panel, FALSE, FALSE, NULL);
+            SalamanderGeneral->ShowSecurityIcon(panel, FALSE, FALSE, nullptr);
             return;
         }
         const bool trusted = IsHostKeyTrusted(info);

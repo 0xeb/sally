@@ -31,7 +31,7 @@ class CSiteTabPage : public CDialog
 public:
     CSiteTabPage(int resID, CSiteEditDialog& owner);
     bool CreatePage(HWND parent);
-    HWND Control(int id) const { return HWindow == NULL ? NULL : GetDlgItem(HWindow, id); }
+    HWND Control(int id) const { return HWindow == nullptr ? nullptr : GetDlgItem(HWindow, id); }
 
 protected:
     INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam) override;

@@ -25,12 +25,12 @@ namespace
 // Reads the name Sally passes in 'newName'. False when the buffer cannot be read.
 bool ReadNewName(CSalamanderStringBuffer* buffer, std::wstring& name)
 {
-    return buffer != NULL && sally::plugin_abi::ReadStringBuffer(*buffer, name);
+    return buffer != nullptr && sally::plugin_abi::ReadStringBuffer(*buffer, name);
 }
 
 bool WriteNewName(CSalamanderStringBuffer* buffer, const std::wstring& name)
 {
-    return buffer != NULL && sally::plugin_abi::WriteStringBuffer(*buffer, name);
+    return buffer != nullptr && sally::plugin_abi::WriteStringBuffer(*buffer, name);
 }
 } // namespace
 
@@ -101,7 +101,7 @@ bool CPluginFSInterface::DoQuickRename(HWND parent, CFileData& file, CSalamander
     if (RefuseBadName(parent, typed))
         return false;
     const CSftpFileData* data = reinterpret_cast<const CSftpFileData*>(file.PluginData);
-    const std::string oldRaw = data != NULL ? data->rawName : codec_.Encode(file.Name);
+    const std::string oldRaw = data != nullptr ? data->rawName : codec_.Encode(file.Name);
     std::string newRaw;
     if (!EncodeNewName(parent, typed, newRaw))
         return false;

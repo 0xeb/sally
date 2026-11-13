@@ -52,7 +52,7 @@ class COperationWindow : public CCenteredDialog
 {
 public:
     COperationWindow(COperationWindowHost& host, COperation& operation, const COperationWindowOptions& options)
-        : CCenteredDialog(HLanguage, IDD_OPERATION, NULL), // no owner: an owner on Sally's thread would couple the input queues
+        : CCenteredDialog(HLanguage, IDD_OPERATION, nullptr), // no owner: an owner on Sally's thread would couple the input queues
           host_(host), op_(operation), options_(options)
     {
         SetObjectOrigin(ooStatic);
@@ -126,7 +126,7 @@ private:
 void COperationWindow::Run()
 {
     HWND window = Create();
-    if (window == NULL)
+    if (window == nullptr)
         return;
 
     bool visible = true;
@@ -140,15 +140,15 @@ void COperationWindow::Run()
     }
 
     MSG msg;
-    while (GetMessageW(&msg, NULL, 0, 0) > 0)
+    while (GetMessageW(&msg, nullptr, 0, 0) > 0)
     {
-        if (HWindow == NULL || !IsDialogMessageW(HWindow, &msg))
+        if (HWindow == nullptr || !IsDialogMessageW(HWindow, &msg))
         {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
     }
-    if (HWindow != NULL) // the loop ended without WM_DESTROY (GetMessage error)
+    if (HWindow != nullptr) // the loop ended without WM_DESTROY (GetMessage error)
         DestroyWindow(HWindow);
 }
 
@@ -283,7 +283,7 @@ void COperationWindow::SetTextIfChanged(int controlId, const std::wstring& text)
 void COperationWindow::EnableIfChanged(int controlId, bool enable)
 {
     HWND control = GetDlgItem(HWindow, controlId);
-    if (control != NULL && (IsWindowEnabled(control) != FALSE) != enable)
+    if (control != nullptr && (IsWindowEnabled(control) != FALSE) != enable)
         EnableWindow(control, enable ? TRUE : FALSE);
 }
 
@@ -312,7 +312,7 @@ void COperationWindow::InitControls()
     SetDlgItemTextW(HWindow, IDC_OP_TARGET, options_.target.c_str());
     SendDlgItemMessageW(HWindow, IDC_OP_PROGRESS, PBM_SETRANGE32, 0, 100);
     InitList();
-    SetTimer(HWindow, TIMER_SECOND, 1000, NULL);
+    SetTimer(HWindow, TIMER_SECOND, 1000, nullptr);
     RefreshNow();
 }
 
@@ -349,7 +349,7 @@ void COperationWindow::RequestRefresh()
         RefreshNow();
     else if (!refreshTimerArmed_)
     {
-        refreshTimerArmed_ = SetTimer(HWindow, TIMER_REFRESH, static_cast<UINT>(MinRepaintMs - sinceLast + 1), NULL) != 0;
+        refreshTimerArmed_ = SetTimer(HWindow, TIMER_REFRESH, static_cast<UINT>(MinRepaintMs - sinceLast + 1), nullptr) != 0;
     }
 }
 
@@ -677,7 +677,7 @@ void COperationWindow::ConfirmCancel()
     if (answer == IDYES)
         op_.RequestCancel(); // the window stays until the workers have ended (OnState closes it)
     FinishModal();
-    if (HWindow != NULL)
+    if (HWindow != nullptr)
         RefreshNow();
 }
 
@@ -697,7 +697,7 @@ void COperationWindow::SolveSelected()
     }
     --modalDepth_;
     FinishModal();
-    if (HWindow != NULL)
+    if (HWindow != nullptr)
     {
         itemsDirty_ = true;
         RefreshNow();
@@ -757,9 +757,9 @@ BOOL CALLBACK FindEnabledDialogProc(HWND window, LPARAM param)
 // calls FinishModal, which ends the next one, until the window can be destroyed. False when none was found.
 bool COperationWindow::CloseTopmostModal()
 {
-    CFindModal find = {HWindow, NULL};
+    CFindModal find = {HWindow, nullptr};
     EnumThreadWindows(GetCurrentThreadId(), FindEnabledDialogProc, reinterpret_cast<LPARAM>(&find));
-    if (find.found == NULL)
+    if (find.found == nullptr)
         return false;
     EndDialog(find.found, IDCANCEL); // works for message boxes and for our dialogs; we are on the thread that owns them
     return true;
@@ -767,7 +767,7 @@ bool COperationWindow::CloseTopmostModal()
 
 void COperationWindow::FinishModal()
 {
-    if (!closeRequested_ || HWindow == NULL)
+    if (!closeRequested_ || HWindow == nullptr)
         return;
     if (modalDepth_ == 0)
         DestroyWindow(HWindow);
@@ -787,7 +787,7 @@ void COperationWindow::HandleInteractions()
     try
     {
         CInteraction in;
-        while (HWindow != NULL && op_.TryGetInteraction(in))
+        while (HWindow != nullptr && op_.TryGetInteraction(in))
             AnswerInteraction(in);
     }
     catch (...)
@@ -855,7 +855,7 @@ void COperationWindow::AnswerInteraction(const CInteraction& in)
         }
     }
 
-    if (HWindow != NULL)
+    if (HWindow != nullptr)
         RefreshNow();
 }
 
@@ -940,7 +940,7 @@ bool COperationWindowHost::Show()
         wantVisible_ = true;
         if (running_)
         {
-            if (hwnd_ != NULL)
+            if (hwnd_ != nullptr)
                 PostMessageW(hwnd_, WM_APP_SHOW, 0, 0); // else the thread is still starting and shows the window itself
             return true;
         }
@@ -971,7 +971,7 @@ void COperationWindowHost::Hide()
 {
     std::lock_guard<std::mutex> lock(mutex_);
     wantVisible_ = false;
-    if (running_ && hwnd_ != NULL)
+    if (running_ && hwnd_ != nullptr)
         PostMessageW(hwnd_, WM_APP_HIDE, 0, 0);
 }
 
@@ -998,7 +998,7 @@ void COperationWindowHost::CloseLocked()
     {
         std::lock_guard<std::mutex> lock(mutex_);
         closing_ = true; // stops the bridge from posting; a window being created destroys itself
-        if (hwnd_ != NULL)
+        if (hwnd_ != nullptr)
             PostMessageW(hwnd_, WM_APP_CLOSE, 0, 0);
     }
     if (thread_.joinable())
@@ -1006,7 +1006,7 @@ void COperationWindowHost::CloseLocked()
     std::lock_guard<std::mutex> lock(mutex_);
     closing_ = false;
     running_ = false;
-    hwnd_ = NULL;
+    hwnd_ = nullptr;
 }
 
 bool COperationWindowHost::IsWindowOpen() const
@@ -1032,7 +1032,7 @@ void COperationWindowHost::WindowThreadMain()
     }
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        hwnd_ = NULL;
+        hwnd_ = nullptr;
         running_ = false;
     }
     // A worker may have asked while this thread started, and a window that could not be created never answers it.
@@ -1058,7 +1058,7 @@ bool COperationWindowHost::OnWindowCreated(HWND window, bool& wantVisible)
 void COperationWindowHost::OnWindowDestroyed()
 {
     std::lock_guard<std::mutex> lock(mutex_);
-    hwnd_ = NULL;
+    hwnd_ = nullptr;
     running_ = false; // a Show from now on starts a new window (after joining this thread)
 }
 
@@ -1075,7 +1075,7 @@ void COperationWindowHost::SetWantVisible(bool visible)
 void COperationWindowHost::Post(std::atomic<bool>& pending, UINT message)
 {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (hwnd_ == NULL || closing_)
+    if (hwnd_ == nullptr || closing_)
         return;
     if (pending.exchange(true)) // one message of this kind is on its way
         return;
@@ -1139,7 +1139,7 @@ void COperationWindowHost::OnInteractionPending()
         std::lock_guard<std::mutex> lock(mutex_);
         if (shutdown_ || closing_)
             reject = true;
-        else if (hwnd_ != NULL)
+        else if (hwnd_ != nullptr)
         {
             if (!pendingInteraction_.exchange(true) && !PostMessageW(hwnd_, WM_APP_INTERACTION, 0, 0))
                 pendingInteraction_ = false;

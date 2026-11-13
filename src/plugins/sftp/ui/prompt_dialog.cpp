@@ -49,7 +49,7 @@ void CPromptDialog::InitControls()
         {
             HWND edit = GetDlgItem(HWindow, IDE_PROMPT1 + (int)i);
             SendMessageW(edit, EM_SETPASSWORDCHAR, 0, 0); // the template edits are ES_PASSWORD
-            InvalidateRect(edit, NULL, TRUE);
+            InvalidateRect(edit, nullptr, TRUE);
         }
     }
     RemoveUnusedRows();
@@ -74,8 +74,8 @@ void CPromptDialog::RemoveUnusedRows()
         HWND ctrl = GetDlgItem(HWindow, id);
         RECT r;
         GetWindowRect(ctrl, &r);
-        MapWindowPoints(NULL, HWindow, (POINT*)&r, 2);
-        SetWindowPos(ctrl, NULL, r.left, r.top - px, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        MapWindowPoints(nullptr, HWindow, (POINT*)&r, 2);
+        SetWindowPos(ctrl, nullptr, r.left, r.top - px, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     };
 
     for (int i = 0; i < (int)MaxPrompts; i++)
@@ -101,7 +101,7 @@ void CPromptDialog::RemoveUnusedRows()
 
     RECT w;
     GetWindowRect(HWindow, &w);
-    SetWindowPos(HWindow, NULL, 0, 0, w.right - w.left, w.bottom - w.top - up,
+    SetWindowPos(HWindow, nullptr, 0, 0, w.right - w.left, w.bottom - w.top - up,
                  SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -117,11 +117,11 @@ void CPromptDialog::CollectAnswers()
         GetWindowTextW(edit, wide.data(), length + 1);
 
         CSecret answer;
-        const int bytes = length > 0 ? WideCharToMultiByte(CP_UTF8, 0, wide.data(), length, NULL, 0, NULL, NULL) : 0;
+        const int bytes = length > 0 ? WideCharToMultiByte(CP_UTF8, 0, wide.data(), length, nullptr, 0, nullptr, nullptr) : 0;
         if (bytes > 0)
         {
             answer.resize((size_t)bytes);
-            WideCharToMultiByte(CP_UTF8, 0, wide.data(), length, answer.data(), bytes, NULL, NULL);
+            WideCharToMultiByte(CP_UTF8, 0, wide.data(), length, answer.data(), bytes, nullptr, nullptr);
         }
         SecureZeroMemory(wide.data(), wide.size() * sizeof(wchar_t));
         answers_.push_back(std::move(answer));

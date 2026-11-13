@@ -32,12 +32,12 @@ public:
     virtual BOOL WINAPI GetFileDataForNewDir(const wchar_t* dirName, CFileData& dir) { return FALSE; }
 
     // custom icons are not used (the listing says pitSimple)
-    virtual HIMAGELIST WINAPI GetSimplePluginIcons(int iconSize) { return NULL; }
+    virtual HIMAGELIST WINAPI GetSimplePluginIcons(int iconSize) { return nullptr; }
     virtual BOOL WINAPI HasSimplePluginIcon(CFileData& file, BOOL isDir) { return TRUE; }
     virtual HICON WINAPI GetPluginIcon(const CFileData* file, int iconSize, BOOL& destroyIcon)
     {
         destroyIcon = FALSE;
-        return NULL;
+        return nullptr;
     }
     virtual int WINAPI CompareFilesFromFS(const CFileData* file1, const CFileData* file2);
 

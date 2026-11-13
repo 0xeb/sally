@@ -114,7 +114,7 @@ CPluginFSInterface::CompleteDirectoryLineHotPath(CSalamanderStringBuffer* path)
     try
     {
         std::wstring text;
-        if (path == NULL || !sally::plugin_abi::ReadStringBuffer(*path, text))
+        if (path == nullptr || !sally::plugin_abi::ReadStringBuffer(*path, text))
             return FALSE;
         CompleteHotPath(text);
         return sally::plugin_abi::WriteStringBuffer(*path, text) ? TRUE : FALSE;
@@ -237,20 +237,20 @@ CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int menuX, i
     CALL_STACK_MESSAGE5("CPluginFSInterface::ContextMenu(, , , , %d, %d, %d, %d)", type, panel, selectedFiles,
                         selectedDirs);
     CBusyGuard busy(this); // declared first: destroyed last, and may delete 'this' (see ChangePath)
-    CGUIMenuPopupAbstract* menu = NULL;
+    CGUIMenuPopupAbstract* menu = nullptr;
     try
     {
         if (closeRequested_ || !connected_ || IsWaiting())
             return;
         menu = SalamanderGUI->CreateMenuPopup();
-        if (menu == NULL)
+        if (menu == nullptr)
             return;
         BuildContextMenu(menu, type, panel);
         // MENU_TRACK_RETURNCMD: the call returns the chosen id (0 = nothing) instead of posting a message
         const int command = static_cast<int>(
-            menu->Track(MENU_TRACK_RETURNCMD | MENU_TRACK_RIGHTBUTTON, menuX, menuY, parent, NULL));
+            menu->Track(MENU_TRACK_RETURNCMD | MENU_TRACK_RIGHTBUTTON, menuX, menuY, parent, nullptr));
         SalamanderGUI->DestroyMenuPopup(menu);
-        menu = NULL;
+        menu = nullptr;
         if (command != 0 && !closeRequested_ && connected_)
             RunContextCommand(fsName, parent, command, type, panel, selectedFiles, selectedDirs);
     }
@@ -258,7 +258,7 @@ CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int menuX, i
     {
         TRACE_E("ContextMenu: unexpected exception.");
     }
-    if (menu != NULL)
+    if (menu != nullptr)
         SalamanderGUI->DestroyMenuPopup(menu);
 }
 

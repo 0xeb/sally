@@ -21,7 +21,7 @@ bool OurProcessIsForeground()
 {
     DWORD pid = 0;
     const HWND foreground = GetForegroundWindow();
-    if (foreground == NULL)
+    if (foreground == nullptr)
         return false;
     GetWindowThreadProcessId(foreground, &pid);
     return pid == GetCurrentProcessId();
@@ -32,14 +32,14 @@ bool OurProcessIsForeground()
 class CParentDisabler
 {
 public:
-    explicit CParentDisabler(HWND parent) : parent_(parent), focus_(NULL), wasEnabled_(true)
+    explicit CParentDisabler(HWND parent) : parent_(parent), focus_(nullptr), wasEnabled_(true)
     {
-        if (parent_ == NULL)
+        if (parent_ == nullptr)
             return;
         wasEnabled_ = IsWindowEnabled(parent_) != FALSE;
         // remember the focus if it is inside the parent
         HWND focus = GetFocus();
-        for (HWND w = focus; w != NULL; w = GetParent(w))
+        for (HWND w = focus; w != nullptr; w = GetParent(w))
             if (w == parent_)
             {
                 focus_ = focus;
@@ -51,18 +51,18 @@ public:
     // The question dialogs are modal over the parent: they want it enabled to disable it themselves.
     void Suspend()
     {
-        if (parent_ != NULL)
+        if (parent_ != nullptr)
             EnableWindow(parent_, TRUE);
     }
     void Resume()
     {
-        if (parent_ != NULL)
+        if (parent_ != nullptr)
             EnableWindow(parent_, FALSE);
     }
 
     ~CParentDisabler()
     {
-        if (parent_ == NULL)
+        if (parent_ == nullptr)
             return;
         if (wasEnabled_)
             EnableWindow(parent_, TRUE); // restore the state we found, not "enabled" unconditionally
@@ -70,7 +70,7 @@ public:
         {
             if (parent_ == SalamanderGeneral->GetMainWindowHWND())
                 SalamanderGeneral->RestoreFocusInSourcePanel();
-            else if (focus_ != NULL)
+            else if (focus_ != nullptr)
                 SetFocus(focus_);
         }
     }
@@ -90,9 +90,9 @@ public:
         const std::wstring caption = LangStr(IDS_PLUGINNAME);
         // The wait window shows itself only while this exact window is the foreground one. Sally often hands us the
         // panel window (a child window, never the foreground window), so use the top-level window above it.
-        const HWND foreground = parent != NULL ? GetAncestor(parent, GA_ROOT) : NULL;
+        const HWND foreground = parent != nullptr ? GetAncestor(parent, GA_ROOT) : nullptr;
         SalamanderGeneral->CreateSafeWaitWindow(text.c_str(), caption.c_str(), static_cast<int>(WaitWindowDelayMs),
-                                                TRUE, foreground != NULL ? foreground : parent);
+                                                TRUE, foreground != nullptr ? foreground : parent);
     }
     ~CSafeWaitWindow() { SalamanderGeneral->DestroySafeWaitWindow(); }
     CSafeWaitWindow(const CSafeWaitWindow&) = delete;
@@ -106,9 +106,9 @@ public:
 class CWaitCursor
 {
 public:
-    CWaitCursor() : old_(SetCursor(LoadCursor(NULL, IDC_WAIT))) {}
+    CWaitCursor() : old_(SetCursor(LoadCursor(nullptr, IDC_WAIT))) {}
     ~CWaitCursor() { SetCursor(old_); }
-    void Refresh() { SetCursor(LoadCursor(NULL, IDC_WAIT)); } // Windows resets the cursor on mouse moves
+    void Refresh() { SetCursor(LoadCursor(nullptr, IDC_WAIT)); } // Windows resets the cursor on mouse moves
 private:
     HCURSOR old_;
 };
@@ -132,7 +132,7 @@ struct CQuitState
 bool PumpMessages(CQuitState& quit)
 {
     MSG msg;
-    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE | PM_QS_PAINT | PM_QS_SENDMESSAGE))
+    while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE | PM_QS_PAINT | PM_QS_SENDMESSAGE))
     {
         if (msg.message == WM_QUIT)
         {
@@ -160,7 +160,7 @@ bool CancelRequested(CSafeWaitWindow& waitWindow, bool escArmed)
     if (pressed)
     {
         MSG msg; // discard the buffered ESC
-        while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+        while (PeekMessageW(&msg, nullptr, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
             ;
         SalamanderGeneral->WaitForESCRelease();
     }

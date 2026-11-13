@@ -27,5 +27,5 @@ private:
 
     std::wstring text_;
     std::wstring status_;
-    HFONT font_ = NULL; // fixed-width font of the output edit; owned here, deleted in the destructor (the window is gone by then)
+    HFONT font_ = nullptr; // fixed-width font of the output edit; owned here, deleted in the destructor (the window is gone by then)
 };

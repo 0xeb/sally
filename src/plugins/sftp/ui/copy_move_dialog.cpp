@@ -66,12 +66,12 @@ void CCopyMoveDialog::FillPolicyCombo(HWND combo) const
 
 void CCopyMoveDialog::Transfer(CTransferInfo& ti)
 {
-    HWND target = NULL;
+    HWND target = nullptr;
     if (ti.GetControl(target, IDC_COPYMOVE_TARGET))
     {
         if (ti.Type == ttDataToWindow)
         {
-            if (history_ != NULL)
+            if (history_ != nullptr)
                 SalamanderGeneral->LoadComboFromStdHistoryValues(target, history_, historyCount_);
             SetWindowTextW(target, choice_.target.c_str());
         }
@@ -81,12 +81,12 @@ void CCopyMoveDialog::Transfer(CTransferInfo& ti)
             std::vector<wchar_t> text(static_cast<size_t>(length) + 1, L'\0');
             GetWindowTextW(target, text.data(), length + 1);
             choice_.target.assign(text.data());
-            if (history_ != NULL && !choice_.target.empty())
+            if (history_ != nullptr && !choice_.target.empty())
                 SalamanderGeneral->AddValueToStdHistoryValues(history_, historyCount_, choice_.target.c_str(), FALSE);
         }
     }
 
-    HWND policy = NULL;
+    HWND policy = nullptr;
     if (ti.GetControl(policy, IDC_COPYMOVE_POLICY))
     {
         if (ti.Type == ttDataToWindow)

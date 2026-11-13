@@ -22,7 +22,7 @@ void CExecOutputDialog::Run()
 
 CExecOutputDialog::~CExecOutputDialog()
 {
-    if (font_ != NULL)
+    if (font_ != nullptr)
         DeleteObject(font_); // also when Execute failed before WM_DESTROY
 }
 
@@ -40,7 +40,7 @@ void CExecOutputDialog::SetFixedFont(HWND edit)
     {
         wcscpy_s(lf.lfFaceName, face);
         HFONT font = CreateFontIndirectW(&lf);
-        if (font == NULL)
+        if (font == nullptr)
             continue;
         // the face of the font that Windows really selected (a missing face is replaced by another one)
         HGDIOBJ old = SelectObject(dc, font);
@@ -55,7 +55,7 @@ void CExecOutputDialog::SetFixedFont(HWND edit)
         DeleteObject(font);
     }
     ReleaseDC(edit, dc);
-    if (font_ != NULL)
+    if (font_ != nullptr)
         SendMessageW(edit, WM_SETFONT, reinterpret_cast<WPARAM>(font_), TRUE);
 }
 

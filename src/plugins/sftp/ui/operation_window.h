@@ -115,7 +115,7 @@ private:
     std::thread thread_;        // guarded by lifecycleMutex_
 
     mutable std::mutex mutex_; // the leaf lock: guards hwnd_, closing_, shutdown_, wantVisible_, running_
-    HWND hwnd_ = NULL;         // valid only while set; the window thread clears it in WM_DESTROY
+    HWND hwnd_ = nullptr;         // valid only while set; the window thread clears it in WM_DESTROY
     bool closing_ = false;
     bool shutdown_ = false;
     bool wantVisible_ = true;

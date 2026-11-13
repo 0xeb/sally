@@ -10,7 +10,7 @@ public:
 protected:
     INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam) override
     {
-        if (uMsg == WM_INITDIALOG && Parent != NULL)
+        if (uMsg == WM_INITDIALOG && Parent != nullptr)
             SalamanderGeneral->MultiMonCenterWindow(HWindow, Parent, TRUE);
         return CDialog::DialogProc(uMsg, wParam, lParam);
     }

@@ -19,13 +19,13 @@ std::wstring FormatUnixTime(int64_t unixSeconds)
     ticks.QuadPart = (static_cast<unsigned long long>(unixSeconds) + 11644473600ull) * 10000000ull;
     FILETIME utc = {ticks.LowPart, ticks.HighPart};
     SYSTEMTIME utcTime, local;
-    if (!FileTimeToSystemTime(&utc, &utcTime) || !SystemTimeToTzSpecificLocalTime(NULL, &utcTime, &local))
+    if (!FileTimeToSystemTime(&utc, &utcTime) || !SystemTimeToTzSpecificLocalTime(nullptr, &utcTime, &local))
         return LangStr(IDS_SOLVE_UNKNOWN_DATE);
 
     wchar_t date[64] = L"";
     wchar_t time[64] = L"";
-    GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &local, NULL, date, 64);
-    GetTimeFormatW(LOCALE_USER_DEFAULT, TIME_NOSECONDS, &local, NULL, time, 64);
+    GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &local, nullptr, date, 64);
+    GetTimeFormatW(LOCALE_USER_DEFAULT, TIME_NOSECONDS, &local, nullptr, time, 64);
     return std::wstring(date) + L" " + time;
 }
 

@@ -32,11 +32,11 @@ public:
 
     virtual void WINAPI ReleasePluginDataInterface(CPluginDataInterfaceAbstract* pluginData);
 
-    virtual CPluginInterfaceForArchiverAbstract* WINAPI GetInterfaceForArchiver() { return NULL; }
-    virtual CPluginInterfaceForViewerAbstract* WINAPI GetInterfaceForViewer() { return NULL; }
+    virtual CPluginInterfaceForArchiverAbstract* WINAPI GetInterfaceForArchiver() { return nullptr; }
+    virtual CPluginInterfaceForViewerAbstract* WINAPI GetInterfaceForViewer() { return nullptr; }
     virtual CPluginInterfaceForMenuExtAbstract* WINAPI GetInterfaceForMenuExt();
     virtual CPluginInterfaceForFSAbstract* WINAPI GetInterfaceForFS();
-    virtual CPluginInterfaceForThumbLoaderAbstract* WINAPI GetInterfaceForThumbLoader() { return NULL; }
+    virtual CPluginInterfaceForThumbLoaderAbstract* WINAPI GetInterfaceForThumbLoader() { return nullptr; }
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent) {}
@@ -49,18 +49,18 @@ CPluginInterface PluginInterface;
 CPluginInterfaceForFS InterfaceForFS;
 CPluginInterfaceForMenuExt InterfaceForMenuExt;
 
-HINSTANCE DLLInstance = NULL; // handle to this DLL
-HINSTANCE HLanguage = NULL;   // module with the language-dependent resources (this DLL)
+HINSTANCE DLLInstance = nullptr; // handle to this DLL
+HINSTANCE HLanguage = nullptr;   // module with the language-dependent resources (this DLL)
 
-CSalamanderGeneralAbstract* SalamanderGeneral = NULL;
+CSalamanderGeneralAbstract* SalamanderGeneral = nullptr;
 
 // variable definition for "dbg.h"
-CSalamanderDebugAbstract* SalamanderDebug = NULL;
+CSalamanderDebugAbstract* SalamanderDebug = nullptr;
 
 // variable definition for "spl_com.h"
 int SalamanderVersion = 0;
 
-CSalamanderGUIAbstract* SalamanderGUI = NULL;
+CSalamanderGUIAbstract* SalamanderGUI = nullptr;
 
 std::wstring AssignedFSName;
 
@@ -125,7 +125,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     { // reject older versions
         MessageBoxW(salamander->GetParentWindow(), SFTP_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
                     L"SFTP" /* do not translate */, MB_OK | MB_ICONERROR);
-        return NULL;
+        return nullptr;
     }
 
     // the plugin's resources (every language) are in its own DLL
@@ -144,8 +144,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         if (!salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
                                             FUNCTION_LOADSAVECONFIGURATION | FUNCTION_FILESYSTEM,
                                             SFTP_WIDEN(VERSINFO_VERSION_NO_PLATFORM), SFTP_WIDEN(VERSINFO_COPYRIGHT),
-                                            LangStr(IDS_PLUGIN_DESCRIPTION).c_str(), L"SFTP", NULL, L"sftp"))
-            return NULL;
+                                            LangStr(IDS_PLUGIN_DESCRIPTION).c_str(), L"SFTP", nullptr, L"sftp"))
+            return nullptr;
 
         salamander->SetPluginHomePageURL(Sally::Urls::Website);
 
@@ -155,11 +155,11 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         // obtain our FS name (it might not stay "sftp" because Salamander can adjust it)
         AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);
         if (AssignedFSName.empty())
-            return NULL;
+            return nullptr;
 
         // WinLib (dark mode, dialogs) is released in Release, or here when a later step fails
         if (!InitializeWinLib(L"SFTP" /* do not translate */, DLLInstance))
-            return NULL;
+            return nullptr;
         winLibInitialized = true;
         SetupWinLibHelp(HelpCallback);
         const std::wstring invalidNumber = LangStr(IDS_INVALIDNUMBER);
@@ -179,7 +179,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
             SalamanderGeneral->SalMessageBox(salamander->GetParentWindow(),
                                              SPLFormatStringOwned(LangStr(IDS_LIBSSH2_INIT_FAILED).c_str(), sshInitError.libssh2Code).c_str(),
                                              LangStr(IDS_PLUGINNAME).c_str(), MB_OK | MB_ICONERROR);
-            return NULL;
+            return nullptr;
         }
     }
     catch (...)
@@ -187,7 +187,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         TRACE_E("SalamanderPluginEntry: out of memory.");
         if (winLibInitialized)
             ReleaseWinLib(DLLInstance);
-        return NULL;
+        return nullptr;
     }
 
     return &PluginInterface;
@@ -299,7 +299,7 @@ CPluginInterface::AcceptChangeOnPathNotification(const wchar_t* path, BOOL inclu
     try
     {
         const size_t nameLength = AssignedFSName.size();
-        if (path == NULL || wcslen(path) <= nameLength || path[nameLength] != L':' ||
+        if (path == nullptr || wcslen(path) <= nameLength || path[nameLength] != L':' ||
             SalamanderGeneral->StrNICmp(path, AssignedFSName.c_str(), static_cast<int>(nameLength)) != 0)
             return;
         SalamanderGeneral->RemoveFilesFromCache((AssignedFSName + L":").c_str());

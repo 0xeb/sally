@@ -29,5 +29,5 @@ private:
     std::wstring keyType_;
     std::wstring fingerprint_;
     bool changed_;
-    HFONT boldFont_ = NULL;
+    HFONT boldFont_ = nullptr;
 };

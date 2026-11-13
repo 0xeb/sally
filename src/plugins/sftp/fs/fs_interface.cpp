@@ -26,7 +26,7 @@ CPluginInterfaceForFS::OpenFS(const wchar_t* fsName, int fsNameIndex)
     catch (...)
     {
         TRACE_E("OpenFS: out of memory.");
-        return NULL;
+        return nullptr;
     }
 }
 
@@ -35,7 +35,7 @@ CPluginInterfaceForFS::CloseFS(CPluginFSInterfaceAbstract* fs)
 {
     // No window may be opened here (Salamander rule). The destructor joins the session thread.
     CALL_STACK_MESSAGE1("CPluginInterfaceForFS::CloseFS()");
-    if (fs == NULL)
+    if (fs == nullptr)
         return;
     CPluginFSInterface* object = static_cast<CPluginFSInterface*>(fs);
     openFS_.erase(std::remove(openFS_.begin(), openFS_.end(), object), openFS_.end());
@@ -107,7 +107,7 @@ CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(HWND parent, int panel, in
 {
     CALL_STACK_MESSAGE3("CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(, %d, , , , , %d,)", panel,
                         isDetachedFS);
-    if (pluginFS == NULL)
+    if (pluginFS == nullptr)
         return FALSE; // the plain "SFTP" item has no menu yet
     try
     {
@@ -115,12 +115,12 @@ CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(HWND parent, int panel, in
         const std::wstring disconnectText = LangStr(IDS_MENU_DISCONNECT);
 
         HMENU menu = CreatePopupMenu();
-        if (menu == NULL)
+        if (menu == nullptr)
             return FALSE;
         if (isDetachedFS)
             AppendMenuW(menu, MF_STRING, CmdShowInPanel, showText.c_str());
         AppendMenuW(menu, MF_STRING, CmdDisconnect, disconnectText.c_str());
-        const DWORD cmd = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_RIGHTBUTTON, x, y, parent, NULL);
+        const DWORD cmd = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_RIGHTBUTTON, x, y, parent, nullptr);
         DestroyMenu(menu);
         if (cmd == 0)
             return FALSE; // cancelled
@@ -128,7 +128,7 @@ CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(HWND parent, int panel, in
         refreshMenu = FALSE;
         closeMenu = FALSE;
         postCmd = 0;
-        postCmdParam = NULL;
+        postCmdParam = nullptr;
         if (cmd == CmdShowInPanel)
         {
             closeMenu = TRUE; // do it after the menu is closed
@@ -170,7 +170,7 @@ CPluginInterfaceForFS::ExecuteChangeDrivePostCommand(int panel, int postCmd, voi
         CPluginFSInterfaceAbstract* fs = static_cast<CPluginFSInterfaceAbstract*>(postCmdParam);
         if (postCmd == CmdShowInPanel)
         {
-            SalamanderGeneral->ChangePanelPathToDetachedFS(panel, fs, NULL);
+            SalamanderGeneral->ChangePanelPathToDetachedFS(panel, fs, nullptr);
         }
         else if (postCmd == CmdDisconnect)
         {
@@ -209,8 +209,8 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
         if (!static_cast<CPluginFSInterface*>(pluginFS)->BuildNavigation(file, isDir, userPart, focusName))
             return;
         // pluginFS and 'file' may be invalid after the call (the listing is replaced)
-        SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, userPart.c_str(), NULL, -1,
-                                                     focusName.empty() ? NULL : focusName.c_str());
+        SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, userPart.c_str(), nullptr, -1,
+                                                     focusName.empty() ? nullptr : focusName.c_str());
     }
     catch (...)
     {
@@ -251,14 +251,14 @@ BOOL WINAPI
 CPluginInterfaceForFS::ConvertPathToInternal(const wchar_t* fsName, int fsNameIndex,
                                              CSalamanderStringBuffer* fsUserPart)
 {
-    return fsUserPart != NULL && sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
+    return fsUserPart != nullptr && sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
 }
 
 BOOL WINAPI
 CPluginInterfaceForFS::ConvertPathToExternal(const wchar_t* fsName, int fsNameIndex,
                                              CSalamanderStringBuffer* fsUserPart)
 {
-    return fsUserPart != NULL && sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
+    return fsUserPart != nullptr && sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
 }
 
 //
@@ -267,7 +267,7 @@ CPluginInterfaceForFS::ConvertPathToExternal(const wchar_t* fsName, int fsNameIn
 //
 
 int PendingDisconnectPanel = -1; // main thread only
-CPluginFSInterfaceAbstract* PendingDisconnectFs = NULL; // the FS the context menu was opened in
+CPluginFSInterfaceAbstract* PendingDisconnectFs = nullptr; // the FS the context menu was opened in
 
 DWORD WINAPI
 CPluginInterfaceForMenuExt::GetMenuItemState(int id, DWORD eventMask)
@@ -298,9 +298,9 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
             CPluginFSInterfaceAbstract* const expected = PendingDisconnectFs;
             const bool fromContextMenu = PendingDisconnectPanel >= 0;
             PendingDisconnectPanel = -1; // reset whether the command runs or is ignored
-            PendingDisconnectFs = NULL;
+            PendingDisconnectFs = nullptr;
             CPluginFSInterfaceAbstract* fs = SalamanderGeneral->GetPanelPluginFS(panel);
-            if (fs == NULL)
+            if (fs == nullptr)
                 break;
             if (fromContextMenu && fs != expected)
                 break; // the panel shows another FS now than when the menu was used: ignore the command
