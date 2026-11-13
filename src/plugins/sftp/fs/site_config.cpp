@@ -5,6 +5,9 @@
 
 #include <vector>
 
+#include <climits>
+
+#include "global_config.h"
 #include "site_config.h"
 #include "text_util.h"
 
@@ -210,6 +213,50 @@ void SaveBlob(CSalamanderRegistryAbstract* registry, HKEY key, const wchar_t* en
         return;
     registry->SetValue(key, IsAesBlob(blob) ? encryptedName : scrambledName, REG_BINARY, blob.data(),
                        static_cast<DWORD>(blob.size()));
+}
+
+// ---- global configuration (values in the plugin's root key; a missing value keeps its default) ----
+
+void GetInt(CSalamanderRegistryAbstract* registry, HKEY key, const wchar_t* name, int& value)
+{
+    DWORD dw;
+    if (GetDword(registry, key, name, dw))
+        value = dw > static_cast<DWORD>(INT_MAX) ? INT_MAX : static_cast<int>(dw); // Clamp() does the rest
+}
+
+void LoadGlobalConfig(CSalamanderRegistryAbstract* registry, HKEY key)
+{
+    CGlobalConfig config;
+    GetInt(registry, key, L"DefaultWorkers", config.defaultWorkers);
+    GetInt(registry, key, L"DefaultTimeout", config.defaultTimeoutSeconds);
+    GetInt(registry, key, L"KeepaliveSeconds", config.keepaliveSeconds);
+    DWORD dw;
+    if (GetDword(registry, key, L"ListingCache", dw))
+        config.listingCacheEnabled = dw != 0;
+    GetInt(registry, key, L"ListingCacheMaxAge", config.listingCacheMaxAgeSeconds);
+    GetInt(registry, key, L"DetachedIdleMinutes", config.detachedIdleMinutes);
+    int level = static_cast<int>(config.logLevel);
+    GetInt(registry, key, L"LogLevel", level);
+    config.logLevel = static_cast<SessionLogLevel>(level);
+    GetInt(registry, key, L"LogMaxKiB", config.logMaxKiB);
+    GetInt(registry, key, L"ClosedLogsKept", config.closedLogsKept);
+    GetInt(registry, key, L"MaxWorkersTotal", config.maxWorkersTotal);
+    GlobalConfigStore().Set(config); // clamps
+}
+
+void SaveGlobalConfig(CSalamanderRegistryAbstract* registry, HKEY key)
+{
+    const CGlobalConfig config = GlobalConfigStore().Get();
+    SetDword(registry, key, L"DefaultWorkers", static_cast<DWORD>(config.defaultWorkers));
+    SetDword(registry, key, L"DefaultTimeout", static_cast<DWORD>(config.defaultTimeoutSeconds));
+    SetDword(registry, key, L"KeepaliveSeconds", static_cast<DWORD>(config.keepaliveSeconds));
+    SetDword(registry, key, L"ListingCache", config.listingCacheEnabled ? 1 : 0);
+    SetDword(registry, key, L"ListingCacheMaxAge", static_cast<DWORD>(config.listingCacheMaxAgeSeconds));
+    SetDword(registry, key, L"DetachedIdleMinutes", static_cast<DWORD>(config.detachedIdleMinutes));
+    SetDword(registry, key, L"LogLevel", static_cast<DWORD>(config.logLevel));
+    SetDword(registry, key, L"LogMaxKiB", static_cast<DWORD>(config.logMaxKiB));
+    SetDword(registry, key, L"ClosedLogsKept", static_cast<DWORD>(config.closedLogsKept));
+    SetDword(registry, key, L"MaxWorkersTotal", static_cast<DWORD>(config.maxWorkersTotal));
 }
 
 bool LoadSite(CSalamanderRegistryAbstract* registry, HKEY key, CSite& site, CStoredSecrets& secrets)
@@ -512,6 +559,7 @@ void CSiteConfig::Load(HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
     loaded_ = false;
     readOnly_ = false;
+    GlobalConfigStore().Set(CGlobalConfig()); // defaults for whatever the registry does not hold
     try
     {
         list_.Clear();
@@ -535,6 +583,8 @@ void CSiteConfig::Load(HKEY regKey, CSalamanderRegistryAbstract* registry)
             readOnly_ = true;
             return;
         }
+
+        LoadGlobalConfig(registry, regKey);
 
         HKEY sitesKey;
         if (registry->OpenKey(regKey, kSitesKey, sitesKey))
@@ -593,6 +643,7 @@ bool CSiteConfig::Save(HKEY regKey, CSalamanderRegistryAbstract* registry)
     {
         EnsureDirectory(AppDataSallyDir()); // known_hosts and other plugin files live there
         SetDword(registry, regKey, kConfigVersion, kCurrentVersion);
+        SaveGlobalConfig(registry, regKey);
 
         HKEY sitesKey;
         if (!registry->CreateKey(regKey, kSitesKey, sitesKey))

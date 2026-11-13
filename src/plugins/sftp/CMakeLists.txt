@@ -172,6 +172,7 @@ sal_add_plugin(NAME sftp
     "${SAL_PLUGINS}/sftp/ui/properties_dialog.cpp"
     "${SAL_PLUGINS}/sftp/ui/site_edit_dialog.cpp"
     "${SAL_PLUGINS}/sftp/ui/site_list_dialog.cpp"
+    "${SAL_PLUGINS}/sftp/ui/config_dialog.cpp"
   RC "${SAL_PLUGINS}/sftp/sftp.rc"
   DEF "${SAL_PLUGINS}/sftp/sftp.def"
   LIBS sftp_ops sftp_core libssh2::libssh2_static ws2_32 crypt32 bcrypt user32 advapi32 comdlg32 uxtheme

@@ -453,4 +453,14 @@ STRINGTABLE
  IDS_ERRMSG_SUFFIX_CODE, "(code %1)"
  // the same with an SFTP status; arguments: %1 libssh2 error code, %2 SFTP status code of the server
  IDS_ERRMSG_SUFFIX_CODE_STATUS, "(code %1, SFTP status %2)"
+ // Configuration dialog: entries of the session log level combo box
+ IDS_CONFIG_LOGLEVEL_OFF, "Off"
+ IDS_CONFIG_LOGLEVEL_ERRORS, "Errors only"
+ IDS_CONFIG_LOGLEVEL_NORMAL, "Normal"
+ IDS_CONFIG_LOGLEVEL_VERBOSE, "Verbose (every SFTP call)"
+ IDS_MENU_CONFIGURATION, "C&onfiguration..."
+ // arguments (printf style, in this order): %d lowest value, %d highest value
+ IDS_CONFIG_ERR_RANGE, "Enter a whole number from %d to %d."
+ // arguments (printf style, in this order): %d lowest interval in seconds, %d highest interval in seconds
+ IDS_CONFIG_ERR_KEEPALIVE, "Enter 0 (no keepalive) or a whole number of seconds from %d to %d."
 }

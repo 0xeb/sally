@@ -65,6 +65,10 @@ public:
 const int SftpCmdConnect = 1;
 const int SftpCmdDisconnect = 2;
 const int SftpCmdOperations = 3;
+const int SftpCmdConfiguration = 4;
+
+// The Configuration dialog (defined in sftp.cpp, also reached from the plugin manager)
+void ShowPluginConfiguration(HWND parent);
 
 // The panel whose FS the Disconnect command closes: set by the context menu (which posts the command), -1 = the active
 // panel (the plugin menu). The command resets it.

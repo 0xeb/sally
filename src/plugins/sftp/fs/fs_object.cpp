@@ -8,6 +8,7 @@
 #include "cancel_policy.h"
 #include "fs_data.h"
 #include "fs_messages.h"
+#include "global_config.h"
 #include "listing_format.h"
 #include "../ui/prompt_dialog.h"
 #include "site_config.h"
@@ -234,7 +235,7 @@ bool CPluginFSInterface::ResolveSite(const CSftpPath& wanted, CSite& site, CSecr
     }
     else // quick connect: user@host[:port], everything else at its default
     {
-        site = CSite();
+        site = MakeNewSite(GlobalConfigStore().Get());
         site.user = wanted.user;
         site.host = wanted.host;
         site.port = wanted.port;

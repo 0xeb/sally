@@ -298,3 +298,34 @@ BEGIN
     EDITTEXT        IDE_SITE_LOCALPATH,4,48,250,12,ES_AUTOHSCROLL
 END
 #endif
+
+IDD_CONFIG DIALOGEX 0, 0, 290, 236
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "SFTP - Configuration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Connections",IDC_STATIC,7,7,276,88
+    LTEXT           "Default &workers of a new site (1-8):",IDC_STATIC,14,21,200,8
+    EDITTEXT        IDE_CFG_WORKERS,222,19,50,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "Default &timeout of a new site, seconds (1-3600):",IDC_STATIC,14,35,200,8
+    EDITTEXT        IDE_CFG_TIMEOUT,222,33,50,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "&Keepalive interval, seconds (0 = off, 10-3600):",IDC_STATIC,14,49,200,8
+    EDITTEXT        IDE_CFG_KEEPALIVE,222,47,50,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "Transfer connections of &all operations (1-32):",IDC_STATIC,14,63,200,8
+    EDITTEXT        IDE_CFG_MAXWORKERS,222,61,50,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "Close an &idle detached connection after, minutes (0 = never):",IDC_STATIC,14,77,200,8
+    EDITTEXT        IDE_CFG_DETACHEDIDLE,222,75,50,12,ES_AUTOHSCROLL | ES_NUMBER
+    GROUPBOX        "Listing cache",IDC_STATIC,7,101,276,46
+    CONTROL         "&Reuse a folder listing when going back to a folder",IDX_CFG_CACHE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,114,262,10
+    LTEXT           "&Maximum age of a cached listing, seconds:",IDC_STATIC,14,130,200,8
+    EDITTEXT        IDE_CFG_CACHEAGE,222,128,50,12,ES_AUTOHSCROLL | ES_NUMBER
+    GROUPBOX        "Session log",IDC_STATIC,7,153,276,60
+    LTEXT           "&Level:",IDC_STATIC,14,167,200,8
+    COMBOBOX        IDC_CFG_LOGLEVEL,172,165,100,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Si&ze limit of one connection log, KiB (16-16384):",IDC_STATIC,14,181,200,8
+    EDITTEXT        IDE_CFG_LOGKIB,222,179,50,12,ES_AUTOHSCROLL | ES_NUMBER
+    LTEXT           "Logs of closed connections to ke&ep (0-100):",IDC_STATIC,14,195,200,8
+    EDITTEXT        IDE_CFG_LOGKEEP,222,193,50,12,ES_AUTOHSCROLL | ES_NUMBER
+    DEFPUSHBUTTON   "OK",IDOK,173,217,50,14,WS_GROUP
+    PUSHBUTTON      "Cancel",IDCANCEL,233,217,50,14
+END

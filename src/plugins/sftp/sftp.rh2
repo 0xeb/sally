@@ -350,5 +350,13 @@
 // suffixes of a shown error text (DescribeSshError): "(code %1)" and "(code %1, SFTP status %2)"
 #define IDS_ERRMSG_SUFFIX_CODE                    424
 #define IDS_ERRMSG_SUFFIX_CODE_STATUS             425
+// Configuration dialog and menu item
+#define IDS_CONFIG_LOGLEVEL_OFF                   426
+#define IDS_CONFIG_LOGLEVEL_ERRORS                427
+#define IDS_CONFIG_LOGLEVEL_NORMAL                428
+#define IDS_CONFIG_LOGLEVEL_VERBOSE               429
+#define IDS_MENU_CONFIGURATION                    430
+#define IDS_CONFIG_ERR_RANGE                      431
+#define IDS_CONFIG_ERR_KEEPALIVE                  432
 
 #endif // __SFTP_RH2

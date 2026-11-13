@@ -4,6 +4,7 @@
 #include <uxtheme.h>
 
 #include "dark_controls.h"
+#include "global_config.h"
 #include "plugindarkmode.h"
 #include "secret_edit.h"
 #include "site_edit_dialog.h"
@@ -156,7 +157,7 @@ CSiteEditDialog::CSiteEditDialog(HWND parent, const CSiteList& sites, const CSit
       originalName_(existing != nullptr ? existing->name : std::wstring()),
       hasPassword_(hasPassword),
       hasPassphrase_(hasPassphrase),
-      form_(FormFromSite(existing != nullptr ? *existing : CSite())),
+      form_(FormFromSite(existing != nullptr ? *existing : MakeNewSite(GlobalConfigStore().Get()))),
       session_(*this),
       auth_(*this),
       connection_(*this),

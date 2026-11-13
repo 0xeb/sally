@@ -10,8 +10,10 @@
 #include "../core/ssh_init.h"
 #include "../ops/op_trace.h"
 #include "fs_data.h"
+#include "fs_interface.h"
 #include "operations_registry.h"
 #include "site_config.h"
+#include "../ui/config_dialog.h"
 
 #define SFTP_WIDEN_IMPL(value) L##value
 #define SFTP_WIDEN(value) SFTP_WIDEN_IMPL(value)
@@ -26,7 +28,7 @@ public:
 
     virtual void WINAPI LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry);
     virtual void WINAPI SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry);
-    virtual void WINAPI Configuration(HWND parent) {}
+    virtual void WINAPI Configuration(HWND parent);
 
     virtual void WINAPI Connect(HWND parent, CSalamanderConnectAbstract* salamander);
 
@@ -142,7 +144,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     {
         // provide basic information about the plugin
         if (!salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
-                                            FUNCTION_LOADSAVECONFIGURATION | FUNCTION_FILESYSTEM,
+                                            FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION | FUNCTION_FILESYSTEM,
                                             SFTP_WIDEN(VERSINFO_VERSION_NO_PLATFORM), SFTP_WIDEN(VERSINFO_COPYRIGHT),
                                             LangStr(IDS_PLUGIN_DESCRIPTION).c_str(), L"SFTP", nullptr, L"sftp"))
             return nullptr;
@@ -230,6 +232,30 @@ CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRegistr
 {
     CALL_STACK_MESSAGE1("CPluginInterface::SaveConfiguration(, ,)");
     SiteConfig.Save(regKey, registry); // catches everything itself
+}
+
+// Plugins / SFTP / Configuration (also the Configure button of the plugin manager). Main thread.
+void ShowPluginConfiguration(HWND parent)
+{
+    try
+    {
+        CGlobalConfig config = GlobalConfigStore().Get();
+        if (!ShowConfigDialog(parent, config))
+            return;
+        GlobalConfigStore().Set(config);
+        SiteConfig.SaveNow(); // the values must survive a crash of Sally, like the sites
+    }
+    catch (...)
+    {
+        TRACE_E("Configuration: unexpected exception.");
+    }
+}
+
+void WINAPI
+CPluginInterface::Configuration(HWND parent)
+{
+    CALL_STACK_MESSAGE1("CPluginInterface::Configuration()");
+    ShowPluginConfiguration(parent);
 }
 
 // The state at the event: for CHANGED and REMOVED the old key is still usable, for CREATED/CHANGED the new master
@@ -333,6 +359,8 @@ CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
         salamander->AddMenuItem(-1, LangStr(IDS_MENU_DISCONNECT).c_str(), 0, SftpCmdDisconnect, FALSE,
                                 MENU_EVENT_THIS_PLUGIN_FS, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
         salamander->AddMenuItem(-1, LangStr(IDS_MENU_OPERATIONS).c_str(), 0, SftpCmdOperations, FALSE,
+                                MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
+        salamander->AddMenuItem(-1, LangStr(IDS_MENU_CONFIGURATION).c_str(), 0, SftpCmdConfiguration, FALSE,
                                 MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
     }
     catch (...)

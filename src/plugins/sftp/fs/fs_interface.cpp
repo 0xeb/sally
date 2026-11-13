@@ -316,6 +316,10 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
             OperationsRegistry.ShowDialog(parent);
             break;
 
+        case SftpCmdConfiguration:
+            ShowPluginConfiguration(parent);
+            break;
+
         default:
             TRACE_E("Unknown menu command, ID=" << id);
         }
