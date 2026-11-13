@@ -83,8 +83,101 @@ void CPluginFSInterface::CloseSession()
     cacheEntries_.reset();
     cacheRaw_.clear();
     reestablish_ = false;
+    listingCache_.Clear();
     if (session_)
         session_->Close();
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Directory listing cache (D60)
+
+// The lines go to the connection's session log at the Verbose level (English like the other plugin log lines).
+void CPluginFSInterface::LogCache(const std::wstring& text) const
+{
+    if (session_)
+        session_->LogLine(SshLogLevel::Verbose, text);
+}
+
+void CPluginFSInterface::ClearListingCache(const wchar_t* why)
+{
+    if (listingCache_.Size() == 0)
+        return;
+    listingCache_.Clear();
+    LogCache(std::wstring(L"Listing cache cleared: ") + why);
+}
+
+// A reconnect (the connection was lost, a keepalive failed) means the folders may have changed meanwhile.
+void CPluginFSInterface::SyncListingCacheWithConnection()
+{
+    if (!session_)
+        return;
+    const unsigned count = session_->ConnectCount();
+    if (count == cacheConnectCount_)
+        return;
+    cacheConnectCount_ = count;
+    ClearListingCache(L"reconnected");
+}
+
+// Also forgets everything when the user switched the cache off in the configuration.
+bool CPluginFSInterface::ListingCacheEnabled()
+{
+    if (GlobalConfigStore().Get().listingCacheEnabled)
+        return true;
+    ClearListingCache(L"switched off");
+    return false;
+}
+
+CPluginFSInterface::ListingPtr CPluginFSInterface::LookupListing(const std::string& rawPath, BOOL forceRefresh)
+{
+    const CGlobalConfig config = GlobalConfigStore().Get();
+    if (!config.listingCacheEnabled)
+    {
+        ClearListingCache(L"switched off");
+        return nullptr;
+    }
+    if (!MayUseListingCache(true, forceRefresh != FALSE))
+        return nullptr; // Ctrl+R: read the server (the result replaces the entry)
+    SyncListingCacheWithConnection();
+    ListingPtr entries = listingCache_.Get(rawPath, config.listingCacheMaxAgeSeconds, CListingCache::Clock::now());
+    if (entries != nullptr)
+        LogCache(L"Listing cache hit: " + DisplayPath(rawPath) + L" (no request sent)");
+    return entries;
+}
+
+void CPluginFSInterface::StoreListing(const std::string& rawPath, const ListingPtr& entries)
+{
+    if (!ListingCacheEnabled())
+        return;
+    SyncListingCacheWithConnection();
+    listingCache_.Put(rawPath, entries, CListingCache::Clock::now());
+}
+
+void CPluginFSInterface::DropListings(const std::string& rawPath, bool includingSubdirs)
+{
+    if (listingCache_.Size() == 0)
+        return;
+    const std::string path = NormalizeRemotePath(rawPath);
+    listingCache_.Invalidate(path);
+    listingCache_.Invalidate(ParentRemotePath(path));
+    if (includingSubdirs)
+        listingCache_.InvalidateTree(path);
+    LogCache(L"Listing cache invalidated: " + DisplayPath(path) + (includingSubdirs ? L" and below" : L""));
+}
+
+// A change notification names a folder as text. Its raw bytes are known only when the text survives the encoding;
+// otherwise (or for the login folder, which has no path) everything is dropped.
+void CPluginFSInterface::DropListingsForNotification(const std::wstring& changedPath, bool includingSubdirs)
+{
+    if (listingCache_.Size() == 0)
+        return;
+    bool lossy = false;
+    const std::string raw = changedPath.empty() ? std::string() : codec_.Encode(changedPath, &lossy);
+    if (raw.empty() || lossy)
+    {
+        ClearListingCache(L"change notification for an unknown folder");
+        return;
+    }
+    DropListings(raw, includingSubdirs);
 }
 
 bool CPluginFSInterface::CloseOrDefer()
@@ -394,7 +487,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, CSalamanderStringBuffer* 
             TRACE_E("ChangePath called while another wait is running.");
             return FALSE;
         }
-        return DoChangePath(userPart, cutFileName, pathWasCut, mode);
+        return DoChangePath(userPart, cutFileName, pathWasCut, mode, forceRefresh);
     }
     catch (...)
     {
@@ -406,7 +499,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, CSalamanderStringBuffer* 
 
 // The path change itself. "path" below is always raw bytes.
 BOOL CPluginFSInterface::DoChangePath(const wchar_t* userPart, CSalamanderStringBuffer* cutFileName,
-                                      BOOL* pathWasCut, int mode)
+                                      BOOL* pathWasCut, int mode, BOOL forceRefresh)
 {
     const FsErrorState last = errorState_;
     errorState_ = FsErrorState::Ok; // ready for the next call
@@ -463,6 +556,12 @@ BOOL CPluginFSInterface::DoChangePath(const wchar_t* userPart, CSalamanderString
     else
         path = hinted ? hintedRaw : NormalizeRemotePath(codec_.Encode(wanted.path));
 
+    // A folder visited before may come from the cache, so going back to it needs no server request. The current folder
+    // is not "going back": a refresh of it (also the one Sally does when the window is activated) reads the server.
+    ListingPtr cached;
+    if (!opening && !cut && !path.empty() && path != curRaw_)
+        cached = LookupListing(path, forceRefresh);
+
     // Mode 3 (Change Directory) must not shorten a missing path of an open FS (it reports and stays); everything
     // else, including opening, shortens to the nearest directory that can be listed.
     const bool mayShorten = mode != 3 || opening || last == FsErrorState::InaccessiblePath;
@@ -473,6 +572,8 @@ BOOL CPluginFSInterface::DoChangePath(const wchar_t* userPart, CSalamanderString
     CListResult listing;
     for (;;)
     {
+        if (cached != nullptr)
+            break; // no request: the cached listing is used below
         listing = RunList(path);
         if (closeRequested_)
             return FALSE; // closed meanwhile: nothing more to do here
@@ -501,12 +602,14 @@ BOOL CPluginFSInterface::DoChangePath(const wchar_t* userPart, CSalamanderString
         if (listing.outcome == ListOutcome::ConnectionError)
         {
             cacheEntries_.reset();
+            ClearListingCache(L"connection error");
             ShowError(SPLFormatStringOwned(LangStr(IDS_ERR_LIST).c_str(), DisplayPath(path.empty() ? "/" : path).c_str(),
                                            DescribeError(listing.error).c_str()));
             return FALSE;
         }
 
-        // PathError: a file instead of a directory?
+        // PathError: the folder cannot be listed (any cached copy is outdated), or is it a file instead of a directory?
+        listingCache_.Invalidate(path);
         if (firstTry && !path.empty() && !cut && IsFile(path))
         {
             cutName = codec_.Decode(LastRemoteComponent(path));
@@ -536,7 +639,13 @@ BOOL CPluginFSInterface::DoChangePath(const wchar_t* userPart, CSalamanderString
 
     // success: remember the listing for ListCurrentPath. For the login directory the server tells the real path.
     curRaw_ = path.empty() ? NormalizeRemotePath(listing.resolvedPath) : path;
-    pendingListing_ = std::make_shared<const std::vector<CSftpEntry>>(std::move(listing.entries));
+    if (cached != nullptr)
+        pendingListing_ = cached;
+    else
+    {
+        pendingListing_ = std::make_shared<const std::vector<CSftpEntry>>(std::move(listing.entries));
+        StoreListing(curRaw_, pendingListing_);
+    }
     cacheEntries_ = pendingListing_;
     cacheRaw_ = curRaw_;
     if (pathWasCut != nullptr)
@@ -566,7 +675,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir, CPluginDa
             TRACE_E("ListCurrentPath called while another wait is running.");
             return FALSE;
         }
-        return DoListCurrentPath(dir, pluginData, iconsType);
+        return DoListCurrentPath(dir, pluginData, iconsType, forceRefresh);
     }
     catch (...)
     {
@@ -577,7 +686,8 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir, CPluginDa
 }
 
 BOOL CPluginFSInterface::DoListCurrentPath(CSalamanderDirectoryAbstract* dir,
-                                           CPluginDataInterfaceAbstract*& pluginData, int& iconsType)
+                                           CPluginDataInterfaceAbstract*& pluginData, int& iconsType,
+                                           BOOL forceRefresh)
 {
     ListingPtr entries;
     if (pendingListing_ != nullptr)
@@ -586,6 +696,12 @@ BOOL CPluginFSInterface::DoListCurrentPath(CSalamanderDirectoryAbstract* dir,
         // after ESC: use that, once
         entries = std::move(pendingListing_);
         pendingListing_.reset();
+    }
+    else if ((entries = LookupListing(curRaw_, forceRefresh)) != nullptr)
+    {
+        // a fresh cached listing of this folder and no hard refresh: no request
+        cacheEntries_ = entries;
+        cacheRaw_ = curRaw_;
     }
     else
     {
@@ -596,6 +712,7 @@ BOOL CPluginFSInterface::DoListCurrentPath(CSalamanderDirectoryAbstract* dir,
             entries = std::make_shared<const std::vector<CSftpEntry>>(std::move(listing.entries));
             cacheEntries_ = entries;
             cacheRaw_ = curRaw_;
+            StoreListing(curRaw_, entries);
             break;
         case ListOutcome::Cancelled: // ESC: Salamander calls ChangePath next
             if (DecideOnCancel(CancelPoint::InListCurrentPath, false, HaveCache()) ==
@@ -611,6 +728,7 @@ BOOL CPluginFSInterface::DoListCurrentPath(CSalamanderDirectoryAbstract* dir,
             return FALSE;
         default: // the connection is broken
             cacheEntries_.reset();
+            ClearListingCache(L"connection error");
             ShowError(SPLFormatStringOwned(LangStr(IDS_ERR_LIST).c_str(), DisplayPath(curRaw_).c_str(),
                                            DescribeError(listing.error).c_str()));
             errorState_ = FsErrorState::Fatal;
@@ -809,6 +927,7 @@ CPluginFSInterface::Event(int event, DWORD param)
         UpdateSecurityIcon(static_cast<int>(param));
         break;
     case FSE_DETACHED:
+        ClearListingCache(L"detached"); // simple rule: a detached or re-attached FS starts with an empty cache
         detached_ = true;
         lastUsed_ = IdleClock::now();
         try
@@ -822,6 +941,7 @@ CPluginFSInterface::Event(int event, DWORD param)
         break;
     case FSE_ATTACHED:
     case FSE_OPENED:
+        ClearListingCache(L"attached"); // the folders may have changed while it was detached
         detached_ = false;
         UnregisterDetached(this);
         SalamanderGeneral->KillPluginFSTimer(this, FALSE, IdleTimerParam);

@@ -121,6 +121,7 @@ bool CPluginFSInterface::ChmodOneOnSession(HWND parent, const CSelectedItem& ite
     }
     if (old.known && mode == PermissionBitsOf(old.mode))
         return true; // nothing would change: nothing is sent
+    DropListings(curRaw_, false);
     std::shared_ptr<CPanelRequest> request = session_->Chmod(JoinRemotePath(curRaw_, item.rawName), mode);
     if (!WaitForNameRequest(parent, request, LangStr(IDS_WAIT_CHMOD)))
     {
@@ -142,6 +143,7 @@ bool CPluginFSInterface::StartChmodOperation(const std::vector<CSelectedItem>& i
     CPanelConnectParams params;
     if (!MakeWorkerParams(identity_, params))
         return false;
+    DropListings(curRaw_, true); // see StartDeleteOperation
     COperationSettings settings = SettingsFromSite(params.site, TransferDirection::Chmod, false);
     settings.remoteRoot = curRaw_;
     settings.modeChange = change;

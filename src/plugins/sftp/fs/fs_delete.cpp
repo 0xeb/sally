@@ -65,6 +65,7 @@ BOOL CPluginFSInterface::DoDelete(HWND parent, int panel, int selectedFiles, int
 // Removes one file or link on the panel session and waits for it. True: it is gone (an already missing item counts).
 bool CPluginFSInterface::DeleteOneOnSession(HWND parent, const CSelectedItem& item)
 {
+    DropListings(curRaw_, item.isDir); // also when ESC stops the wait (NotifyFolderChanged below is then not reached)
     std::shared_ptr<CPanelRequest> request = session_->RemoveFile(JoinRemotePath(curRaw_, item.rawName));
     if (!WaitForNameRequest(parent, request, LangStr(IDS_WAIT_DELETING)))
         return false; // cancelled with ESC, or the FS was closed meanwhile
@@ -85,6 +86,7 @@ bool CPluginFSInterface::StartDeleteOperation(const std::vector<CSelectedItem>& 
     CPanelConnectParams params;
     if (!MakeWorkerParams(identity_, params))
         return false;
+    DropListings(curRaw_, true); // the operation changes things below the current folder; its end notifies again
     COperationSettings settings = SettingsFromSite(params.site, TransferDirection::Delete, false);
     settings.remoteRoot = curRaw_;
 

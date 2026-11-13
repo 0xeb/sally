@@ -512,6 +512,7 @@ bool CPanelSession::DoConnect(CPanelRequest& req)
         hostKeyType_ = keyType;
         hostKeyFingerprint_ = keyFingerprint;
         info_.valid = true;
+        ++connectCount_;
         info_.server = serverInfo;
         info_.methods = methods;
         info_.hostKeyType = hostKeyType_;

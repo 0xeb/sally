@@ -109,6 +109,7 @@ bool CPluginFSInterface::DoQuickRename(HWND parent, CFileData& file, CSalamander
         return true; // same name: nothing to do (newName already holds it, Sally focuses the item)
 
     // overwrite=false: an existing target is an error, never silently replaced
+    DropListings(curRaw_, true); // also when ESC stops the wait: the server may have renamed it anyway (a folder: below too)
     std::shared_ptr<CPanelRequest> request =
         session_->Rename(JoinRemotePath(curRaw_, oldRaw), JoinRemotePath(curRaw_, newRaw), false);
     if (!WaitForNameRequest(parent, request, LangStr(IDS_WAIT_RENAMING)))
@@ -170,6 +171,7 @@ bool CPluginFSInterface::DoCreateDir(HWND parent, CSalamanderStringBuffer* newNa
     if (!EncodeNewName(parent, typed, raw))
         return false;
 
+    DropListings(curRaw_, false); // also when ESC stops the wait
     std::shared_ptr<CPanelRequest> request = session_->Mkdir(JoinRemotePath(curRaw_, raw));
     if (!WaitForNameRequest(parent, request, LangStr(IDS_WAIT_CREATING_DIR)))
     {

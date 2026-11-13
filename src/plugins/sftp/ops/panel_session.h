@@ -262,6 +262,13 @@ public:
     // after Disconnect). The log is opened by the first connect and closed by Disconnect or Close.
     unsigned LogId() const { return logSink_.LogId(); }
 
+    // Any thread. A line of the plugin itself in this connection's log (dropped above the configured level).
+    void LogLine(SshLogLevel level, const std::wstring& text) { logSink_.Line(level, text); }
+
+    // Any thread. Counts the successful connects (the first one and every reconnect). A change tells the owner that
+    // what it learned from the old connection (a cached listing) may be out of date.
+    unsigned ConnectCount() const { return connectCount_.load(); }
+
     // Any thread. When the last request was submitted or finished (the keepalives do not count). A detached FS that has
     // been unused for long is closed; see DetachedIdleExpired.
     IdleClock::time_point LastActivity() const { return IdleClock::time_point(IdleClock::duration(lastActivity_.load())); }
@@ -330,6 +337,7 @@ private:
 
     std::atomic<IdleClock::rep> lastActivity_{0};
     std::atomic<int> keepaliveOverride_{-1};
+    std::atomic<unsigned> connectCount_{0};
     IdleClock::time_point lastTraffic_; // session thread only: last request or keepalive
 
     // session_ lives on the session thread only (Cancel reads it only while running_ is executing)

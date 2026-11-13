@@ -101,6 +101,8 @@ BOOL CPluginFSInterface::DoExecuteCommandLine(HWND parent, CSalamanderStringBuff
         execConfirmed_ = true;
     }
 
+    // a command can change anything on the server, not only the current folder: forget every cached listing
+    ClearListingCache(L"command executed");
     std::shared_ptr<CPanelRequest> request = session_->Exec(BuildRemoteCommand(curRaw_, raw));
     const std::wstring waitText = LangStr(IDS_WAIT_EXEC);
     const WaitResult waited = WaitForRequest(parent, *session_, request, waitText);

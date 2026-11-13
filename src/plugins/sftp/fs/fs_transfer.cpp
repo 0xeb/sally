@@ -367,6 +367,8 @@ bool CPluginFSInterface::StartDownload(BOOL copy, int panel, int selectedFiles, 
     if (!MakeWorkerParams(identity_, params))
         return false;
 
+    if (!copy)
+        DropListings(curRaw_, true); // moved items disappear from here; the end of the operation notifies again
     COperationSettings settings = SettingsFromSite(params.site, TransferDirection::Download, copy == FALSE);
     settings.policy = policy;
     settings.preserveTime = preserveTime;
@@ -415,6 +417,9 @@ bool CPluginFSInterface::MoveOnServer(HWND parent, int panel, int selectedFiles,
     const std::string targetRaw = target.path == DisplayPath(curRaw_) ? curRaw_
                                                                       : NormalizeRemotePath(codec_.Encode(target.path));
     const std::wstring targetText = DisplayPath(targetRaw);
+    // before the first rename: items already moved stay moved when a later one fails or ESC stops the loop
+    DropListings(curRaw_, true);
+    DropListings(targetRaw, true);
     for (const CSelectedItem& item : items)
     {
         const std::string from = JoinRemotePath(curRaw_, item.rawName);
@@ -546,6 +551,7 @@ BOOL CPluginFSInterface::DoCopyOrMoveFromDiskToFS(BOOL copy, int mode, const wch
     settings.remoteRoot = (connected_ && wanted.path == DisplayPath(curRaw_)) ? curRaw_
                                                                               : NormalizeRemotePath(codec.Encode(wanted.path));
 
+    DropListings(settings.remoteRoot, true); // the upload creates things below the target; its end notifies again
     COperationLaunch launch;
     launch.source = sourcePath;
     launch.target = AssignedFSName + L":" + FormatSftpPath(wanted);
@@ -623,7 +629,11 @@ CPluginFSInterface::AcceptChangeOnPathNotification(const wchar_t* fsName, const 
         if (!connected_ || closeRequested_ || path == nullptr ||
             !SplitFsPath(path, fsName != nullptr ? fsName : AssignedFSName, userPart) || !ParseSftpPath(userPart, changed))
             return;
-        if (SameServer(identity_, changed) && IsPathWithin(DisplayPath(curRaw_), changed.path, includingSubdirs != FALSE))
+        if (!SameServer(identity_, changed))
+            return;
+        // first: the cached listings of the folder (and of its parent, and below it) are outdated, whatever panel shows it
+        DropListingsForNotification(changed.path, includingSubdirs != FALSE);
+        if (IsPathWithin(DisplayPath(curRaw_), changed.path, includingSubdirs != FALSE))
             SalamanderGeneral->PostRefreshPanelFS(this);
     }
     catch (...)

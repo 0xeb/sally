@@ -277,5 +277,6 @@ CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int menuX, i
 // refreshes a second panel or a detached FS showing the same folder) and the F3 copies in the disk cache are dropped.
 void CPluginFSInterface::NotifyFolderChanged(bool includingSubdirs)
 {
+    DropListings(curRaw_, includingSubdirs); // at once: the notification below comes later
     SalamanderGeneral->PostChangeOnPathNotification(FullFsPath(curRaw_).c_str(), includingSubdirs ? TRUE : FALSE);
 }

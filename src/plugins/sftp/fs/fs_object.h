@@ -10,6 +10,7 @@
 #include "file_mode.h"
 #include "idle_policy.h"
 #include "known_hosts.h"
+#include "listing_cache.h"
 #include "op_types.h"
 #include "panel_session.h"
 #include "site.h"
@@ -179,9 +180,10 @@ private:
         CPluginFSInterface* fs_;
     };
 
-    BOOL DoChangePath(const wchar_t* userPart, CSalamanderStringBuffer* cutFileName, BOOL* pathWasCut, int mode);
+    BOOL DoChangePath(const wchar_t* userPart, CSalamanderStringBuffer* cutFileName, BOOL* pathWasCut, int mode,
+                      BOOL forceRefresh);
     BOOL DoListCurrentPath(CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData,
-                           int& iconsType);
+                           int& iconsType, BOOL forceRefresh);
 
     bool OpenConnection(const CSftpPath& wanted);
     CListResult RunList(const std::string& rawPath);
@@ -328,6 +330,25 @@ private:
     // A ListCurrentPath was cancelled: the next ChangePath (Salamander re-establishes the path) returns TRUE for the
     // current path without network traffic, and the ListCurrentPath after it serves the cache. One shot.
     bool reestablish_ = false;
+
+    // ---- directory listing cache (D60). Separate from the "last good listing" above. Main thread only.
+    // Folders visited before; used only by a non-forced ChangePath/ListCurrentPath, filled by every server read.
+    CListingCache listingCache_;
+    unsigned cacheConnectCount_ = 0; // the session's ConnectCount() the entries belong to
+
+public:
+    // Drops the cached listings of 'rawPath' and of its parent (an entry of the parent shows size and time of the
+    // folder), and everything below 'rawPath' when 'includingSubdirs'. Called before and after every change we make.
+    void DropListings(const std::string& rawPath, bool includingSubdirs);
+
+private:
+    void ClearListingCache(const wchar_t* why);
+    void SyncListingCacheWithConnection();
+    bool ListingCacheEnabled();
+    ListingPtr LookupListing(const std::string& rawPath, BOOL forceRefresh);
+    void StoreListing(const std::string& rawPath, const ListingPtr& entries);
+    void LogCache(const std::wstring& text) const;
+    void DropListingsForNotification(const std::wstring& changedPath, bool includingSubdirs);
 
     // Set by BuildNavigation, used by the next ChangePath for the same user part.
     std::wstring hintUserPart_;
