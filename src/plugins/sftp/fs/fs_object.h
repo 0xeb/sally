@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "file_mode.h"
+#include "idle_policy.h"
 #include "known_hosts.h"
 #include "op_types.h"
 #include "panel_session.h"
@@ -127,6 +128,11 @@ public:
     // A call that waits is running (CBusyGuard).
     bool IsBusy() const { return busy_ > 0; }
     bool CloseRequested() const { return closeRequested_; }
+
+    // Closes every detached FS that has been unused for the configured time (detachedIdleMinutes). Runs as the menu
+    // command SftpCmdCloseIdleDetached, because CloseDetachedFS must not be called inside an FS method. Only objects that
+    // are still registered as detached are touched.
+    static void CloseIdleDetached(HWND parent);
 
     // Id of this connection's session log (see CPanelSession::LogId); 0 when there is none.
     unsigned LogId() const { return session_ != nullptr ? session_->LogId() : 0; }
@@ -285,6 +291,11 @@ private:
     bool EncodeNewName(HWND parent, const std::wstring& name, std::string& raw) const;
     bool WaitForNameRequest(HWND parent, const std::shared_ptr<CPanelRequest>& request, const std::wstring& waitText);
 
+    // ---- idle close of a detached FS (fs_object.cpp)
+    void OnIdleTimer();
+    void ArmIdleTimer();
+    bool IsIdleDetached(IdleClock::time_point now, int idleMinutes) const;
+
     std::wstring DisplayPath(const std::string& rawPath) const;
     std::wstring UserPartOf(const std::string& rawPath) const; // "user@host:port/path" or "@Site/path"
     std::wstring ConnectionText() const;                       // "user@host" (or the site name) for messages
@@ -335,4 +346,5 @@ private:
     bool closeRequested_ = false;    // CloseFS/ReleaseObject came during a wait: no new wait, delete when unwound
     bool disconnectRequested_ = false;
     bool detached_ = false;
+    IdleClock::time_point lastUsed_ = IdleClock::now(); // set when the FS is detached; requests are in the session
 };

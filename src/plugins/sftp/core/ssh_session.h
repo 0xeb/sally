@@ -136,6 +136,12 @@ public:
     // must outlive the session; nullptr = no log. Owner thread, before the first call.
     void SetLogSink(ISshLogSink* sink) { logSink_ = sink; }
 
+    // Sends an SSH keep-alive message (no reply is waited for) so firewalls and servers see traffic on an idle connection.
+    // Needs a connected session: kind ConnectFailed "Not connected" otherwise. A failure breaks the session like every
+    // connection error (D24); the next request reconnects. libssh2 sends at most one message per 2 seconds, a call
+    // sooner than that does nothing and succeeds.
+    bool SendKeepalive();
+
     // Closes the SFTP session, the SSH session and the socket (also after a failed or cancelled OpenTransport), clears
     // the cancel request and the broken state.
     void Disconnect();
@@ -144,6 +150,10 @@ public:
     void Cancel();
 
     bool IsConnected() const { return connected_ && !broken_; }
+    // A broken session (see above) and why: "connection error" (the server or the network closed it), "timeout" or
+    // "cancel". Empty reason when the session is not broken. Cleared by Disconnect.
+    bool IsBroken() const { return broken_; }
+    const std::string& BrokenReason() const { return brokenReason_; }
     bool IsAuthenticated() const { return authenticated_; }
     bool HasSftp() const { return sftp_ != nullptr; }
     const CSshError& LastError() const { return error_; }

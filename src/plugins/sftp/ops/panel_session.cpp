@@ -4,6 +4,7 @@
 #include <exception>
 #include <new>
 
+#include "global_config.h"
 #include "listing_format.h"
 #include "local_name.h"
 #include "ssh_init.h"
@@ -24,6 +25,8 @@ CPanelSession::CPanelSession(CKnownHosts* hosts)
 {
     if (interactionEvent_ == nullptr)
         throw std::bad_alloc();
+    TouchActivity();
+    lastTraffic_ = IdleClock::now();
     try
     {
         // The new thread starts with lock+unlock of mutex_, so it never runs before threadId_ is set.
@@ -52,6 +55,7 @@ std::shared_ptr<CPanelRequest> CPanelSession::Submit(std::shared_ptr<CPanelReque
         std::lock_guard<std::mutex> lock(mutex_);
         if (!closing_)
         {
+            TouchActivity();
             queue_.push_back(req);
             queueCv_.notify_one();
             return req;
@@ -248,6 +252,8 @@ void CPanelSession::Close()
             if (running_->executed_)
                 session_->Cancel();
         }
+        else if (keepaliveRunning_)
+            session_->Cancel(); // a keepalive must not delay the close
         queueCv_.notify_all();
         answerCv_.notify_all();
     }
@@ -298,9 +304,16 @@ void CPanelSession::ThreadMain()
         std::shared_ptr<CPanelRequest> req;
         {
             std::unique_lock<std::mutex> lock(mutex_);
-            queueCv_.wait(lock, [this] { return closing_ || !queue_.empty(); });
+            // Wake up at least once a second: an idle session may owe the server a keepalive.
+            queueCv_.wait_for(lock, std::chrono::seconds(1), [this] { return closing_ || !queue_.empty(); });
             if (closing_)
                 break;
+            if (queue_.empty())
+            {
+                lock.unlock();
+                KeepaliveTick(); // between requests, on this thread: never concurrent with a request
+                continue;
+            }
             req = queue_.front();
             queue_.pop_front();
             running_ = req;
@@ -312,6 +325,12 @@ void CPanelSession::ThreadMain()
             try
             {
                 Execute(*req);
+                if (ShouldRetrySilently(*req))
+                {
+                    logSink_.Line(SshLogLevel::Normal, L"Connection lost: reconnecting and repeating the request");
+                    ResetResult(*req);
+                    Execute(*req); // reconnects through EnsureConnected (host key and prompts work as usual)
+                }
             }
             catch (const std::exception& e)
             {
@@ -355,6 +374,8 @@ void CPanelSession::ThreadMain()
             req->entries_.clear();
             req->exec_ = CExecResult();
         }
+        lastTraffic_ = IdleClock::now();
+        TouchActivity(); // before the owner is released: it may look at LastActivity right away
         SetEvent(req->done_);
     }
 
@@ -377,6 +398,74 @@ void CPanelSession::ThreadMain()
     }
     logSink_.End();
     ForgetSite();
+}
+
+bool CPanelSession::IsReadOnly(CPanelRequest::Kind kind)
+{
+    switch (kind)
+    {
+    case CPanelRequest::Kind::List:
+    case CPanelRequest::Kind::RealPath:
+    case CPanelRequest::Kind::Stat:
+    case CPanelRequest::Kind::LStat:
+    case CPanelRequest::Kind::ReadLink:
+    case CPanelRequest::Kind::Statvfs:
+        return true;
+    default: // Connect, Disconnect and everything that changes something (it may have run before the connection died)
+        return false;
+    }
+}
+
+bool CPanelSession::ShouldRetrySilently(const CPanelRequest& req)
+{
+    if (!IsReadOnly(req.kind_) || req.Ok() || session_ == nullptr || !session_->IsBroken())
+        return false;
+    // only "the server or the network closed the connection"; a timeout would make the user wait twice, a cancel is final
+    if (session_->BrokenReason() != "connection error")
+        return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    return hasSite_ && !req.cancelled_ && !closing_;
+}
+
+void CPanelSession::ResetResult(CPanelRequest& req)
+{
+    req.error_ = CSshError();
+    req.entries_.clear();
+    req.realPath_.clear();
+    req.attributes_ = CSftpEntry();
+    req.vfs_ = CSftpVfs();
+    req.hasVfs_ = false;
+}
+
+void CPanelSession::KeepaliveTick()
+{
+    if (session_ == nullptr || !session_->IsConnected() || !session_->HasSftp())
+        return;
+    const int fromTest = keepaliveOverride_.load();
+    const int seconds = fromTest >= 0 ? fromTest : GlobalConfigStore().Get().keepaliveSeconds;
+    if (!KeepaliveDue(lastTraffic_, IdleClock::now(), seconds))
+        return;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (closing_ || !queue_.empty())
+            return;
+        keepaliveRunning_ = true;
+    }
+    bool ok = false;
+    try
+    {
+        ok = session_->SendKeepalive(); // the core logs the success and the error text
+    }
+    catch (...)
+    {
+    }
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        keepaliveRunning_ = false;
+    }
+    lastTraffic_ = IdleClock::now();
+    if (!ok)
+        logSink_.Line(SshLogLevel::Normal, L"Keepalive failed: the connection is reopened by the next request");
 }
 
 void CPanelSession::ForgetSite()

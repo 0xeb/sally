@@ -330,6 +330,10 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
             break;
         }
 
+        case SftpCmdCloseIdleDetached:
+            CPluginFSInterface::CloseIdleDetached(parent);
+            break;
+
         default:
             TRACE_E("Unknown menu command, ID=" << id);
         }

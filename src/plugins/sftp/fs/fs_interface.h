@@ -67,6 +67,8 @@ const int SftpCmdDisconnect = 2;
 const int SftpCmdOperations = 3;
 const int SftpCmdConfiguration = 4;
 const int SftpCmdSessionLog = 5;
+// Helper command, not in the menu: posted by the idle timer of a detached FS (see CPluginFSInterface::CloseIdleDetached)
+const int SftpCmdCloseIdleDetached = 6;
 
 // The Configuration dialog (defined in sftp.cpp, also reached from the plugin manager)
 void ShowPluginConfiguration(HWND parent);

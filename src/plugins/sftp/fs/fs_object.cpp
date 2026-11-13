@@ -5,8 +5,11 @@
 
 #include "fs_object.h"
 
+#include <algorithm>
+
 #include "cancel_policy.h"
 #include "fs_data.h"
+#include "fs_interface.h"
 #include "fs_messages.h"
 #include "global_config.h"
 #include "listing_format.h"
@@ -35,6 +38,29 @@ bool ShouldReport(int mode, SshErrorKind kind)
         return mode != 1;
     return true;
 }
+
+// The detached FS objects (main thread only). Salamander owns them; an object leaves the list when it is attached again
+// or destroyed, so a pointer in the list is valid.
+std::vector<CPluginFSInterface*> DetachedFsList;
+
+const DWORD IdleTimerParam = 1;      // timerParam of the idle check
+const int IdleTimerPeriodMs = 60000; // how often a detached FS looks at its idle time
+
+bool IsRegisteredDetached(const CPluginFSInterface* fs)
+{
+    return std::find(DetachedFsList.begin(), DetachedFsList.end(), fs) != DetachedFsList.end();
+}
+
+void RegisterDetached(CPluginFSInterface* fs)
+{
+    if (!IsRegisteredDetached(fs))
+        DetachedFsList.push_back(fs);
+}
+
+void UnregisterDetached(CPluginFSInterface* fs)
+{
+    DetachedFsList.erase(std::remove(DetachedFsList.begin(), DetachedFsList.end(), fs), DetachedFsList.end());
+}
 } // namespace
 
 CPluginFSInterface::CPluginFSInterface()
@@ -46,6 +72,7 @@ CPluginFSInterface::CPluginFSInterface()
 
 CPluginFSInterface::~CPluginFSInterface()
 {
+    UnregisterDetached(this);
     CloseSession(); // joins the session thread before hosts_ goes away
     session_.reset();
 }
@@ -783,12 +810,27 @@ CPluginFSInterface::Event(int event, DWORD param)
         break;
     case FSE_DETACHED:
         detached_ = true;
+        lastUsed_ = IdleClock::now();
+        try
+        {
+            RegisterDetached(this);
+        }
+        catch (...) // out of memory: the FS then simply stays detached until the user closes it
+        {
+        }
+        ArmIdleTimer();
         break;
     case FSE_ATTACHED:
     case FSE_OPENED:
         detached_ = false;
+        UnregisterDetached(this);
+        SalamanderGeneral->KillPluginFSTimer(this, FALSE, IdleTimerParam);
         break;
-    default: // FSE_CLOSEORDETACHCANCELED, FSE_TIMER: nothing to do yet
+    case FSE_TIMER:
+        if (param == IdleTimerParam)
+            OnIdleTimer();
+        break;
+    default: // FSE_CLOSEORDETACHCANCELED: nothing to do
         break;
     }
     // The panel is shown (again) or may be refreshed: a listing read earlier must not be used for a later,
@@ -797,6 +839,59 @@ CPluginFSInterface::Event(int event, DWORD param)
     {
         pendingListing_.reset();
         reestablish_ = false;
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Idle close of a detached FS. The timer runs silently on the main thread (no windows, see FSE_TIMER); closing is done
+// by a posted menu command, outside of this object's methods.
+
+void CPluginFSInterface::ArmIdleTimer()
+{
+    SalamanderGeneral->AddPluginFSTimer(IdleTimerPeriodMs, this, IdleTimerParam);
+}
+
+bool CPluginFSInterface::IsIdleDetached(IdleClock::time_point now, int idleMinutes) const
+{
+    if (!detached_ || busy_ > 0 || closeRequested_)
+        return false;
+    IdleClock::time_point lastUsed = lastUsed_;
+    if (session_ && session_->LastActivity() > lastUsed)
+        lastUsed = session_->LastActivity(); // a request made while detached counts as use
+    return DetachedIdleExpired(lastUsed, now, idleMinutes);
+}
+
+void CPluginFSInterface::OnIdleTimer()
+{
+    if (!detached_)
+        return; // attached again meanwhile: the timer is not re-armed
+    try
+    {
+        const int minutes = GlobalConfigStore().Get().detachedIdleMinutes;
+        if (IsIdleDetached(IdleClock::now(), minutes))
+            SalamanderGeneral->PostMenuExtCommand(SftpCmdCloseIdleDetached, TRUE); // when Sally is idle
+    }
+    catch (...)
+    {
+    }
+    ArmIdleTimer(); // the timer fires once; look again later (a close cancels it with the object)
+}
+
+void CPluginFSInterface::CloseIdleDetached(HWND parent)
+{
+    const int minutes = GlobalConfigStore().Get().detachedIdleMinutes;
+    const IdleClock::time_point now = IdleClock::now();
+    std::vector<CPluginFSInterface*> idle;
+    for (CPluginFSInterface* fs : DetachedFsList)
+        if (fs->IsIdleDetached(now, minutes))
+            idle.push_back(fs);
+    for (CPluginFSInterface* fs : idle)
+    {
+        if (!IsRegisteredDetached(fs))
+            continue; // gone since the list was made
+        fs->SetDisconnectRequested(true); // not the user's question "keep the connection?"
+        if (!SalamanderGeneral->CloseDetachedFS(parent, fs))
+            fs->SetDisconnectRequested(false); // still alive (the object is deleted when the call succeeds)
     }
 }
 

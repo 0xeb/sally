@@ -91,6 +91,23 @@ void CSshSession::Disconnect()
     cancelled_ = false;
 }
 
+bool CSshSession::SendKeepalive()
+{
+    if (IsCancelled())
+        return Fail(SshErrorKind::Cancelled, std::string());
+    if (broken_)
+        return FailBroken();
+    if (!connected_ || session_ == nullptr)
+        return Fail(SshErrorKind::ConnectFailed, SshMsg::NotConnected, {}, "Not connected");
+    libssh2_keepalive_config(session_, 0, 2); // 2 s is libssh2's smallest interval; the caller decides how often to call
+    int secondsToNext = 0;
+    const int rc = Run([&] { return libssh2_keepalive_send(session_, &secondsToNext); }, timeoutMs_);
+    if (rc != 0)
+        return FailFromSession("Keepalive failed", rc);
+    Log(SshLogLevel::Normal, "Keepalive sent");
+    return true;
+}
+
 std::string CSshSession::NegotiatedMethod(int methodType) const
 {
     if (session_ == nullptr || !connected_)

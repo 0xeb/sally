@@ -26,6 +26,7 @@
 #include <thread>
 #include <vector>
 
+#include "idle_policy.h"
 #include "session_log.h"
 #include "site.h"
 #include "ssh_session.h"
@@ -261,6 +262,14 @@ public:
     // after Disconnect). The log is opened by the first connect and closed by Disconnect or Close.
     unsigned LogId() const { return logSink_.LogId(); }
 
+    // Any thread. When the last request was submitted or finished (the keepalives do not count). A detached FS that has
+    // been unused for long is closed; see DetachedIdleExpired.
+    IdleClock::time_point LastActivity() const { return IdleClock::time_point(IdleClock::duration(lastActivity_.load())); }
+
+    // Any thread. Keepalive interval in seconds for THIS session: 0 = off, negative = use the global configuration
+    // (the default). Mainly for tests, which cannot wait a minute.
+    void SetKeepaliveSeconds(int seconds) { keepaliveOverride_ = seconds; }
+
     // The session thread's id (valid from the constructor on).
     std::thread::id SessionThreadId() const { return threadId_; }
 
@@ -284,6 +293,14 @@ private:
     bool EnsureConnected(CPanelRequest& req);
     bool DoConnect(CPanelRequest& req);
     void ForgetSite();
+    void TouchActivity() { lastActivity_ = IdleClock::now().time_since_epoch().count(); }
+    // Idle tick of the session thread (no request waits): sends a keepalive when the connection has been quiet long enough.
+    void KeepaliveTick();
+    // The silent retry of D59: a request that only reads (so running it twice is harmless) and failed because the
+    // connection was lost (not cancelled, not a timeout) is run once more after a reconnect.
+    bool ShouldRetrySilently(const CPanelRequest& req);
+    static bool IsReadOnly(CPanelRequest::Kind kind);
+    static void ResetResult(CPanelRequest& req);
     void ReadFreeSpaceAfterList(CPanelRequest& req);
     void DownloadFile(CPanelRequest& req);
     bool WaitForAnswer(std::unique_lock<std::mutex>& lock); // true: answered, false: aborted
@@ -301,6 +318,7 @@ private:
     std::deque<std::shared_ptr<CPanelRequest>> queue_;
     std::shared_ptr<CPanelRequest> running_;
     bool closing_ = false;
+    bool keepaliveRunning_ = false; // the session thread is inside SendKeepalive (Close cancels it)
     CInteraction interaction_; // kind None = nothing waiting
     bool interactionDelivered_ = false;
     bool answered_ = false;
@@ -309,6 +327,10 @@ private:
     CSecret promptAnswer_;
 
     HANDLE interactionEvent_;
+
+    std::atomic<IdleClock::rep> lastActivity_{0};
+    std::atomic<int> keepaliveOverride_{-1};
+    IdleClock::time_point lastTraffic_; // session thread only: last request or keepalive
 
     // session_ lives on the session thread only (Cancel reads it only while running_ is executing)
     std::unique_ptr<CSshSession> session_;

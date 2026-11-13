@@ -127,6 +127,14 @@ public:
     uint64_t Forwarded() const { return forwarded_; }
     int Accepted() const { return accepted_; } // connections that reached the target
     bool IsStalled() const { return stalled_; }
+    // Closes every open connection (client and server side) but keeps listening: the client sees a server that closed
+    // the connection, and may connect again. Returns when the proxy thread has done it.
+    void DropConnections()
+    {
+        drop_ = true;
+        for (int i = 0; i < 200 && drop_; ++i)
+            Sleep(10);
+    }
 
 private:
     struct Pair
@@ -178,6 +186,16 @@ private:
     {
         while (!stop_)
         {
+            if (drop_)
+            {
+                for (const Pair& p : pairs_)
+                {
+                    closesocket(p.client);
+                    closesocket(p.server);
+                }
+                pairs_.clear();
+                drop_ = false;
+            }
             fd_set readSet;
             FD_ZERO(&readSet);
             FD_SET(listen_, &readSet);
@@ -219,6 +237,7 @@ private:
     SOCKET listen_ = INVALID_SOCKET;
     std::atomic<bool> stop_{false};
     std::atomic<bool> stalled_{false};
+    std::atomic<bool> drop_{false};
     std::atomic<uint64_t> limit_{0};
     std::atomic<uint64_t> forwarded_{0};
     std::atomic<int> accepted_{0};
