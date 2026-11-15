@@ -1,0 +1,2 @@
+# Overlay ports are applied by vcpkg as they are: patches, scripts and hashes must keep LF
+* -text
