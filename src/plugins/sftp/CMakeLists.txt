@@ -48,6 +48,12 @@ endif()
 # editing vcpkg.json (versions, features) has to rerun this file, because that is where vcpkg install runs
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${SAL_PLUGINS}/sftp/vcpkg.json")
 
+# Overlay ports (OpenSSL 3.5 LTS, libssh2 with security patches): see vcpkg-ports/README.md. An overlay port
+# replaces the registry port of the same name, so the "overrides" of those two ports are not in vcpkg.json.
+set(_SFTP_OVERLAY_PORTS "${SAL_PLUGINS}/sftp/vcpkg-ports")
+file(GLOB_RECURSE _SFTP_OVERLAY_FILES CONFIGURE_DEPENDS "${_SFTP_OVERLAY_PORTS}/*")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${_SFTP_OVERLAY_FILES})
+
 # Overlay triplet: same name and content as the stock triplet (so the install path stays the same), plus
 # the MSVC toolset version of this build. Without it vcpkg picks the newest toolset on the machine, which can
 # be newer than the one Sally links with (mixed C++ runtimes). VCPKG_VISUAL_STUDIO_PATH is not used: vcpkg
@@ -81,6 +87,7 @@ execute_process(
     "--x-install-root=${_SFTP_INSTALL_ROOT}"
     "--triplet=${_SFTP_TRIPLET}"
     "--overlay-triplets=${_SFTP_TRIPLET_DIR}"
+    "--overlay-ports=${_SFTP_OVERLAY_PORTS}"
     "--x-buildtrees-root=${CMAKE_BINARY_DIR}/vcpkg_work/buildtrees"
     "--x-packages-root=${CMAKE_BINARY_DIR}/vcpkg_work/packages"
     --disable-metrics
