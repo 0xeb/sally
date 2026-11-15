@@ -3,6 +3,7 @@
 #include "operation_test_support.h"
 
 #include "global_config.h"
+#include "operations_list.h"
 #include "worker_slots.h"
 
 namespace
@@ -267,4 +268,62 @@ TEST_F(OperationSlotsTest, ChangingTheCapAtRunTimeLetsWaitersIn)
 
     holder->RequestCancel();
     ASSERT_TRUE(holder->WaitFinished(30000));
+}
+
+// ---- unload (Release -> COperationsList::Clear) --------------------------------------------------------------------
+// Release must end every worker thread before the DLL goes away, whatever the workers are doing (M7).
+
+TEST_F(OperationSlotsTest, ClearEndsAnOperationThatHoldsASlotAndOneThatWaitsForIt)
+{
+    SetCap(1);
+    CTestObserver holderObserver; // declared before the list: the operations still call them while Clear joins
+    CTestObserver waiterObserver;
+    sftptest::CStallProxy proxy(sftptest::kPort);
+    COperationsList list;
+
+    std::unique_ptr<COperation> holderOwned;
+    StartHolder(holderOwned, holderObserver, proxy); // its worker holds the only slot, the connection is frozen
+    std::shared_ptr<COperation> holder(std::move(holderOwned));
+    list.Add(holder);
+
+    auto waiterOwned = MakeDownloadTo(PutManyFiles("waiter", 4), "waiter");
+    std::shared_ptr<COperation> waiter(std::move(waiterOwned));
+    waiter->SetObserver(&waiterObserver);
+    list.Add(waiter);
+    ASSERT_TRUE(waiter->Start());
+    ASSERT_TRUE(WaitUntil([&] { return waiter->IsWaitingForSlot(); }, 10000));
+    ASSERT_EQ(WorkerSlots().Held(), 1);
+    ASSERT_EQ(WorkerSlots().Waiting(), 2);
+
+    const auto start = std::chrono::steady_clock::now();
+    list.Clear(); // what Release does
+    EXPECT_LT(std::chrono::steady_clock::now() - start, std::chrono::seconds(10));
+    EXPECT_TRUE(list.Snapshot().empty());
+    holder.reset();
+    waiter.reset(); // the last owners: the threads are joined now
+    EXPECT_EQ(WorkerSlots().Held(), 0);
+    EXPECT_EQ(WorkerSlots().Waiting(), 0);
+}
+
+TEST_F(OperationSlotsTest, ClearEndsAPausedOperation)
+{
+    SetCap(1);
+    CTestObserver holderObserver;
+    sftptest::CStallProxy proxy(sftptest::kPort);
+    COperationsList list;
+
+    std::unique_ptr<COperation> holderOwned;
+    StartHolder(holderOwned, holderObserver, proxy);
+    std::shared_ptr<COperation> holder(std::move(holderOwned));
+    list.Add(holder);
+
+    holder->Pause(); // the network is silent: the pause must not wait for the idle timeout
+    ASSERT_TRUE(WaitUntil([] { return WorkerSlots().Held() == 0; }, 10000)); // a paused worker gives its slot back
+    EXPECT_TRUE(holder->IsPaused());
+
+    const auto start = std::chrono::steady_clock::now();
+    list.Clear();
+    EXPECT_LT(std::chrono::steady_clock::now() - start, std::chrono::seconds(10));
+    holder.reset();
+    EXPECT_EQ(WorkerSlots().Held(), 0);
 }

@@ -754,3 +754,26 @@ TEST_F(OperationFlowTest, ClearCancelsAndJoinsRunningOperations)
     }
     EXPECT_LE(HandleCount(), handlesBefore + 2);
 }
+
+TEST_F(OperationFlowTest, ClearEndsAWorkerThatSleepsInTheReconnectBackoff)
+{
+    const DWORD handlesBefore = HandleCount();
+    {
+        CTestObserver observer; // before the server and the list: the operation still calls it while Clear joins
+        CClosingServer server;
+        port_ = server.Port();
+        delays_ = {60000, 60000, 60000}; // a minute: only Clear can end this in time
+        COperationsList list;
+        std::shared_ptr<COperation> op(MakeDownload({RemoteSrc("fixtures/small/hello.txt", false, 6)}, false, 2).release());
+        op->SetObserver(&observer);
+        list.Add(op);
+        ASSERT_TRUE(op->Start());
+        ASSERT_TRUE(WaitUntil([&] { return server.Attempts() >= 1; }, 5000));
+        Sleep(200); // the worker is in its backoff wait
+        const auto start = std::chrono::steady_clock::now();
+        list.Clear();
+        EXPECT_LT(std::chrono::steady_clock::now() - start, std::chrono::seconds(5));
+        EXPECT_FALSE(list.HasRunning());
+    }
+    EXPECT_LE(HandleCount(), handlesBefore + 2);
+}
