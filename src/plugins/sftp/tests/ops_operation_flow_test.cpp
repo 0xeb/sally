@@ -126,7 +126,8 @@ TEST_F(OperationFlowTest, CancelMidFileThenANewOperationResumesTheLocalFile)
         const std::vector<CQueueItem> items = op->Queue().Items(false);
         ASSERT_EQ(items.size(), 1u);
         EXPECT_EQ(items[0].state, ItemState::Waiting);
-        EXPECT_GT(items[0].bytesDone, 0u);
+        // items[0].bytesDone is not checked: the progress callback fires at most every 100 ms, and an optimized build
+        // moves the first 8 MiB over loopback faster than that. The partial file below is what resume uses.
         EXPECT_TRUE(items[0].ownsPartial);
     }
     const uint64_t partial = fs::file_size(local_ / "big.bin");
