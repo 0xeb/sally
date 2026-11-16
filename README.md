@@ -199,7 +199,7 @@ a launcher wrapper, and troubleshooting.
 
 Sally is free, with no ads, no telemetry and no paid edition. If it saves you time, a donation pays for the next fix, and a star helps a small Windows project get found.
 
-An optional supporter key acknowledges your contribution locally. Import or paste it through **Help → Support Sally → Enter supporter key**; verification works offline. Your name and support dates are available in About, with an optional title-bar acknowledgement. Every feature and update remains free when the support term ends. See [Support Sally](https://get-sally.app/support-sally/) for contribution and key-delivery details.
+An optional supporter key acknowledges your contribution locally. Import or paste it through **Help → Support Sally → Enter supporter key**; verification works offline. Your name and support dates are available in About, with an optional title-bar acknowledgement. Automatic updates are included with active support. File management, plugins and manual updates remain free when the support term ends. See [Support Sally](https://get-sally.app/support-sally/) for contribution and key-delivery details.
 
 <p>
   <a href="https://paypal.me/EliasBachaalany"><img alt="Donate with PayPal" src="https://img.shields.io/badge/Donate-PayPal-0070e0?style=for-the-badge&logo=paypal&logoColor=white"></a>

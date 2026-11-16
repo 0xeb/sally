@@ -1,7 +1,11 @@
 // SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include "precomp.h"
+// Also compiled into standalone support/update windows; keep this Win32 adapter
+// independent of either the core or a plugin precompiled header.
+#include <windows.h>
+#include <algorithm>
+#include <mutex>
 #include "plugindarkmode.h"
 #include "combo_dark_paint.h"
 #include "plugin_window_text.h"
@@ -23,6 +27,8 @@ extern "C" __declspec(dllimport) HRESULT WINAPI DwmSetWindowAttribute(HWND hwnd,
 
 namespace
 {
+std::wstring ProfileRootOverride;
+std::mutex ProfileRootMutex;
 typedef HRESULT(WINAPI* PFNSETWINDOWTHEME)(HWND hwnd, LPCWSTR pszSubAppName, LPCWSTR pszSubIdList);
 
 const int PLUGIN_THEME_MODE_LIGHT = 0;
@@ -160,7 +166,8 @@ BOOL ReadConfiguredThemeMode(int* themeMode)
     try
     {
         std::wstring hostRoot;
-        if (ReadEnvironmentVariableOwned(SAL_ENV_CONFIG_ROOT_W, hostRoot))
+        { std::lock_guard<std::mutex> lock(ProfileRootMutex); hostRoot = ProfileRootOverride; }
+        if (!hostRoot.empty() || ReadEnvironmentVariableOwned(SAL_ENV_CONFIG_ROOT_W, hostRoot))
         {
             const std::wstring hostKey = hostRoot + L"\\" SAL_REG_SUBKEY_CONFIGURATION_W;
             DWORD value = PLUGIN_THEME_MODE_LIGHT;
@@ -562,6 +569,26 @@ BOOL CALLBACK ApplyListTreeThemeEnumProc(HWND hwnd, LPARAM lParam)
 }
 
 } // namespace
+
+void PluginDarkMode_SetProfileRoot(const wchar_t* root)
+{
+    std::lock_guard<std::mutex> lock(ProfileRootMutex);
+    ProfileRootOverride = root ? root : L"";
+}
+
+COLORREF PluginDarkMode_GetLinkColor()
+{
+    return PluginDarkMode_ShouldUseDark() ? RGB(124, 188, 255) : GetSysColor(COLOR_HOTLIGHT);
+}
+
+LRESULT PluginDarkMode_DrawLink(LPARAM notification)
+{
+    if (!PluginDarkMode_ShouldUseDark()) return CDRF_DODEFAULT;
+    auto draw = reinterpret_cast<NMCUSTOMDRAW*>(notification);
+    if (draw->dwDrawStage == CDDS_PREPAINT) return CDRF_NOTIFYITEMDRAW;
+    if (draw->dwDrawStage == CDDS_ITEMPREPAINT) SetTextColor(draw->hdc, PluginDarkMode_GetLinkColor());
+    return CDRF_DODEFAULT;
+}
 
 void PluginDarkMode_Initialize()
 {

@@ -235,6 +235,12 @@ bool TextEngine::ReadUnit(std::int64_t pos, std::uint32_t& unit)
         return false;
     if ((int)available < unitSize)
     {
+        if (unitSize == 2 && available == 1 && pos == m_config.FileSize - 1)
+        {
+            // Match forward decoding of a real odd EOF, including CR lookahead.
+            unit = 0xFFFD;
+            return true;
+        }
         if (m_source.Copy(pos, joined, (std::size_t)unitSize) != (std::size_t)unitSize)
             return false;
         data = joined;
@@ -317,7 +323,8 @@ TextStatus TextEngine::LayoutRow(std::int64_t rowBegin, ICellSink* sink, RowLayo
 {
     row = RowLayout();
     const std::int64_t size = m_config.FileSize;
-    const std::int64_t start = Align(std::max(rowBegin, m_config.TextStart));
+    // The row after an odd UTF-16 tail is empty, not the tail again.
+    const std::int64_t start = rowBegin == size ? size : Align(std::max(rowBegin, m_config.TextStart));
     row.LineEnd = row.NextLineBegin = start;
     if (start >= size)
         return TextStatus::Ok;

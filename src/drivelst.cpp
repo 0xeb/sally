@@ -2463,17 +2463,11 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
     return ret;
 }
 
-BOOL CDrivesList::Track()
+BOOL CDrivesList::Track(const RECT* menuOpener)
 {
     CALL_STACK_MESSAGE1("CDrivesList::Track()");
-    RECT r;
-    GetWindowRect(FilesWindow->HWindow, &r);
-    int dirHeight = MainWindow->GetDirectoryLineHeight();
-
-    RECT buttonRect;
-    buttonRect = r;
-    buttonRect.bottom = buttonRect.top + dirHeight;
-    buttonRect.right = buttonRect.left + dirHeight;
+    const POINT origin = menuOpener != NULL ? POINT{menuOpener->left, menuOpener->bottom}
+                                           : FilesWindow->GetDirectoryMenuPosition();
 
     MenuPopup = new CMenuPopup;
     if (MenuPopup == NULL)
@@ -2505,8 +2499,8 @@ BOOL CDrivesList::Track()
         MenuPopup->SetSelectedItemIndex(FocusIndex);
     FilesWindow->OpenedDrivesList = this; // so that FilesWindow deliver us notifications
     DWORD cmd = MenuPopup->Track(MENU_TRACK_RETURNCMD | MENU_TRACK_SELECT | MENU_TRACK_VERTICAL,
-                                 buttonRect.left, buttonRect.bottom,
-                                 FilesWindow->HWindow, &buttonRect);
+                                 origin.x, origin.y,
+                                 FilesWindow->HWindow, menuOpener);
     FilesWindow->OpenedDrivesList = NULL;
 
     // let the returning variable be set

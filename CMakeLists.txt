@@ -356,7 +356,7 @@ target_compile_definitions(salupdate PRIVATE
 target_link_libraries(salupdate PRIVATE
   comctl32
   sally_supporter_mt
-  shell32 ole32 bcrypt version wininet winhttp shlwapi
+  shell32 ole32 oleacc bcrypt version wininet winhttp shlwapi
 )
 
 if(MSVC)

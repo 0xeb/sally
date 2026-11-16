@@ -12,6 +12,8 @@
 #include <shellapi.h>
 #include <richedit.h>
 #include <commctrl.h>
+#include <initguid.h>
+#include <oleacc.h>
 #include <set>
 #include "supporter/Win32SupporterUi.h"
 #include "update/Win32DisplayContent.h"
@@ -27,6 +29,7 @@
 #include "salupdate.rh"
 #include "ui_style.h"
 #include "ApplicationAppearance.h"
+#include "plugins/shared/plugindarkmode.h"
 #include "Win32HttpsClient.h"
 #include "Win32TextCodec.h"
 #include "update/GitHubRelease.h"
@@ -38,6 +41,7 @@
 #include "update/UpdatePackage.h"
 #include "update/UpdateProcesses.h"
 #include "update/UpdaterCommand.h"
+#include "update/UpdateAccess.h"
 
 using namespace Sally::Update;
 
@@ -65,7 +69,7 @@ enum ControlId
     kIdStatus,
     kIdSupport = 211, kIdSupporter,
     kIdCheckUpdates = 214, kIdInvitation,
-    kIdNotesVersion, kIdNotesLabel,
+    kIdNotesVersion, kIdNotesLabel, kIdBenefit, kIdDetails,
 };
 
 enum : UINT
@@ -102,7 +106,10 @@ struct Session
     bool SuccessfulReport = false;
     HWND AppearanceOwner = nullptr;
     Sally::Appearance::Snapshot Appearance;
-    bool Offline = false, HasBundle = false, SupportActions = true;
+    bool Offline = false, HasBundle = false;
+    Sally::Supporter::Certificate Certificate;
+    UpdateAccess Access;
+    std::shared_ptr<ManagedUpdateAttempt> Attempt;
     bool LayingOut = false;
     uint64_t NextContentTime = 0;
     std::wstring Profile;
@@ -136,6 +143,7 @@ struct Session
     HWND Window = NULL;
     HFONT Font = NULL;
     HFONT Bold = NULL;
+    HFONT Heading = NULL;
     int Dpi = 96;
     bool Placed = false;
 };
@@ -322,75 +330,67 @@ DWORD WINAPI CheckWorker(void*)
     return 0;
 }
 
-DWORD WINAPI InstallWorker(void*)
+struct InstallWork
 {
-    Session& s = TheSession;
-    bool ok = false;
-    std::wstring error;
-    CreateDirectoryW(Sally::ToExtendedLengthPath(s.Staging).c_str(), NULL);
-    const std::wstring package = s.Staging + L"\\" + Widen(s.Release.PrimaryAssetName);
-    Log(L"downloading " + Widen(s.Release.PrimaryUrl) + L" -> " + package);
-    FilePackageSink sink(package, s.Window);
-    DWORD openError = 0;
-    if (!sink.Open(openError))
-    {
-        error = package + L"\n" + SystemErrorText(openError);
-    }
-    else
-    {
-        Win32HttpsClient client(&s.Cancel);
-        int reported = -1;
-        std::string sha256;
-        ReleaseFailure failure;
-        const bool downloaded = DownloadReleasePackage(
-            client, s.Release, sink,
-            [&](unsigned long long received, unsigned long long total) {
-                const int percent = total > 0 ? static_cast<int>(received * 100 / total) : -1;
-                if (percent != reported)
-                {
-                    reported = percent;
-                    PostMessageW(s.Window, WM_APP_PROGRESS, kStageDownloading, percent);
-                }
-            },
-            sha256, failure);
-        if (!downloaded)
-        {
-            error = FailureText(failure);
-            Log(L"download failed: " + error);
-        }
+    std::shared_ptr<ManagedUpdateAttempt> Attempt;
+    std::wstring Staging, Version;
+    HWND Window;
+};
+
+DWORD WINAPI InstallWorker(void* parameter)
+{
+    std::unique_ptr<InstallWork> work(static_cast<InstallWork*>(parameter));
+    if (!work) return 0;
+    const auto attempt = work->Attempt;
+    RunManagedUpdate(attempt, [&](const ManagedUpdateAttempt& accepted) {
+        ManagedUpdateResult outcome;
+        // No staging, sink opening, checksum or package request precedes admission.
+        CreateDirectoryW(Sally::ToExtendedLengthPath(work->Staging).c_str(), NULL);
+        const std::wstring package = work->Staging + L"\\" + Widen(accepted.Release.PrimaryAssetName);
+        FilePackageSink sink(package, work->Window);
+        DWORD openError = 0;
+        if (!sink.Open(openError))
+            outcome.Error = package + L"\n" + SystemErrorText(openError);
         else
         {
-            PostMessageW(s.Window, WM_APP_PROGRESS, kStagePreparing, -1);
-            UpdaterCommand prepare;
-            prepare.Mode = UpdaterMode::Prepare;
-            prepare.Package = package;
-            prepare.Sha256 = Widen(sha256);
-            prepare.Staging = s.Staging;
-            prepare.Version = s.Version;
-            prepare.Arch = s.Arch;
-            UpdateResult result;
-            ok = PrepareRelease(prepare, result);
-            if (!ok)
+            Win32HttpsClient client(&TheSession.Cancel);
+            int reported = -1;
+            std::string sha256;
+            ReleaseFailure failure;
+            const bool downloaded = DownloadReleasePackage(client, accepted.Release, sink,
+                [&](unsigned long long received, unsigned long long total) {
+                    const int percent = total > 0 ? static_cast<int>(received * 100 / total) : -1;
+                    if (percent != reported) { reported = percent; PostMessageW(work->Window, WM_APP_PROGRESS, kStageDownloading, percent); }
+                }, sha256, failure);
+            if (!downloaded) outcome.Error = FailureText(failure);
+            else
             {
-                error = result.Message;
-                if (!result.FailedPath.empty())
-                    error += L"\n" + result.FailedPath;
-                if (result.Code != 0)
-                    error += L"\n" + SystemErrorText(result.Code);
+                PostMessageW(work->Window, WM_APP_PROGRESS, kStagePreparing, -1);
+                UpdaterCommand prepare;
+                prepare.Mode = UpdaterMode::Prepare;
+                prepare.Package = package; prepare.Sha256 = Widen(sha256);
+                prepare.Staging = work->Staging; prepare.Version = work->Version; prepare.Arch = accepted.Arch;
+                UpdateResult result;
+                outcome.Prepared = PrepareRelease(prepare, result);
+                if (!outcome.Prepared)
+                {
+                    outcome.Error = result.Message;
+                    if (!result.FailedPath.empty()) outcome.Error += L"\n" + result.FailedPath;
+                    if (result.Code != 0) outcome.Error += L"\n" + SystemErrorText(result.Code);
+                }
+                DeleteFileW(Sally::ToExtendedLengthPath(package).c_str());
             }
-            DeleteFileW(Sally::ToExtendedLengthPath(package).c_str());
         }
-    }
-    s.InstallError = error;
-    PostMessageW(s.Window, WM_APP_PREPARED, ok ? TRUE : FALSE, 0);
+        return outcome;
+    });
+    if (attempt) PostMessageW(work->Window, WM_APP_PREPARED, static_cast<WPARAM>(attempt->Id), 0);
     return 0;
 }
 
-bool StartWorker(LPTHREAD_START_ROUTINE routine)
+bool StartWorker(LPTHREAD_START_ROUTINE routine, void* parameter = nullptr)
 {
-    HANDLE thread = CreateThread(NULL, 0, routine, NULL, 0, NULL);
-    if (thread == NULL)
-        return false;
+    HANDLE thread = CreateThread(NULL, 0, routine, parameter, 0, NULL);
+    if (thread == NULL) return false;
     CloseHandle(thread);
     return true;
 }
@@ -457,11 +457,22 @@ void Place(int id, bool visible, int x, int y, int width, int height)
 
 std::wstring T(UINT id) { return Sally::Supporter::SupporterText(id, Language); }
 
+int DefaultAction()
+{
+    if (TheSession.Current == View::CheckFailed && IsWindowVisible(Control(kIdCheckUpdates)) && IsWindowEnabled(Control(kIdCheckUpdates))) return kIdCheckUpdates;
+    for (int id : std::initializer_list<int>{kIdInstall, kIdReleasePage, kIdCheckUpdates, IDCANCEL})
+        if (IsWindowVisible(Control(id)) && IsWindowEnabled(Control(id))) return id;
+    return IDCANCEL;
+}
+
+
 void Layout()
 {
     Session& s = TheSession;
     if (s.LayingOut || !s.Window) return;
     s.LayingOut = true;
+    const HWND previousFocus = GetFocus();
+    const bool ownedFocus = previousFocus && IsChild(s.Window, previousFocus);
     const bool release = s.Current != View::Report && !s.Installing && !s.InstallStopped;
     const bool checked = s.Current == View::Newer || s.Current == View::UpToDate;
     const bool readingVisible = release && s.Reading.Content.Visible;
@@ -476,7 +487,7 @@ void Layout()
         GetMonitorInfoW(MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY), &monitor);
         const RECT& area = monitor.rcWork;
         const int fontLine = TextHeight(s.Font, L"Ag", 1000);
-        const int preferredWidth = (std::max)(Px(kind == 3 ? 560 : 720), fontLine * 32);
+        const int preferredWidth = (std::max)(Px(kind == 3 ? 560 : 700), fontLine * 32);
         const int preferredHeight = kind == 2 ? (std::max)(Px(600), fontLine * 18) : Px(kind == 3 ? 180 : 260);
         int width = (std::min)(preferredWidth, static_cast<int>(area.right - area.left) - Px(12));
         int height = (std::min)(preferredHeight, static_cast<int>(area.bottom - area.top) - Px(20));
@@ -488,49 +499,70 @@ void Layout()
         s.Placed = true;
     }
     RECT client{}; GetClientRect(s.Window, &client);
-    const int margin = Px(12), width = (std::max)(Px(100), static_cast<int>(client.right) - 2 * margin);
+    const int margin = Px(24), width = (std::max)(Px(100), static_cast<int>(client.right) - 2 * margin);
     const int line = TextHeight(s.Font, L"Ag", width), buttonHeight = (std::max)(Px(26), line + Px(10));
     int y = margin;
-    int headline = TextHeight(s.Bold, GetText(Control(kIdHeadline)), width);
+    int headline = TextHeight(s.Heading, GetText(Control(kIdHeadline)), width);
     Place(kIdHeadline, true, margin, y, width, headline); y += headline + Px(8);
-    Place(kIdInstalled, release, margin, y, width, line); if (release) y += line + Px(3);
-    Place(kIdLatest, release && checked && !s.Offline, margin, y, width, line);
-    if (release && checked && !s.Offline) y += line + Px(6);
-    // The notes list is offered only when there is a choice (latest and installed).
-    // With the installed release alone, the line above already names it; a greyed-out list read as
-    // broken.
+    const bool versions = release && checked && !s.Offline;
+    const int installedWidth = ButtonWidth(kIdInstalled), latestWidth = ButtonWidth(kIdLatest);
+    const bool inlineVersions = versions && installedWidth + latestWidth + Px(16) <= width;
+    Place(kIdInstalled, release, margin, y, inlineVersions ? installedWidth : width, line);
+    if (release && !inlineVersions) y += line + Px(3);
+    Place(kIdLatest, versions, inlineVersions ? margin + installedWidth + Px(16) : margin, y,
+        inlineVersions ? width - installedWidth - Px(16) : width, line);
+    if (versions || inlineVersions) y += line + Px(6);
     const bool notesChoice = SendMessageW(Control(kIdNotesVersion), CB_GETCOUNT, 0, 0) > 1;
-    const int gap = Px(8), labelWidth = ButtonWidth(kIdNotesLabel), checkWidth = ButtonWidth(kIdCheckUpdates);
-    const int notesWidth = notesChoice ? (std::max)(Px(180), ButtonWidth(kIdNotesVersion)) : 0;
-    const bool oneRow = labelWidth + notesWidth + checkWidth + 2 * gap <= width;
-    Place(kIdNotesLabel, release, margin, y + Px(5), oneRow ? labelWidth : width, line);
-    if (release && !oneRow) y += line + Px(6);
-    const int comboWidth = oneRow ? width - labelWidth - checkWidth - 2 * gap : width;
-    Place(kIdNotesVersion, release && notesChoice, oneRow ? margin + labelWidth + gap : margin, y, comboWidth, buttonHeight * 8);
-    if (release && notesChoice && !oneRow) y += buttonHeight + Px(6);
-    Place(kIdCheckUpdates, release, oneRow ? margin + width - checkWidth : margin, y, oneRow ? checkWidth : width, buttonHeight);
-    EnableWindow(Control(kIdCheckUpdates), s.Current != View::Checking && !s.Installing);
-    if (release) y += buttonHeight + Px(8);
+    const int gap = Px(8), labelWidth = ButtonWidth(kIdNotesLabel);
+    Place(kIdNotesLabel, release && notesChoice, margin, y + Px(5), labelWidth, line);
+    Place(kIdNotesVersion, release && notesChoice, margin + labelWidth + gap, y,
+        (std::max)(Px(80), width - labelWidth - gap), buttonHeight * 8);
+    if (release && notesChoice) y += buttonHeight + Px(8);
     bool status = !GetText(Control(kIdStatus)).empty();
     int statusHeight = status ? TextHeight(s.Font, GetText(Control(kIdStatus)), width) + Px(4) : 0;
-    const bool support = (release || (s.Current == View::Report && s.SuccessfulReport)) && s.SupportActions;
-    const int invitationHeight = support ? TextHeight(s.Font, T(IDS_SUP_INVITATION), width) + Px(8) : 0;
+    const bool support = release;
+    const bool active = s.Certificate.State == Sally::Supporter::Status::Active;
+    const bool future = s.Certificate.State == Sally::Supporter::Status::NotYetValid;
+    const int headingHeight = support ? TextHeight(s.Bold, GetText(Control(kIdBenefit)), width) + Px(6) : 0;
+    const int invitationHeight = support ? TextHeight(s.Font, GetText(Control(kIdInvitation)), width) + Px(10) : 0;
     const bool install = s.Current == View::Newer && !s.Offline;
-    const bool page = !(s.Current == View::Report && s.ReportPage.empty());
+    const bool page = release && !active && (install || s.Current == View::CheckFailed);
+    std::vector<int> links;
+    if (support && !active && !future) links.push_back(kIdSupport);
+    if (support && !active) links.push_back(kIdSupporter);
+    if (support && s.Certificate.Authentic()) links.push_back(kIdDetails);
+    std::vector<RECT> linkBounds;
+    int linkX = 0, linkY = 0, rowHeight = 0;
+    for (int id : links)
+    {
+        auto text = GetText(Control(id));
+        if (text.size() >= 7) text = text.substr(3, text.size() - 7);
+        for (size_t at = 0; (at = text.find(L"&amp;", at)) != std::wstring::npos; ++at) text.replace(at, 5, L"&");
+        HDC dc = GetDC(s.Window); auto old = SelectObject(dc, s.Font); SIZE extent{};
+        GetTextExtentPoint32W(dc, text.c_str(), static_cast<int>(text.size()), &extent);
+        SelectObject(dc, old); ReleaseDC(s.Window, dc);
+        const int linkWidth = (std::min)(width, static_cast<int>(extent.cx) + Px(4));
+        if (linkX && linkX + linkWidth > width) { linkX = 0; linkY += rowHeight + Px(6); rowHeight = 0; }
+        SIZE ideal{}; SendMessageW(Control(id), LM_GETIDEALSIZE, linkWidth, reinterpret_cast<LPARAM>(&ideal));
+        const int linkHeight = (std::max)(line + Px(4), static_cast<int>(ideal.cy));
+        linkBounds.push_back({linkX, linkY, linkWidth, linkHeight});
+        linkX += linkWidth + Px(16); rowHeight = (std::max)(rowHeight, linkHeight);
+    }
+    const int linksHeight = links.empty() ? 0 : linkY + rowHeight + Px(12);
     std::vector<int> footer;
     if (install) footer.push_back(kIdInstall);
     if (page) footer.push_back(kIdReleasePage);
+    if (release && s.Current != View::Checking && !install)
+    {
+        SetText(kIdCheckUpdates, T(s.Current == View::CheckFailed ? IDS_SUP_TRY_AGAIN : IDS_SUP_CHECK_UPDATES));
+        footer.insert(footer.begin(), kIdCheckUpdates);
+    }
     footer.push_back(IDCANCEL);
     int footerWidth = Px(8) * static_cast<int>(footer.size() - 1);
     for (int id : footer) footerWidth += ButtonWidth(id);
     const bool footerFits = footerWidth <= width;
     const int footerRows = footerFits ? 1 : static_cast<int>(footer.size());
-    // Support Sally starts the button row, left of the other buttons, when the row has room for it;
-    // only a narrow window gives it a row of its own.
-    const int supportWidth = (std::min)(ButtonWidth(kIdSupport), width);
-    const bool supportInFooter = support && footerFits && supportWidth + Px(16) + footerWidth <= width;
-    const int supportRows = support && !supportInFooter ? 1 : 0;
-    int reserved = invitationHeight + statusHeight + (supportRows + footerRows) * (buttonHeight + Px(6)) + margin;
+    int reserved = headingHeight + invitationHeight + linksHeight + statusHeight + footerRows * (buttonHeight + Px(6)) + margin;
     // State/text changes can add rows without changing the reading-surface kind.
     // Measure those rows before placing the content and footer, also after a resize.
     RECT outer{}; GetWindowRect(s.Window, &outer);
@@ -540,7 +572,10 @@ void Layout()
     const int needed = y + reserved + Px(6) + (readingVisible ? (std::max)(Px(80), line * 3) : 0) + chrome;
     const int minimum = (std::min)(needed, static_cast<int>(monitor.rcWork.bottom - monitor.rcWork.top) - Px(20));
     s.MinimumHeight = MulDiv(minimum, 96, s.Dpi);
-    const int height = contentSizeChanged && (kind == 1 || kind == 3) ? minimum
+    const int readingBaseline = (std::max)(Px(207), line * 8);
+    const int preferred = (std::min)(y + reserved + Px(6) + readingBaseline + chrome,
+        static_cast<int>(monitor.rcWork.bottom - monitor.rcWork.top) - Px(20));
+    const int height = contentSizeChanged ? (kind == 2 ? (std::max)(minimum, preferred) : minimum)
                        : (std::max)(minimum, static_cast<int>(outer.bottom - outer.top));
     if (height != outer.bottom - outer.top)
     {
@@ -552,30 +587,32 @@ void Layout()
     Place(kIdNotes, readingVisible, margin, y, width, reading);
     if (readingVisible) y += reading + Px(6);
     Place(kIdStatus, status, margin, y, width, statusHeight); y += statusHeight;
-    Place(kIdInvitation, support, margin, y, width, invitationHeight > 0 ? invitationHeight - Px(8) : 0);
-    y += invitationHeight;
-    Place(kIdSupport, support, margin, y, supportWidth, buttonHeight); // on the button row below when it fits
-    ShowWindow(Control(kIdSupporter), SW_HIDE);
-    y += supportRows * (buttonHeight + Px(6));
-    const int footerIds[] = {kIdInstall, kIdReleasePage, IDCANCEL};
-    for (int id : footerIds)
+    Place(kIdBenefit, support, margin, y, width, headingHeight); y += headingHeight;
+    Place(kIdInvitation, support, margin, y, width, invitationHeight); y += invitationHeight;
+    for (int id : {kIdSupport, kIdSupporter, kIdDetails}) ShowWindow(Control(id), SW_HIDE);
+    for (size_t i = 0; i < links.size(); ++i)
+    {
+        const auto& bounds = linkBounds[i];
+        Place(links[i], true, margin + bounds.left, y + bounds.top, bounds.right, bounds.bottom);
+    }
+    y += linksHeight;
+    for (int id : std::initializer_list<int>{kIdInstall, kIdReleasePage, kIdCheckUpdates, IDCANCEL})
         if (std::find(footer.begin(), footer.end(), id) == footer.end()) ShowWindow(Control(id), SW_HIDE);
-    const int columns = static_cast<int>(footer.size());
     int footerX = footerFits ? margin + width - footerWidth : margin;
-    for (int i = 0; i < columns; ++i)
+    for (size_t i = 0; i < footer.size(); ++i)
     {
         const int buttonWidth = footerFits ? ButtonWidth(footer[i]) : width;
         Place(footer[i], true, footerFits ? footerX : margin,
-            footerFits ? y : y + i * (buttonHeight + Px(6)), buttonWidth, buttonHeight);
+            footerFits ? y : y + static_cast<int>(i) * (buttonHeight + Px(6)), buttonWidth, buttonHeight);
         footerX += buttonWidth + Px(8);
     }
-    if (supportInFooter) // same row and top as the other buttons, at the left margin
-        Place(kIdSupport, true, margin, y, supportWidth, buttonHeight);
-    EnableWindow(Control(kIdInstall), install && s.Release.CanInstall && !s.Installing);
-    int defaultId = install && s.Release.CanInstall && !s.Installing ? kIdInstall : IDCANCEL;
-    SendMessageW(Control(kIdInstall), BM_SETSTYLE, defaultId == kIdInstall ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON, TRUE);
-    SendMessageW(Control(IDCANCEL), BM_SETSTYLE, defaultId == IDCANCEL ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON, TRUE);
+    EnableWindow(Control(kIdInstall), install && s.Access.Allowed() && !s.Installing);
+    const int defaultId = s.Current == View::CheckFailed ? kIdCheckUpdates : install && s.Access.Allowed() ? kIdInstall : page ? kIdReleasePage :
+        release && s.Current != View::Checking ? kIdCheckUpdates : IDCANCEL;
+    for (int id : std::initializer_list<int>{kIdInstall, kIdReleasePage, kIdCheckUpdates, IDCANCEL})
+        SendMessageW(Control(id), BM_SETSTYLE, id == defaultId ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON, TRUE);
     s.LayingOut = false;
+    if (ownedFocus && (!IsWindowVisible(previousFocus) || !IsWindowEnabled(previousFocus))) SetFocus(Control(DefaultAction()));
     RedrawWindow(s.Window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 }
 
@@ -595,7 +632,9 @@ void Render(const ReadingDisplay& previous, const ReadingDisplay& current)
     SendMessageW(control, EM_SETTEXTEX, reinterpret_cast<WPARAM>(&set), reinterpret_cast<LPARAM>(display.Text.c_str()));
     CHARFORMAT2W format{}; format.cbSize = sizeof(format);
     format.dwMask = CFM_BOLD | CFM_ITALIC | CFM_LINK | CFM_COLOR | CFM_FACE | CFM_SIZE;
-    format.crTextColor = GetSysColor(COLOR_WINDOWTEXT);
+    PluginDarkModeColors colors{}; const bool dark = PluginDarkMode_GetColors(&colors);
+    SendMessageW(control, EM_SETBKGNDCOLOR, 0, dark ? colors.InputBackground : GetSysColor(COLOR_WINDOW));
+    format.crTextColor = dark ? colors.InputText : GetSysColor(COLOR_WINDOWTEXT);
     LOGFONTW font{}; GetObjectW(TheSession.Font, sizeof(font), &font);
     format.yHeight = MulDiv(font.lfHeight < 0 ? -font.lfHeight : font.lfHeight, 1440, TheSession.Dpi);
     wcscpy_s(format.szFaceName, font.lfFaceName);
@@ -608,7 +647,7 @@ void Render(const ReadingDisplay& previous, const ReadingDisplay& current)
         CHARFORMAT2W style = format;
         style.dwEffects = (run.Bold ? CFE_BOLD : 0) | (run.Italic ? CFE_ITALIC : 0) | (!run.Link.empty() ? CFE_LINK : 0);
         if (run.Code) wcscpy_s(style.szFaceName, L"Consolas");
-        if (!run.Link.empty()) style.crTextColor = GetSysColor(COLOR_HOTLIGHT);
+        if (!run.Link.empty()) style.crTextColor = PluginDarkMode_GetLinkColor();
         SendMessageW(control, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&style));
     }
     selection.cpMin = static_cast<LONG>(RemapReadingPosition(previous, current, (std::max)(0L, selection.cpMin)));
@@ -629,8 +668,42 @@ void RefreshSupportState()
     const uint64_t now = Sally::Supporter::NowUtc();
     auto preferences = Sally::Supporter::ReadSupporterState(s.Profile, *GetWin32Registry());
     auto certificate = Sally::Supporter::VerifyCertificate(preferences.Token, now, Sally::Supporter::BuiltinPublicKeys());
-    s.SupportActions = certificate.State != Sally::Supporter::Status::Active && certificate.State != Sally::Supporter::Status::NotYetValid;
-    SetText(kIdSupporter, T(IDS_SUP_ENTER));
+    if (s.Certificate.State != certificate.State) s.LayoutKind = -1;
+    s.Certificate = certificate;
+    s.Access = EvaluateUpdateAccess(certificate, now, s.Release.UpdateAvailable, s.Release.CanInstall);
+    const bool active = certificate.State == Sally::Supporter::Status::Active;
+    UINT heading = active ? IDS_SUP_AUTO_ACTIVE : certificate.State == Sally::Supporter::Status::Expired ? IDS_SUP_AUTO_RENEW_TITLE : IDS_SUP_AUTO_TITLE;
+    UINT explanation = certificate.State == Sally::Supporter::Status::Expired ? IDS_SUP_AUTO_EXPIRED_HINT :
+        certificate.State == Sally::Supporter::Status::NotYetValid ? IDS_SUP_AUTO_FUTURE_HINT :
+        certificate.State == Sally::Supporter::Status::Invalid ? IDS_SUP_AUTO_INVALID_HINT : IDS_SUP_AUTO_HINT;
+    auto title = T(heading), hint = T(explanation);
+    if (certificate.State == Sally::Supporter::Status::NotYetValid)
+    {
+        title = T(IDS_SUP_AUTO_START); title.replace(title.find(L"%s"), 2, Sally::Supporter::SupporterUtcDate(certificate.ValidFrom));
+    }
+    if (active)
+    {
+        hint = T(IDS_SUP_AUTO_END); hint.replace(hint.find(L"%s"), 2, Sally::Supporter::SupporterUtcDate(certificate.ValidUntil));
+    }
+    SetText(kIdBenefit, title); SetText(kIdInvitation, hint);
+    // Expose the same unavailable reason to assistive technology as to sighted users.
+    const HRESULT initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    IAccPropServices* accessibility = nullptr;
+    if (SUCCEEDED(CoCreateInstance(CLSID_AccPropServices, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&accessibility))))
+    {
+        const auto description = active && !s.Release.CanInstall && s.Release.UpdateAvailable ? Text(IDS_UPDATER_NOT_INSTALLABLE) : title + L" " + hint;
+        accessibility->SetHwndPropStr(Control(kIdInstall), OBJID_CLIENT, CHILDID_SELF, PROPID_ACC_DESCRIPTION, description.c_str());
+        accessibility->Release();
+    }
+    if (SUCCEEDED(initialized)) CoUninitialize();
+    auto link = [&](int id, UINT resource) {
+        auto label = T(resource);
+        for (size_t at = 0; (at = label.find(L'&', at)) != std::wstring::npos; at += 5) label.replace(at, 1, L"&amp;");
+        SetText(id, L"<a>" + label + L"</a>");
+    };
+    link(kIdSupport, certificate.State == Sally::Supporter::Status::Expired ? IDS_SUP_AUTO_RENEW : IDS_SUP_AUTO_SUPPORT);
+    link(kIdSupporter, IDS_SUP_ENTER); link(kIdDetails, IDS_SUP_DETAILS);
+    SetText(kIdReleasePage, T(IDS_SUP_DOWNLOAD_MANUAL));
     s.NextContentTime = 0;
     auto boundary = [&](uint64_t value) { if (value > now && (!s.NextContentTime || value < s.NextContentTime)) s.NextContentTime = value; };
     boundary(certificate.ValidFrom); boundary(certificate.ValidUntil);
@@ -733,9 +806,11 @@ void ShowRelease()
 {
     Session& s = TheSession;
     const ReleaseCheckResult& release = s.Release;
+    const bool initialDefault = GetFocus() == Control(IDCANCEL) || GetFocus() == Control(kIdCheckUpdates);
     s.Current = release.UpdateAvailable ? View::Newer : View::UpToDate;
     s.InstallStopped = false;
-    SetText(kIdHeadline, Text(release.UpdateAvailable ? IDS_UPDATER_NEWER : IDS_UPDATER_LATEST));
+    s.LayoutKind = -1;
+    SetText(kIdHeadline, release.UpdateAvailable ? Text(IDS_UPDATER_NEWER, PlainVersion(release.LatestVersion).c_str()) : Text(IDS_UPDATER_LATEST));
     SetText(kIdInstalled, Text(IDS_UPDATER_INSTALLED_VERSION, s.InstalledVersion.c_str()));
     SetText(kIdLatest, Text(IDS_UPDATER_RELEASE_VERSION, PlainVersion(release.LatestVersion).c_str()));
     s.NotesChoice.CompleteCheck(release.UpdateAvailable);
@@ -751,6 +826,7 @@ void ShowRelease()
     EnableWindow(Control(kIdNotesVersion), release.UpdateAvailable);
     SetStatus(release.UpdateAvailable && !release.CanInstall ? Text(IDS_UPDATER_NOT_INSTALLABLE) : std::wstring());
     RefreshContent();
+    if (initialDefault) SetFocus(Control(DefaultAction()));
     if (!s.Content)
     {
         s.Content = std::make_shared<DisplayContentSession>();
@@ -763,9 +839,11 @@ void ShowRelease()
 void ShowCheckFailure()
 {
     Session& s = TheSession;
+    const bool initialDefault = GetFocus() == Control(IDCANCEL) || GetFocus() == Control(kIdCheckUpdates);
     s.Current = View::CheckFailed;
     SetText(kIdHeadline, Text(IDS_UPDATER_CHECK_FAILED, FailureText(s.CheckFailure).c_str()));
     RefreshContent();
+    if (initialDefault) SetFocus(Control(DefaultAction()));
 }
 
 void BeginCheck()
@@ -799,16 +877,18 @@ void BeginCheck()
 void StartInstall()
 {
     Session& s = TheSession;
-    if (s.Installing || !s.Release.CanInstall)
-        return;
+    if (s.Installing || s.Current != View::Newer || s.Offline) return;
+    s.Attempt = ManagedUpdateAttempt::AcceptForProfile(*GetWin32Registry(), s.Profile, Sally::Supporter::NowUtc(),
+        Sally::Supporter::BuiltinPublicKeys(), s.Release, s.InstallRoot, Widen(GetPlatformLabel(BuildPlatform())));
+    if (!s.Attempt) { RefreshContent(); return; }
     s.WorkFolder = UpdateWorkFolder();
     if (s.WorkFolder.empty())
     {
         SetStatus(Text(IDS_UPDATER_STOPPED, L"%LOCALAPPDATA%"));
         return;
     }
-    s.Version = PlainVersion(s.Release.LatestVersion);
-    s.Arch = Widen(GetPlatformLabel(BuildPlatform()));
+    s.Version = PlainVersion(s.Attempt->Release.LatestVersion);
+    s.Arch = s.Attempt->Arch;
     s.Staging = StagingFolderFor(s.WorkFolder, s.Version, s.Arch);
     s.Cancel = false;
     s.Installing = true;
@@ -816,8 +896,11 @@ void StartInstall()
     if (s.Content) s.Content->Cancel = true;
     SetStatus(Text(IDS_UPDATER_DOWNLOADING, Widen(s.Release.PrimaryAssetName).c_str()));
     Layout();
-    if (!StartWorker(InstallWorker))
+    auto work = std::make_unique<InstallWork>(InstallWork{s.Attempt, s.Staging, s.Version, s.Window});
+    if (StartWorker(InstallWorker, work.get())) work.release();
+    else
     {
+        s.Attempt->Cancel();
         s.Installing = false;
         s.InstallStopped = true;
         SetStatus(Text(IDS_UPDATER_STOPPED, SystemErrorText(GetLastError()).c_str()));
@@ -829,6 +912,10 @@ void StartInstall()
 void FinishInstall(bool prepared)
 {
     Session& s = TheSession;
+    const auto accepted = s.Attempt;
+    const HWND owner = s.Window;
+    auto live = [&] { return !s.Cancel && s.Installing && s.Attempt == accepted && accepted && s.Profile == accepted->Profile && s.InstallRoot == accepted->InstallRoot && s.Window == owner && IsWindow(owner); };
+    if (!live()) return;
     auto stop = [&](const std::wstring& status) {
         s.Installing = false;
         s.InstallStopped = true;
@@ -859,6 +946,8 @@ void FinishInstall(bool prepared)
             return;
         }
     }
+    // Modal confirmation pumps messages: closure/cancellation wins over its eventual answer.
+    if (!live()) return;
     UpdaterCommand apply;
     apply.Mode = UpdaterMode::Apply;
     apply.Staging = s.Staging;
@@ -889,19 +978,23 @@ void ApplyAppearance(const Sally::Appearance::Snapshot& value)
     HFONT normal = CreateFontIndirectW(&font);
     font.lfWeight = FW_BOLD;
     HFONT bold = CreateFontIndirectW(&font);
-    if (!normal || !bold) { if (normal) DeleteObject(normal); if (bold) DeleteObject(bold); return; }
-    HFONT old = s.Font, oldBold = s.Bold;
-    s.Font = normal; s.Bold = bold;
+    font.lfHeight = MulDiv(font.lfHeight, 18, 13);
+    HFONT heading = CreateFontIndirectW(&font);
+    if (!normal || !bold || !heading) { if (normal) DeleteObject(normal); if (bold) DeleteObject(bold); if (heading) DeleteObject(heading); return; }
+    HFONT old = s.Font, oldBold = s.Bold, oldHeading = s.Heading;
+    s.Font = normal; s.Bold = bold; s.Heading = heading;
     EnumChildWindows(s.Window, [](HWND child, LPARAM) -> BOOL
     {
         SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(
-            GetDlgCtrlID(child) == kIdHeadline ? TheSession.Bold : TheSession.Font), TRUE);
+            GetDlgCtrlID(child) == kIdHeadline ? TheSession.Heading : GetDlgCtrlID(child) == kIdBenefit ? TheSession.Bold : TheSession.Font), TRUE);
         return TRUE;
     }, 0);
     // Render preserves reading selection/scroll and reapplies rich-text font runs.
     Render(s.Reading, s.Reading);
     if (old) DeleteObject(old);
     if (oldBold) DeleteObject(oldBold);
+    if (oldHeading) DeleteObject(oldHeading);
+    PluginDarkMode_ApplyTitleBar(s.Window); PluginDarkMode_ApplyListTreeThemeRecursive(s.Window);
     s.LayoutKind = -1;
     Layout();
 }
@@ -930,6 +1023,20 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
         break;
     }
+    case WM_DPICHANGED:
+    {
+        s.Dpi = HIWORD(wParam);
+        const auto bounds = reinterpret_cast<RECT*>(lParam);
+        SetWindowPos(window, nullptr, bounds->left, bounds->top, bounds->right - bounds->left, bounds->bottom - bounds->top, SWP_NOZORDER | SWP_NOACTIVATE);
+        ApplyAppearance(s.Appearance); return 0;
+    }
+    case WM_SETTINGCHANGE:
+        PluginDarkMode_OnSettingChange(lParam);
+        [[fallthrough]];
+    case WM_SYSCOLORCHANGE:
+    case WM_THEMECHANGED:
+        PluginDarkMode_ApplyTitleBar(window); PluginDarkMode_ApplyListTreeThemeRecursive(window);
+        Render(s.Reading, s.Reading); Layout(); return 0;
     case WM_SIZE:
         if (s.Placed) Layout();
         return 0;
@@ -952,6 +1059,14 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     case WM_NOTIFY:
     {
         auto header = reinterpret_cast<NMHDR*>(lParam);
+        if (header && header->code == NM_CUSTOMDRAW && (header->idFrom == kIdSupport || header->idFrom == kIdSupporter || header->idFrom == kIdDetails)) return PluginDarkMode_DrawLink(lParam);
+        if (header && (header->code == NM_CLICK || header->code == NM_RETURN) &&
+            (header->idFrom == kIdSupport || header->idFrom == kIdSupporter || header->idFrom == kIdDetails))
+        {
+            SendMessageW(window, WM_COMMAND, header->idFrom, 0);
+            SetFocus(Control(DefaultAction()));
+            return 0;
+        }
         if (header && header->code == EN_LINK)
         {
             auto link = reinterpret_cast<ENLINK*>(lParam);
@@ -970,11 +1085,12 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         switch (LOWORD(wParam))
         {
         case kIdSupport:
-            Sally::Supporter::ShowSupportHub(window, Language, s.Profile, *GetWin32Registry());
+            Sally::Supporter::OpenSupportPage(window);
             if (s.Current == View::Report) { RefreshSupportState(); Layout(); } else RefreshContent();
             return 0;
+        case kIdDetails:
         case kIdSupporter:
-            Sally::Supporter::ShowSupporterDialog(window, Language, s.Profile, *GetWin32Registry(), true);
+            Sally::Supporter::ShowSupporterDialog(window, Language, s.Profile, *GetWin32Registry(), LOWORD(wParam) == kIdSupporter);
             if (s.Current == View::Report) { RefreshSupportState(); s.LayoutKind = -1; Layout(); } else RefreshContent();
             return 0;
         case kIdCheckUpdates:
@@ -998,8 +1114,9 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             if (s.Current == View::Report)
                 OpenPage(s.ReportPage);
             else
-                OpenPage(s.NotesChoice.IsInstalled() ? std::wstring(kReleasesPage) + L"/tag/v" + s.InstalledVersion
-                    : (Widen(s.Release.ReleasePageUrl).empty() ? kReleasesPage : Widen(s.Release.ReleasePageUrl)));
+                // The free update path always targets the offered release, even while
+                // the reading selector is showing installed-version notes.
+                OpenPage(Widen(s.Release.ReleasePageUrl).empty() ? kReleasesPage : Widen(s.Release.ReleasePageUrl));
             return 0;
         case IDCANCEL:
             SendMessageW(window, WM_CLOSE, 0, 0);
@@ -1007,9 +1124,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
         break;
     case DM_GETDEFID:
-        return MAKELRESULT(IsWindowVisible(Control(kIdInstall)) && IsWindowEnabled(Control(kIdInstall)) ? kIdInstall
-                                                                                                           : IDCANCEL,
-                           DC_HASDEFID);
+        return MAKELRESULT(DefaultAction(), DC_HASDEFID);
     case WM_APP_CHECKED:
         if (wParam)
             ShowRelease();
@@ -1032,9 +1147,23 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             SetStatus(Text(IDS_UPDATER_PREPARING, s.Version.c_str()));
         return 0;
     case WM_APP_PREPARED:
-        FinishInstall(wParam != FALSE);
+    {
+        ManagedUpdateResult result;
+        if (s.Installing && s.Attempt && s.Attempt->TakeCompletion(static_cast<uint64_t>(wParam), result))
+        {
+            s.InstallError = std::move(result.Error);
+            FinishInstall(result.Prepared);
+        }
         return 0;
+    }
+    case WM_ERASEBKGND:
+    { RECT bounds{}; GetClientRect(window, &bounds); if (PluginDarkMode_FillDialogBackground(reinterpret_cast<HDC>(wParam), &bounds)) return TRUE; break; }
+    case WM_CTLCOLORBTN:
+    case WM_CTLCOLOREDIT:
+    case WM_CTLCOLORLISTBOX:
+    { auto brush = PluginDarkMode_GetDialogCtlColorBrush(message, reinterpret_cast<HDC>(wParam), reinterpret_cast<HWND>(lParam)); if (brush) return reinterpret_cast<LRESULT>(brush); break; }
     case WM_CTLCOLORSTATIC:
+        if (auto brush = PluginDarkMode_GetDialogCtlColorBrush(message, reinterpret_cast<HDC>(wParam), reinterpret_cast<HWND>(lParam))) return reinterpret_cast<LRESULT>(brush);
         if (reinterpret_cast<HWND>(lParam) == Control(kIdNotes))
         {
             SetBkColor(reinterpret_cast<HDC>(wParam), GetSysColor(COLOR_WINDOW));
@@ -1044,6 +1173,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         break;
     case WM_CLOSE:
         if (s.Content) s.Content->Cancel = true;
+        if (s.Attempt) s.Attempt->Cancel();
         s.Cancel = true; // a download or check under way stops at its next read
         DestroyWindow(window);
         return 0;
@@ -1067,6 +1197,8 @@ HWND AddControl(const wchar_t* className, int id, DWORD style, DWORD exStyle, co
 
 bool CreateUpdateWindow()
 {
+    INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES | ICC_LINK_CLASS};
+    if (!InitCommonControlsEx(&controls)) return false;
     Session& s = TheSession;
     WNDCLASSEXW windowClass = {sizeof(windowClass)};
     windowClass.lpfnWndProc = WindowProc;
@@ -1082,12 +1214,14 @@ bool CreateUpdateWindow()
     s.Dpi = GetDeviceCaps(screen, LOGPIXELSY);
     ReleaseDC(NULL, screen);
     if (s.Profile.empty()) s.Profile = Sally::Supporter::ResolveProfileRoot();
+    PluginDarkMode_SetProfileRoot(s.Profile.c_str()); PluginDarkMode_Initialize();
     s.Appearance = Sally::Appearance::Read(s.Profile, s.InstallRoot, *GetWin32Registry());
     LOGFONTW font = Sally::Appearance::FontForDpi(s.Appearance, s.Dpi);
     s.Font = CreateFontIndirectW(&font);
     LOGFONTW bold = font;
     bold.lfWeight = FW_BOLD;
     s.Bold = CreateFontIndirectW(&bold);
+    bold.lfHeight = MulDiv(bold.lfHeight, 18, 13); s.Heading = CreateFontIndirectW(&bold);
 
     s.Window = CreateWindowExW(WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT, WindowClass.c_str(), Text(IDS_UPDATER_TITLE).c_str(),
                                WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT,
@@ -1096,7 +1230,7 @@ bool CreateUpdateWindow()
         return false;
     Sally::Appearance::SetWindowIcon(s.Window, GetModuleHandleW(nullptr), s.Appearance.Icon);
     const DWORD label = SS_LEFT | SS_NOPREFIX;
-    AddControl(L"STATIC", kIdHeadline, label, 0, std::wstring(), s.Bold);
+    AddControl(L"STATIC", kIdHeadline, label, 0, std::wstring(), s.Heading);
     AddControl(L"STATIC", kIdInstalled, label, 0, std::wstring(), s.Font);
     AddControl(L"STATIC", kIdLatest, label, 0, std::wstring(), s.Font);
     LoadLibraryW(L"Msftedit.dll"); // OS Rich Edit stays loaded for the process lifetime
@@ -1108,8 +1242,11 @@ bool CreateUpdateWindow()
     SendMessageW(Control(kIdNotes), EM_SETLIMITTEXT, ReadingTextLimit, 0);
     if (!SetWindowSubclass(Control(kIdNotes), ContentWindowProc, 1, 0)) return false;
     AddControl(L"STATIC", kIdInvitation, label, 0, T(IDS_SUP_INVITATION), s.Font);
-    AddControl(L"BUTTON", kIdSupport, WS_TABSTOP, 0, T(IDS_SUP_SUPPORT), s.Font);
-    AddControl(L"BUTTON", kIdSupporter, WS_TABSTOP, 0, T(IDS_SUP_ENTER), s.Font);
+    AddControl(L"STATIC", kIdBenefit, label, 0, std::wstring(), s.Bold);
+    AddControl(WC_LINK, kIdSupport, WS_TABSTOP, 0, std::wstring(), s.Font);
+    AddControl(WC_LINK, kIdSupporter, WS_TABSTOP, 0, std::wstring(), s.Font);
+    AddControl(WC_LINK, kIdDetails, WS_TABSTOP, 0, std::wstring(), s.Font);
+    if (!Control(kIdSupport) || !Control(kIdSupporter) || !Control(kIdDetails)) { DestroyWindow(s.Window); s.Window = nullptr; return false; }
     AddControl(L"STATIC", kIdNotesLabel, label, 0, T(IDS_SUP_RELEASE_NOTES), s.Font);
     AddControl(WC_COMBOBOXW, kIdNotesVersion, WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, 0, L"", s.Font);
     AddControl(L"BUTTON", kIdCheckUpdates, WS_TABSTOP, 0, T(s.Offline ? IDS_SUP_CHECK_UPDATES : IDS_SUP_RECHECK), s.Font);
@@ -1118,6 +1255,7 @@ bool CreateUpdateWindow()
     AddControl(L"BUTTON", kIdReleasePage, WS_TABSTOP | BS_PUSHBUTTON, 0, Text(IDS_UPDATER_RELEASE_PAGE_BUTTON),
                s.Font);
     AddControl(L"BUTTON", IDCANCEL, WS_TABSTOP | BS_PUSHBUTTON, 0, Text(IDS_UPDATER_CLOSE_BUTTON), s.Font);
+    PluginDarkMode_ApplyTitleBar(s.Window); PluginDarkMode_ApplyListTreeThemeRecursive(s.Window);
     // Date boundaries apply equally to offline bundled and online content.
     SetTimer(s.Window, 1, 1000, nullptr);
     // Request after initialization, when the normal message loop can receive the reply.
@@ -1132,8 +1270,7 @@ void ShowUpdateWindow(bool activate)
     {
         ShowWindow(s.Window, SW_SHOWNORMAL);
         SetForegroundWindow(s.Window);
-        SetFocus(Control(IsWindowEnabled(Control(kIdInstall)) && IsWindowVisible(Control(kIdInstall)) ? kIdInstall
-                                                                                                         : IDCANCEL));
+        SetFocus(Control(DefaultAction()));
     }
     else
     {

@@ -135,7 +135,7 @@ public:
 
     const CMenuPopup* GetMenuPopup() { return MenuPopup; }
 
-    BOOL Track();
+    BOOL Track(const RECT* menuOpener = NULL);
 
     // loads buttons to the toolbar; their IDs are controlled by 'bar2' if FALSE, they will be from
     // CM_DRIVEBAR_MIN, otherwise from CM_DRIVEBAR2_MIN

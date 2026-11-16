@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "supporter/Win32SupporterUi.h"
 #include "SallyUrls.h"
+#include "ApplicationAppearance.h"
+#include "plugins/shared/plugindarkmode.h"
 #include "Win32TextCodec.h"
 #include "ExtendedLengthPath.h"
 #include <commctrl.h>
@@ -47,23 +49,7 @@ namespace Sally::Supporter
             }
             return data < end && data + 1 + *data <= end ? std::wstring(data + 1, *data) : std::wstring();
         }
-        std::wstring Date(uint64_t seconds)
-        {
-            ULARGE_INTEGER value;
-            value.QuadPart = (seconds + 11644473600ULL) * 10000000ULL;
-            FILETIME file = {value.LowPart, value.HighPart};
-            SYSTEMTIME utc{};
-            if (!FileTimeToSystemTime(&file, &utc))
-                return {};
-            int required = GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, DATE_SHORTDATE, &utc, nullptr, nullptr, 0, nullptr);
-            if (!required)
-                return {};
-            std::wstring result(required, L'\0');
-            if (!GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, DATE_SHORTDATE, &utc, nullptr, result.data(), required, nullptr))
-                return {};
-            result.resize(required - 1);
-            return result;
-        }
+        std::wstring Date(uint64_t seconds) { return SupporterUtcDate(seconds); }
         std::wstring WindowText(HWND window)
         {
             int length = GetWindowTextLengthW(window);
@@ -113,11 +99,11 @@ namespace Sally::Supporter
         {
             Input = 1001, Preview = 1002, Import = 1004, Save = 1005, Title = 1006,
             Export = 1007, Remove = 1008, Replace = 1014,
-            PasteLabel, StatusLabel, DateLabels, DateValues, LocalName, Hint, PreviewBox, ImportHint
+            PasteLabel, StatusLabel, DateLabels, DateValues, LocalName, Hint, PreviewBox, ImportHint, DateEndLabel, DateEndValue, DetailsHint, SupportLink
         };
         struct Dialog
         {
-            HWND Window = nullptr, KeyActionsTip = nullptr;
+            HWND Window = nullptr, Body = nullptr, KeyActionsTip = nullptr;
             std::wstring KeyActionsHint;
             LANGID Language = 0x409;
             std::wstring Profile;
@@ -125,11 +111,12 @@ namespace Sally::Supporter
             Preferences Original;
             Certificate Candidate;
             bool Entry = false, Changed = false, Ready = false;
-            int Dpi = 96, MinimumClientHeight = 0;
+            int Dpi = 96, MinimumClientHeight = 0, ScrollOffset = 0;
             HFONT Font = nullptr, NameFont = nullptr;
+            Appearance::Snapshot Appearance;
             std::wstring T(UINT id) const { return SupporterText(id, Language); }
             int Px(int n) const { return MulDiv(n, Dpi, 96); }
-            HWND Item(int id) const { return GetDlgItem(Window, id); }
+            HWND Item(int id) const { HWND child = Body ? GetDlgItem(Body, id) : nullptr; return child ? child : GetDlgItem(Window, id); }
             void Text(int id, const std::wstring& value) { SetWindowTextW(Item(id), value.c_str()); }
             int Height(const std::wstring& value, int width, HFONT font = nullptr) const
             {
@@ -157,11 +144,15 @@ namespace Sally::Supporter
             {
                 if (!Ready) return;
                 RECT client{}; GetClientRect(Window, &client);
-                const int margin = Px(20), gap = Px(10), width = (std::max)(Px(100), static_cast<int>(client.right) - 2 * margin);
+                const int margin = Px(20), gap = Px(10);
+                const int width = (std::max)(Px(100), static_cast<int>(client.right) - 2 * margin - GetSystemMetrics(SM_CXVSCROLL));
                 const int line = Height(L"Ag", width), button = (std::max)(Px(28), line + Px(10));
                 const int cancelWidth = ButtonWidth(IDCANCEL) + (Entry ? 0 : Px(22));
-                const int footer = client.bottom - margin - button;
-                Place(IDCANCEL, true, client.right - margin - cancelWidth, footer, cancelWidth, button);
+                const int supportWidth = (std::max)(Px(40), width - cancelWidth - gap);
+                SIZE linkSize{}; if (!Entry) SendMessageW(Item(SupportLink), LM_GETIDEALSIZE, supportWidth, reinterpret_cast<LPARAM>(&linkSize));
+                const int footerHeight = (std::max)(button, static_cast<int>(linkSize.cy) + (Entry ? 0 : Px(4)));
+                const int footer = client.bottom - margin - footerHeight;
+                Place(IDCANCEL, true, client.right - margin - cancelWidth, client.bottom - margin - button, cancelWidth, button);
                 if (Entry)
                 {
                     const int saveWidth = ButtonWidth(Save);
@@ -175,24 +166,31 @@ namespace Sally::Supporter
                     tool.rect.left = tool.rect.right - Px(22);
                     SendMessageW(KeyActionsTip, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&tool));
                 }
-                int y = margin;
+                SetWindowPos(Body, nullptr, 0, 0, client.right, (std::max)(1, footer - Px(8)), SWP_NOZORDER | SWP_NOACTIVATE);
+                int y = margin - ScrollOffset;
                 const bool authentic = Candidate.Authentic();
                 const int nameHeight = authentic ? Height(Wide(Candidate.Holder), width - Px(24), NameFont) : 0;
                 const int statusHeight = authentic ? Height(WindowText(Item(StatusLabel)), width - Px(24)) : 0;
                 const int datesWidth = width - Px(24);
                 const int dateLabelWidth = (std::min)(Px(150), datesWidth / 2);
-                const int datesHeight = authentic ? (std::max)(Height(WindowText(Item(DateLabels)), dateLabelWidth), Height(WindowText(Item(DateValues)), datesWidth - dateLabelWidth - gap)) : 0;
+                const int startHeight = authentic ? (std::max)(Height(WindowText(Item(DateLabels)), dateLabelWidth), Height(WindowText(Item(DateValues)), datesWidth - dateLabelWidth - gap)) : 0;
+                const int endHeight = authentic ? (std::max)(Height(WindowText(Item(DateEndLabel)), dateLabelWidth), Height(WindowText(Item(DateEndValue)), datesWidth - dateLabelWidth - gap)) : 0;
+                const int datesHeight = startHeight + endHeight + (authentic ? Px(6) : 0);
                 if (Entry)
                 {
                     const int labelHeight = Height(T(IDS_SUP_PASTE), width);
                     Place(PasteLabel, true, margin, y, width, labelHeight); y += labelHeight + Px(8);
-                    const int previewHeight = authentic ? nameHeight + statusHeight + datesHeight + Px(32) : Px(72);
+                    const int previewHeight = authentic ? nameHeight + statusHeight + datesHeight + Px(44) : Px(72);
                     const int inputHeight = (std::max)(Px(46), (std::min)(Px(90), footer - y - button - previewHeight - Px(44)));
                     Place(Input, true, margin, y, width, inputHeight); y += inputHeight + gap;
                     const int importWidth = ButtonWidth(Import);
+                    const bool stackedHint = width - importWidth - gap < importWidth;
+                    const int hintWidth = stackedHint ? width : (std::max)(Px(20), width - importWidth - gap);
+                    const int hintHeight = Height(WindowText(Item(ImportHint)), hintWidth);
                     Place(Import, true, margin, y, importWidth, button);
-                    Place(ImportHint, true, margin + importWidth + gap, y + Px(3), (std::max)(Px(20), width - importWidth - gap), button);
-                    y += button + Px(16);
+                    const int hintTop = stackedHint ? y + button + Px(8) : y + Px(3);
+                    Place(ImportHint, true, stackedHint ? margin : margin + importWidth + gap, hintTop, hintWidth, hintHeight);
+                    y = (std::max)(y + button, hintTop + hintHeight) + Px(16);
                     Place(PreviewBox, true, margin, y, width, previewHeight);
                     y += Px(10);
                 }
@@ -206,14 +204,27 @@ namespace Sally::Supporter
                 Place(Hint, Entry && !authentic, x, y, innerWidth, Height(WindowText(Item(Hint)), innerWidth));
                 Place(Preview, authentic, x, y, innerWidth, nameHeight); if (authentic) y += nameHeight + Px(4);
                 Place(StatusLabel, authentic, x, y, innerWidth, statusHeight); if (authentic) y += statusHeight + Px(12);
-                Place(DateLabels, authentic, x, y, dateLabelWidth, datesHeight);
-                Place(DateValues, authentic, x + dateLabelWidth + gap, y, (std::max)(Px(20), innerWidth - dateLabelWidth - gap), datesHeight);
-                y += datesHeight + Px(24);
+                Place(DateLabels, authentic, x, y, dateLabelWidth, startHeight);
+                Place(DateValues, authentic, x + dateLabelWidth + gap, y, (std::max)(Px(20), innerWidth - dateLabelWidth - gap), startHeight);
+                y += startHeight + (authentic ? Px(6) : 0);
+                Place(DateEndLabel, authentic, x, y, dateLabelWidth, endHeight);
+                Place(DateEndValue, authentic, x + dateLabelWidth + gap, y, (std::max)(Px(20), innerWidth - dateLabelWidth - gap), endHeight);
+                y += endHeight + Px(16);
+                const int detailsHeight = Entry ? 0 : Height(WindowText(Item(DetailsHint)), width);
+                Place(DetailsHint, !Entry, margin, y, width, detailsHeight); y += detailsHeight + (Entry ? 0 : Px(12));
+                Place(SupportLink, !Entry, margin, footer, supportWidth, footerHeight);
                 const int titleHeight = Height(T(IDS_SUP_SHOW_TITLE), width - Px(24)) + Px(4);
-                Place(Title, !Entry, margin, y, width, titleHeight); y += titleHeight + Px(4);
-                const int localNameHeight = Height(T(IDS_SUP_LOCAL_NAME), width - Px(24));
+                Place(Title, !Entry, margin, y, width, titleHeight); if (!Entry) y += titleHeight + Px(4);
+                const int localNameHeight = Height(WindowText(Item(LocalName)), width - Px(24));
                 Place(LocalName, !Entry, margin + Px(24), y, width - Px(24), localNameHeight);
-                if (!Entry) MinimumClientHeight = y + localNameHeight + Px(20) + button + margin;
+                const int contentHeight = y + ScrollOffset + (Entry ? 0 : localNameHeight) + margin;
+                MinimumClientHeight = contentHeight + footerHeight + margin + Px(8);
+                SCROLLINFO scroll{sizeof(scroll), SIF_RANGE | SIF_PAGE | SIF_POS};
+                scroll.nMax = contentHeight - 1; scroll.nPage = (std::max)(1, footer - Px(8)); scroll.nPos = ScrollOffset;
+                SetScrollInfo(Body, SB_VERT, &scroll, TRUE);
+                const int clamped = GetScrollPos(Body, SB_VERT);
+                if (clamped != ScrollOffset) { ScrollOffset = clamped; Layout(); return; }
+                InvalidateRect(Body, nullptr, TRUE);
                 InvalidateRect(Window, nullptr, TRUE);
             }
             void PreviewCandidate(Certificate value)
@@ -222,8 +233,11 @@ namespace Sally::Supporter
                 Text(Preview, Candidate.Authentic() ? Wide(Candidate.Holder) : L"");
                 UINT status = Candidate.State == Status::Active ? IDS_SUP_ACTIVE : Candidate.State == Status::NotYetValid ? IDS_SUP_FUTURE : IDS_SUP_EXPIRED;
                 Text(StatusLabel, Candidate.Authentic() ? T(status) : L"");
-                Text(DateLabels, T(IDS_SUP_SUPPORT_STARTS) + L"\r\n" + T(IDS_SUP_SUPPORTED_THROUGH));
-                Text(DateValues, Candidate.Authentic() ? Date(Candidate.ValidFrom) + L"\r\n" + Date(Candidate.ValidUntil - 1) : L"");
+                Text(DateLabels, T(IDS_SUP_SUPPORT_STARTS)); Text(DateEndLabel, T(IDS_SUP_END_EXCLUSIVE));
+                Text(DateValues, Candidate.Authentic() ? Date(Candidate.ValidFrom) : L"");
+                Text(DateEndValue, Candidate.Authentic() ? Date(Candidate.ValidUntil) : L"");
+                Text(DetailsHint, T(Candidate.State == Status::Active ? IDS_SUP_AUTO_ACTIVE : IDS_SUP_MANUAL_HINT));
+                Text(SupportLink, L"<a>" + T(Candidate.State == Status::Expired ? IDS_SUP_RENEW_SUPPORT : IDS_SUP_SUPPORT) + L"</a>");
                 Text(Hint, Candidate.State == Status::Missing ? T(IDS_SUP_ENTRY_HINT) : T(IDS_SUP_INVALID));
                 if (Entry) EnableWindow(Item(Save), Candidate.Authentic());
                 Layout();
@@ -251,6 +265,31 @@ namespace Sally::Supporter
                 Original = next; Changed = true; return true;
             }
         };
+        LRESULT CALLBACK BodyProc(HWND body, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR, DWORD_PTR reference)
+        {
+            auto& state = *reinterpret_cast<Dialog*>(reference);
+            if (message == WM_COMMAND || message == WM_NOTIFY || message == WM_CONTEXTMENU || message == WM_CTLCOLORSTATIC || message == WM_CTLCOLOREDIT || message == WM_CTLCOLORBTN || message == WM_DRAWITEM || message == WM_ERASEBKGND)
+                return SendMessageW(state.Window, message, wParam, lParam);
+            if (message == WM_VSCROLL || message == WM_MOUSEWHEEL)
+            {
+                SCROLLINFO scroll{sizeof(scroll), SIF_ALL}; GetScrollInfo(body, SB_VERT, &scroll);
+                int position = scroll.nPos;
+                const int step = state.Px(24);
+                if (message == WM_MOUSEWHEEL) position -= GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA * step * 3;
+                else switch (LOWORD(wParam))
+                {
+                case SB_LINEUP: position -= step; break;
+                case SB_LINEDOWN: position += step; break;
+                case SB_PAGEUP: position -= scroll.nPage; break;
+                case SB_PAGEDOWN: position += scroll.nPage; break;
+                case SB_THUMBTRACK: position = scroll.nTrackPos; break;
+                default: return 0;
+                }
+                state.ScrollOffset = (std::max)(0, (std::min)(position, scroll.nMax - static_cast<int>(scroll.nPage) + 1));
+                state.Layout(); return 0;
+            }
+            return DefSubclassProc(body, message, wParam, lParam);
+        }
         LRESULT CALLBACK DialogProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
         {
             auto state = reinterpret_cast<Dialog*>(GetWindowLongPtrW(window, GWLP_USERDATA));
@@ -263,30 +302,77 @@ namespace Sally::Supporter
             auto& s = *state;
             switch (message)
             {
+            case WM_DPICHANGED:
+            {
+                const int dpi = HIWORD(wParam);
+                auto font = Appearance::FontForDpi(s.Appearance, dpi);
+                HFONT normal = CreateFontIndirectW(&font);
+                font.lfWeight = FW_SEMIBOLD; font.lfHeight = MulDiv(font.lfHeight, 5, 4);
+                HFONT name = CreateFontIndirectW(&font);
+                if (normal && name)
+                {
+                    auto previous = s.Font, previousName = s.NameFont;
+                    s.Dpi = dpi; s.Font = normal; s.NameFont = name;
+                    EnumChildWindows(window, [](HWND child, LPARAM context) -> BOOL {
+                        auto& dialog = *reinterpret_cast<Dialog*>(context);
+                        SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(GetDlgCtrlID(child) == Preview ? dialog.NameFont : dialog.Font), TRUE);
+                        return TRUE;
+                    }, reinterpret_cast<LPARAM>(&s));
+                    DeleteObject(previous); DeleteObject(previousName);
+                }
+                else { if (normal) DeleteObject(normal); if (name) DeleteObject(name); }
+                const auto bounds = reinterpret_cast<RECT*>(lParam);
+                SetWindowPos(window, nullptr, bounds->left, bounds->top, bounds->right - bounds->left, bounds->bottom - bounds->top, SWP_NOZORDER | SWP_NOACTIVATE);
+                s.Layout(); return 0;
+            }
+            case WM_SETTINGCHANGE:
+                PluginDarkMode_OnSettingChange(lParam);
+                [[fallthrough]];
+            case WM_THEMECHANGED:
+                PluginDarkMode_ApplyTitleBar(window); PluginDarkMode_ApplyListTreeThemeRecursive(window);
+                s.Layout(); return 0;
             case WM_SIZE: s.Layout(); return 0;
             case WM_GETMINMAXINFO:
             {
-                RECT minimum{0, 0, s.Px(460), s.MinimumClientHeight};
-                AdjustWindowRectEx(&minimum, static_cast<DWORD>(GetWindowLongPtrW(window, GWL_STYLE)), FALSE,
-                    static_cast<DWORD>(GetWindowLongPtrW(window, GWL_EXSTYLE)));
-                reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = {s.Px(460),
-                    s.Entry ? s.Px(390) : (std::max)(s.Px(260), static_cast<int>(minimum.bottom - minimum.top))};
+                reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = {s.Px(360), s.Px(220)};
                 return 0;
             }
             case DM_GETDEFID: return MAKELRESULT(s.Entry ? Save : IDCANCEL, DC_HASDEFID);
+            case WM_ERASEBKGND:
+            { RECT bounds{}; GetClientRect(window, &bounds); if (PluginDarkMode_FillDialogBackground(reinterpret_cast<HDC>(wParam), &bounds)) return TRUE; break; }
+            case WM_CTLCOLORBTN:
+            case WM_CTLCOLOREDIT:
+            { auto brush = PluginDarkMode_GetDialogCtlColorBrush(message, reinterpret_cast<HDC>(wParam), reinterpret_cast<HWND>(lParam)); if (brush) return reinterpret_cast<LRESULT>(brush); break; }
+            case WM_DRAWITEM:
+            {
+                auto draw = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
+                if (draw && draw->CtlID == PreviewBox)
+                {
+                    PluginDarkModeColors colors{}; const bool dark = PluginDarkMode_GetColors(&colors);
+                    HBRUSH fill = CreateSolidBrush(dark ? colors.InputBackground : GetSysColor(COLOR_WINDOW));
+                    FillRect(draw->hDC, &draw->rcItem, fill); DeleteObject(fill);
+                    return TRUE;
+                }
+                break;
+            }
             case WM_CTLCOLORSTATIC:
             {
                 const int id = GetDlgCtrlID(reinterpret_cast<HWND>(lParam));
                 HDC dc = reinterpret_cast<HDC>(wParam);
-                const bool preview = s.Entry && (id == Preview || id == StatusLabel || id == DateLabels || id == DateValues || id == Hint);
+                const bool preview = s.Entry && (id == Preview || id == StatusLabel || id == DateLabels || id == DateValues || id == DateEndLabel || id == DateEndValue || id == Hint);
+                auto themed = PluginDarkMode_GetDialogCtlColorBrush(preview ? WM_CTLCOLOREDIT : message, dc, reinterpret_cast<HWND>(lParam));
+                if (themed) return reinterpret_cast<LRESULT>(themed);
                 SetBkColor(dc, GetSysColor(preview ? COLOR_WINDOW : COLOR_BTNFACE));
-                SetTextColor(dc, id == StatusLabel && s.Candidate.State == Status::Active ? RGB(28, 98, 48) :
-                    id == LocalName || id == ImportHint || id == DateLabels || id == Hint ? GetSysColor(COLOR_GRAYTEXT) : GetSysColor(COLOR_WINDOWTEXT));
+                SetTextColor(dc, id == LocalName || id == ImportHint || id == DateLabels || id == DateEndLabel || id == Hint ? GetSysColor(COLOR_GRAYTEXT) : GetSysColor(COLOR_WINDOWTEXT));
                 return reinterpret_cast<LRESULT>(GetSysColorBrush(preview ? COLOR_WINDOW : COLOR_BTNFACE));
             }
             case WM_NOTIFY:
             {
                 auto notification = reinterpret_cast<NMHDR*>(lParam);
+                if (notification && notification->idFrom == SupportLink && notification->code == NM_CUSTOMDRAW) return PluginDarkMode_DrawLink(lParam);
+                if (!s.Entry && notification && notification->idFrom == SupportLink &&
+                    (notification->code == NM_CLICK || notification->code == NM_RETURN))
+                { OpenSupportPage(window); return 0; }
                 if (!s.Entry && notification && notification->idFrom == IDCANCEL && notification->code == BCN_DROPDOWN)
                 {
                     s.ShowKeyMenu();
@@ -393,7 +479,7 @@ namespace Sally::Supporter
         std::wstring result = SupporterText(id, language);
         if (certificate.Authentic())
         {
-            result = Wide(certificate.Holder) + L"\r\n" + result + L"\r\n" + SupporterText(IDS_SUP_DATES, language) + L": " + Date(certificate.ValidFrom) + L" — " + Date(certificate.ValidUntil - 1);
+            result = Wide(certificate.Holder) + L"\r\n" + result + L"\r\n" + SupporterText(IDS_SUP_SUPPORT_STARTS, language) + L": " + Date(certificate.ValidFrom) + L"\r\n" + SupporterText(IDS_SUP_END_EXCLUSIVE, language) + L": " + Date(certificate.ValidUntil);
         }
         return result;
     }
@@ -470,17 +556,19 @@ namespace Sally::Supporter
     }
     bool ShowSupporterDialog(HWND parent, LANGID language, const std::wstring& profile, IRegistry& registry, bool enterKey)
     {
-        INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES};
-        InitCommonControlsEx(&controls);
+        INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES | ICC_LINK_CLASS};
+        if (!InitCommonControlsEx(&controls)) return false;
+        PluginDarkMode_SetProfileRoot(profile.c_str()); PluginDarkMode_Initialize();
         Dialog s;
         s.Language = language; s.Profile = profile; s.Registry = &registry;
         s.Original = ReadSupporterState(profile, registry);
         s.Candidate = VerifyCertificate(s.Original.Token, NowUtc(), BuiltinPublicKeys());
         s.Entry = enterKey || !s.Candidate.Authentic();
         HDC dc = GetDC(parent); s.Dpi = GetDeviceCaps(dc, LOGPIXELSY); ReleaseDC(parent, dc);
-        NONCLIENTMETRICSW metrics = {sizeof(metrics)}; SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0);
-        s.Font = CreateFontIndirectW(&metrics.lfMessageFont);
-        auto large = metrics.lfMessageFont; large.lfWeight = FW_SEMIBOLD; large.lfHeight = MulDiv(large.lfHeight, 5, 4); s.NameFont = CreateFontIndirectW(&large);
+        s.Appearance = Appearance::Read(profile, L"", registry);
+        auto font = Appearance::FontForDpi(s.Appearance, s.Dpi);
+        s.Font = CreateFontIndirectW(&font);
+        auto large = font; large.lfWeight = FW_SEMIBOLD; large.lfHeight = MulDiv(large.lfHeight, 5, 4); s.NameFont = CreateFontIndirectW(&large);
         WNDCLASSW wc{}; wc.lpfnWndProc = DialogProc; wc.hInstance = GetModuleHandleW(nullptr); wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
         wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1); wc.lpszClassName = s.Entry ? L"SallySupporterKeyEntry" : L"SallySupporterDetails";
         RegisterClassW(&wc);
@@ -492,12 +580,17 @@ namespace Sally::Supporter
         HWND window = CreateWindowExW(WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT, wc.lpszClassName, s.T(s.Entry ? IDS_SUP_ENTER : IDS_SUP_TITLE).c_str(), style,
             work.left + (work.right - work.left - width) / 2, work.top + (work.bottom - work.top - height) / 2, width, height, parent, nullptr, wc.hInstance, &s);
         if (!window) { DeleteObject(s.NameFont); DeleteObject(s.Font); return false; }
+        Appearance::SetWindowIcon(window, wc.hInstance, s.Appearance.Icon);
+        s.Body = CreateWindowExW(WS_EX_CONTROLPARENT, L"STATIC", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_CLIPCHILDREN,
+            0, 0, 1, 1, window, nullptr, wc.hInstance, nullptr);
+        if (!s.Body || !SetWindowSubclass(s.Body, BodyProc, 1, reinterpret_cast<DWORD_PTR>(&s)))
+        { DestroyWindow(window); DeleteObject(s.NameFont); DeleteObject(s.Font); return false; }
         auto add = [&](const wchar_t* cls, int id, const std::wstring& text, DWORD controlStyle, HFONT font = nullptr, DWORD ex = 0)
         {
-            HWND control = CreateWindowExW(ex, cls, text.c_str(), WS_CHILD | controlStyle, 0, 0, 10, 10, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), wc.hInstance, nullptr);
+            HWND control = CreateWindowExW(ex, cls, text.c_str(), WS_CHILD | controlStyle, 0, 0, 10, 10, (id == IDCANCEL || id == Save || id == SupportLink) ? window : s.Body, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), wc.hInstance, nullptr);
             SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(font ? font : s.Font), FALSE); return control;
         };
-        add(L"STATIC", PreviewBox, L"", SS_WHITERECT, nullptr, WS_EX_STATICEDGE);
+        add(L"STATIC", PreviewBox, L"", SS_OWNERDRAW, nullptr, WS_EX_STATICEDGE);
         add(L"STATIC", PasteLabel, s.T(IDS_SUP_PASTE), SS_NOPREFIX);
         HWND input = add(L"EDIT", Input, L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL, nullptr, WS_EX_CLIENTEDGE);
         SendMessageW(input, EM_SETLIMITTEXT, 4096, 0);
@@ -509,7 +602,11 @@ namespace Sally::Supporter
         add(L"STATIC", DateValues, L"", SS_NOPREFIX);
         add(L"STATIC", Hint, s.T(IDS_SUP_ENTRY_HINT), SS_NOPREFIX);
         add(L"BUTTON", Title, s.T(IDS_SUP_SHOW_TITLE), WS_TABSTOP | BS_AUTOCHECKBOX | BS_MULTILINE);
-        add(L"STATIC", LocalName, s.T(IDS_SUP_LOCAL_NAME), SS_NOPREFIX);
+        add(L"STATIC", LocalName, s.T(IDS_SUP_TITLE_ACKNOWLEDGEMENT), SS_NOPREFIX);
+        add(L"STATIC", DateEndLabel, L"", SS_NOPREFIX);
+        add(L"STATIC", DateEndValue, L"", SS_NOPREFIX);
+        add(L"STATIC", DetailsHint, L"", SS_NOPREFIX);
+        add(WC_LINK, SupportLink, L"", WS_TABSTOP);
         if (s.Entry) add(L"BUTTON", Save, s.T(IDS_SUP_SAVE_KEY), WS_TABSTOP | BS_DEFPUSHBUTTON);
         add(L"BUTTON", IDCANCEL, s.T(s.Entry ? IDS_SUP_CANCEL : IDS_SUP_CLOSE), WS_TABSTOP | (s.Entry ? 0 : BS_DEFSPLITBUTTON));
         if (!s.Entry)
@@ -527,6 +624,8 @@ namespace Sally::Supporter
                 SendMessageW(s.KeyActionsTip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&tool));
             }
         }
+        if (!s.Item(SupportLink) || !s.Item(DetailsHint) || !s.Item(DateEndValue) || !s.Item(Input) || !s.Item(IDCANCEL) || (s.Entry && !s.Item(Save)))
+        { DestroyWindow(window); DeleteObject(s.NameFont); DeleteObject(s.Font); return false; }
         s.Ready = true;
         if (s.Entry) s.Candidate = {}; // Key entry never exposes the previously saved token.
         s.PreviewCandidate(s.Candidate);
@@ -541,6 +640,7 @@ namespace Sally::Supporter
         }
         SendMessageW(s.Item(Title), BM_SETCHECK, s.Original.ShowNameInTitle ? BST_CHECKED : BST_UNCHECKED, 0);
         if (s.Entry) EnableWindow(s.Item(Save), FALSE);
+        PluginDarkMode_ApplyTitleBar(window); PluginDarkMode_ApplyListTreeThemeRecursive(window);
         bool enabled = parent && IsWindowEnabled(parent); if (enabled) EnableWindow(parent, FALSE);
         ShowWindow(window, SW_SHOW); SetFocus(s.Item(s.Entry ? Input : IDCANCEL));
         MSG message{};
@@ -552,8 +652,22 @@ namespace Sally::Supporter
                 (message.message == WM_KEYDOWN || message.message == WM_SYSKEYDOWN) && message.wParam == VK_DOWN)
             { s.ShowKeyMenu(); continue; }
             if (message.hwnd == input && message.message == WM_KEYDOWN && message.wParam == VK_TAB)
-            { SetFocus(GetNextDlgTabItem(window, input, (GetKeyState(VK_SHIFT) & 0x8000) != 0)); continue; }
-            if (!IsDialogMessageW(window, &message)) { TranslateMessage(&message); DispatchMessageW(&message); }
+            { SetFocus(GetNextDlgTabItem(window, input, (GetKeyState(VK_SHIFT) & 0x8000) != 0)); }
+            else if (!IsDialogMessageW(window, &message)) { TranslateMessage(&message); DispatchMessageW(&message); }
+            HWND focused = GetFocus();
+            if (focused && IsChild(s.Body, focused))
+            {
+                RECT bounds{}, viewport{}; GetWindowRect(focused, &bounds);
+                if (focused == s.Item(Import))
+                {
+                    RECT hint{}; GetWindowRect(s.Item(ImportHint), &hint);
+                    bounds.bottom = (std::max)(bounds.bottom, hint.bottom);
+                }
+                MapWindowPoints(nullptr, s.Body, reinterpret_cast<POINT*>(&bounds), 2); GetClientRect(s.Body, &viewport);
+                if (bounds.bottom - bounds.top > viewport.bottom) bounds.bottom = bounds.top + viewport.bottom;
+                int delta = bounds.top < 0 ? bounds.top : bounds.bottom > viewport.bottom ? bounds.bottom - viewport.bottom : 0;
+                if (delta) { s.ScrollOffset = (std::max)(0, s.ScrollOffset + delta); s.Layout(); }
+            }
         }
         if (IsWindow(s.KeyActionsTip)) DestroyWindow(s.KeyActionsTip);
         if (IsWindow(window)) DestroyWindow(window);

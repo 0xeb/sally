@@ -17,5 +17,6 @@ namespace Sally::Supporter
         AllFields = 15
     };
     RegistryResult WriteSupporterState(const std::wstring& profile, IRegistry& registry, const Preferences& state, unsigned fields = AllFields);
+    std::wstring SupporterUtcDate(uint64_t seconds);
     uint64_t NowUtc();
 } // namespace Sally::Supporter

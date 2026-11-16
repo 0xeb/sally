@@ -212,17 +212,12 @@ DetectionResult Detect(const std::uint8_t* data, std::size_t size,
     {
         const bool le = LooksLikeUtf16(data, window, false);
         const bool be = LooksLikeUtf16(data, window, true);
-        if (le != be)
+        if (le || be)
         {
-            // Exactly one byte order yields plausible code units.
-            result.encoding = le ? Encoding::Utf16Le : Encoding::Utf16Be;
-            result.confidence = Confidence::Heuristic;
-            result.textOffset = 0;
-            return result;
-        }
-        if (le && be)
-        {
-            // Both orders produce plausible code units, which is the NORMAL case
+            // Plausible code units alone do not identify UTF-16: legacy bytes
+            // can invalidate just one order too. Require positive zero-byte
+            // evidence for the chosen order in either case. Both orders are plausible
+            // in the normal case
             // for text: 'a' is 0x0061 read one way and 0x6100 the other, and
             // neither is forbidden. The decisive evidence is WHERE the zero bytes
             // sit. Every character below U+0100 - i.e. all ASCII, and real text
@@ -247,7 +242,7 @@ DetectionResult Detect(const std::uint8_t* data, std::size_t size,
             {
                 const std::size_t high = zerosAtOdd > zerosAtEven ? zerosAtOdd : zerosAtEven;
                 const std::size_t low = zerosAtOdd > zerosAtEven ? zerosAtEven : zerosAtOdd;
-                if (high >= 2 && high >= low * 4)
+                if (high >= 2 && high >= low * 4 && (zerosAtOdd > zerosAtEven ? le : be))
                 {
                     result.encoding = zerosAtOdd > zerosAtEven ? Encoding::Utf16Le
                                                                : Encoding::Utf16Be;
