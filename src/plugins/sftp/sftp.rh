@@ -4,5 +4,7 @@
 // Resource IDs of the language-neutral resources (sftp.rc). The IDs of the strings are in sftp.rh2,
 // the IDs of the language-dependent dialogs are in lang\lang.rh; the three ranges must not overlap.
 //
-// Icon of the file system in the panel and in the Change Drive menu (sftp.rc, sftp_fs.ico)
+// Icon of the file system in the panel and in the Change Drive menu, and the plugin icon (sftp.rc, sftp_fs.ico)
 #define IDI_SFTP_FS               200
+// The same icon dimmed, with two amber pause bars: a detached connection that is kept open (sftp_fs_detached.ico)
+#define IDI_SFTP_FS_DETACHED      201

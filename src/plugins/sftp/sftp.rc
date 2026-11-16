@@ -60,8 +60,9 @@ END
 /////////////////////////////////////////////////////////////////////////////
 // Icon
 
-// placeholder art (a blue square with a white S); final icon later
+// A cloud above the label "SFTP" (16x16 and 32x32, with alpha); the second one is the dimmed "detached" variant
 IDI_SFTP_FS ICON "sftp_fs.ico"
+IDI_SFTP_FS_DETACHED ICON "sftp_fs_detached.ico"
 
 #endif    // Neutral resources
 /////////////////////////////////////////////////////////////////////////////

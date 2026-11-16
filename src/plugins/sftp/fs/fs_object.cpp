@@ -1093,39 +1093,14 @@ CPluginFSInterface::GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_
     }
 }
 
-namespace
-{
-// A 50% blended copy of a 16x16 icon (through an image list); NULL when something fails (the caller keeps the original).
-HICON MakeFadedIcon(HICON icon)
-{
-    HIMAGELIST list = ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 1, 0);
-    if (list == nullptr)
-        return nullptr;
-    HICON faded = nullptr;
-    if (ImageList_AddIcon(list, icon) >= 0)
-        faded = ImageList_GetIcon(list, 0, ILD_TRANSPARENT | ILD_BLEND50);
-    ImageList_Destroy(list);
-    return faded;
-}
-} // namespace
-
 HICON WINAPI
 CPluginFSInterface::GetFSIcon(BOOL& destroyIcon)
 {
     // Loaded at 16x16 on purpose (LoadIcon would return 32x32, see the SDK note); Salamander destroys it after use.
+    // A detached connection (kept open while the panel shows something else) has its own icon: dimmed, with pause bars.
     destroyIcon = TRUE;
-    HICON icon = static_cast<HICON>(LoadImageW(DLLInstance, MAKEINTRESOURCEW(IDI_SFTP_FS), IMAGE_ICON, 16, 16,
-                                               LR_DEFAULTCOLOR));
-    if (icon != nullptr && detached_)
-    {
-        HICON faded = MakeFadedIcon(icon); // a detached connection looks "dimmed"
-        if (faded != nullptr)
-        {
-            DestroyIcon(icon);
-            icon = faded;
-        }
-    }
-    return icon;
+    return static_cast<HICON>(LoadImageW(DLLInstance, MAKEINTRESOURCEW(detached_ ? IDI_SFTP_FS_DETACHED : IDI_SFTP_FS),
+                                         IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
 }
 
 BOOL WINAPI
