@@ -363,8 +363,35 @@ CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
     try
     {
-        // item in the Change Drive menu and in the Drive bars (-1 = no icon yet)
-        salamander->SetChangeDriveMenuItem(LangStr(IDS_CHNGDRVITEM).c_str(), -1);
+        // The plugin icon: one 16x16 icon with alpha in an icon list that Salamander keeps (it shows it in the Plugins
+        // Manager, the Plugins menu, the top toolbar, the Change Drive menu and the Drive bars without loading us).
+        // -1 = no icon, when anything below fails.
+        int iconIndex = -1;
+        CGUIIconListAbstract* iconList = SalamanderGUI != nullptr ? SalamanderGUI->CreateIconList() : nullptr;
+        if (iconList != nullptr)
+        {
+            HICON icon = static_cast<HICON>(LoadImageW(DLLInstance, MAKEINTRESOURCEW(IDI_SFTP_FS), IMAGE_ICON, 16, 16,
+                                                       LR_DEFAULTCOLOR));
+            if (icon != nullptr && iconList->Create(16, 16, 1) && iconList->ReplaceIcon(0, icon))
+            {
+                salamander->SetIconListForGUI(iconList); // Salamander owns the list from here on
+                iconIndex = 0;
+            }
+            else
+            {
+                SalamanderGUI->DestroyIconList(iconList);
+            }
+            if (icon != nullptr)
+                DestroyIcon(icon); // the list holds its own copy
+        }
+        if (iconIndex >= 0)
+        {
+            salamander->SetPluginIcon(iconIndex);
+            salamander->SetPluginMenuAndToolbarIcon(iconIndex);
+        }
+
+        // item in the Change Drive menu and in the Drive bars
+        salamander->SetChangeDriveMenuItem(LangStr(IDS_CHNGDRVITEM).c_str(), iconIndex);
 
         // Plugins / SFTP menu. Keep in step with CPluginInterfaceForMenuExt.
         salamander->AddMenuItem(-1, LangStr(IDS_MENU_CONNECT).c_str(), 0, SftpCmdConnect, FALSE, MENU_EVENT_TRUE,
