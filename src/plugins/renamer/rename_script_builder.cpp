@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "renamer_date_time.h"
+
 const char* VarOriginalName = "OriginalName";
 const char* VarDrive = "Drive";
 const char* VarPath = "Path";
@@ -121,13 +123,11 @@ public:
     virtual int DoExpand(char*& string, char* end,
                          const char* srcStart, const char* srcEnd)
     {
-        const char *s, *e;
-        s = CountStartFrom > 0 ? srcStart + CutStart : srcEnd - CutStart;
-        if (s < srcStart)
-            s = srcStart;
-        e = CountEndFrom > 0 ? srcStart + CutEnd : srcEnd - CutEnd;
-        if (e > srcEnd)
-            e = srcEnd;
+        // The positions count characters; the source is UTF-8 (see renamer_text.h).
+        const CRenamerTextCut cut = SelectRenamerTextCut(srcStart, srcEnd, CutStart, CountStartFrom < 0,
+                                                         CutEnd, CountEndFrom < 0);
+        const char* s = cut.Start;
+        const char* e = cut.End;
         int l = (int)(e - s);
         if (l > 0)
         {
@@ -333,38 +333,6 @@ public:
         return l;
     }
 };
-
-// $(Date:fmt) and $(Time:fmt), formatted wide and re-encoded as the UTF-8 the engine
-// buffer holds.
-//
-// These two used the TCHAR GetDateFormat/GetTimeFormat, which resolved to the ANSI form
-// while the plugin was built without UNICODE; pinning them to the explicit ...A kept that
-// behaviour once UNICODE went build-wide. But the engine buffer is no longer ACP - it is
-// UTF-8, and TryRenamerTextToWide decodes it as strict UTF-8 with no fallback. So the ACP
-// bytes the ANSI formatter writes for any locale whose date or time names are not plain
-// ASCII - Czech, Russian, Greek, Japanese - failed that decode and the whole rename was
-// refused, where before the same bytes had simply become the ACP file name.
-//
-// The format string travels the same road in reverse: it comes from the user's expression,
-// so it is UTF-8 and has to be widened before the W formatter sees it.
-static bool FormatWideDateTime(bool date, const std::wstring& format, const SYSTEMTIME& st,
-                               std::string& utf8)
-{
-    utf8.clear();
-    const int needed = date ? GetDateFormatW(LOCALE_USER_DEFAULT, 0, &st, format.c_str(), NULL, 0)
-                            : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, format.c_str(), NULL, 0);
-    if (needed <= 0)
-        return false;
-    std::vector<wchar_t> buffer(static_cast<size_t>(needed), L'\0');
-    const int written = date ? GetDateFormatW(LOCALE_USER_DEFAULT, 0, &st, format.c_str(),
-                                              buffer.data(), needed)
-                             : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, format.c_str(),
-                                              buffer.data(), needed);
-    if (written <= 0)
-        return false;
-    // 'written' counts the terminator.
-    return TryWideToRenamerText(buffer.data(), utf8, written - 1);
-}
 
 // Shared by both Expand overrides: format, then copy into the caller's remaining space.
 // The CVariable contract is "negative means no", and a result that does not fit is one of

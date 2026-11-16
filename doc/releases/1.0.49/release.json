@@ -1,0 +1,35 @@
+{
+  "_copyright": "SPDX-FileCopyrightText: 2026 Elias Bachaalany",
+  "_license": "SPDX-License-Identifier: GPL-2.0-or-later",
+  "announcements": [],
+  "notes_source_sha256": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+  "notes_titles": {
+    "cs-CZ": "Novinky",
+    "de-DE": "Was ist neu?",
+    "en-US": "What's new",
+    "es-ES": "Novedades",
+    "fr-FR": "Nouveautés",
+    "hu-HU": "Újdonságok",
+    "ko-KR": "새로운 기능",
+    "nl-NL": "Wat is er nieuw?",
+    "ro-RO": "Noutăți",
+    "ru-RU": "Что нового",
+    "sk-SK": "Novinky",
+    "zh-CN": "更新内容"
+  },
+  "notes_translation_source_sha256": {
+    "cs-CZ": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "de-DE": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "es-ES": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "fr-FR": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "hu-HU": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "ko-KR": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "nl-NL": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "ro-RO": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "ru-RU": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "sk-SK": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd",
+    "zh-CN": "edf32d6db8e70d1894980926eb91f1686a8ebdfe37ef7d62643a8ff46b858ddd"
+  },
+  "release_version": "1.0.49",
+  "schema_version": 1
+}

@@ -5,6 +5,7 @@
 #include "precomp.h"
 #include "SallyUrls.h"
 #include "../../registry_names.h"
+#include "renamer_dialog_policy.h"
 
 // enables dumping of blocks that remain allocated on the heap after the plugin finishes
 // #define DUMP_MEM
@@ -293,7 +294,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     LastOptions.Reset(FALSE);
     strcpy(LastMask, "*.*");
     LastSubdirs = FALSE;
-    LastRemoveSourcePath = FALSE;
+    LastRemoveSourcePath = RenamerDefaultRemoveEmptiedDirectories;
     UseCustomFont = FALSE;
     ConfirmESCClose = TRUE;
     Command = L"notepad";

@@ -343,6 +343,9 @@ BOOL CPreviewWindow::CustomDraw(LPNMLVCUSTOMDRAW cd, LRESULT& result)
 
     case CDDS_ITEMPREPAINT:
     {
+        // The subitem stage below paints the selection itself. The themed (dark
+        // mode) list would otherwise fill a full-row selection from this stage.
+        cd->nmcd.uItemState &= ~CDIS_SELECTED;
         // request sending the CDDS_ITEMPREPAINT | CDDS_SUBITEM notification
         result = CDRF_NOTIFYSUBITEMDRAW;
         return TRUE;
@@ -363,15 +366,23 @@ BOOL CPreviewWindow::CustomDraw(LPNMLVCUSTOMDRAW cd, LRESULT& result)
 
         PluginDarkModeColors colors;
         PluginDarkMode_GetColors(&colors);
-        BOOL selected = (cd->nmcd.uItemState & CDIS_SELECTED) != 0;
+        // In this owner-data report list the subitem draw state reports CDIS_SELECTED
+        // for rows that are not selected, so every visible row painted as selected.
+        // Ask the list for the row's real state, and clear the flag so the control
+        // does not paint its own selection over the colors chosen here.
+        BOOL selected = (ListView_GetItemState(HWindow, item, LVIS_SELECTED) & LVIS_SELECTED) != 0;
+        cd->nmcd.uItemState &= ~CDIS_SELECTED;
         BOOL focused = selected && GetFocus() == HWindow;
         cd->clrTextBk = selected ? (focused ? colors.Highlight : colors.InactiveSelection) : colors.InputBackground;
 
+        // The inactive selection background is a dialog-face color; pair it with the
+        // dialog text color (highlight text on it is white on light gray).
+        const COLORREF selectedText = focused ? colors.HighlightText : colors.DialogText;
         if (subItem == CI_NEWNAME &&
             wcscmp(GetItemText(item, CI_OLDNAME), GetItemText(item, CI_NEWNAME)) == 0)
-            cd->clrText = selected ? colors.HighlightText : colors.DisabledText;
+            cd->clrText = selected ? selectedText : colors.DisabledText;
         else
-            cd->clrText = selected ? colors.HighlightText : colors.InputText;
+            cd->clrText = selected ? selectedText : colors.InputText;
         result = CDRF_NEWFONT;
         return TRUE;
     }

@@ -6,6 +6,7 @@
 
 #include "common/widepath.h"
 #include "common/find/FindDialogSeed.h"
+#include "common/find/FindShellVerb.h"
 
 // structure for adding messages to the Find Log; sent as the message parameter
 // of WM_USER_ADDLOG; parameters will be copied into the log data (can be deallocated after returning)
@@ -870,9 +871,9 @@ protected:
 
     // OLE clipboard operations
 
-    // creates a context menu for the selected items and calls ContextMenuInvoke for the specified lpVerb
-    // returns TRUE if Invoke was called, otherwise returns FALSE if something fails
-    BOOL InvokeContextMenu(const wchar_t* lpVerb);
+    // creates a context menu for the selected items and calls ContextMenuInvoke for the specified lpVerb;
+    // returns what happened (errors are already reported to the user)
+    sally::find::ShellVerbOutcome InvokeContextMenu(const wchar_t* lpVerb);
 
     void OnCutOrCopy(BOOL cut);
     void OnDrag(BOOL rightMouseButton);

@@ -66,6 +66,61 @@ inline bool TryWideToRenamerText(const wchar_t* text, std::string& result,
     return Win32EncodeText(CP_UTF8, text, inputLength, result).Succeeded();
 }
 
+// Cut positions such as $(Name:2,4) count characters, but the engine holds names as UTF-8,
+// where a letter like 'Ž' takes two bytes. Counting bytes would shift every later position
+// and could split a letter into invalid UTF-8, so positions step over whole UTF-8 sequences
+// (one character = one code point). Both helpers stop at the text's ends, so an
+// out-of-range position simply selects up to the end or start.
+inline bool IsRenamerTextContinuationByte(char c)
+{
+    return (static_cast<unsigned char>(c) & 0xC0) == 0x80;
+}
+
+inline const char* AdvanceRenamerTextCharacters(const char* start, const char* end, int count)
+{
+    const char* p = start;
+    for (; count > 0 && p < end; --count)
+    {
+        ++p;
+        while (p < end && IsRenamerTextContinuationByte(*p))
+            ++p;
+    }
+    return p;
+}
+
+inline const char* RetreatRenamerTextCharacters(const char* start, const char* end, int count)
+{
+    const char* p = end;
+    for (; count > 0 && p > start; --count)
+    {
+        --p;
+        while (p > start && IsRenamerTextContinuationByte(*p))
+            --p;
+    }
+    return p;
+}
+
+// The text a cut variable selects: a start and an end position, each counted in characters
+// from the start of the source or, when 'fromEnd', back from its end. An empty or inverted
+// range has End <= Start.
+struct CRenamerTextCut
+{
+    const char* Start;
+    const char* End;
+};
+
+inline CRenamerTextCut SelectRenamerTextCut(const char* start, const char* end,
+                                            int cutStart, bool startFromEnd,
+                                            int cutEnd, bool endFromEnd)
+{
+    CRenamerTextCut cut;
+    cut.Start = startFromEnd ? RetreatRenamerTextCharacters(start, end, cutStart)
+                             : AdvanceRenamerTextCharacters(start, end, cutStart);
+    cut.End = endFromEnd ? RetreatRenamerTextCharacters(start, end, cutEnd)
+                         : AdvanceRenamerTextCharacters(start, end, cutEnd);
+    return cut;
+}
+
 struct CRenamerNamePartOffsets
 {
     size_t File;
