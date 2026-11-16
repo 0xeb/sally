@@ -17,6 +17,7 @@
 #include "common/configuration/RegistryWriteMonitor.h"
 #include "common/update/UpdateSchedule.h"
 #include "common/fsutil.h"
+#include "common/DpiScale.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise, collision with CSalamanderGeneral::PathIsPrefix
 
@@ -455,6 +456,8 @@ const wchar_t* CONFIG_CMDLFOCUS_REG = L"Command Line Focused";
 const wchar_t* CONFIG_CLOSESHELL_REG = L"Close Shell Window";
 const wchar_t* CONFIG_USECUSTOMPANELFONT_REG = L"Use Custom Panel Font";
 const wchar_t* CONFIG_PANELFONT_REG = L"Panel Font";
+// DPI at which the pixel height in "Panel Font" was saved; a missing value means 96 (older profiles)
+const wchar_t* CONFIG_PANELFONT_DPI_REG = L"Panel Font DPI";
 const wchar_t* CONFIG_USECUSTOMCONFIGURATIONFONT_REG = L"Use Custom Configuration Font";
 const wchar_t* CONFIG_CONFIGURATIONFONT_REG = L"Configuration Font";
 // Registry names are native UTF-16 even where the corresponding legacy value
@@ -2364,6 +2367,10 @@ BOOL CMainWindow::SaveConfig(HWND parent, LONG* error)
 
                 SetValueW(actKey, CONFIG_USECUSTOMPANELFONT_REG_W, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
                 writes.Require(SaveLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont) != FALSE);
+                {
+                    DWORD panelFontDpi = (DWORD)GetSystemDPI();
+                    SetValueW(actKey, CONFIG_PANELFONT_DPI_REG, REG_DWORD, &panelFontDpi, sizeof(DWORD));
+                }
                 SetValueW(actKey, CONFIG_USECUSTOMCONFIGURATIONFONT_REG, REG_DWORD, &UseCustomConfigurationFont, sizeof(DWORD));
                 writes.Require(SaveLogFont(actKey, CONFIG_CONFIGURATIONFONT_REG, &ConfigurationLogFont) != FALSE);
 
@@ -4111,6 +4118,14 @@ BOOL CMainWindow::LoadConfig(
 
             GetValueW(actKey, CONFIG_USECUSTOMPANELFONT_REG_W, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
             const BOOL panelFontLoaded = LoadLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont);
+            if (panelFontLoaded)
+            {
+                // the saved pixel height belongs to the DPI it was saved at; convert it to the current one
+                DWORD savedDpi = 96;
+                if (!GetValueW(actKey, CONFIG_PANELFONT_DPI_REG, REG_DWORD, &savedDpi, sizeof(DWORD)) || savedDpi < 48 || savedDpi > 960)
+                    savedDpi = 96;
+                LogFont.lfHeight = sally::dpi::FontHeightFromDpiToDpi(LogFont.lfHeight, (int)savedDpi, GetSystemDPI());
+            }
             if (panelFontLoaded && UseCustomPanelFont)
             {
                 // if the user uses a custom font, propagate it now
