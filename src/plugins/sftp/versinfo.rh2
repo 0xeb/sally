@@ -18,7 +18,7 @@
 
 #include "spl_vers.h" // retrieve version and build numbers
 
-#define VERSINFO_COPYRIGHT   "Copyright © 2026 Sally Authors"
+#define VERSINFO_COPYRIGHT   "Copyright © 2026 Martin Dařílek and Sally Authors"
 #define VERSINFO_COMPANY     "Sally"
 
 #define VERSINFO_DESCRIPTION "SFTP Client for Sally"

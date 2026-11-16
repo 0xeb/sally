@@ -11,29 +11,29 @@
 
 STRINGTABLE
 {
- IDS_PLUGINNAME,             "SFTP"
- IDS_PLUGIN_DESCRIPTION,     "SFTP client for Sally."
+ IDS_PLUGINNAME,             "SFTP Client"
+ IDS_PLUGIN_DESCRIPTION,     "Transfer files and directories over SFTP."
  IDS_ABOUT,                  "About SFTP Plugin"
  // arguments: plugin name, plugin version, copyright, description, libssh2 version, OpenSSL version text
- IDS_ABOUT_FORMAT,           "%ls %ls\n\n%ls\n\n%ls\n\nlibssh2 %hs\n%hs"
+ IDS_ABOUT_FORMAT,           "%ls %ls\n\n%ls\n\n%ls\n\nlibssh2 %hs\n%hs\n\nUses libssh2 (BSD-3-Clause), OpenSSL (Apache-2.0) and zlib."
  // argument: libssh2 error code
  IDS_LIBSSH2_INIT_FAILED,    "SFTP: the libssh2 library could not be initialized (error %d). The plugin cannot be loaded."
  // item in the Change Drive menu: hotkey, TAB, title
- IDS_CHNGDRVITEM,            "\tSFTP"
+ IDS_CHNGDRVITEM,            "\tSFTP Client"
  // WinLib: text for an invalid number typed into a numeric field
  IDS_INVALIDNUMBER,          "Invalid number."
  // master password changed/removed: remembered passwords that could not be converted
  IDS_CANNOT_DECRYPT_SOMEPASSWORDS, "Some remembered passwords could not be decrypted with the previous master password and may no longer work. You will be asked for them again when connecting."
  // host key dialog: window titles
- IDS_HOSTKEY_TITLE_NEW,      "SFTP - Unknown Host Key"
- IDS_HOSTKEY_TITLE_CHANGED,  "SFTP - WARNING: Host Key Has Changed"
+ IDS_HOSTKEY_TITLE_NEW,      "SFTP Client - Unknown Host Key"
+ IDS_HOSTKEY_TITLE_CHANGED,  "SFTP Client - WARNING: Host Key Has Changed"
  IDS_HOSTKEY_TEXT_NEW,       "The authenticity of this server cannot be verified: its host key is not known yet. Compare the fingerprint below with the one from the server administrator before you continue."
  IDS_HOSTKEY_TEXT_CHANGED,   "WARNING: THE HOST KEY OF THIS SERVER HAS CHANGED!\nSomeone may be intercepting your connection, or the administrator may have reinstalled the server. Do not continue unless you know the reason. The replace button overwrites the stored key with the new one."
  // host key dialog: text of the "save" button
  IDS_HOSTKEY_SAVE_NEW,       "&Accept and save"
  IDS_HOSTKEY_SAVE_CHANGED,   "&Replace stored key"
  // prompt dialog: default window title (the server gave none)
- IDS_PROMPT_TITLE,           "SFTP - Authentication"
+ IDS_PROMPT_TITLE,           "SFTP Client - Authentication"
  IDS_PROMPT_TOO_MANY,        "The server asks for more input fields than this dialog supports. The login was cancelled."
  // wait window while the panel waits for the server; argument: host
  IDS_WAIT_CONNECTING,        "Connecting to %ls..."
@@ -52,7 +52,7 @@ STRINGTABLE
  IDS_ERR_SITE_UNKNOWN,       "There is no saved SFTP site named ""%ls""."
  // argument: path
  IDS_ERR_FILE_NOT_DIR,       """%ls"" is a file, not a directory."
- IDS_PASSWORD_TITLE,         "SFTP - Password"
+ IDS_PASSWORD_TITLE,         "SFTP Client - Password"
  // arguments: user, host
  IDS_PASSWORD_PROMPT,        "Password for %ls@%ls:"
  // panel columns: name (up to 30 characters) and tooltip
@@ -68,7 +68,7 @@ STRINGTABLE
  IDS_ERR_INTERNAL,           "SFTP: an unexpected error occurred."
  IDS_ERR_NO_PASSWORD,        "The remembered password for this site could not be decrypted. Enter it when asked."
  // site list dialog
- IDS_SITELIST_TITLE,         "SFTP - Sites"
+ IDS_SITELIST_TITLE,         "SFTP Client - Sites"
  IDS_SITELIST_COL_NAME,      "Name"
  IDS_SITELIST_COL_HOST,      "Host"
  IDS_SITELIST_COL_USER,      "User"
@@ -112,10 +112,10 @@ STRINGTABLE
  IDS_SITE_ERR_WORKERS_RANGE, "The number of workers must be a number from 1 to 8."
  IDS_SITE_ERR_UPLOADPERM_INVALID, "Enter the upload permissions as one to four octal digits from 0 to 7777, for example 644."
  // operation window: titles, status line, list texts
- IDS_OP_TITLE_DOWNLOAD, "SFTP - Download"
- IDS_OP_TITLE_UPLOAD, "SFTP - Upload"
- IDS_OP_TITLE_MOVE_DOWNLOAD, "SFTP - Move from Server"
- IDS_OP_TITLE_MOVE_UPLOAD, "SFTP - Move to Server"
+ IDS_OP_TITLE_DOWNLOAD, "SFTP Client - Download"
+ IDS_OP_TITLE_UPLOAD, "SFTP Client - Upload"
+ IDS_OP_TITLE_MOVE_DOWNLOAD, "SFTP Client - Move from Server"
+ IDS_OP_TITLE_MOVE_UPLOAD, "SFTP Client - Move to Server"
  IDS_OP_TITLE_PERCENT, "%d%% - %ls"
  IDS_OP_STATUS_RUNNING, "Running"
  IDS_OP_STATUS_PAUSED, "Paused"
@@ -203,13 +203,13 @@ STRINGTABLE
  IDS_ERR_CREATE_DIR, "The directory ""%ls"" could not be created: %ls"
  IDS_WAIT_RENAMING, "Renaming on the server..."
  IDS_WAIT_CREATING_DIR, "Creating the directory on the server..."
- IDS_OP_TITLE_DELETE, "SFTP - Delete"
+ IDS_OP_TITLE_DELETE, "SFTP Client - Delete"
  // arguments: items done, items total, elapsed
  IDS_OP_STATS_DELETE, "Items: %d of %d   Elapsed: %ls"
  IDS_WAIT_DELETING, "Deleting on the server..."
  // arguments: name, error text
  IDS_ERR_DELETE_ITEM, "The item ""%ls"" could not be deleted: %ls"
- IDS_OP_TITLE_CHMOD, "SFTP - Change attributes"
+ IDS_OP_TITLE_CHMOD, "SFTP Client - Change attributes"
  IDS_WAIT_CHMOD, "Changing the attributes on the server..."
  // arguments: name, error text
  IDS_ERR_CHMOD_ITEM, "The attributes of ""%ls"" could not be changed: %ls"

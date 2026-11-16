@@ -128,7 +128,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
         MessageBoxW(salamander->GetParentWindow(), SFTP_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
-                    L"SFTP" /* do not translate */, MB_OK | MB_ICONERROR);
+                    L"SFTP Client" /* do not translate */, MB_OK | MB_ICONERROR);
         return nullptr;
     }
 
