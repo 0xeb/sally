@@ -465,7 +465,7 @@ SYSTEMTIME SalamanderStartSystemTime = {0}; // Salamander start time (GetSystemT
 
 BOOL WaitForESCReleaseBeforeTestingESC = FALSE; // should we wait for ESC release before starting path browsing in panel?
 
-int SPACE_WIDTH = 10;
+int SPACE_WIDTH = 10; // set to 10 px * DPI scale in InitializeGraphics()
 
 const char* LOW_MEMORY = "Low memory.";
 
@@ -2191,6 +2191,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
     IconSizes[ICONSIZE_16] = GetIconSizeForSystemDPI(ICONSIZE_16);
     IconSizes[ICONSIZE_32] = GetIconSizeForSystemDPI(ICONSIZE_32);
     IconSizes[ICONSIZE_48] = GetIconSizeForSystemDPI(ICONSIZE_48);
+    SPACE_WIDTH = 10 * GetScaleForSystemDPI() / 100; // gap between columns in detailed view: 10 px at 100% DPI
 
     HKEY hKey;
     IRegistry* registry = GetMainSalamanderRegistry();
