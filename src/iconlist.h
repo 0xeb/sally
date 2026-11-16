@@ -151,6 +151,10 @@ public:
     // the returned imagelist must be destroyed using the ImageList_Destroy() API after use
     virtual HIMAGELIST WINAPI GetImageList();
 
+    // like GetImageList(), but the imagelist has images of size 'width' x 'height' (the icons are stretched
+    // when it differs from the size of this list); used to show icons of plugins (always 16x16) at the system DPI
+    HIMAGELIST GetImageListScaled(int width, int height);
+
     // copies one item from 'srcIL' at position 'srcIndex' to position 'dstIndex'
     virtual BOOL WINAPI Copy(int dstIndex, CIconList* srcIL, int srcIndex);
 

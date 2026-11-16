@@ -1415,6 +1415,25 @@ BOOL CIconList::ConvertToGrayscale(BOOL forceAlphaForBW)
 }
 
 HIMAGELIST
+CIconList::GetImageListScaled(int width, int height)
+{
+    if (width == ImageWidth && height == ImageHeight)
+        return GetImageList();
+    HIMAGELIST hIL = ImageList_Create(width, height, GetImageListColorFlags() | ILC_MASK, 0, 1);
+    if (hIL != NULL)
+    {
+        int i;
+        for (i = 0; i < ImageCount; i++)
+        {
+            HICON hIcon = GetIcon(i, TRUE);
+            ImageList_AddIcon(hIL, hIcon); // the icon is stretched to the size of the imagelist
+            HANDLES(DestroyIcon(hIcon));
+        }
+    }
+    return hIL;
+}
+
+HIMAGELIST
 CIconList::GetImageList()
 {
     HIMAGELIST hIL = ImageList_Create(ImageWidth, ImageHeight, GetImageListColorFlags() | ILC_MASK, 0, 1);

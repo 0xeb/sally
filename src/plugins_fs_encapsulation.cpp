@@ -3911,7 +3911,9 @@ CPluginData::CreateImageList(BOOL gray)
     if (srcList == NULL)
         return NULL; // the plugin has no bitmap assigned
 
-    HIMAGELIST ret = srcList->GetImageList();
+    // the plugin icons are 16x16; show them at the size of Sally's own menu icons (scaled with the system DPI)
+    int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
+    HIMAGELIST ret = srcList->GetImageListScaled(iconSize, iconSize);
     if (deleteSrcList)
         delete srcList;
     return ret;
