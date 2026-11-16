@@ -319,6 +319,10 @@ TEST_F(StressTest, PanelSessionWorksAfterEveryRandomCancel)
         ASSERT_TRUE(Pump(session, *connect));
         ASSERT_TRUE(connect->Ok()) << connect->Error().message;
     }
+    // A long listing of our own (600 folders), so the test does not depend on the shared fixtures.
+    ASSERT_TRUE(admin_.Mkdir(remoteDir_ + "/many")) << admin_.LastError().message;
+    for (int i = 0; i < 600; ++i)
+        ASSERT_TRUE(admin_.Mkdir(remoteDir_ + "/many/d" + std::to_string(i))) << admin_.LastError().message;
     int rounds = 0, cancelled = 0;
     for (; MoreRounds(rounds); ++rounds)
     {
@@ -332,7 +336,7 @@ TEST_F(StressTest, PanelSessionWorksAfterEveryRandomCancel)
         else if (kind == 2)
             req = session.DownloadToFile(remoteDir_ + "/srcdata/big.bin", localFile.wstring(), 0);
         else
-            req = session.List("fixtures/many"); // 5000 entries: a long listing
+            req = session.List(remoteDir_ + "/many"); // 600 entries: a long listing
         Sleep(static_cast<DWORD>(Rand(0, 80)));
         session.Cancel();
 

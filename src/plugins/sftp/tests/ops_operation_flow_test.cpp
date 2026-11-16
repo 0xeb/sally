@@ -771,6 +771,13 @@ TEST_F(OperationFlowTest, ClearEndsAWorkerThatSleepsInTheReconnectBackoff)
         ASSERT_TRUE(op->Start());
         ASSERT_TRUE(WaitUntil([&] { return server.Attempts() >= 1; }, 5000));
         Sleep(200); // the worker is in its backoff wait
+        {
+            // the test is only meaningful when that is really so: the item is taken, and the server refused at least once
+            const std::vector<CQueueItem> items = op->Queue().Items(false);
+            ASSERT_EQ(items.size(), 1u);
+            ASSERT_EQ(items[0].state, ItemState::Processing) << "the worker is not in its backoff wait";
+            ASSERT_GE(server.Attempts(), 1);
+        }
         const auto start = std::chrono::steady_clock::now();
         list.Clear();
         EXPECT_LT(std::chrono::steady_clock::now() - start, std::chrono::seconds(5));

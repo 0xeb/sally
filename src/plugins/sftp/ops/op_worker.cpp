@@ -1419,7 +1419,14 @@ CWorker::CItemResult CWorker::Upload(const CQueueItem& item)
     {
         queue.SetRenameSent(item.uid); // if the answer is lost, the next attempt looks at what the server did
         if (!session_.Rename(writeTo, target, existing.exists))
+        {
+            // Only a lost connection, a timeout or a cancel can leave the answer unknown; any other error is the
+            // server's own refusal: the rename was not done.
+            const SshErrorKind kind = session_.LastError().kind;
+            if (kind != SshErrorKind::Cancelled && kind != SshErrorKind::ConnectFailed && kind != SshErrorKind::Timeout)
+                queue.SetRenameSent(item.uid, false);
             return FromSessionError(Problem::TransferFailed);
+        }
     }
 
     return finishUpload();

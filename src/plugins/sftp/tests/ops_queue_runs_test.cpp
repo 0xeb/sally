@@ -178,3 +178,25 @@ TEST(QueueTransferBookkeeping, RenameSentIsKeptWhenTheItemGoesBackToWaiting)
     ASSERT_TRUE(queue.GetItem(uid, item));
     EXPECT_TRUE(item.renameSent); // the next attempt must still know that the rename may have been done
 }
+
+TEST(QueueTransferBookkeeping, RenameSentCanBeClearedAndRetargetingToAnotherNameClearsIt)
+{
+    CQueue queue;
+    const uint64_t uid = queue.AddRootItems({MakeDownload("a")})[0];
+    Take(queue);
+    CQueueItem item;
+
+    EXPECT_TRUE(queue.SetRenameSent(uid));
+    EXPECT_TRUE(queue.SetRenameSent(uid, false)); // the server refused the rename: it was not done
+    ASSERT_TRUE(queue.GetItem(uid, item));
+    EXPECT_FALSE(item.renameSent);
+
+    queue.SetRenameSent(uid);
+    ASSERT_TRUE(queue.GetItem(uid, item));
+    EXPECT_TRUE(queue.Retarget(uid, std::wstring(), item.remotePath)); // the same name: the flag stays
+    ASSERT_TRUE(queue.GetItem(uid, item));
+    EXPECT_TRUE(item.renameSent);
+    EXPECT_TRUE(queue.Retarget(uid, std::wstring(), item.remotePath + "_2")); // another name: the flag was about the old one
+    ASSERT_TRUE(queue.GetItem(uid, item));
+    EXPECT_FALSE(item.renameSent);
+}

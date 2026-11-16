@@ -30,7 +30,7 @@ libssh2 port is plain 1.11.1 without any of the security fixes published since (
 |---|---|---|
 | `CVE-2026-7598.patch` | CVE-2026-7598 integer overflow in `userauth_password` | 256d04b6 |
 | `libssh2-unconst-backport.patch` | (helper for the next patch) | 606c102e |
-| `CVE-2025-15661.patch` | CVE-2025-15661 out-of-bounds read in `sftp_symlink` | 2dae3024(local fix, see below) |
+| `CVE-2025-15661.patch` | CVE-2025-15661 out-of-bounds read in `sftp_symlink` | 2dae3024 (local fix, see below) |
 | `CVE-2026-55199.patch` | CVE-2026-55199 CPU loop in the `EXT_INFO` handler | 17626857 |
 | `CVE-2026-55200.patch` | CVE-2026-55200 missing `packet_length` upper bound | 97acf3df |
 | `CVE-2026-66032.patch` | CVE-2026-66032 double free in `sftp_open` | 5e477614 |

@@ -577,3 +577,39 @@ TEST_F(OperationTest, ALostRenameAnswerIsNotTrustedWhenTheTargetHasAnotherSizeOr
     ASSERT_TRUE(Run(op, observer)) << Describe(op);
     EXPECT_EQ(ItemsWithProblem(op, Problem::TargetExists).size(), 2u) << Describe(op);
 }
+
+TEST_F(OperationTest, AnAnswerOfTheUserIsNeverSecondGuessedByTheLostRenameShortcut)
+{
+    const std::string fresh = PatternBytes(64 * 1024, 41);
+    WriteAll(local_ / "src" / "over.bin", fresh);
+    PutRemoteFile(remoteDir_ + "/over.bin", PatternBytes(64 * 1024, 40)); // same size, other content
+
+    CQueueItem item = UploadItemFor(local_ / "src" / "over.bin", remoteDir_, "over.bin", true);
+    item.forceAction = SolveAction::Overwrite; // the user said: replace it
+    COperation op(Settings(TransferDirection::Upload), Params(), {item});
+    CTestObserver observer;
+    ASSERT_TRUE(Run(op, observer)) << Describe(op);
+    EXPECT_EQ(op.State(), OperationState::Finished) << Describe(op);
+    EXPECT_EQ(GetRemoteFile(remoteDir_ + "/over.bin"), fresh); // really uploaded, not taken for done
+}
+
+TEST_F(OperationTest, TheLostRenameShortcutAlsoSetsTheTimeAndThePermissionsOfTheTarget)
+{
+    const std::string content = PatternBytes(64 * 1024, 42);
+    WriteAll(local_ / "src" / "meta.bin", content);
+    SetLocalMtime(local_ / "src" / "meta.bin", 1577836800);
+    PutRemoteFile(remoteDir_ + "/meta.bin", content); // finished by the lost rename, time is "now", mode is the default
+
+    COperationSettings settings = Settings(TransferDirection::Upload);
+    settings.preserveTime = true;
+    settings.setUploadPermissions = true;
+    settings.uploadPermissions = 0640;
+    COperation op(settings, Params(), {UploadItemFor(local_ / "src" / "meta.bin", remoteDir_, "meta.bin", true)});
+    CTestObserver observer;
+    ASSERT_TRUE(Run(op, observer)) << Describe(op);
+    EXPECT_EQ(op.State(), OperationState::Finished) << Describe(op);
+    CSftpEntry e;
+    ASSERT_TRUE(admin_.Stat(remoteDir_ + "/meta.bin", e));
+    EXPECT_EQ(e.mtime, 1577836800);
+    EXPECT_EQ(e.permissions & 07777, 0640u);
+}

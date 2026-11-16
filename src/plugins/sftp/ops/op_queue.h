@@ -182,8 +182,10 @@ public:
     //   does not decide again.
     // - SetTargetInfo: size and time of the existing target, kept for the solve dialog.
     bool SetOwnsPartial(uint64_t uid);
-    // The worker is about to send the final rename of a safe upload (see CQueueItem::renameSent).
-    bool SetRenameSent(uint64_t uid);
+    // The worker is about to send the final rename of a safe upload (see CQueueItem::renameSent); false clears the
+    // flag again when the server answered with a refusal (the rename was not done). Retarget clears it too, because the
+    // flag belongs to the old target name.
+    bool SetRenameSent(uint64_t uid, bool sent = true);
     bool Retarget(uint64_t uid, const std::wstring& localPath, const std::string& remotePath);
     bool SetTargetInfo(uint64_t uid, uint64_t size, int64_t mtime);
 
