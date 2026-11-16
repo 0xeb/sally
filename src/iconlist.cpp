@@ -1385,6 +1385,60 @@ BOOL CIconList::CreateAsCopy(const CIconList* iconList, BOOL grayscale)
     return TRUE;
 }
 
+BOOL CIconList::CreateAsScaledCopy(const CIconList* iconList, int newImageWidth, int newImageHeight)
+{
+    if (!Create(newImageWidth, newImageHeight, iconList->ImageCount))
+        return FALSE;
+
+    for (int index = 0; index < ImageCount; index++)
+    {
+        const int srcX0 = iconList->ImageWidth * (index % IL_ITEMS_IN_ROW);
+        const int srcY0 = iconList->ImageHeight * (index / IL_ITEMS_IN_ROW);
+        const int dstX0 = ImageWidth * (index % IL_ITEMS_IN_ROW);
+        const int dstY0 = ImageHeight * (index / IL_ITEMS_IN_ROW);
+
+        for (int y = 0; y < ImageHeight; y++)
+        {
+            // source position of the center of the destination pixel (clamped to the image)
+            float fy = ((float)y + 0.5f) * iconList->ImageHeight / ImageHeight - 0.5f;
+            if (fy < 0)
+                fy = 0;
+            int y0 = (int)fy;
+            int y1 = min(y0 + 1, iconList->ImageHeight - 1);
+            float wy = fy - (float)y0;
+
+            for (int x = 0; x < ImageWidth; x++)
+            {
+                float fx = ((float)x + 0.5f) * iconList->ImageWidth / ImageWidth - 0.5f;
+                if (fx < 0)
+                    fx = 0;
+                int x0 = (int)fx;
+                int x1 = min(x0 + 1, iconList->ImageWidth - 1);
+                float wx = fx - (float)x0;
+
+                DWORD p00 = iconList->ImageRaw[(srcY0 + y0) * iconList->BitmapWidth + srcX0 + x0];
+                DWORD p10 = iconList->ImageRaw[(srcY0 + y0) * iconList->BitmapWidth + srcX0 + x1];
+                DWORD p01 = iconList->ImageRaw[(srcY0 + y1) * iconList->BitmapWidth + srcX0 + x0];
+                DWORD p11 = iconList->ImageRaw[(srcY0 + y1) * iconList->BitmapWidth + srcX0 + x1];
+
+                DWORD result = 0;
+                for (int shift = 0; shift < 32; shift += 8)
+                {
+                    float top = (float)((p00 >> shift) & 0xFF) * (1 - wx) + (float)((p10 >> shift) & 0xFF) * wx;
+                    float bottom = (float)((p01 >> shift) & 0xFF) * (1 - wx) + (float)((p11 >> shift) & 0xFF) * wx;
+                    DWORD value = (DWORD)(top * (1 - wy) + bottom * wy + 0.5f);
+                    result |= min(value, 255u) << shift;
+                }
+                ImageRaw[(dstY0 + y) * BitmapWidth + dstX0 + x] = result;
+            }
+        }
+        ImageFlags[index] = iconList->ImageFlags[index];
+    }
+
+    BkColor = iconList->BkColor;
+    return TRUE;
+}
+
 BOOL CIconList::ConvertToGrayscale(BOOL forceAlphaForBW)
 {
     if (ImageCount > 0)
