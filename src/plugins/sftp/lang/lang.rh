@@ -1,0 +1,172 @@
+﻿// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Resource IDs of the language-dependent resources (dialogs, controls). The IDs of the strings
+// are in ..\sftp.rh2; the ranges must not overlap.
+//
+#ifndef IDC_STATIC
+#define IDC_STATIC                -1
+#endif
+
+// Host key dialog (IDD_HOSTKEY)
+#define IDD_HOSTKEY               1000
+#define IDC_HOSTKEY_MESSAGE       1100
+#define IDE_HOSTKEY_HOST          1101
+#define IDE_HOSTKEY_TYPE          1102
+#define IDE_HOSTKEY_FINGERPRINT   1103
+#define IDB_HOSTKEY_SAVE          1104
+#define IDB_HOSTKEY_ONCE          1105
+
+// Prompt dialog (IDD_PROMPT): up to 4 label/edit pairs; the IDs of the pairs are consecutive
+#define IDD_PROMPT                1001
+#define IDC_PROMPT_INSTRUCTION    1110
+#define IDC_PROMPT_LABEL1         1111 // ..IDC_PROMPT_LABEL4 = 1114
+#define IDE_PROMPT1               1121 // ..IDE_PROMPT4 = 1124
+
+// Site list dialog (IDD_SITELIST); IDOK = Connect, IDCANCEL = Close
+#define IDD_SITELIST              1002
+#define IDC_SITELIST_LIST         1200
+#define IDB_SITELIST_NEW          1201
+#define IDB_SITELIST_EDIT         1202
+#define IDB_SITELIST_DELETE       1203
+#define IDB_SITELIST_RENAME       1204
+#define IDB_SITELIST_DUPLICATE    1205
+#define IDE_SITELIST_QUICK        1206
+
+// Site name dialog (IDD_SITENAME): rename
+#define IDD_SITENAME              1003
+#define IDE_SITENAME_NAME         1210
+
+// Site edit dialog (IDD_SITEEDIT) and its four tab pages (child dialogs)
+#define IDD_SITEEDIT              1004
+#define IDC_SITEEDIT_TABS         1300
+#define IDD_SITETAB_SESSION       1005
+#define IDD_SITETAB_AUTH          1006
+#define IDD_SITETAB_CONNECTION    1007
+#define IDD_SITETAB_DIRECTORIES   1008
+#define IDE_SITE_NAME             1310
+#define IDE_SITE_HOST             1311
+#define IDE_SITE_PORT             1312
+#define IDE_SITE_USER             1313
+#define IDE_SITE_PASSWORD         1314
+#define IDC_SITE_PASSWORD_HINT    1315
+#define IDX_SITE_REMEMBER         1316
+#define IDX_SITE_FORGET           1317
+#define IDX_SITE_AGENT            1320
+#define IDE_SITE_KEYFILE          1321
+#define IDB_SITE_KEYBROWSE        1322
+#define IDE_SITE_PASSPHRASE       1323
+#define IDC_SITE_PASSPHRASE_HINT  1324
+#define IDE_SITE_TIMEOUT          1330
+#define IDX_SITE_COMPRESSION      1331
+#define IDR_SITE_ENC_UTF8         1332
+#define IDR_SITE_ENC_AUTO         1333
+#define IDR_SITE_ENC_CODEPAGE     1334
+#define IDE_SITE_CODEPAGE         1335
+#define IDE_SITE_WORKERS          1336
+#define IDX_SITE_SAFEUPLOAD       1337
+#define IDX_SITE_PRESERVETIME     1338
+#define IDX_SITE_UPLOADPERM       1339
+#define IDE_SITE_REMOTEPATH       1340
+#define IDE_SITE_LOCALPATH        1341
+#define IDE_SITE_UPLOADMODE       1342
+
+// Operation window (IDD_OPERATION)
+#define IDD_OPERATION             1009
+#define IDC_OP_SOURCE             1400
+#define IDC_OP_TARGET             1401
+#define IDC_OP_FILE               1402
+#define IDC_OP_PROGRESS           1403
+#define IDC_OP_STATS              1404
+#define IDC_OP_STATUS             1405
+#define IDX_OP_ERRORS_ONLY        1406
+#define IDC_OP_LIST               1407
+#define IDB_OP_PAUSE              1408
+#define IDB_OP_CANCEL             1409
+#define IDB_OP_SOLVE              1410
+#define IDB_OP_RETRY              1411
+#define IDB_OP_HIDE               1412
+#define IDX_OP_CLOSE_WHEN_DONE    1413
+
+// Solve-error dialog (IDD_SOLVE_ERROR): one parked or failed item; IDCANCEL = Close
+#define IDD_SOLVE_ERROR           1010
+#define IDC_SOLVE_NAME            1420
+#define IDC_SOLVE_MESSAGE         1421
+#define IDC_SOLVE_SOURCE          1422
+#define IDC_SOLVE_TARGET          1423
+#define IDE_SOLVE_NEWNAME         1424
+#define IDB_SOLVE_OVERWRITE       1425
+#define IDB_SOLVE_RESUME          1426
+#define IDB_SOLVE_RENAME          1427
+#define IDB_SOLVE_RETRY           1428
+#define IDB_SOLVE_SKIP            1429
+#define IDX_SOLVE_ALL             1430
+
+// Operations list dialog (IDD_OPERATIONS); IDCANCEL = Close
+#define IDD_OPERATIONS            1011
+#define IDC_OPS_LIST              1440
+#define IDB_OPS_SHOW              1441
+#define IDB_OPS_CANCEL            1442
+
+// Copy/Move dialog (IDD_COPYMOVE): target path (history combo), file exists policy, preserve time
+#define IDD_COPYMOVE              1012
+#define IDC_COPYMOVE_SUBJECT      1450
+#define IDC_COPYMOVE_TARGET       1451
+#define IDC_COPYMOVE_POLICY       1452
+#define IDX_COPYMOVE_PRESERVETIME 1453
+
+// Change attributes dialog (IDD_CHMOD): 3x3 grid (owner/group/others x read/write/execute), octal value, symbolic text,
+// recursive options. The nine grid checkboxes have consecutive ids in the order owner r,w,x, group r,w,x, others r,w,x.
+#define IDD_CHMOD                 1013
+#define IDX_CHMOD_FIRST_BIT       1460
+#define IDX_CHMOD_OWNER_R         1460
+#define IDX_CHMOD_OWNER_W         1461
+#define IDX_CHMOD_OWNER_X         1462
+#define IDX_CHMOD_GROUP_R         1463
+#define IDX_CHMOD_GROUP_W         1464
+#define IDX_CHMOD_GROUP_X         1465
+#define IDX_CHMOD_OTHERS_R        1466
+#define IDX_CHMOD_OTHERS_W        1467
+#define IDX_CHMOD_OTHERS_X        1468
+#define IDE_CHMOD_OCTAL           1469
+#define IDC_CHMOD_SYMBOLIC        1470
+#define IDX_CHMOD_RECURSIVE       1471
+#define IDX_CHMOD_FILES           1472
+#define IDX_CHMOD_DIRS            1473
+
+// Information dialogs: read-only list of "property: value" rows (IDD_FSINFO Ctrl+F1, IDD_FSSECURITY security icon,
+// IDD_FSPROPERTIES Alt+Enter). All three have the same controls: IDC_INFO_LIST, IDB_INFO_COPY and IDCANCEL (Close).
+#define IDD_FSINFO                1014
+#define IDD_FSSECURITY            1015
+#define IDD_FSPROPERTIES          1016
+#define IDC_INFO_LIST             1480
+#define IDB_INFO_COPY             1481
+
+// Command output dialog (IDD_EXEC_OUTPUT): read-only text of what a command line command printed, a status line (exit
+// code, signal, cut output), Copy (all text to the clipboard) and Close.
+#define IDD_EXEC_OUTPUT           1017
+#define IDE_EXEC_OUTPUT           1490
+#define IDC_EXEC_STATUS           1491
+#define IDB_EXEC_COPY             1492
+
+// Configuration dialog (IDD_CONFIG): plugin-wide settings; three group boxes (Connections, Listing cache, Session log)
+#define IDD_CONFIG                1018
+#define IDE_CFG_WORKERS           1520
+#define IDE_CFG_TIMEOUT           1521
+#define IDE_CFG_KEEPALIVE         1522
+#define IDE_CFG_MAXWORKERS        1523
+#define IDE_CFG_DETACHEDIDLE      1524
+#define IDX_CFG_CACHE             1525
+#define IDE_CFG_CACHEAGE          1526
+#define IDC_CFG_LOGLEVEL          1527
+#define IDE_CFG_LOGKIB            1528
+#define IDE_CFG_LOGKEEP           1529
+
+// Session log window (IDD_SESSION_LOG): modeless and resizable; a combo box of the connection logs, the read-only text of
+// the selected one, Copy, Save as..., Clear and Close (IDCANCEL)
+#define IDD_SESSION_LOG           1019
+#define IDC_LOG_COMBO             1500
+#define IDE_LOG_TEXT              1501
+#define IDB_LOG_COPY              1502
+#define IDB_LOG_SAVE              1503
+#define IDB_LOG_CLEAR             1504

@@ -1,0 +1,20 @@
+{
+  "name": "sally-sftp",
+  "version-string": "1.0.0",
+  "description": "Third-party libraries of the Sally SFTP plugin, linked statically into sftp.dll",
+  "builtin-baseline": "fe8e78fac7df2793f9848ed0d27aa59d9c035998",
+  "dependencies": [
+    {
+      "name": "libssh2",
+      "default-features": false,
+      "features": [ "openssl", "zlib" ]
+    },
+    "openssl",
+    "zlib",
+    "gtest"
+  ],
+  "overrides": [
+    { "name": "zlib", "version": "1.3.2", "port-version": 3 },
+    { "name": "gtest", "version": "1.18.0" }
+  ]
+}

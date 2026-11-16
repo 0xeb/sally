@@ -1,0 +1,4 @@
+*.sh text eol=lf
+Dockerfile text eol=lf
+sshd_config* text eol=lf
+vsftpd.conf text eol=lf

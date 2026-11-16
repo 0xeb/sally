@@ -1,0 +1,13 @@
+﻿// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+//
+// sftp.rc2 - resources that Microsoft Visual C++ does not edit directly (the version information)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+#include "versinfo.rh2"
+#include "versinfo.rc2"

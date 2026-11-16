@@ -10,6 +10,7 @@ the remaining files use the upstream LGPL/BSD/unRAR terms as identified there.
 === Jean-loup Gailly and Mark Adler ===
 Portions of ZIP plugin utilizes zlib library.
 ZLIB Library Copyright (C) 1995-2002 Jean-loup Gailly and Mark Adler
+The SFTP plugin links zlib 1.3.2 statically. See doc/license/license_zlib.txt.
 
 === Tomas Jelinek ===
 The Multimedia Viewer plugin includes software written by Tomas Jelinek.
@@ -80,6 +81,15 @@ ISZ SDK Copyright (C) 2002-2006 EZB Systems, Inc., All Rights Reserved.
 === OpenSSL Project === 
 The FTP Client plugin can utilize OpenSSL library.
 Copyright (c) 1998-2019 The OpenSSL Project.  All rights reserved.
+The SFTP plugin links OpenSSL 3.5.9 statically (OpenSSL 3.x is licensed under the
+Apache License 2.0; the complete text is in doc/license/license_openssl.txt).
+Copyright (c) 1998-2026 The OpenSSL Project Authors.
+
+=== libssh2 ===
+The SFTP plugin links libssh2 1.11.1 statically, with upstream security fixes applied
+(see src/plugins/sftp/vcpkg-ports/README.md). Copyright (c) 2004-2023 Sara Golemon,
+Daniel Stenberg and the other libssh2 authors. Licensed under the BSD 3-Clause License.
+The complete notice is in doc/license/license_libssh2.txt.
 
 === SQLite === 
 Open Salamander uses SQLite. SQLite is in the Public Domain.

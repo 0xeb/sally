@@ -1,0 +1,401 @@
+﻿// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// WARNING: cannot be replaced by "#pragma once" because it is included from .rc file and it seems resource compiler does not support "#pragma once"
+#ifndef __SFTP_RH2
+#define __SFTP_RH2
+
+#if defined(APSTUDIO_INVOKED) && !defined(APSTUDIO_READONLY_SYMBOLS)
+#error this file is not editable by Microsoft Visual C++
+#endif //defined(APSTUDIO_INVOKED) && !defined(APSTUDIO_READONLY_SYMBOLS)
+
+// IDs of the strings in lang\lang.rc2
+#define IDS_PLUGINNAME           100
+#define IDS_PLUGIN_DESCRIPTION   101
+#define IDS_ABOUT                102
+#define IDS_ABOUT_FORMAT         103
+// 104 was IDS_NOT_IMPLEMENTED (removed)
+#define IDS_LIBSSH2_INIT_FAILED  105
+#define IDS_CHNGDRVITEM          106
+#define IDS_INVALIDNUMBER        107
+#define IDS_CANNOT_DECRYPT_SOMEPASSWORDS 108
+#define IDS_HOSTKEY_TITLE_NEW    109
+#define IDS_HOSTKEY_TITLE_CHANGED 110
+#define IDS_HOSTKEY_TEXT_NEW     111
+#define IDS_HOSTKEY_TEXT_CHANGED 112
+#define IDS_HOSTKEY_SAVE_NEW     113
+#define IDS_HOSTKEY_SAVE_CHANGED 114
+#define IDS_PROMPT_TITLE         115
+#define IDS_PROMPT_TOO_MANY      116
+#define IDS_WAIT_CONNECTING      117
+#define IDS_WAIT_LISTING         118
+#define IDS_DETACH_PROMPT        119
+#define IDS_BTN_DISCONNECT       120
+#define IDS_BTN_KEEP_CONNECTION  121
+#define IDS_ERR_CONNECT          122
+#define IDS_ERR_LIST             123
+#define IDS_ERR_BAD_PATH         124
+#define IDS_ERR_SITE_UNKNOWN     125
+#define IDS_ERR_FILE_NOT_DIR     126
+#define IDS_PASSWORD_TITLE       127
+#define IDS_PASSWORD_PROMPT      128
+#define IDS_COL_PERMISSIONS      129
+#define IDS_COL_PERMISSIONS_DESC 130
+#define IDS_COL_OWNER            131
+#define IDS_COL_OWNER_DESC       132
+#define IDS_COL_GROUP            133
+#define IDS_COL_GROUP_DESC       134
+#define IDS_MENU_SHOWINPANEL     135
+#define IDS_MENU_DISCONNECT      136
+#define IDS_ERR_INTERNAL         137
+#define IDS_ERR_NO_PASSWORD      138
+#define IDS_SITELIST_TITLE       139
+#define IDS_SITELIST_COL_NAME    140
+#define IDS_SITELIST_COL_HOST    141
+#define IDS_SITELIST_COL_USER    142
+#define IDS_SITELIST_DELETE_CONFIRM 143
+#define IDS_SITELIST_BAD_QUICK   144
+#define IDS_SITEEDIT_TITLE_NEW   145
+#define IDS_SITEEDIT_TITLE_EDIT  146
+#define IDS_SITEEDIT_TAB_SESSION 147
+#define IDS_SITEEDIT_TAB_AUTH    148
+#define IDS_SITEEDIT_TAB_CONNECTION 149
+#define IDS_SITEEDIT_TAB_DIRECTORIES 150
+#define IDS_SITE_KEEP_PASSWORD   151
+#define IDS_SITE_KEEP_PASSPHRASE 152
+#define IDS_SITE_ERR_NAME_EMPTY  153
+#define IDS_SITE_ERR_NAME_INVALID 154
+#define IDS_SITE_ERR_NAME_TAKEN  155
+#define IDS_SITE_ERR_HOST_EMPTY  156
+#define IDS_SITE_ERR_HOST_INVALID 157
+#define IDS_SITE_ERR_PORT_RANGE  158
+#define IDS_SITE_ERR_USER_EMPTY  159
+#define IDS_SITE_ERR_USER_INVALID 160
+#define IDS_SITE_ERR_TIMEOUT_RANGE 161
+#define IDS_SITE_ERR_CODEPAGE_INVALID 162
+#define IDS_SITE_KEY_FILTER      163
+#define IDS_SITE_KEY_BROWSE_TITLE 164
+#define IDS_SITE_SECRET_NOT_STORED 165
+#define IDS_SITENAME_TITLE       166
+#define IDS_SITE_SAVE_FAILED     167
+#define IDS_MENU_CONNECT         168
+#define IDS_SITES_READONLY       169
+#define IDS_PROMPT_PASSPHRASE    170
+#define IDS_ERR_UNKNOWN          171
+#define IDS_SITE_ERR_WORKERS_RANGE 174
+#define IDS_SITE_ERR_UPLOADPERM_INVALID 175
+// operation window (ui/operation_window.cpp, ui/problem_text.cpp)
+#define IDS_OP_TITLE_DOWNLOAD              176
+#define IDS_OP_TITLE_UPLOAD                177
+#define IDS_OP_TITLE_MOVE_DOWNLOAD         178
+#define IDS_OP_TITLE_MOVE_UPLOAD           179
+#define IDS_OP_TITLE_PERCENT               180
+#define IDS_OP_STATUS_RUNNING              181
+#define IDS_OP_STATUS_PAUSED               182
+#define IDS_OP_STATUS_CANCELLING           183
+#define IDS_OP_STATUS_CANCELLED            184
+#define IDS_OP_STATUS_FINISHED             185
+#define IDS_OP_STATUS_FINISHED_SKIPS       186
+#define IDS_OP_STATUS_FINISHED_ERRORS      187
+#define IDS_OP_STATUS_NEEDS_USER           188
+#define IDS_OP_STATUS_ASKING               189
+#define IDS_OP_STATS                       190
+#define IDS_OP_PAUSE                       191
+#define IDS_OP_RESUME                      192
+#define IDS_OP_CANCEL_CONFIRM              193
+#define IDS_OP_COL_STATE                   194
+#define IDS_OP_COL_NAME                    195
+#define IDS_OP_COL_PROBLEM                 196
+#define IDS_OP_COL_SIZE                    197
+#define IDS_OP_MORE                        198
+#define IDS_OP_ITEM_WAITING                199
+#define IDS_OP_ITEM_PROCESSING             200
+#define IDS_OP_ITEM_DELAYED                201
+#define IDS_OP_ITEM_DONE                   202
+#define IDS_OP_ITEM_SKIPPED                203
+#define IDS_OP_ITEM_FAILED                 204
+#define IDS_OP_ITEM_USERINPUT              205
+#define IDS_OP_ITEM_FORCEDFAIL             206
+#define IDS_OP_PROBLEM_TARGET_EXISTS       207
+#define IDS_OP_PROBLEM_INVALID_LOCAL_NAME  208
+#define IDS_OP_PROBLEM_INVALID_REMOTE_NAME 209
+#define IDS_OP_PROBLEM_TRANSFER_FAILED     210
+#define IDS_OP_PROBLEM_CONNECTION_LOST     211
+#define IDS_OP_PROBLEM_PERMISSION_DENIED   212
+#define IDS_OP_PROBLEM_NOT_FOUND           213
+#define IDS_OP_PROBLEM_DIR_CREATE_FAILED   214
+#define IDS_OP_PROBLEM_DELETE_FAILED       215
+#define IDS_OP_PROBLEM_SYMLINK_LOOP        216
+#define IDS_OP_PROBLEM_LOCAL_IO_ERROR      217
+#define IDS_OP_PROBLEM_DISK_FULL           218
+#define IDS_OP_PROBLEM_OTHER               219
+#define IDS_OP_PROMPT_HOST                 220
+#define IDS_SOLVE_SOURCE_INFO              221
+#define IDS_SOLVE_TARGET_INFO              222
+#define IDS_SOLVE_UNKNOWN_DATE             223
+#define IDS_SOLVE_BAD_NAME                 224
+#define IDS_OPS_COL_OPERATION              225
+#define IDS_OPS_COL_STATE                  226
+#define IDS_OPS_COL_DESCRIPTION            227
+#define IDS_OPS_DESCRIPTION                228
+// copy/move dialog, FS services (fs/fs_transfer.cpp, ui/copy_move_dialog.cpp), operations menu and unload
+#define IDS_COPYMOVE_TITLE_COPY            229
+#define IDS_COPYMOVE_TITLE_MOVE            230
+#define IDS_COPYMOVE_SUBJECT_COPY          231
+#define IDS_COPYMOVE_SUBJECT_MOVE          232
+#define IDS_POLICY_ASK                     233
+#define IDS_POLICY_OVERWRITE               234
+#define IDS_POLICY_RESUME                  235
+#define IDS_POLICY_SKIP                    236
+#define IDS_POLICY_OVERWRITE_OLDER         237
+#define IDS_POLICY_RENAME                  238
+#define IDS_ERR_SFTP_TARGET_UNSUPPORTED    239
+#define IDS_ERR_DROP_TARGET                240
+#define IDS_ERR_MOVE_ITEM                  241
+#define IDS_ERR_OP_START                   242
+#define IDS_OPS_RELEASE_PROMPT             243
+#define IDS_MENU_OPERATIONS                244
+#define IDS_WAIT_MOVING                    245
+#define IDS_ERR_NOT_CONNECTED              246
+#define IDS_OP_STATUS_PAUSED_REASON        247
+#define IDS_ERR_MASK_UNSUPPORTED           248
+#define IDS_ERR_NAME_EMPTY                 249
+#define IDS_ERR_NAME_INVALID               250
+#define IDS_ERR_NAME_EXISTS                251
+#define IDS_ERR_RENAME_ITEM                252
+#define IDS_ERR_CREATE_DIR                 253
+#define IDS_WAIT_RENAMING                  254
+#define IDS_WAIT_CREATING_DIR              255
+#define IDS_ERR_NAME_ENCODING              256
+#define IDS_OP_TITLE_DELETE                257
+#define IDS_OP_STATS_DELETE                258
+#define IDS_WAIT_DELETING                  259
+#define IDS_ERR_DELETE_ITEM                260
+// chmod (fs/fs_chmod.cpp, ui/chmod_dialog.cpp)
+#define IDS_OP_TITLE_CHMOD                 261
+#define IDS_WAIT_CHMOD                     262
+#define IDS_ERR_CHMOD_ITEM                 263
+#define IDS_OP_PROBLEM_CHMOD_FAILED        264
+#define IDS_CHMOD_TITLE_ONE                265
+#define IDS_CHMOD_TITLE_MANY               266
+#define IDS_ERR_CHMOD_OCTAL                267
+
+// information services (fs/fs_info.cpp, fs/fs_properties.cpp, ui/*_dialog.cpp)
+#define IDS_INFO_COL_PROPERTY              268
+#define IDS_INFO_COL_VALUE                 269
+#define IDS_WAIT_PROPERTIES                270
+#define IDS_INFO_TITLE                     271
+#define IDS_INFO_HOST                      272
+#define IDS_INFO_PORT                      273
+#define IDS_INFO_USER                      274
+#define IDS_INFO_BANNER                    275
+#define IDS_INFO_SFTP_VERSION              276
+#define IDS_INFO_SFTP_VERSION_VALUE        277
+#define IDS_INFO_FREE                      278
+#define IDS_INFO_TOTAL                     279
+#define IDS_INFO_UNKNOWN                   280
+#define IDS_INFO_NOT_REPORTED              281
+#define IDS_INFO_NOT_CONNECTED             282
+#define IDS_INFO_KEX                       283
+#define IDS_INFO_CIPHER                    284
+#define IDS_INFO_MAC                       285
+#define IDS_INFO_COMPRESSION               286
+#define IDS_INFO_TO_SERVER                 287
+#define IDS_INFO_FROM_SERVER               288
+#define IDS_SEC_TITLE                      289
+#define IDS_SEC_HOSTKEY_TYPE               290
+#define IDS_SEC_FINGERPRINT                291
+#define IDS_SEC_TRUST                      292
+#define IDS_SEC_TRUST_KNOWN                293
+#define IDS_SEC_TRUST_SAVED                294
+#define IDS_SEC_TRUST_ONCE                 295
+#define IDS_SEC_ICON_TRUSTED               296
+#define IDS_SEC_ICON_UNVERIFIED            297
+#define IDS_PROP_TITLE_ONE                 298
+#define IDS_PROP_TITLE_MANY                299
+#define IDS_PROP_NAME                      300
+#define IDS_PROP_LOCATION                  301
+#define IDS_PROP_TYPE                      302
+#define IDS_PROP_TYPE_FILE                 303
+#define IDS_PROP_TYPE_DIR                  304
+#define IDS_PROP_TYPE_LINK                 305
+#define IDS_PROP_TYPE_DIR_LINK             306
+#define IDS_PROP_LINK_TARGET               307
+#define IDS_PROP_SIZE                      308
+#define IDS_PROP_SIZE_VALUE                309
+#define IDS_PROP_MODIFIED                  310
+#define IDS_PROP_ACCESSED                  311
+#define IDS_PROP_OWNER                     312
+#define IDS_PROP_GROUP                     313
+#define IDS_PROP_PERMISSIONS               314
+#define IDS_PROP_MIXED                     315
+#define IDS_PROP_CONTENTS                  316
+#define IDS_PROP_CONTENTS_VALUE            317
+#define IDS_PROP_TOTAL_SIZE                318
+#define IDS_PROP_LINKS                     319
+#define IDS_ERR_PROPERTIES                 320
+
+// F3 view (fs/fs_view.cpp)
+#define IDS_WAIT_VIEWING                   321
+#define IDS_WAIT_VIEWING_PROGRESS          322
+#define IDS_ERR_VIEW                       323
+#define IDS_WAIT_ESC_HINT                  324
+
+// Command line (fs/fs_commandline.cpp, ui/exec_output_dialog.cpp)
+#define IDS_WAIT_EXEC                      325
+#define IDS_ERR_EXEC                       326
+#define IDS_ERR_EXEC_REFUSED               327
+#define IDS_EXEC_STATUS_EXIT               328
+#define IDS_EXEC_STATUS_SIGNAL             329
+#define IDS_EXEC_STATUS_CUT                330
+#define IDS_ERR_EXEC_ENCODING              331
+#define IDS_EXEC_CONFIRM                   332
+
+// Context menu and Shift+F3 (fs/fs_menu.cpp)
+#define IDS_CTX_COPY_PATH                  333
+#define IDS_CTX_COPY_URL                   334
+#define IDS_CTX_PROPERTIES                 335
+#define IDS_CTX_ATTRIBUTES                 336
+#define IDS_CTX_REFRESH                    337
+#define IDS_CTX_COPY_CUR_PATH              338
+#define IDS_CTX_COPY_CUR_URL               339
+#define IDS_CTX_SERVER_INFO                340
+
+// Chmod when the server does not report the current permissions
+#define IDS_OP_PROBLEM_PERMS_UNKNOWN       341
+#define IDS_ERR_CHMOD_UNKNOWN              342
+
+// Translatable texts of core errors (SshMsg in core/ssh_types.h, mapped in ui/error_text.cpp); patterns with %1, %2
+#define IDS_ERRMSG_RESOLVE_FAILED          343
+#define IDS_ERRMSG_RESOLVE_TIMEOUT         344
+#define IDS_ERRMSG_CONNECT_TIMEOUT         345
+#define IDS_ERRMSG_SESSION_NOT_OPEN        346
+#define IDS_ERRMSG_CONNECT_FAILED          347
+#define IDS_ERRMSG_NO_HOST_GIVEN           348
+#define IDS_ERRMSG_NO_HOST_KEY             349
+#define IDS_ERRMSG_KNOWN_HOSTS_UNCHECKED   350
+#define IDS_ERRMSG_HOSTKEY_CHANGED         351
+#define IDS_ERRMSG_HOSTKEY_REJECTED        352
+#define IDS_ERRMSG_NO_KNOWN_HOSTS_FILE     353
+#define IDS_ERRMSG_KNOWN_HOSTS_WRITE_FAILED 354
+#define IDS_ERRMSG_KNOWN_HOSTS_REPLACE_FAILED 355
+#define IDS_ERRMSG_SFTP_NEEDS_AUTH         356
+#define IDS_ERRMSG_NO_SFTP_SUBSYSTEM       357
+#define IDS_ERRMSG_BROKEN_TIMEOUT          358
+#define IDS_ERRMSG_BROKEN_CANCEL           359
+#define IDS_ERRMSG_BROKEN_ERROR            360
+#define IDS_ERRMSG_AUTH_CANCELLED          361
+#define IDS_ERRMSG_AUTH_NEEDS_CONNECTION   362
+#define IDS_ERRMSG_PASSWORD_EXPIRED        363
+#define IDS_ERRMSG_AUTH_FAILED             364
+#define IDS_ERRMSG_AUTH_FAILED_NO_CREDENTIALS 365
+#define IDS_ERRMSG_KEYFILE_UNUSABLE        366
+#define IDS_ERRMSG_KEYFILE_WRONG_PASSPHRASE 367
+#define IDS_ERRMSG_KEYFILE_PATH_INVALID    368
+#define IDS_ERRMSG_KEYFILE_OPEN_FAILED     369
+#define IDS_ERRMSG_KEYFILE_BAD_SIZE        370
+#define IDS_ERRMSG_KEYFILE_READ_FAILED     371
+#define IDS_ERRMSG_PPK_DECRYPT_FAILED    372
+#define IDS_ERRMSG_PPK_UNSUPPORTED_ENCRYPTION 373
+#define IDS_ERRMSG_PPK_UNSUPPORTED_KDF   374
+#define IDS_ERRMSG_PPK_UNSUPPORTED_KEY_TYPE 375
+#define IDS_ERRMSG_PPK_UNSUPPORTED_OLD_FORMAT 376
+#define IDS_ERRMSG_PPK_NOT_PUTTY_FILE    377
+#define IDS_ERRMSG_PPK_DAMAGED           378
+#define IDS_ERRMSG_SFTP_LIST                      379
+#define IDS_ERRMSG_SFTP_READ_INFO                 380
+#define IDS_ERRMSG_SFTP_READ_FILE                 381
+#define IDS_ERRMSG_SFTP_WRITE_FILE                382
+#define IDS_ERRMSG_SFTP_CREATE                    383
+#define IDS_ERRMSG_SFTP_DELETE                    384
+#define IDS_ERRMSG_SFTP_RENAME                    385
+#define IDS_ERRMSG_SFTP_CHANGE_ATTRS              386
+#define IDS_ERRMSG_REASON_NOT_FOUND               387
+#define IDS_ERRMSG_REASON_PERMISSION_DENIED       388
+#define IDS_ERRMSG_REASON_EXISTS                  389
+#define IDS_ERRMSG_REASON_DIR_NOT_EMPTY           390
+#define IDS_ERRMSG_REASON_NOT_A_DIRECTORY         391
+#define IDS_ERRMSG_REASON_NO_SPACE                392
+#define IDS_ERRMSG_REASON_WRITE_PROTECTED         393
+#define IDS_ERRMSG_REASON_UNSUPPORTED             394
+#define IDS_ERRMSG_REASON_CONNECTION_LOST         395
+#define IDS_ERRMSG_REASON_NO_ANSWER               396
+#define IDS_ERRMSG_REASON_FAILED                  397
+#define IDS_ERRMSG_SFTP_NOT_OPEN                  398
+#define IDS_ERRMSG_RESUME_FAILED                  399
+#define IDS_ERRMSG_SERVER_ACCEPTED_NO_DATA        400
+#define IDS_ERRMSG_ALREADY_EXISTS                 401
+#define IDS_ERRMSG_REPLACE_DIR_NOT_EMPTY          402
+#define IDS_ERRMSG_REPLACE_DIR_UNREADABLE         403
+#define IDS_ERRMSG_LOCAL_SET_POSITION             404
+#define IDS_ERRMSG_LOCAL_WRITE                    405
+#define IDS_ERRMSG_LOCAL_GET_SIZE                 406
+#define IDS_ERRMSG_LOCAL_READ_TIME                407
+#define IDS_ERRMSG_LOCAL_READ                     408
+#define IDS_ERRMSG_HANDSHAKE_FAILED               409
+#define IDS_ERRMSG_SFTP_SUBSYSTEM_FAILED          410
+#define IDS_ERRMSG_AUTH_INTERRUPTED               411
+#define IDS_ERRMSG_AUTH_METHODS_QUERY_FAILED      412
+#define IDS_ERRMSG_EXEC_CHANNEL_FAILED            413
+#define IDS_ERRMSG_EXEC_START_FAILED              414
+#define IDS_ERRMSG_EXEC_READ_FAILED               415
+#define IDS_ERRMSG_EXEC_FINISH_FAILED             416
+#define IDS_ERRMSG_NO_ANSWER_TIMEOUT              417
+#define IDS_ERRMSG_EXEC_IDLE_TIMEOUT              418
+#define IDS_ERRMSG_INVALID_SERVER_DATA            419
+#define IDS_ERRMSG_CANCELLED                      420
+#define IDS_ERRMSG_NOT_CONNECTED                  421
+#define IDS_ERRMSG_LOCAL_FILE_CREATE_FAILED       422
+#define IDS_ERRMSG_LOCAL_FILE_RENAME_FAILED       423
+// suffixes of a shown error text (DescribeSshError): "(code %1)" and "(code %1, SFTP status %2)"
+#define IDS_ERRMSG_SUFFIX_CODE                    424
+#define IDS_ERRMSG_SUFFIX_CODE_STATUS             425
+// Configuration dialog and menu item
+#define IDS_CONFIG_LOGLEVEL_OFF                   426
+#define IDS_CONFIG_LOGLEVEL_ERRORS                427
+#define IDS_CONFIG_LOGLEVEL_NORMAL                428
+#define IDS_CONFIG_LOGLEVEL_VERBOSE               429
+#define IDS_MENU_CONFIGURATION                    430
+#define IDS_CONFIG_ERR_RANGE                      431
+#define IDS_CONFIG_ERR_KEEPALIVE                  432
+// Session log window, menu item and context menu item
+#define IDS_MENU_SESSION_LOG                      433
+#define IDS_CTX_SHOW_LOG                          434
+#define IDS_LOG_TITLE_PANEL                       435
+#define IDS_LOG_TITLE_WORKER                      436
+#define IDS_LOG_TITLE_WORKER_NO_OPERATION         437
+#define IDS_LOG_CLOSED_SUFFIX                     438
+#define IDS_LOG_NO_LOGS                           439
+#define IDS_LOG_SAVE_FILTER_TEXT                  440
+#define IDS_LOG_SAVE_FILTER_ALL                   441
+#define IDS_LOG_SAVE_FAILED                       442
+#define IDS_LOG_OFF_HINT                          443
+// shown instead of "Running" while every worker of an operation waits for a free connection (global cap)
+#define IDS_OP_STATUS_WAITING_SLOT                444
+
+// Help topic ids (F1 in a dialog, Plugins > SFTP menu help). Sally maps them to the pages of the sftp manual
+// (https://get-sally.app/manual/sftp/<page>.html, see .notes/help/topics.md). Unique, 2000 and up, never reused.
+#define IDH_SFTP_CONTENTS                 2000 // the manual's start
+#define IDH_SITE_LIST                     2001
+#define IDH_SITE_NAME                     2002
+#define IDH_SITE_EDIT                     2003 // the dialog around the tabs
+#define IDH_SITE_EDIT_SESSION             2004 // tab pages
+#define IDH_SITE_EDIT_AUTH                2005
+#define IDH_SITE_EDIT_CONNECTION          2006
+#define IDH_SITE_EDIT_DIRECTORIES         2007
+#define IDH_HOST_KEY                      2008
+#define IDH_PROMPT                        2009
+#define IDH_COPY_MOVE                     2010
+#define IDH_CHMOD                         2011
+#define IDH_OPERATION_WINDOW              2012
+#define IDH_SOLVE_ERROR                   2013
+#define IDH_OPERATIONS_LIST               2014
+#define IDH_SESSION_LOG                   2015
+#define IDH_CONFIGURATION                 2016
+#define IDH_SERVER_INFO                   2017 // Ctrl+F1
+#define IDH_SECURITY_INFO                 2018 // the security icon
+#define IDH_PROPERTIES                    2019 // Alt+Enter
+#define IDH_COMMAND_OUTPUT                2020
+#define IDH_DISCONNECT                    2021 // menu item only (no dialog)
+
+#endif // __SFTP_RH2

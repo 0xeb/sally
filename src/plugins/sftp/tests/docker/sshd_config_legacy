@@ -1,0 +1,19 @@
+# Test server: legacy algorithms only (SHA-1 / CBC / ssh-rsa host key). Sally must refuse to connect.
+Port 2226
+HostKey /etc/ssh/ssh_host_rsa_key
+PidFile /run/sshd-2226.pid
+
+UsePAM yes
+PasswordAuthentication yes
+PubkeyAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+
+KexAlgorithms diffie-hellman-group14-sha1
+Ciphers aes128-cbc
+MACs hmac-sha1
+HostKeyAlgorithms ssh-rsa
+
+Subsystem sftp internal-sftp
+
+PerSourcePenalties no

@@ -1,0 +1,489 @@
+﻿// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+//
+// lang.rc2 - the English strings of the SFTP plugin
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME,             "SFTP Client"
+ IDS_PLUGIN_DESCRIPTION,     "Transfer files and directories over SFTP."
+ IDS_ABOUT,                  "About SFTP Plugin"
+ // arguments: plugin name, plugin version, copyright, description, libssh2 version, OpenSSL version text
+ IDS_ABOUT_FORMAT,           "%ls %ls\n\n%ls\n\n%ls\n\nlibssh2 %hs\n%hs\n\nUses libssh2 (BSD-3-Clause), OpenSSL (Apache-2.0) and zlib."
+ // argument: libssh2 error code
+ IDS_LIBSSH2_INIT_FAILED,    "SFTP: the libssh2 library could not be initialized (error %d). The plugin cannot be loaded."
+ // item in the Change Drive menu: hotkey, TAB, title
+ IDS_CHNGDRVITEM,            "\tSFTP Client"
+ // WinLib: text for an invalid number typed into a numeric field
+ IDS_INVALIDNUMBER,          "Invalid number."
+ // master password changed/removed: remembered passwords that could not be converted
+ IDS_CANNOT_DECRYPT_SOMEPASSWORDS, "Some remembered passwords could not be decrypted with the previous master password and may no longer work. You will be asked for them again when connecting."
+ // host key dialog: window titles
+ IDS_HOSTKEY_TITLE_NEW,      "SFTP Client - Unknown Host Key"
+ IDS_HOSTKEY_TITLE_CHANGED,  "SFTP Client - WARNING: Host Key Has Changed"
+ IDS_HOSTKEY_TEXT_NEW,       "The authenticity of this server cannot be verified: its host key is not known yet. Compare the fingerprint below with the one from the server administrator before you continue."
+ IDS_HOSTKEY_TEXT_CHANGED,   "WARNING: THE HOST KEY OF THIS SERVER HAS CHANGED!\nSomeone may be intercepting your connection, or the administrator may have reinstalled the server. Do not continue unless you know the reason. The replace button overwrites the stored key with the new one."
+ // host key dialog: text of the "save" button
+ IDS_HOSTKEY_SAVE_NEW,       "&Accept and save"
+ IDS_HOSTKEY_SAVE_CHANGED,   "&Replace stored key"
+ // prompt dialog: default window title (the server gave none)
+ IDS_PROMPT_TITLE,           "SFTP Client - Authentication"
+ IDS_PROMPT_TOO_MANY,        "The server asks for more input fields than this dialog supports. The login was cancelled."
+ // wait window while the panel waits for the server; argument: host
+ IDS_WAIT_CONNECTING,        "Connecting to %ls..."
+ IDS_WAIT_LISTING,           "Reading directory..."
+ // closing/changing away from a connection; argument: user@host
+ IDS_DETACH_PROMPT,          "Do you want to disconnect from %ls, or keep the connection open so you can return to it later?"
+ IDS_BTN_DISCONNECT,         "&Disconnect"
+ IDS_BTN_KEEP_CONNECTION,    "&Keep Connection"
+ // arguments: host, error text
+ IDS_ERR_CONNECT,            "Cannot connect to %ls.\n\n%ls"
+ // arguments: path, error text
+ IDS_ERR_LIST,               "Cannot read the directory %ls.\n\n%ls"
+ // argument: the path as typed
+ IDS_ERR_BAD_PATH,           """%ls"" is not a valid SFTP path. Use sftp:user@host[:port]/path or sftp:@SiteName/path."
+ // argument: site name
+ IDS_ERR_SITE_UNKNOWN,       "There is no saved SFTP site named ""%ls""."
+ // argument: path
+ IDS_ERR_FILE_NOT_DIR,       """%ls"" is a file, not a directory."
+ IDS_PASSWORD_TITLE,         "SFTP Client - Password"
+ // arguments: user, host
+ IDS_PASSWORD_PROMPT,        "Password for %ls@%ls:"
+ // panel columns: name (up to 30 characters) and tooltip
+ IDS_COL_PERMISSIONS,        "Permissions"
+ IDS_COL_PERMISSIONS_DESC,   "Unix permissions"
+ IDS_COL_OWNER,              "Owner"
+ IDS_COL_OWNER_DESC,         "Owner (numeric user id)"
+ IDS_COL_GROUP,              "Group"
+ IDS_COL_GROUP_DESC,         "Group (numeric group id)"
+ // context menu of a connection in the Change Drive menu
+ IDS_MENU_SHOWINPANEL,       "&Show in Panel"
+ IDS_MENU_DISCONNECT,        "&Disconnect"
+ IDS_ERR_INTERNAL,           "SFTP: an unexpected error occurred."
+ IDS_ERR_NO_PASSWORD,        "The remembered password for this site could not be decrypted. Enter it when asked."
+ // site list dialog
+ IDS_SITELIST_TITLE,         "SFTP Client - Sites"
+ IDS_SITELIST_COL_NAME,      "Name"
+ IDS_SITELIST_COL_HOST,      "Host"
+ IDS_SITELIST_COL_USER,      "User"
+ // argument: site name
+ IDS_SITELIST_DELETE_CONFIRM, "Do you want to delete the site ""%ls""?"
+ IDS_SITELIST_BAD_QUICK,     "Enter the server as user@host, user@host:port or user@host/path."
+ // site edit dialog
+ IDS_SITEEDIT_TITLE_NEW,     "New SFTP Site"
+ IDS_SITEEDIT_TITLE_EDIT,    "Edit SFTP Site"
+ IDS_SITEEDIT_TAB_SESSION,   "Session"
+ IDS_SITEEDIT_TAB_AUTH,      "Authentication"
+ IDS_SITEEDIT_TAB_CONNECTION, "Connection"
+ IDS_SITEEDIT_TAB_DIRECTORIES, "Directories"
+ IDS_SITE_KEEP_PASSWORD,     "A password is stored. Leave this field empty to keep it."
+ IDS_SITE_KEEP_PASSPHRASE,   "A passphrase is stored. Leave this field empty to keep it."
+ IDS_SITE_ERR_NAME_EMPTY,    "Enter a name for the site."
+ IDS_SITE_ERR_NAME_INVALID,  "The site name cannot start with @, start or end with a space, or contain / or \ or control characters."
+ IDS_SITE_ERR_NAME_TAKEN,    "A site with this name already exists. Choose another name."
+ IDS_SITE_ERR_HOST_EMPTY,    "Enter the host name or IP address of the server."
+ IDS_SITE_ERR_HOST_INVALID,  "The host name cannot contain spaces, control characters or any of / \ @ [ ]."
+ IDS_SITE_ERR_PORT_RANGE,    "The port must be a number from 1 to 65535."
+ IDS_SITE_ERR_USER_EMPTY,    "Enter the user name."
+ IDS_SITE_ERR_USER_INVALID,  "The user name cannot contain control characters."
+ IDS_SITE_ERR_TIMEOUT_RANGE, "The timeout must be a number of seconds from 1 to 3600."
+ IDS_SITE_ERR_CODEPAGE_INVALID, "Enter the number of an installed code page, for example 1250 or 1252."
+ // file dialog filter: pairs of text and pattern separated by |
+ IDS_SITE_KEY_FILTER,        "All files (*.*)|*.*"
+ IDS_SITE_KEY_BROWSE_TITLE,  "Select Private Key File"
+ IDS_SITE_SECRET_NOT_STORED, "The password or key passphrase could not be stored (the master password was not accepted or encryption failed). The site was saved without it."
+ IDS_SITENAME_TITLE,         "Rename Site"
+ IDS_SITE_SAVE_FAILED,       "The site could not be saved."
+ // plugin menu
+ IDS_MENU_CONNECT,           "&Connect..."
+ // the saved sites were written by a newer plugin version
+ IDS_SITES_READONLY,         "The saved sites were written by a newer version of the SFTP plugin. They are not loaded and will not be changed by this version, so New, Edit, Delete, Rename and Duplicate are unavailable. Install the newer plugin version to manage them."
+ // key passphrase prompt (argument: key file)
+ IDS_PROMPT_PASSPHRASE,      "Passphrase for %ls:"
+ // shown when an error has no message at all (the suffix patterns are IDS_ERRMSG_SUFFIX_CODE*)
+ IDS_ERR_UNKNOWN,            "Unknown error"
+ // site edit: transfer settings
+ IDS_SITE_ERR_WORKERS_RANGE, "The number of workers must be a number from 1 to 8."
+ IDS_SITE_ERR_UPLOADPERM_INVALID, "Enter the upload permissions as one to four octal digits from 0 to 7777, for example 644."
+ // operation window: titles, status line, list texts
+ IDS_OP_TITLE_DOWNLOAD, "SFTP Client - Download"
+ IDS_OP_TITLE_UPLOAD, "SFTP Client - Upload"
+ IDS_OP_TITLE_MOVE_DOWNLOAD, "SFTP Client - Move from Server"
+ IDS_OP_TITLE_MOVE_UPLOAD, "SFTP Client - Move to Server"
+ IDS_OP_TITLE_PERCENT, "%d%% - %ls"
+ IDS_OP_STATUS_RUNNING, "Running"
+ IDS_OP_STATUS_PAUSED, "Paused"
+ IDS_OP_STATUS_PAUSED_REASON, "Paused: %ls"
+ IDS_OP_STATUS_CANCELLING, "Cancelling..."
+ IDS_OP_STATUS_CANCELLED, "Cancelled"
+ IDS_OP_STATUS_FINISHED, "Finished"
+ IDS_OP_STATUS_FINISHED_SKIPS, "Finished, %d skipped"
+ IDS_OP_STATUS_FINISHED_ERRORS, "Finished with errors: %d failed"
+ IDS_OP_STATUS_NEEDS_USER, "Needs your decision: %d item(s) wait for an answer"
+ IDS_OP_STATUS_ASKING, "Needs your decision: waiting for your answer"
+ // arguments: done, total, files done, files total, speed, time left, elapsed
+ IDS_OP_STATS, "%ls of %ls   Files: %d of %d   Speed: %ls   Left: %ls   Elapsed: %ls"
+ IDS_OP_PAUSE, "&Pause"
+ IDS_OP_RESUME, "&Resume"
+ IDS_OP_CANCEL_CONFIRM, "Do you want to cancel this operation? Files that are not finished stay as they are; partly transferred files can be continued later."
+ IDS_OP_COL_STATE, "State"
+ IDS_OP_COL_NAME, "Name"
+ IDS_OP_COL_PROBLEM, "Problem"
+ IDS_OP_COL_SIZE, "Size"
+ IDS_OP_MORE, "... %d more"
+ IDS_OP_ITEM_WAITING, "Waiting"
+ IDS_OP_ITEM_PROCESSING, "Working"
+ IDS_OP_ITEM_DELAYED, "Waiting for content"
+ IDS_OP_ITEM_DONE, "Done"
+ IDS_OP_ITEM_SKIPPED, "Skipped"
+ IDS_OP_ITEM_FAILED, "Failed"
+ IDS_OP_ITEM_USERINPUT, "Needs decision"
+ IDS_OP_ITEM_FORCEDFAIL, "Not done"
+ IDS_OP_PROBLEM_TARGET_EXISTS, "The target already exists"
+ IDS_OP_PROBLEM_INVALID_LOCAL_NAME, "The name cannot be used as a Windows file name"
+ IDS_OP_PROBLEM_INVALID_REMOTE_NAME, "The name cannot be written in the site's name encoding"
+ IDS_OP_PROBLEM_TRANSFER_FAILED, "The transfer failed"
+ IDS_OP_PROBLEM_CONNECTION_LOST, "The connection was lost"
+ IDS_OP_PROBLEM_PERMISSION_DENIED, "Permission denied"
+ IDS_OP_PROBLEM_NOT_FOUND, "The source no longer exists"
+ IDS_OP_PROBLEM_DIR_CREATE_FAILED, "The folder could not be created"
+ IDS_OP_PROBLEM_DELETE_FAILED, "The source could not be deleted"
+ IDS_OP_PROBLEM_SYMLINK_LOOP, "Symbolic link loop"
+ IDS_OP_PROBLEM_LOCAL_IO_ERROR, "Local file error"
+ IDS_OP_PROBLEM_DISK_FULL, "The disk is full"
+ IDS_OP_PROBLEM_OTHER, "Unexpected error"
+ // argument: host:port
+ IDS_OP_PROMPT_HOST, "This is the connection of a transfer to %ls."
+ // arguments: size, date
+ IDS_SOLVE_SOURCE_INFO, "Source: %ls, %ls"
+ IDS_SOLVE_TARGET_INFO, "Existing target: %ls, %ls"
+ IDS_SOLVE_UNKNOWN_DATE, "unknown date"
+ IDS_SOLVE_BAD_NAME, "The new name is not valid."
+ IDS_OPS_COL_OPERATION, "Operation"
+ IDS_OPS_COL_STATE, "State"
+ IDS_OPS_COL_DESCRIPTION, "From -> To"
+ // arguments: source, target
+ IDS_OPS_DESCRIPTION, "%ls -> %ls"
+ IDS_COPYMOVE_TITLE_COPY, "Copy"
+ IDS_COPYMOVE_TITLE_MOVE, "Move"
+ // argument: what is copied (e.g. "3 files")
+ IDS_COPYMOVE_SUBJECT_COPY, "Copy %ls from the SFTP server to:"
+ IDS_COPYMOVE_SUBJECT_MOVE, "Move %ls from the SFTP server to:"
+ // the "If the file exists" choices
+ IDS_POLICY_ASK, "Ask"
+ IDS_POLICY_OVERWRITE, "Overwrite"
+ IDS_POLICY_RESUME, "Resume (continue the existing file)"
+ IDS_POLICY_SKIP, "Skip"
+ IDS_POLICY_OVERWRITE_OLDER, "Overwrite if older"
+ IDS_POLICY_RENAME, "Rename the new file automatically"
+ IDS_ERR_SFTP_TARGET_UNSUPPORTED, "Only Move to a folder on the same SFTP server is supported for an sftp: target (it is done as a rename on the server). To copy between servers, copy to a local folder first."
+ IDS_ERR_DROP_TARGET, "Files can be dropped from an SFTP panel only onto an existing Windows folder."
+ // arguments: item name, target folder, error text
+ IDS_ERR_MOVE_ITEM, "The item ""%ls"" could not be moved to ""%ls"": %ls"
+ IDS_ERR_OP_START, "The transfer could not be started."
+ IDS_OPS_RELEASE_PROMPT, "SFTP transfers are still running. Cancel them and unload the plugin?"
+ IDS_MENU_OPERATIONS, "&Operations..."
+ IDS_WAIT_MOVING, "Moving on the server..."
+ IDS_ERR_NOT_CONNECTED, "The connection to the server is not available."
+ IDS_ERR_MASK_UNSUPPORTED, "Masks with * or ? are not supported when downloading from an SFTP server. Enter a folder, or a single file name when one file is selected."
+ IDS_ERR_NAME_EMPTY, "Enter a name."
+ IDS_ERR_NAME_INVALID, "The name must not be ""."" or "".."" and must not contain ""/"". Enter one plain name, not a path."
+ IDS_ERR_NAME_ENCODING, "The name contains characters that the encoding used for this server cannot represent."
+ // argument: the name
+ IDS_ERR_NAME_EXISTS, "An item named ""%ls"" already exists in this folder."
+ // arguments: old name, new name, error text
+ IDS_ERR_RENAME_ITEM, "The item ""%ls"" could not be renamed to ""%ls"": %ls"
+ // arguments: name, error text
+ IDS_ERR_CREATE_DIR, "The directory ""%ls"" could not be created: %ls"
+ IDS_WAIT_RENAMING, "Renaming on the server..."
+ IDS_WAIT_CREATING_DIR, "Creating the directory on the server..."
+ IDS_OP_TITLE_DELETE, "SFTP Client - Delete"
+ // arguments: items done, items total, elapsed
+ IDS_OP_STATS_DELETE, "Items: %d of %d   Elapsed: %ls"
+ IDS_WAIT_DELETING, "Deleting on the server..."
+ // arguments: name, error text
+ IDS_ERR_DELETE_ITEM, "The item ""%ls"" could not be deleted: %ls"
+ IDS_OP_TITLE_CHMOD, "SFTP Client - Change attributes"
+ IDS_WAIT_CHMOD, "Changing the attributes on the server..."
+ // arguments: name, error text
+ IDS_ERR_CHMOD_ITEM, "The attributes of ""%ls"" could not be changed: %ls"
+ IDS_OP_PROBLEM_CHMOD_FAILED, "The attributes could not be changed"
+ // argument: the name of the item
+ IDS_CHMOD_TITLE_ONE, "Change Attributes - %ls"
+ // argument: the number of items
+ IDS_CHMOD_TITLE_MANY, "Change Attributes - %d items"
+ IDS_ERR_CHMOD_OCTAL, "The octal value must have 1 to 4 digits, each from 0 to 7 (for example 755)."
+ IDS_INFO_COL_PROPERTY, "Property"
+ IDS_INFO_COL_VALUE, "Value"
+ IDS_WAIT_PROPERTIES, "Reading the properties from the server..."
+ // argument: user@host
+ IDS_INFO_TITLE, "Server Information - %ls"
+ IDS_INFO_HOST, "Host"
+ IDS_INFO_PORT, "Port"
+ IDS_INFO_USER, "User"
+ IDS_INFO_BANNER, "Server software"
+ IDS_INFO_SFTP_VERSION, "SFTP protocol version"
+ // argument: the version number
+ IDS_INFO_SFTP_VERSION_VALUE, "Up to %d (the highest this plugin speaks; the server does not report its own)"
+ IDS_INFO_FREE, "Free space"
+ IDS_INFO_TOTAL, "Total size"
+ IDS_INFO_UNKNOWN, "unknown"
+ IDS_INFO_NOT_REPORTED, "not reported by this server"
+ IDS_INFO_NOT_CONNECTED, "The connection is not available."
+ IDS_INFO_KEX, "Key exchange"
+ IDS_INFO_CIPHER, "Encryption"
+ IDS_INFO_MAC, "Integrity check (MAC)"
+ IDS_INFO_COMPRESSION, "Compression"
+ IDS_INFO_TO_SERVER, " (to server)"
+ IDS_INFO_FROM_SERVER, " (from server)"
+ // argument: user@host
+ IDS_SEC_TITLE, "Security - %ls"
+ IDS_SEC_HOSTKEY_TYPE, "Host key type"
+ IDS_SEC_FINGERPRINT, "Host key fingerprint"
+ IDS_SEC_TRUST, "Host key status"
+ IDS_SEC_TRUST_KNOWN, "Verified: it matches an entry in a known_hosts file"
+ IDS_SEC_TRUST_SAVED, "Trusted: you accepted it and it is saved in the plugin's known hosts"
+ IDS_SEC_TRUST_ONCE, "Not verified: you accepted it for this session only"
+ IDS_SEC_ICON_TRUSTED, "Encrypted connection. The server's host key is trusted. Click for details."
+ IDS_SEC_ICON_UNVERIFIED, "Encrypted connection, but the server's host key was accepted for this session only. Click for details."
+ // argument: the name of the item
+ IDS_PROP_TITLE_ONE, "Properties - %ls"
+ // argument: the number of items
+ IDS_PROP_TITLE_MANY, "Properties - %d items"
+ IDS_PROP_NAME, "Name"
+ IDS_PROP_LOCATION, "Location"
+ IDS_PROP_TYPE, "Type"
+ IDS_PROP_TYPE_FILE, "File"
+ IDS_PROP_TYPE_DIR, "Folder"
+ IDS_PROP_TYPE_LINK, "Symbolic link"
+ IDS_PROP_TYPE_DIR_LINK, "Symbolic link to a folder"
+ IDS_PROP_LINK_TARGET, "Link target"
+ IDS_PROP_SIZE, "Size"
+ // arguments: readable size, exact number of bytes
+ IDS_PROP_SIZE_VALUE, "%ls (%llu bytes)"
+ IDS_PROP_MODIFIED, "Modified"
+ IDS_PROP_ACCESSED, "Accessed"
+ IDS_PROP_OWNER, "Owner"
+ IDS_PROP_GROUP, "Group"
+ IDS_PROP_PERMISSIONS, "Permissions"
+ IDS_PROP_MIXED, "differs between the items"
+ IDS_PROP_CONTENTS, "Selected"
+ // arguments: files, folders
+ IDS_PROP_CONTENTS_VALUE, "%d files, %d folders"
+ IDS_PROP_TOTAL_SIZE, "Size of the selected files"
+ IDS_PROP_LINKS, "Symbolic links among them"
+ // arguments: name, error text
+ IDS_ERR_PROPERTIES, "The properties of ""%ls"" could not be read: %ls"
+ // argument: file name
+ IDS_WAIT_VIEWING, "Downloading %ls ..."
+ // arguments: file name, bytes done, total size (the last two are formatted sizes like "1.5 MB")
+ IDS_WAIT_VIEWING_PROGRESS, "Downloading %ls ... %ls of %ls"
+ // arguments: file name, error text
+ IDS_ERR_VIEW, "The file ""%ls"" could not be downloaded for viewing: %ls"
+ // hint appended to the text of a wait window that ESC can cancel (the Esc key name stays "ESC" in every language)
+ IDS_WAIT_ESC_HINT, "(Press ESC to cancel)"
+ IDS_WAIT_EXEC, "Running the command ..."
+ // argument: error text
+ IDS_ERR_EXEC, "The command could not be run: %ls"
+ IDS_ERR_EXEC_REFUSED, "The server does not allow running commands."
+ // argument: the exit code of the command
+ IDS_EXEC_STATUS_EXIT, "Exit code %d"
+ // argument: the name of the signal that ended the command (e.g. TERM)
+ IDS_EXEC_STATUS_SIGNAL, "Terminated by signal %ls"
+ // argument: the status text (the exit code or the signal), the output limit stays 1 MB
+ IDS_EXEC_STATUS_CUT, "%ls. Output cut at 1 MB."
+ // arguments: the server as host:port, the command text (cut to about 300 characters)
+ IDS_EXEC_CONFIRM, "You are about to run a command on the server %ls (not on this computer):\n\n%ls\n\nIt runs with the rights of the logged-in user, like in an SSH terminal. Run it?"
+ IDS_ERR_EXEC_ENCODING, "The command contains characters that the encoding used for this server cannot represent."
+ IDS_CTX_COPY_PATH, "Copy &Path"
+ IDS_CTX_COPY_URL, "Copy &URL"
+ IDS_CTX_PROPERTIES, "P&roperties"
+ IDS_CTX_ATTRIBUTES, "Change &Attributes..."
+ IDS_CTX_REFRESH, "&Refresh"
+ IDS_CTX_COPY_CUR_PATH, "Copy Current &Path"
+ IDS_CTX_COPY_CUR_URL, "Copy Current &URL"
+ IDS_CTX_SERVER_INFO, "&Server Information..."
+ IDS_OP_PROBLEM_PERMS_UNKNOWN, "The server does not report the current permissions, so only a complete setting can be applied"
+ IDS_ERR_CHMOD_UNKNOWN, "The attributes of ""%ls"" were not changed: the server does not report the current permissions. Set all permission bits explicitly (for example by typing the octal value)."
+ // texts of core errors: %1, %2 are filled in by FormatErrorMessage and may be reordered; %% is a literal percent sign
+ // arguments: %1 host name, %2 Winsock error number
+ IDS_ERRMSG_RESOLVE_FAILED, "Cannot resolve host '%1' (Winsock error %2)"
+ // arguments: %1 host name, %2 time limit in seconds
+ IDS_ERRMSG_RESOLVE_TIMEOUT, "Resolving host '%1' timed out after %2 s"
+ // arguments: %1 host and port (host:port), %2 time limit in seconds
+ IDS_ERRMSG_CONNECT_TIMEOUT, "Connecting to %1 timed out after %2 s"
+ IDS_ERRMSG_SESSION_NOT_OPEN, "The SSH session is not open"
+ // arguments: %1 host and port (host:port), %2 Winsock error number
+ IDS_ERRMSG_CONNECT_FAILED, "Cannot connect to %1 (Winsock error %2)"
+ IDS_ERRMSG_NO_HOST_GIVEN, "No host name given"
+ IDS_ERRMSG_NO_HOST_KEY, "The server sent no host key"
+ // arguments: %1 host name
+ IDS_ERRMSG_KNOWN_HOSTS_UNCHECKED, "The known_hosts data could not be checked; the host key of %1 was not verified"
+ // arguments: %1 host name, %2 key fingerprint
+ IDS_ERRMSG_HOSTKEY_CHANGED, "The host key of %1 has changed (%2) and was not accepted"
+ // arguments: %1 host name, %2 key fingerprint
+ IDS_ERRMSG_HOSTKEY_REJECTED, "The host key of %1 (%2) was not accepted"
+ IDS_ERRMSG_NO_KNOWN_HOSTS_FILE, "No known_hosts file is configured"
+ // arguments: %1 file path
+ IDS_ERRMSG_KNOWN_HOSTS_WRITE_FAILED, "Cannot write the known_hosts file: %1"
+ // arguments: %1 file path
+ IDS_ERRMSG_KNOWN_HOSTS_REPLACE_FAILED, "Cannot replace the known_hosts file: %1"
+ IDS_ERRMSG_SFTP_NEEDS_AUTH, "The SFTP subsystem needs an authenticated session"
+ IDS_ERRMSG_NO_SFTP_SUBSYSTEM, "The server does not provide the SFTP subsystem"
+ IDS_ERRMSG_BROKEN_TIMEOUT, "The connection is no longer usable after a timeout; disconnect and reconnect"
+ IDS_ERRMSG_BROKEN_CANCEL, "The connection is no longer usable after a cancel; disconnect and reconnect"
+ IDS_ERRMSG_BROKEN_ERROR, "The connection is no longer usable after a connection error; disconnect and reconnect"
+ IDS_ERRMSG_AUTH_CANCELLED, "Authentication was cancelled"
+ IDS_ERRMSG_AUTH_NEEDS_CONNECTION, "Authentication needs an open connection with an accepted host key"
+ IDS_ERRMSG_PASSWORD_EXPIRED, "The server requires a password change; change the password outside Sally first"
+ // arguments: %1 user name, %2 authentication methods the server offers (- = none), %3 methods tried
+ IDS_ERRMSG_AUTH_FAILED, "Authentication failed for user '%1'. The server offers: %2. Tried: %3"
+ // arguments: %1 user name, %2 authentication methods the server offers (- = none)
+ IDS_ERRMSG_AUTH_FAILED_NO_CREDENTIALS, "Authentication failed for user '%1'. The server offers: %2. Tried: nothing (no matching credentials in the site settings)"
+ // arguments: %1 key file path, %2 reason (still English text for .ppk problems)
+ IDS_ERRMSG_KEYFILE_UNUSABLE, "The key file '%1' could not be used: %2"
+ // arguments: %1 key file path
+ IDS_ERRMSG_KEYFILE_WRONG_PASSPHRASE, "The key file '%1' could not be used: wrong or missing passphrase, or an unsupported key format"
+ // arguments: %1 key file path
+ IDS_ERRMSG_KEYFILE_PATH_INVALID, "The key file path is empty or not valid text: %1"
+ // arguments: %1 key file path, %2 Windows error number
+ IDS_ERRMSG_KEYFILE_OPEN_FAILED, "Cannot open the key file '%1' (Windows error %2)"
+ // arguments: %1 key file path
+ IDS_ERRMSG_KEYFILE_BAD_SIZE, "The key file '%1' is empty or too large"
+ // arguments: %1 key file path, %2 Windows error number
+ IDS_ERRMSG_KEYFILE_READ_FAILED, "Cannot read the key file '%1' (Windows error %2)"
+ // arguments: %1 key file path
+ IDS_ERRMSG_PPK_DECRYPT_FAILED, "The key file '%1' could not be used: the private key part could not be decrypted"
+ // arguments: %1 key file path, %2 encryption name
+ IDS_ERRMSG_PPK_UNSUPPORTED_ENCRYPTION, "The key file '%1' could not be used: unsupported key encryption '%2'"
+ // arguments: %1 key file path, %2 key derivation name
+ IDS_ERRMSG_PPK_UNSUPPORTED_KDF, "The key file '%1' could not be used: unsupported key derivation '%2'"
+ // arguments: %1 key file path, %2 key type name
+ IDS_ERRMSG_PPK_UNSUPPORTED_KEY_TYPE, "The key file '%1' could not be used: unsupported key type '%2'"
+ // arguments: %1 key file path
+ IDS_ERRMSG_PPK_UNSUPPORTED_OLD_FORMAT, "The key file '%1' could not be used: unsupported old PuTTY key file format (without a MAC); save it again with a current PuTTYgen"
+ // arguments: %1 key file path
+ IDS_ERRMSG_PPK_NOT_PUTTY_FILE, "The key file '%1' is not a PuTTY private key file"
+ // arguments: %1 key file path
+ IDS_ERRMSG_PPK_DAMAGED, "The key file '%1' could not be used: the PuTTY key file is damaged or incomplete"
+ // arguments: %1 remote path, %2 reason (see IDS_ERRMSG_REASON_*, or the text of the failed call)
+ IDS_ERRMSG_SFTP_LIST, "Cannot list '%1': %2"
+ // arguments: %1 remote path, %2 reason
+ IDS_ERRMSG_SFTP_READ_INFO, "Cannot read information about '%1': %2"
+ // arguments: %1 remote path, %2 reason
+ IDS_ERRMSG_SFTP_READ_FILE, "Cannot read '%1': %2"
+ // arguments: %1 remote path, %2 reason
+ IDS_ERRMSG_SFTP_WRITE_FILE, "Cannot write '%1': %2"
+ // arguments: %1 remote path, %2 reason
+ IDS_ERRMSG_SFTP_CREATE, "Cannot create '%1': %2"
+ // arguments: %1 remote path, %2 reason
+ IDS_ERRMSG_SFTP_DELETE, "Cannot delete '%1': %2"
+ // arguments: %1 remote path, %2 reason
+ IDS_ERRMSG_SFTP_RENAME, "Cannot rename '%1': %2"
+ // arguments: %1 remote path, %2 reason
+ IDS_ERRMSG_SFTP_CHANGE_ATTRS, "Cannot change the attributes of '%1': %2"
+ // reasons (the %2 of the sentences above, chosen from the status the server answered with)
+ IDS_ERRMSG_REASON_NOT_FOUND, "no such file or directory"
+ IDS_ERRMSG_REASON_PERMISSION_DENIED, "permission denied"
+ IDS_ERRMSG_REASON_EXISTS, "already exists"
+ IDS_ERRMSG_REASON_DIR_NOT_EMPTY, "directory not empty"
+ IDS_ERRMSG_REASON_NOT_A_DIRECTORY, "not a directory"
+ IDS_ERRMSG_REASON_NO_SPACE, "no space left or quota exceeded"
+ IDS_ERRMSG_REASON_WRITE_PROTECTED, "write protected"
+ IDS_ERRMSG_REASON_UNSUPPORTED, "not supported by the server"
+ IDS_ERRMSG_REASON_CONNECTION_LOST, "connection lost"
+ IDS_ERRMSG_REASON_NO_ANSWER, "no answer from the server"
+ IDS_ERRMSG_REASON_FAILED, "operation failed"
+ IDS_ERRMSG_SFTP_NOT_OPEN, "The SFTP session is not open"
+ // arguments: %1 remote path
+ IDS_ERRMSG_RESUME_FAILED, "Cannot resume '%1': the remote file is shorter than the start offset or its size is unknown"
+ // arguments: %1 remote path
+ IDS_ERRMSG_SERVER_ACCEPTED_NO_DATA, "The server accepted no data for '%1'"
+ // arguments: %1 path
+ IDS_ERRMSG_ALREADY_EXISTS, "'%1' already exists"
+ // arguments: %1 path of the target
+ IDS_ERRMSG_REPLACE_DIR_NOT_EMPTY, "Cannot replace '%1': it is a directory that is not empty"
+ // arguments: %1 path of the target
+ IDS_ERRMSG_REPLACE_DIR_UNREADABLE, "Cannot replace '%1': it is a directory whose content cannot be read"
+ // arguments: %1 Windows error number
+ IDS_ERRMSG_LOCAL_SET_POSITION, "Cannot set the position in the local file (Windows error %1)"
+ // arguments: %1 Windows error number
+ IDS_ERRMSG_LOCAL_WRITE, "Cannot write the local file (Windows error %1)"
+ // arguments: %1 Windows error number
+ IDS_ERRMSG_LOCAL_GET_SIZE, "Cannot get the size of the local file (Windows error %1)"
+ // arguments: %1 Windows error number
+ IDS_ERRMSG_LOCAL_READ_TIME, "Cannot read the time of the local file (Windows error %1)"
+ // arguments: %1 Windows error number
+ IDS_ERRMSG_LOCAL_READ, "Cannot read the local file (Windows error %1)"
+ // arguments: %1 text of the SSH library (English); after a timeout the reason "no answer from the server" instead
+ IDS_ERRMSG_HANDSHAKE_FAILED, "SSH handshake failed: %1"
+ // arguments: %1 text of the SSH library (English); after a timeout the reason "no answer from the server" instead
+ IDS_ERRMSG_SFTP_SUBSYSTEM_FAILED, "Cannot start the SFTP subsystem: %1"
+ // arguments: %1 text of the SSH library (English); after a timeout the reason "no answer from the server" instead
+ IDS_ERRMSG_AUTH_INTERRUPTED, "Authentication interrupted: %1"
+ // arguments: %1 text of the SSH library (English); after a timeout the reason "no answer from the server" instead
+ IDS_ERRMSG_AUTH_METHODS_QUERY_FAILED, "Cannot query the authentication methods: %1"
+ // arguments: %1 text of the SSH library (English); after a timeout the reason "no answer from the server" instead
+ IDS_ERRMSG_EXEC_CHANNEL_FAILED, "Cannot open a channel for the command: %1"
+ // arguments: %1 text of the SSH library (English); after a timeout the reason "no answer from the server" instead
+ IDS_ERRMSG_EXEC_START_FAILED, "The server did not start the command: %1"
+ // arguments: %1 text of the SSH library (English); after a timeout the reason "no answer from the server" instead
+ IDS_ERRMSG_EXEC_READ_FAILED, "Reading the output of the command failed: %1"
+ // arguments: %1 text of the SSH library (English); after a timeout the reason "no answer from the server" instead
+ IDS_ERRMSG_EXEC_FINISH_FAILED, "The command did not finish cleanly: %1"
+ // arguments: %1 time limit in seconds
+ IDS_ERRMSG_NO_ANSWER_TIMEOUT, "No answer within %1 s"
+ // arguments: %1 time limit in seconds
+ IDS_ERRMSG_EXEC_IDLE_TIMEOUT, "No output for %1 s"
+ // arguments: %1 directory path
+ IDS_ERRMSG_INVALID_SERVER_DATA, "The server sent invalid data for the directory '%1'"
+ IDS_ERRMSG_CANCELLED, "The operation was cancelled"
+ IDS_ERRMSG_NOT_CONNECTED, "Not connected"
+ // arguments: %1 Windows error number
+ IDS_ERRMSG_LOCAL_FILE_CREATE_FAILED, "The local file could not be created (Windows error %1)"
+ // arguments: %1 Windows error number
+ IDS_ERRMSG_LOCAL_FILE_RENAME_FAILED, "The local file could not be renamed (Windows error %1)"
+ // suffix after an error text that has a libssh2 code; arguments: %1 libssh2 error code
+ IDS_ERRMSG_SUFFIX_CODE, "(code %1)"
+ // the same with an SFTP status; arguments: %1 libssh2 error code, %2 SFTP status code of the server
+ IDS_ERRMSG_SUFFIX_CODE_STATUS, "(code %1, SFTP status %2)"
+ // Configuration dialog: entries of the session log level combo box
+ IDS_CONFIG_LOGLEVEL_OFF, "Off"
+ IDS_CONFIG_LOGLEVEL_ERRORS, "Errors only"
+ IDS_CONFIG_LOGLEVEL_NORMAL, "Normal"
+ IDS_CONFIG_LOGLEVEL_VERBOSE, "Verbose (every SFTP call)"
+ IDS_MENU_CONFIGURATION, "C&onfiguration..."
+ // arguments (printf style, in this order): %d lowest value, %d highest value
+ IDS_CONFIG_ERR_RANGE, "Enter a whole number from %d to %d."
+ // arguments (printf style, in this order): %d lowest interval in seconds, %d highest interval in seconds
+ IDS_CONFIG_ERR_KEEPALIVE, "Enter 0 (no keepalive) or a whole number of seconds from %d to %d."
+ // Plugin menu item that opens the session log window
+ IDS_MENU_SESSION_LOG, "Session &log..."
+ // Context menu item of a connection: opens the session log window on that connection's log
+ IDS_CTX_SHOW_LOG, "Show session log"
+ // Names of the logs in the session log window (printf style). %ls: "user@host:port"
+ IDS_LOG_TITLE_PANEL, "%ls - panel"
+ // arguments (printf style, in this order): %ls "user@host:port", %d operation number, %d worker number
+ IDS_LOG_TITLE_WORKER, "%ls - operation %d, worker %d"
+ // arguments (printf style, in this order): %ls "user@host:port", %d worker number
+ IDS_LOG_TITLE_WORKER_NO_OPERATION, "%ls - worker %d"
+ // a log of a connection that has ended; %ls: the name of the log
+ IDS_LOG_CLOSED_SUFFIX, "%ls (closed)"
+ // shown in the log window when no connection has been logged yet
+ IDS_LOG_NO_LOGS, "No connection has been logged yet."
+ // file type texts of the Save as dialog of the log window
+ IDS_LOG_SAVE_FILTER_TEXT, "Text files (*.txt)"
+ IDS_LOG_SAVE_FILTER_ALL, "All files (*.*)"
+ // argument (printf style): %d Windows error number
+ IDS_LOG_SAVE_FAILED, "The log could not be saved (Windows error %d)."
+ // shown in the log window next to an empty log when the log level is Off
+ IDS_LOG_OFF_HINT, "Logging is switched off. Change the log level in the plugin's Configuration."
+ // the operation is running but every worker waits for a free connection (the total of connections is used up)
+ IDS_OP_STATUS_WAITING_SLOT, "Waiting for a free connection"
+}

@@ -1,0 +1,29 @@
+﻿// SPDX-FileCopyrightText: 2026 Sally Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// WARNING: cannot be replaced by "#pragma once" because it is included from .rc file and it seems resource compiler does not support "#pragma once"
+#ifndef __SFTP_VERSINFO_RH2
+#define __SFTP_VERSINFO_RH2
+
+#if defined(APSTUDIO_INVOKED) && !defined(APSTUDIO_READONLY_SYMBOLS)
+#error this file is not editable by Microsoft Visual C++
+#endif //defined(APSTUDIO_INVOKED) && !defined(APSTUDIO_READONLY_SYMBOLS)
+
+// defines for the VERSIONINFO of sftp.dll
+// look at shared\versinfo.rc2
+
+#define VERSINFO_MAJOR       1
+#define VERSINFO_MINORA      0
+#define VERSINFO_MINORB      0
+
+#include "spl_vers.h" // retrieve version and build numbers
+
+#define VERSINFO_COPYRIGHT   "Copyright © 2026 Martin Dařílek and Sally Authors"
+#define VERSINFO_COMPANY     "Sally"
+
+#define VERSINFO_DESCRIPTION "SFTP Client for Sally"
+
+#define VERSINFO_INTERNAL    "SFTP"
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".DLL"
+
+#endif // __SFTP_VERSINFO_RH2
