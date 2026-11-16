@@ -187,8 +187,27 @@ void CHeaderLine::PaintAllItems(HDC hDC, HRGN hUpdateRgn)
     ValidateRect(HWindow, NULL);
 }
 
-#define SORT_BITMAP_W 8 // width of the bitmap for sorting
-#define SORT_BITMAP_H 8 // height of the bitmap for sorting
+#define SORT_SRC_SIZE 8 // size of one arrow in the HHeaderSort bitmap (two arrows side by side: up, down)
+
+// size of the sort arrow on screen: 8 px at 100% DPI, scaled with the system DPI
+static int GetSortBitmapSize()
+{
+    return SORT_SRC_SIZE * GetScaleForSystemDPI() / 100;
+}
+
+#define SORT_BITMAP_W GetSortBitmapSize() // width of the arrow for sorting
+#define SORT_BITMAP_H GetSortBitmapSize() // height of the arrow for sorting
+
+// draws the sort arrow (HHeaderSort is selected into hArrowDC) scaled to the current DPI;
+// COLORONCOLOR keeps the 3-color pixel art crisp (no blended colors)
+static void DrawSortArrow(HDC hDC, HDC hArrowDC, int x, int y, BOOL reverse)
+{
+    int size = GetSortBitmapSize();
+    int oldMode = SetStretchBltMode(hDC, COLORONCOLOR);
+    StretchBlt(hDC, x, y, size, size,
+               hArrowDC, reverse ? SORT_SRC_SIZE : 0, 0, SORT_SRC_SIZE, SORT_SRC_SIZE, SRCCOPY);
+    SetStretchBltMode(hDC, oldMode);
+}
 
 void CHeaderLine::PaintItem(HDC hDC, int index, int x)
 {
@@ -270,11 +289,10 @@ void CHeaderLine::PaintItem(HDC hDC, int index, int x)
         hMemDC = HANDLES(CreateCompatibleDC(hDC));
         SelectObject(hMemDC, HHeaderSort);
         if (sort)
-            BitBlt(ItemBitmap.HMemDC,
-                   r.left + 3 + sz.cx + SORT_BITMAP_W,
-                   (r.bottom - SORT_BITMAP_H) / 2,
-                   SORT_BITMAP_W, SORT_BITMAP_H,
-                   hMemDC, panel->ReverseSort ? SORT_BITMAP_W : 0, 0, SRCCOPY);
+            DrawSortArrow(ItemBitmap.HMemDC, hMemDC,
+                          r.left + 3 + sz.cx + SORT_BITMAP_W,
+                          (r.bottom - SORT_BITMAP_H) / 2,
+                          panel->ReverseSort);
 
         // "Ext" inside the "Name" column
         if (index == 0 && !Parent->Parent->IsExtensionInSeparateColumn() &&
@@ -294,11 +312,10 @@ void CHeaderLine::PaintItem(HDC hDC, int index, int x)
                 // arrow indicating sort direction
                 GetTextExtentPoint32W(ItemBitmap.HMemDC, colExtStr, colExtStrLen, &sz);
 
-                BitBlt(ItemBitmap.HMemDC,
-                       textLeft + sz.cx + SORT_BITMAP_W,
-                       (r.bottom - SORT_BITMAP_H) / 2,
-                       SORT_BITMAP_W, SORT_BITMAP_H,
-                       hMemDC, panel->ReverseSort ? SORT_BITMAP_W : 0, 0, SRCCOPY);
+                DrawSortArrow(ItemBitmap.HMemDC, hMemDC,
+                              textLeft + sz.cx + SORT_BITMAP_W,
+                              (r.bottom - SORT_BITMAP_H) / 2,
+                              panel->ReverseSort);
             }
         }
         if (hMemDC != NULL)
