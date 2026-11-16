@@ -1319,6 +1319,38 @@ CWorker::CItemResult CWorker::Upload(const CQueueItem& item)
     if (!StatRemoteSide(target, existing, failure))
         return failure;
 
+    // What follows a finished upload: the time and permissions of the target, and for a move the deletion of the source.
+    auto finishUpload = [&]() -> CItemResult
+    {
+        if (settings.preserveTime && source.mtime > 0)
+            session_.SetTimes(target, source.mtime, source.mtime); // best effort, like the local side
+        if (settings.setUploadPermissions)
+            session_.Chmod(target, settings.uploadPermissions); // best effort too: the file is there and complete
+
+        if (settings.move && !item.viaLink)
+        {
+            guard.Close(); // the open source file blocks its own deletion
+            DWORD error = 0;
+            if (!DeleteLocalFileForce(ExtendedLocalPath(item.localPath), error))
+                return Failure(Problem::DeleteFailed, WindowsErrorText(error));
+        }
+        return Done();
+    };
+
+    // An earlier attempt sent the final rename and never saw the answer (a pause or a dropped connection at that very
+    // moment), and the server had done it: the target is our finished file and the .filepart is gone. A rename that was
+    // not carried out leaves the .filepart behind, so a missing .filepart with a full-size target can only be ours. A
+    // pending answer of the user (Overwrite, Rename ...) is never second-guessed.
+    if (existing.exists && !existing.isDir && settings.safeUpload && item.renameSent &&
+        item.forceAction == SolveAction::Retry && existing.size == source.size)
+    {
+        CTransferSide leftover;
+        if (!StatRemoteSide(SafeUploadName(target), leftover, failure))
+            return failure;
+        if (!leftover.exists)
+            return finishUpload();
+    }
+
     uint64_t resumeOffset = 0; // from the conflict decision: the target itself is a partial copy
     if (existing.exists)
     {
@@ -1383,22 +1415,14 @@ CWorker::CItemResult CWorker::Upload(const CQueueItem& item)
         return FromSessionError(Problem::TransferFailed); // the partial stays: the next attempt can continue it
 
     // Without overwrite the rename refuses a target that appeared meanwhile (kind Exists) instead of replacing it.
-    if (viaPartial && !session_.Rename(writeTo, target, existing.exists))
-        return FromSessionError(Problem::TransferFailed);
-
-    if (settings.preserveTime && source.mtime > 0)
-        session_.SetTimes(target, source.mtime, source.mtime); // best effort, like the local side
-    if (settings.setUploadPermissions)
-        session_.Chmod(target, settings.uploadPermissions); // best effort too: the file is there and complete
-
-    if (settings.move && !item.viaLink)
+    if (viaPartial)
     {
-        guard.Close(); // the open source file blocks its own deletion
-        DWORD error = 0;
-        if (!DeleteLocalFileForce(ExtendedLocalPath(item.localPath), error))
-            return Failure(Problem::DeleteFailed, WindowsErrorText(error));
+        queue.SetRenameSent(item.uid); // if the answer is lost, the next attempt looks at what the server did
+        if (!session_.Rename(writeTo, target, existing.exists))
+            return FromSessionError(Problem::TransferFailed);
     }
-    return Done();
+
+    return finishUpload();
 }
 
 // ---- directories and deletes ----------------------------------------------------------------------------------

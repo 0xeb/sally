@@ -162,3 +162,19 @@ TEST(ExploredDirs, OnlyOneOfTwoRacingThreadsWins)
     t2.join();
     EXPECT_EQ(winners.load(), 1);
 }
+
+TEST(QueueTransferBookkeeping, RenameSentIsKeptWhenTheItemGoesBackToWaiting)
+{
+    CQueue queue;
+    const uint64_t uid = queue.AddRootItems({MakeDownload("a")})[0];
+    Take(queue);
+    CQueueItem item;
+    ASSERT_TRUE(queue.GetItem(uid, item));
+    EXPECT_FALSE(item.renameSent);
+
+    EXPECT_TRUE(queue.SetRenameSent(uid));
+    EXPECT_FALSE(queue.SetRenameSent(999));
+    EXPECT_TRUE(queue.ReturnToWaiting(uid)); // a pause or a lost connection
+    ASSERT_TRUE(queue.GetItem(uid, item));
+    EXPECT_TRUE(item.renameSent); // the next attempt must still know that the rename may have been done
+}

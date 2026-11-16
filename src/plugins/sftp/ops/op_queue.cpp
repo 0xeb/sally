@@ -286,6 +286,16 @@ bool CQueue::SetOwnsPartial(uint64_t uid)
     return true;
 }
 
+bool CQueue::SetRenameSent(uint64_t uid)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    Node* node = Find(uid);
+    if (node == nullptr)
+        return false;
+    node->item.renameSent = true;
+    return true;
+}
+
 bool CQueue::Retarget(uint64_t uid, const std::wstring& localPath, const std::string& remotePath)
 {
     std::lock_guard<std::mutex> lock(mutex_);

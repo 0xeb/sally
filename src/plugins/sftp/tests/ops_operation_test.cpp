@@ -497,3 +497,83 @@ TEST_F(OperationTest, UploadItemWithAnEmptyRemoteNameFailsWithInvalidRemoteName)
 
     EXPECT_EQ(ItemsWithProblem(op, Problem::InvalidRemoteName).size(), 1u) << Describe(op);
 }
+
+// ---- an upload whose final rename was sent and its answer lost (found by the stress test, M7) --------------------------
+// A pause or a dropped connection at the moment of the rename can leave the finished file on the server while the item goes
+// back to Waiting. The retry must recognise it and not ask "the target exists" about the file it has just uploaded.
+
+namespace
+{
+CQueueItem UploadItemFor(const fs::path& local, const std::string& remoteDir, const std::string& name, bool renameSent)
+{
+    CQueueItem item;
+    item.type = ItemType::Upload;
+    item.localPath = local.wstring();
+    item.remotePath = remoteDir + "/" + name;
+    item.parentRemote = remoteDir;
+    item.renameSent = renameSent;
+    return item;
+}
+} // namespace
+
+TEST_F(OperationTest, ARetryAfterALostRenameAnswerFindsTheFinishedFileAndIsDone)
+{
+    const std::string content = PatternBytes(300 * 1024 + 5, 31);
+    WriteAll(local_ / "src" / "done.bin", content);
+    PutRemoteFile(remoteDir_ + "/done.bin", content); // what the server did before the answer got lost
+
+    COperation op(Settings(TransferDirection::Upload), Params(),
+                  {UploadItemFor(local_ / "src" / "done.bin", remoteDir_, "done.bin", true)});
+    CTestObserver observer;
+    ASSERT_TRUE(Run(op, observer)) << Describe(op);
+    EXPECT_EQ(op.State(), OperationState::Finished) << Describe(op);
+    EXPECT_TRUE(ItemsWithProblem(op, Problem::TargetExists).empty());
+    EXPECT_EQ(GetRemoteFile(remoteDir_ + "/done.bin"), content);
+    EXPECT_FALSE(RemoteExists(remoteDir_ + "/done.bin.filepart"));
+}
+
+TEST_F(OperationTest, ARetryAfterALostRenameAnswerStillDeletesTheSourceOfAMove)
+{
+    const std::string content = PatternBytes(64 * 1024, 32);
+    WriteAll(local_ / "src" / "moved.bin", content);
+    PutRemoteFile(remoteDir_ + "/moved.bin", content);
+
+    COperation op(Settings(TransferDirection::Upload, true), Params(),
+                  {UploadItemFor(local_ / "src" / "moved.bin", remoteDir_, "moved.bin", true)});
+    CTestObserver observer;
+    ASSERT_TRUE(Run(op, observer)) << Describe(op);
+    EXPECT_EQ(op.State(), OperationState::Finished) << Describe(op);
+    EXPECT_FALSE(fs::exists(local_ / "src" / "moved.bin")); // a move is finished only when the source is gone
+    EXPECT_EQ(GetRemoteFile(remoteDir_ + "/moved.bin"), content);
+}
+
+TEST_F(OperationTest, AFullSizeTargetWithoutAnySignOfOurRenameStillAsksAboutTheConflict)
+{
+    const std::string content = PatternBytes(64 * 1024, 33);
+    WriteAll(local_ / "src" / "other.bin", content);
+    PutRemoteFile(remoteDir_ + "/other.bin", PatternBytes(64 * 1024, 34)); // same size, somebody else's content
+
+    COperation op(Settings(TransferDirection::Upload), Params(),
+                  {UploadItemFor(local_ / "src" / "other.bin", remoteDir_, "other.bin", false)});
+    CTestObserver observer;
+    ASSERT_TRUE(Run(op, observer)) << Describe(op);
+    EXPECT_EQ(ItemsWithProblem(op, Problem::TargetExists).size(), 1u) << Describe(op);
+    EXPECT_EQ(GetRemoteFile(remoteDir_ + "/other.bin"), PatternBytes(64 * 1024, 34)); // untouched
+}
+
+TEST_F(OperationTest, ALostRenameAnswerIsNotTrustedWhenTheTargetHasAnotherSizeOrAPartialIsStillThere)
+{
+    const std::string content = PatternBytes(64 * 1024, 35);
+    WriteAll(local_ / "src" / "size.bin", content);
+    PutRemoteFile(remoteDir_ + "/size.bin", content.substr(0, 1000)); // another size: not our finished file
+    WriteAll(local_ / "src" / "part.bin", content);
+    PutRemoteFile(remoteDir_ + "/part.bin", content);
+    PutRemoteFile(remoteDir_ + "/part.bin.filepart", content.substr(0, 500)); // the rename did not happen: a partial is left
+
+    COperation op(Settings(TransferDirection::Upload), Params(),
+                  {UploadItemFor(local_ / "src" / "size.bin", remoteDir_, "size.bin", true),
+                   UploadItemFor(local_ / "src" / "part.bin", remoteDir_, "part.bin", true)});
+    CTestObserver observer;
+    ASSERT_TRUE(Run(op, observer)) << Describe(op);
+    EXPECT_EQ(ItemsWithProblem(op, Problem::TargetExists).size(), 2u) << Describe(op);
+}

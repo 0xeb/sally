@@ -97,6 +97,9 @@ struct CQueueItem
     // delete the source, because that is the content of the link's target. The link itself is removed as a link.
     bool viaLink = false;
     bool ownsPartial = false;  // this operation has written (part of) the target: a retry resumes it whatever the policy
+    // Safe upload: the worker sent the final rename (.filepart -> name). When the answer was lost (a pause or a dropped
+    // connection at that moment) the server may have done it; a retry then finds the finished file and no .filepart.
+    bool renameSent = false;
     uint64_t targetSize = 0;   // what the last conflict check saw at the target (for the solve dialog)
     int64_t targetMtime = 0;
 };
@@ -179,6 +182,8 @@ public:
     //   does not decide again.
     // - SetTargetInfo: size and time of the existing target, kept for the solve dialog.
     bool SetOwnsPartial(uint64_t uid);
+    // The worker is about to send the final rename of a safe upload (see CQueueItem::renameSent).
+    bool SetRenameSent(uint64_t uid);
     bool Retarget(uint64_t uid, const std::wstring& localPath, const std::string& remotePath);
     bool SetTargetInfo(uint64_t uid, uint64_t size, int64_t mtime);
 
