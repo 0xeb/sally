@@ -1,19 +1,57 @@
 ﻿// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// English resources of the SFTP plugin. Hand-written: not edited by Microsoft Visual C++.
+// English resources of the SFTP plugin. The dialogs can be edited in Microsoft Visual C++ (it keeps the TEXTINCLUDE
+// blocks below); the strings are in lang.rc2, which Visual C++ does not edit.
 
 #pragma code_page(65001)
 
+#include "lang.rh"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
 #include "winresrc.h"
 
-#include "lang.rh"
 #include "..\sftp.rh2"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
-#include "lang.rc2" // strings
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "lang.rh\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""winresrc.h""\r\n"
+    "\r\n"
+    "#include ""..\\sftp.rh2""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
+    "LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US\r\n"
+    "#include ""lang.rc2""   // strings (not edited by Microsoft Visual C++)\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
 
 /////////////////////////////////////////////////////////////////////////////
 // Dialogs
@@ -312,7 +350,6 @@ BEGIN
     LTEXT           "Initial &local directory:",IDC_STATIC,4,38,250,8
     EDITTEXT        IDE_SITE_LOCALPATH,4,48,250,12,ES_AUTOHSCROLL
 END
-#endif
 
 IDD_CONFIG DIALOGEX 0, 0, 290, 236
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
@@ -344,3 +381,20 @@ BEGIN
     DEFPUSHBUTTON   "OK",IDOK,173,217,50,14,WS_GROUP
     PUSHBUTTON      "Cancel",IDCANCEL,233,217,50,14
 END
+
+#endif    // Neutral resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#include "lang.rc2"   // strings (not edited by Microsoft Visual C++)
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
