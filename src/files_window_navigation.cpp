@@ -3244,7 +3244,7 @@ void CFilesWindow::SetQuickSearchCaretPos()
         case vmIcons:
         {
             // we'll have to deal with the situation where the cursor could be on the second line later
-            int iconH = 2 + 32;
+            int iconH = 2 + GetIconSizePx(ICONSIZE_32);
             if (GetViewMode() == vmThumbnails)
             {
                 iconH = 3 + ListBox->ThumbnailHeight + 2;

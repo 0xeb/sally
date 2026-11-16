@@ -1597,7 +1597,7 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
         if (isItemUpDir)
         {
             out1Len = 0;
-            maxWidth = (GetViewMode() == vmThumbnails) ? ListBox->ThumbnailWidth : 32;
+            maxWidth = (GetViewMode() == vmThumbnails) ? ListBox->ThumbnailWidth : GetIconSizePx(ICONSIZE_32);
             out1Width = maxWidth;
             out2Len = 0;
         }
@@ -2111,7 +2111,7 @@ BOOL StateImageList_Draw(CIconList* iconList, int imageIndex, HDC hDC, int xDst,
     if (iconSize == ICONSIZE_48 && overlayRect == NULL)
     {
         iconSize = ICONSIZE_32;
-        yOverlayDst += 48 - 32;
+        yOverlayDst += GetIconSizePx(ICONSIZE_48) - GetIconSizePx(ICONSIZE_32);
     }
 
     int iconW = GetIconSizePx(iconSize);

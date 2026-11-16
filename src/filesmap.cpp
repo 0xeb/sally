@@ -442,8 +442,8 @@ void CFilesMap::SetPoint(int x, int y)
                     }
                     else
                     {
-                        mw = 32;
-                        mh = 32;
+                        mw = GetIconSizePx(ICONSIZE_32);
+                        mh = GetIconSizePx(ICONSIZE_32);
                     }
                     int mx = col * Panel->ListBox->ItemWidth;
                     mx += (Panel->ListBox->ItemWidth - mw) / 2;
@@ -484,8 +484,8 @@ void CFilesMap::SetPoint(int x, int y)
                     }
                     else
                     {
-                        mw = 32;
-                        mh = 32;
+                        mw = GetIconSizePx(ICONSIZE_32);
+                        mh = GetIconSizePx(ICONSIZE_32);
                     }
                     int mx = col * Panel->ListBox->ItemWidth;
                     mx += (Panel->ListBox->ItemWidth - mw) / 2;

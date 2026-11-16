@@ -130,6 +130,10 @@ public:
     virtual BOOL WINAPI CreateFromRawPNG(const void* rawPNG, DWORD rawPNGSize, int imageWidth);
     virtual BOOL WINAPI CreateFromBitmap(HBITMAP hBitmap, int imageCount, COLORREF transparentClr); // loads bitmap (maximum 256 colors), must be a long strip one row high
     virtual BOOL WINAPI CreateAsCopy(const CIconList* iconList, BOOL grayscale);
+
+    // creates this list as a copy of 'iconList' with every image resampled (bilinear) to 'newImageWidth' x 'newImageHeight';
+    // meant for simple symbols (throbber, lock) drawn with IL_DRAW_ASALPHA, the 4 channels are interpolated independently
+    BOOL CreateAsScaledCopy(const CIconList* iconList, int newImageWidth, int newImageHeight);
     virtual BOOL WINAPI CreateAsCopy(const CGUIIconListAbstract* iconList, BOOL grayscale);
 
     // converts icon list to grayscale version
@@ -150,6 +154,10 @@ public:
     // creates an imagelist (one row, number of columns based on number of items); returns its handle or NULL on failure
     // the returned imagelist must be destroyed using the ImageList_Destroy() API after use
     virtual HIMAGELIST WINAPI GetImageList();
+
+    // like GetImageList(), but the imagelist has images of size 'width' x 'height' (the icons are stretched
+    // when it differs from the size of this list); used to show icons of plugins (always 16x16) at the system DPI
+    HIMAGELIST GetImageListScaled(int width, int height);
 
     // copies one item from 'srcIL' at position 'srcIndex' to position 'dstIndex'
     virtual BOOL WINAPI Copy(int dstIndex, CIconList* srcIL, int srcIndex);

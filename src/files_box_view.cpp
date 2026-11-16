@@ -1997,8 +1997,8 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             pt.y = (y + TopIndex) % ItemHeight;
 
             rect.top = 2;
-            int iconW = 32;
-            int iconH = 32;
+            int iconW = GetIconSizePx(ICONSIZE_32);
+            int iconH = GetIconSizePx(ICONSIZE_32);
 
             // detect a click on the icon
             if (ViewMode == vmThumbnails)
@@ -2048,7 +2048,7 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             if (isItemUpDir) // updir is just "..", we must extend it to the displayed size
             {
                 // see CFilesWindow::DrawIconThumbnailItem
-                maxWidth = max(maxWidth, (Parent->GetViewMode() == vmThumbnails ? ThumbnailWidth : 32) + 4);
+                maxWidth = max(maxWidth, (Parent->GetViewMode() == vmThumbnails ? ThumbnailWidth : GetIconSizePx(ICONSIZE_32)) + 4);
             }
 
             rect.left = (ItemWidth - maxWidth) / 2;

@@ -40,4 +40,25 @@ constexpr int FontHeightForDpi(int points, int dpi)
     return -(points * dpi) / 72;
 }
 
+
+// Converts a LOGFONT height saved at 'fromDpi' to 'toDpi'. A negative height (character height)
+// goes through whole points, so 10 pt saved at 96 DPI (-13) becomes -27 at 192 DPI, not -26.
+// A positive height (cell height) and 0 (default) are scaled proportionally.
+constexpr int FontHeightFromDpiToDpi(int height, int fromDpi, int toDpi)
+{
+    if (height == 0 || fromDpi <= 0 || toDpi <= 0 || fromDpi == toDpi)
+        return height;
+    if (height > 0)
+        return (height * toDpi + fromDpi / 2) / fromDpi;
+    const int points = (-height * 72 + fromDpi / 2) / fromDpi;
+    return -((points * toDpi + 36) / 72);
+}
+
+static_assert(FontHeightFromDpiToDpi(-13, 96, 192) == -27, "10 pt: 96 -> 192 DPI");
+static_assert(FontHeightFromDpiToDpi(-12, 96, 120) == -15, "9 pt: 96 -> 120 DPI");
+static_assert(FontHeightFromDpiToDpi(-27, 192, 96) == -13, "10 pt: 192 -> 96 DPI");
+static_assert(FontHeightFromDpiToDpi(-13, 96, 96) == -13, "same DPI keeps the height");
+static_assert(FontHeightFromDpiToDpi(0, 96, 192) == 0, "0 stays 0");
+static_assert(FontHeightFromDpiToDpi(16, 96, 192) == 32, "positive height scales");
+
 } // namespace sally::dpi

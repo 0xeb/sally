@@ -1470,14 +1470,20 @@ extern HICON HSlowFileOverlays[ICONSIZE_COUNT]; // slow files
 
 extern CIconList* SimpleIconLists[ICONSIZE_COUNT]; // simple icons in all sizes
 
-#define THROBBER_WIDTH 12 // single cell dimensions
-#define THROBBER_HEIGHT 12
+// _SRC_ = size of one cell in the PNG (100% DPI); THROBBER_WIDTH/HEIGHT and LOCK_WIDTH/HEIGHT = size on screen,
+// scaled with the system DPI (the frames are scaled when loaded, see CIconList::CreateAsScaledCopy)
+#define THROBBER_SRC_WIDTH 12 // single cell dimensions
+#define THROBBER_SRC_HEIGHT 12
+#define THROBBER_WIDTH (THROBBER_SRC_WIDTH * GetScaleForSystemDPI() / 100)
+#define THROBBER_HEIGHT (THROBBER_SRC_HEIGHT * GetScaleForSystemDPI() / 100)
 #define THROBBER_COUNT 36     // total number of cells
 #define IDT_THROBBER_DELAY 30 // delay [ms] in animation of single cell
 extern CIconList* ThrobberFrames;
 
-#define LOCK_WIDTH 8 // single cell dimensions
-#define LOCK_HEIGHT 13
+#define LOCK_SRC_WIDTH 8 // single cell dimensions
+#define LOCK_SRC_HEIGHT 13
+#define LOCK_WIDTH (LOCK_SRC_WIDTH * GetScaleForSystemDPI() / 100)
+#define LOCK_HEIGHT (LOCK_SRC_HEIGHT * GetScaleForSystemDPI() / 100)
 extern CIconList* LockFrames;
 
 extern HICON HGroupIcon;   // group for UserMenu popups

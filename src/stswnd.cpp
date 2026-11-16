@@ -690,8 +690,12 @@ void CStatusWindow::FlashText(BOOL hotTrackOnly)
     Repaint(FALSE, hotTrackOnly);
 }
 
-void PaintSymbol(HDC hDC, HDC hMemDC, HBITMAP hBitmap, int xOffset, int width, int height, const RECT* rect, BOOL hot, BOOL activeCaption)
+// srcWidth/srcHeight: size of the symbol in the 100% DPI bitmap; it is drawn scaled to the system DPI
+// (COLORONCOLOR keeps the 1-bit pixel art crisp)
+void PaintSymbol(HDC hDC, HDC hMemDC, HBITMAP hBitmap, int xOffset, int srcWidth, int srcHeight, const RECT* rect, BOOL hot, BOOL activeCaption)
 {
+    int width = srcWidth * GetScaleForSystemDPI() / 100;
+    int height = srcHeight * GetScaleForSystemDPI() / 100;
     HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemDC, hBitmap);
     COLORREF textColor = GetStatusTextColor(activeCaption, Configuration.ShowPanelCaption, hot);
     COLORREF bkColor = GetStatusBkColor(activeCaption, Configuration.ShowPanelCaption);
@@ -699,7 +703,9 @@ void PaintSymbol(HDC hDC, HDC hMemDC, HBITMAP hBitmap, int xOffset, int width, i
     int oldBkColor = SetBkColor(hDC, bkColor);
     int x = (rect->left + rect->right) / 2 - width / 2;
     int y = (rect->top + rect->bottom) / 2 - height / 2;
-    BitBlt(hDC, x, y, width, height, hMemDC, xOffset, 0, SRCCOPY);
+    int oldStretchMode = SetStretchBltMode(hDC, COLORONCOLOR);
+    StretchBlt(hDC, x, y, width, height, hMemDC, xOffset, 0, srcWidth, srcHeight, SRCCOPY);
+    SetStretchBltMode(hDC, oldStretchMode);
     SetBkColor(hDC, oldBkColor);
     SetTextColor(hDC, oldTextColor);
     SelectObject(hMemDC, hOldBitmap);
@@ -743,11 +749,15 @@ void CStatusWindow::PaintSecurity(HDC hDC)
     LockFrames->Draw(DWORD(Security - 1), hDC, x, y, fgClr, IL_DRAW_ASALPHA /*IL_DRAW_TRANSPARENT*/);
 }
 
-#define FILTER_WIDTH 9
-#define FILTER_HEIGHT 8
+// size of the symbols in the bitmaps (100% DPI); the _WIDTH macros are the size on screen,
+// scaled with the system DPI, and are used for the layout of the line
+#define FILTER_SRC_WIDTH 9
+#define FILTER_SRC_HEIGHT 8
+#define FILTER_WIDTH (FILTER_SRC_WIDTH * GetScaleForSystemDPI() / 100)
 
-#define ZOOM_WIDTH 9
-#define ZOOM_HEIGHT 8
+#define ZOOM_SRC_WIDTH 9
+#define ZOOM_SRC_HEIGHT 8
+#define ZOOM_WIDTH (ZOOM_SRC_WIDTH * GetScaleForSystemDPI() / 100)
 
 void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnly)
 {
@@ -1155,7 +1165,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                 zoomed = MainWindow->IsPanelZoomed(TRUE);
             else
                 zoomed = MainWindow->IsPanelZoomed(FALSE);
-            PaintSymbol(dc, hMemDC, HZoomBitmap, zoomed ? ZOOM_WIDTH : 0, ZOOM_WIDTH, ZOOM_HEIGHT, &ZoomRect, HotZoom, activeCaption);
+            PaintSymbol(dc, hMemDC, HZoomBitmap, zoomed ? ZOOM_SRC_WIDTH : 0, ZOOM_SRC_WIDTH, ZOOM_SRC_HEIGHT, &ZoomRect, HotZoom, activeCaption);
         }
 
         // disk free
@@ -1199,7 +1209,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
 
         // filter symbol
         if (HiddenRect.left < HiddenRect.right)
-            PaintSymbol(dc, hMemDC, HFilter, 0, FILTER_WIDTH, FILTER_HEIGHT, &HiddenRect, HotHidden, activeCaption);
+            PaintSymbol(dc, hMemDC, HFilter, 0, FILTER_SRC_WIDTH, FILTER_SRC_HEIGHT, &HiddenRect, HotHidden, activeCaption);
 
         // throbber
         if (ThrobberRect.left < ThrobberRect.right)

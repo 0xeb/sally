@@ -465,7 +465,7 @@ SYSTEMTIME SalamanderStartSystemTime = {0}; // Salamander start time (GetSystemT
 
 BOOL WaitForESCReleaseBeforeTestingESC = FALSE; // should we wait for ESC release before starting path browsing in panel?
 
-int SPACE_WIDTH = 10;
+int SPACE_WIDTH = 10; // set to 10 px * DPI scale in InitializeGraphics()
 
 const char* LOW_MEMORY = "Low memory.";
 
@@ -2171,6 +2171,19 @@ static HBITMAP CreateBottomTBKeyCapStrip(int capW, int capH, COLORREF fill, COLO
     return hBmp;
 }
 
+// loads a PNG strip (cells 'srcCellWidth' wide) into 'list'; when the target size differs from the
+// size of the cell in the PNG (higher system DPI), the frames are scaled to 'width' x 'height'
+static BOOL CreateScaledIconListFromPNG(CIconList* list, int pngResourceID, int srcCellWidth, int width, int height)
+{
+    if (width == srcCellWidth)
+        return list->CreateFromPNG(HInstance, MAKEINTRESOURCEW(pngResourceID), srcCellWidth);
+
+    CIconList source;
+    if (!source.CreateFromPNG(HInstance, MAKEINTRESOURCEW(pngResourceID), srcCellWidth))
+        return FALSE;
+    return list->CreateAsScaledCopy(&source, width, height);
+}
+
 BOOL InitializeGraphics(BOOL colorsOnly)
 {
     // 48x48 only from XP
@@ -2191,6 +2204,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
     IconSizes[ICONSIZE_16] = GetIconSizeForSystemDPI(ICONSIZE_16);
     IconSizes[ICONSIZE_32] = GetIconSizeForSystemDPI(ICONSIZE_32);
     IconSizes[ICONSIZE_48] = GetIconSizeForSystemDPI(ICONSIZE_48);
+    SPACE_WIDTH = 10 * GetScaleForSystemDPI() / 100; // gap between columns in detailed view: 10 px at 100% DPI
 
     HKEY hKey;
     IRegistry* registry = GetMainSalamanderRegistry();
@@ -2324,13 +2338,14 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             SimpleIconLists[i]->SetBkColor(GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]));
         }
 
-        if (!ThrobberFrames->CreateFromPNG(HInstance, MAKEINTRESOURCEW(IDB_THROBBER), THROBBER_WIDTH))
+        // the PNGs are drawn for 100% DPI; at higher DPI the frames are scaled (the size on screen is THROBBER_WIDTH/HEIGHT, LOCK_WIDTH/HEIGHT)
+        if (!CreateScaledIconListFromPNG(ThrobberFrames, IDB_THROBBER, THROBBER_SRC_WIDTH, THROBBER_WIDTH, THROBBER_HEIGHT))
         {
             TRACE_E("Unable to create throbber.");
             return FALSE;
         }
 
-        if (!LockFrames->CreateFromPNG(HInstance, MAKEINTRESOURCEW(IDB_LOCK), LOCK_WIDTH))
+        if (!CreateScaledIconListFromPNG(LockFrames, IDB_LOCK, LOCK_SRC_WIDTH, LOCK_WIDTH, LOCK_HEIGHT))
         {
             TRACE_E("Unable to create lock.");
             return FALSE;
